@@ -14,8 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    # Deployment stays off until the run-site gate enables this workflow.
-    if: ${{ false }}
+    if: vars.RUN_SITE_DEPLOY == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: run-site

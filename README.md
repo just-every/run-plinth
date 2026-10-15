@@ -66,4 +66,4 @@ This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e26
 
 `rer build --site` builds the public homepage, `/run` instructions and `/docs` from the Markdown in `docs/`. The installed `/` remains the Lobby. `rer dev` prints a separate `RER_SITE` address for the public site. Start with [Getting started](docs/GETTING-STARTED.md), [the main flows](docs/MAIN-FLOWS.md), [Move in](docs/MOVE-IN.md) and [Backup and restore](docs/BACKUP-RESTORE.md).
 
-The run-site deployment workflow is disabled until the site gate enables it. No deployment is needed to use the local copy.
+The public site is at https://run-plinth.com. Updates to `main` publish it automatically through GitHub Actions. No deployment is needed to use the local copy.
