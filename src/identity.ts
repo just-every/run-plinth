@@ -16,7 +16,7 @@ export const identity: EditionIdentity = {
   installedHome: 'lobby',
   theme: '/rer-theme.css',
   mark: '/brand/mark.svg',
-  band: '/brand/band.svg',
+  band: '/brand/band.webp',
   fonts: '/fonts/fonts.css',
   accentColor: branding.primaryColor,
 }

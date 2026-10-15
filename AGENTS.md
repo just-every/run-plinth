@@ -8,7 +8,7 @@ Without `rer`, install it once using `npx -y @runeditrun/rer cli install` and ad
 
 ## Product and commands
 
-Read README.md and ACCEPTANCE.md. This is contractor job management, with human approvals and external bookkeeping. The first release uses Base's theme; a brand/design pass is separate work.
+Read README.md and ACCEPTANCE.md. This is contractor job management, with human approvals and external bookkeeping. The run site and workspace use Plinth’s Albert Sans, jade and terrazzo theme; shared tokens live in public/brand/tokens.css.
 
 For a real owner installation use `rer install`, `rer setup` (enter the owner's email privately), then `rer dev`. Local sign-in mail appears in the local development outbox and sends no external messages. `rer dev --login` exercises ordinary email links; the `client` persona uses `client@dev.localhost`. Never send a dev sign-in link outside the owner's private session.
 

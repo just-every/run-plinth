@@ -41,3 +41,8 @@ export function Action({ children, action, className = '' }: {children: ReactNod
 export function Download({ filename, data, label }: {filename: string; data: string; label: string}) {
   return <button className="secondary" onClick={() => { const url = URL.createObjectURL(new Blob([data], {type:'text/plain'})); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }}>{label}</button>
 }
+
+export function Badge({ children, status = String(children) }: { children: ReactNode; status?: string }) {
+  const checked = ['accepted', 'approved', 'published', 'booked', 'exported', 'issued', 'completed'].includes(status.toLowerCase())
+  return <span className={`badge status-${status.toLowerCase().replace(/[^a-z-]/g, '')}`}><span className={checked ? 'badge-icon is-check' : 'badge-icon'} aria-hidden="true">{checked ? '✓' : ''}</span>{children}</span>
+}

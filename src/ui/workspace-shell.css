@@ -1,0 +1,37 @@
+.workspace .topbar{display:flex;gap:28px;align-items:center;min-height:74px;padding:16px 0;border-bottom:1px solid var(--rule)}
+.workspace .wordmark{display:inline-flex;align-items:center;gap:18px;font-size:28px;line-height:1;font-weight:800;letter-spacing:-.03em;text-decoration:none;color:var(--ink)}
+.workspace .wordmark img{display:block;width:30px;height:24px;object-fit:contain}
+.workspace .topbar>span{flex:1;color:var(--muted);font-size:15px}
+.workspace .topbar>a:not(.wordmark){color:var(--ink);text-decoration:none;margin-left:auto}
+.workspace .topbar .secondary{min-width:112px;min-height:40px;border-color:var(--ink);padding:8px 24px}
+.workspace .main-nav,.workspace .tabs{display:flex;align-items:stretch;gap:48px;overflow-x:auto;scrollbar-width:thin;border-bottom:1px solid var(--rule);padding:0;margin:0 0 32px}
+.workspace .main-nav button,.workspace .tabs button{position:relative;flex:none;min-height:52px;padding:14px 0;background:transparent;color:var(--muted);border-radius:0;white-space:nowrap;font-size:16px;font-weight:400}
+.workspace .main-nav button[aria-current],.workspace .tabs button[aria-current]{color:var(--ink);font-weight:600}
+.workspace .main-nav button[aria-current]::after,.workspace .tabs button[aria-current]::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:3px;background:var(--jade)}
+.workspace .main-nav button:focus-visible,.workspace .tabs button:focus-visible{outline-offset:-4px}
+.workspace .job-list{display:grid;gap:12px;min-width:0}
+.workspace .job-card{position:relative;display:block;width:100%;min-width:0;background:var(--card);color:var(--ink);border:1px solid var(--rule);padding:24px 148px 24px 28px;text-align:left;border-radius:14px;box-shadow:var(--panel-shadow);overflow-wrap:anywhere;font-weight:400}
+.workspace .job-card:hover{border-color:var(--jade)}
+.workspace .job-card h2{margin:12px 0 4px;font-size:26px;font-weight:800;letter-spacing:-.03em}
+.workspace .job-card p{margin:0 0 2px;font-size:18px}
+.workspace .open-job{position:absolute;right:28px;top:62%;color:var(--jade-ink);font-size:16px;font-weight:700;white-space:nowrap}
+.workspace .jobs-heading{align-items:flex-start;margin:36px 0 28px}
+.workspace .jobs-heading>div>p:last-child{font-size:20px;color:var(--muted)}
+.workspace .badge.job-count{flex:none;min-width:110px;justify-content:center;margin-top:4px;padding:6px 18px;border:1px solid var(--rule);background:transparent;color:var(--muted);font-size:13px;font-weight:400}
+.workspace .empty-jobs{min-height:440px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:48px 32px}
+.workspace .empty-jobs p{max-width:44ch;margin-bottom:0}
+.workspace .empty-icon{display:grid;place-items:center;width:88px;height:88px;border-radius:50%;background:var(--card-inset);color:var(--muted);margin-bottom:24px}
+.workspace .empty-icon svg{width:38px;height:38px}
+.workspace .job-heading{display:grid;grid-template-columns:minmax(0,1fr) 356px;gap:28px;margin-bottom:12px}
+.workspace .job-heading .eyebrow{letter-spacing:normal;text-transform:none;margin-bottom:12px}
+.workspace .job-heading>div>p:not(.eyebrow):not(.muted){font-size:24px;line-height:1.3;margin-bottom:4px}
+.workspace .job-heading>div>p.muted{margin:0}
+.workspace .job-workspace>.text-button{margin-top:-20px;margin-bottom:8px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.workspace .total{position:relative;align-self:start;display:grid;gap:2px;min-width:0;margin-top:-36px;padding:20px 26px 58px;border:1px solid var(--rule);background:var(--card);border-radius:14px;overflow:hidden;box-shadow:var(--card-shadow)}
+.workspace .total::after{content:'';position:absolute;inset:auto 0 0;height:36px;background:url('/brand/terrazzo.webp') center/512px;box-shadow:inset 0 -6px 0 #0000000F}
+.workspace .total span,.workspace .total small{font-size:16px;color:var(--muted)}
+.workspace .total strong{font-size:44px;line-height:1.2;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.workspace .tabs{gap:48px;margin:16px 0 20px}
+@media(max-width:1000px) and (min-width:701px){.workspace .job-heading{grid-template-columns:minmax(0,1fr) 300px}.workspace .total{padding-left:20px;padding-right:20px}.workspace .total strong{font-size:40px}.workspace .tabs{gap:32px}.workspace .job-card{padding-right:28px}.workspace .open-job{position:static;display:block;margin-top:12px}}
+@media(max-width:700px){.workspace .topbar{gap:16px;min-height:68px;padding:14px 0}.workspace .wordmark{font-size:24px;gap:10px;flex:1}.workspace .wordmark img{width:26px;height:22px}.workspace .topbar>span{display:none}.workspace .topbar .secondary{min-width:0;min-height:38px;padding:8px 14px}.workspace .main-nav{justify-content:space-between;gap:20px;margin-bottom:24px}.workspace .main-nav button{min-height:52px}.workspace .jobs-heading{margin:28px 0 24px;gap:10px}.workspace .jobs-heading>div>p:last-child{font-size:16px}.workspace .badge.job-count{min-width:54px;padding:4px 10px}.workspace .job-card{padding:20px}.workspace .job-card h2{font-size:22px}.workspace .job-card p{font-size:16px}.workspace .open-job{position:static;display:block;margin-top:12px}.workspace .empty-jobs{min-height:0;text-align:left;align-items:flex-start;padding:24px 20px}.workspace .empty-icon{display:none}.workspace .job-heading{display:flex;align-items:stretch;flex-direction:column;gap:24px}.workspace .job-heading>div>p:not(.eyebrow):not(.muted){font-size:20px}.workspace .job-workspace>.text-button{margin-top:-12px;margin-bottom:10px}.workspace .total{margin:0;padding:20px 20px 56px;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;row-gap:4px}.workspace .total>span{grid-column:1}.workspace .total strong{grid-column:1/-1;font-size:44px}.workspace .total small{grid-column:2;grid-row:1;align-self:center;font-size:14px}.workspace .tabs{gap:28px;margin:16px 0 20px;flex-wrap:nowrap}.workspace .tabs button{font-size:16px}}
+@media(max-width:370px){.workspace .topbar{gap:10px}.workspace .wordmark{font-size:22px;gap:7px}.workspace .total{padding-left:16px;padding-right:16px;column-gap:8px}.workspace .total strong{font-size:40px}.workspace .total small{padding-left:8px}}

@@ -4,7 +4,7 @@ import { rejectedResponse } from './rejected-response'
 // seed's floor art. Claimed, the button is Sign in; before the owner's claim it
 // is Finish setup. It reveals nothing but that state, is the same for every
 // visitor and works without JavaScript. Visual authority: the 12ui Lobby.
-// This file is copied unchanged to src/base by both maintained exporters.
+// Plinth supplies the entry card and low terrazzo floor band.
 import { checkIdentity, deploymentLine, type EditionIdentity } from './identity'
 import { admitted, baseFirstRun, setupState, type ClaimRead, type SetupState } from './setup-state'
 import { ink } from './theme-frame'
@@ -13,23 +13,18 @@ interface LobbyBindings { DB: D1Database; AUTH_ORIGIN: string }
 
 // Every colour, face and radius is the seed's declared --rer-* token, each with
 // a readable neutral when the theme cannot load.
-const STYLE = '*,*::before,*::after{box-sizing:border-box}html,body{margin:0;min-height:100%}'
-  + 'body{--lobby-ink:var(--rer-text,#172033);--lobby-accent:var(--rer-accent,var(--rer-brand-accent,var(--rer-text,#172033)));--lobby-accent-ink:var(--rer-accent-text,var(--rer-brand-accent-text,var(--rer-surface,#fff)));'
-  + 'background:radial-gradient(120% 80% at 18% -12%,rgba(255,255,255,.75),transparent 58%),var(--rer-page,#f3f5f8);color:var(--lobby-ink);font-family:var(--rer-font-body,system-ui,sans-serif);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}'
-  + '.door{position:relative;min-height:100vh;min-height:100dvh;overflow:hidden;isolation:isolate;display:flex;align-items:flex-start;justify-content:center;padding:22vh 16px 32vh}'
-  + '.door-art{position:absolute;left:0;right:0;bottom:0;height:29vh;min-height:150px;pointer-events:none;z-index:-1}.door-art img{width:100%;height:100%;display:block;object-fit:cover;object-position:center bottom}'
-  + '.door-card{display:flex;flex-direction:column;align-items:center;text-align:center;max-width:640px}'
-  + 'h1{margin:0;font-size:clamp(40px,6vw,68px);font-weight:inherit;line-height:1}'
-  + '.lockup{display:inline-flex;align-items:center;gap:.3em;max-width:100%;color:var(--lobby-ink);text-decoration:none}.mark{flex:none;width:1.16em;height:1.16em;display:block}'
-  + '.word{font-family:var(--rer-font-heading,var(--rer-font-body,inherit));font-weight:var(--rer-wordmark-weight,600);letter-spacing:var(--rer-wordmark-tracking,-.02em);line-height:1;text-wrap:balance}'
-  + '.line{margin:30px 0 0;font-size:25px;line-height:1.5;max-width:36ch;text-wrap:balance}'
-  + '.btn{margin-top:36px;display:inline-flex;align-items:center;justify-content:center;gap:14px;min-height:58px;padding:0 32px;border-radius:var(--rer-button-radius,999px);'
-  + 'background:linear-gradient(180deg,color-mix(in srgb,var(--lobby-accent) 90%,white),var(--lobby-accent));color:var(--lobby-accent-ink);text-decoration:none;font-size:19px;font-weight:600;letter-spacing:.005em;'
-  + 'box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 14px 28px -16px color-mix(in srgb,var(--lobby-ink) 70%,transparent)}.btn svg{width:19px;height:19px}'
-  + '.credit{margin:28px 0 0;font-size:15px;color:var(--rer-muted,#475569)}'
-  + '.credit a{color:inherit;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1.5px;text-decoration-color:color-mix(in srgb,var(--lobby-accent) 70%,var(--lobby-ink))}'
-  + ':focus-visible{outline:3px solid var(--rer-focus,currentColor);outline-offset:3px;border-radius:4px}.btn:focus-visible{border-radius:var(--rer-button-radius,999px)}'
-  + '@media(max-width:640px){.door{padding:168px 16px 210px}.door-art{height:200px}h1{font-size:min(54px,11vw)}.line{font-size:21px;margin-top:26px}.btn{margin-top:32px;padding:0 30px;min-height:56px;font-size:18px}.credit{font-size:14px}}'
+const STYLE = `
+*,*::before,*::after{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--rer-font-body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.door{position:relative;min-height:100vh;min-height:100dvh;isolation:isolate;display:grid;place-items:center;padding:64px 20px 180px}
+.door-art{position:absolute;left:24px;right:24px;bottom:48px;height:80px;max-width:1240px;margin:0 auto;overflow:hidden;border-radius:10px;pointer-events:none;z-index:-1;box-shadow:0 24px 48px -24px #00000033}.door-art img{width:100%;height:100%;display:block;object-fit:cover;object-position:center bottom}.door-art::after{content:"";position:absolute;inset:0;box-shadow:inset 0 -10px 0 #0000000F}
+.door-card{display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;max-width:580px;background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:40px 32px;box-shadow:var(--card-shadow)}
+h1{margin:0;font-size:30px;font-weight:800;line-height:1}.lockup{display:inline-flex;flex-direction:column;align-items:center;gap:10px;max-width:100%;color:var(--ink);text-decoration:none}.mark{width:54px;height:36px;display:block}.word{font-family:var(--rer-font-heading);font-weight:800;letter-spacing:-.03em}
+.line{margin:32px 0 0;font-size:16px;line-height:1.5;max-width:42ch;color:var(--muted)}
+.btn{margin-top:28px;display:inline-flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:48px;padding:12px 24px;border-radius:999px;background:var(--jade);color:var(--card);text-decoration:none;font-size:16px;font-weight:600}.btn svg{width:19px;height:19px}
+.credit{margin:24px 0 0;font-size:15px;color:var(--muted)}.credit a{color:inherit;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1.5px}:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+@media(max-width:600px){.door{padding:40px 16px 156px}.door-card{padding:32px 20px}.door-art{left:16px;right:16px;bottom:32px;height:64px}h1{font-size:26px}.mark{width:44px;height:32px}}
+`
 
 const ARROW = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>'
 const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))

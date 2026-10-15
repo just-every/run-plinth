@@ -1,0 +1,26 @@
+.workspace button,.workspace input,.workspace textarea,.workspace select{font:inherit}
+.workspace button{cursor:pointer;border:0;background:var(--jade);color:var(--card);min-height:48px;padding:12px 22px;border-radius:999px;font-weight:600;line-height:1.5}
+.workspace button:disabled{opacity:.65;cursor:wait}
+.workspace button.secondary{background:var(--card);color:var(--ink);border:1px solid var(--rule)}
+.workspace button.text-button{min-height:36px;padding:6px 0;background:none;color:var(--jade-ink);font-weight:400}
+.workspace :focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.workspace fieldset{padding:0;border:0;display:grid;gap:24px;min-width:0;margin:24px 0 0}
+.workspace label{display:grid;gap:8px;font-size:15px;font-weight:500;min-width:0;color:var(--ink)}
+.workspace input,.workspace textarea,.workspace select{width:100%;min-width:0;min-height:48px;border:1px solid var(--rer-border);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:16px;font-weight:400}
+.workspace input::placeholder,.workspace textarea::placeholder{color:var(--muted);opacity:.8}
+.workspace input[type=file]{font-size:14px;padding:12px;border-style:dashed;white-space:normal;overflow:hidden}
+.workspace input[type=file]::file-selector-button{font:inherit;background:var(--card-inset);color:var(--ink);border:1px solid var(--rule);border-radius:999px;padding:8px 12px;margin:0 12px 4px 0;cursor:pointer}
+.workspace textarea{resize:vertical;line-height:1.5}
+.workspace .action{display:inline-grid;gap:5px;margin:8px 0 0;max-width:100%}
+.workspace .button-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
+.workspace .notice{background:var(--jade-tint);color:var(--jade-ink);padding:12px 14px;border-radius:10px}
+.workspace .error{color:var(--danger);display:block;padding:10px 0;overflow-wrap:anywhere}
+.workspace .danger{border-top:1px solid var(--rule);padding-top:20px}
+.workspace button.danger-button{background:var(--danger)}
+.workspace .pre-wrap{white-space:pre-wrap}
+.workspace pre{max-width:100%;overflow:auto;max-height:350px;font-size:12px;background:var(--card-inset);padding:12px;border-radius:10px}
+.workspace details{margin:16px 0}
+.workspace summary{cursor:pointer;min-height:34px}
+.workspace .csv-header{display:block;font-size:12px;overflow-wrap:anywhere;background:var(--card-inset);border-radius:8px;padding:10px;margin:16px 0}
+.workspace .preview{border-top:1px solid var(--rule);margin-top:24px;padding-top:20px}
+@media(max-width:700px){.workspace fieldset{gap:20px}.workspace .action,.workspace .button-row button{max-width:100%}.workspace input[type=datetime-local]{max-width:100%}}

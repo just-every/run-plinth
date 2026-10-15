@@ -1,16 +1,16 @@
-// The run site `rer build --site` writes: the homepage with its Run action,
-// /run, the not-found page and the public files they use. Every Run page
-// string and command is in run.json; nothing here reads installation data.
-import { runPageHtml, siteHomeHtml, siteNotFoundHtml, type RunData, type SiteBuild } from '../base/run-site'
+import { runPageHtml, siteNotFoundHtml, type RunData, type SiteBuild, type SiteContext } from '../base/run-site'
 import { identity } from '../identity'
+import { landingHtml } from './landing/Landing'
+import { docPages } from './docs'
 import run from './run.json'
 
-export function sitePages(): SiteBuild {
+export function sitePages({ styles = [] }: Partial<SiteContext> = {}): SiteBuild {
   const data: RunData = run
   return {
     pages: [
-      { path: '/', html: siteHomeHtml(identity, data) },
+      { path: '/', html: landingHtml(styles) },
       { path: '/run', html: runPageHtml(identity, data) },
+      ...docPages(),
       { path: '/404', html: siteNotFoundHtml(identity, data) },
     ],
     assets: ['rer-theme.css', 'fonts', 'brand'],

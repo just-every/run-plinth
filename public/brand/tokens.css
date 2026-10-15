@@ -1,0 +1,16 @@
+:root {
+  --paper: #FCFBF7;
+  --ink: #17181A;
+  --muted: #6E6C69;
+  --card: #FFFFFF;
+  --card-inset: #F7F6F2;
+  --rule: #E4E1DA;
+  --jade: #1F8357;
+  --jade-tint: #E3F1EA;
+  --jade-ink: #17643F;
+  --terrazzo-cement: #D9D1C3;
+  --danger: #9A2B20;
+  --focus: var(--ink);
+  --card-shadow: 0 1px 2px #0000000D, 0 16px 36px -12px #0000002E;
+  --panel-shadow: 0 1px 2px #0000000A;
+}

@@ -1,0 +1,35 @@
+.workspace .badge{display:inline-flex;align-items:center;gap:8px;border:0;background:var(--jade-tint);color:var(--jade-ink);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;line-height:1.4;white-space:nowrap;vertical-align:middle}
+.workspace .badge-icon{display:block;flex:none;width:8px;height:8px;border-radius:50%;background:var(--jade)}
+.workspace .badge-icon.is-check{display:grid;place-items:center;width:17px;height:17px;color:white;font-size:12px;line-height:1}
+.workspace .badge.status-quoting{background:var(--card-inset);color:var(--muted)}
+.workspace .status-quoting .badge-icon{background:var(--muted)}
+.workspace .record{border:1px solid var(--rule);border-radius:10px;padding:20px;overflow-wrap:anywhere;margin-top:20px;background:var(--card);min-width:0}
+.workspace .record p:last-child{margin-bottom:0}
+.workspace .record .heading{margin-bottom:12px;justify-content:flex-start;gap:16px}
+.workspace .record .heading h3{margin:0}
+.workspace .record>strong{font-variant-numeric:tabular-nums}
+.workspace .claim-heading{display:flex;align-items:center;gap:20px;margin-bottom:12px}
+.workspace .claim-heading h3{margin:0}
+.workspace .reconciliation{margin:12px 0 16px}
+.workspace .reconciliation>div{display:flex;gap:16px;justify-content:space-between;align-items:baseline;padding:4px 0;border-top:1px solid var(--rule);line-height:1.4;font-size:16px}
+.workspace .reconciliation>div:last-child{border-bottom:1px solid var(--rule)}
+.workspace .reconciliation dt{color:var(--muted)}
+.workspace .reconciliation dd{font-variant-numeric:tabular-nums;margin:0;text-align:right;white-space:nowrap;font-weight:400}
+.workspace .reconciliation .is-key dt,.workspace .reconciliation .is-key dd{font-weight:700;color:var(--ink)}
+.workspace .claim-record>.action{min-width:min(100%,320px)}
+.workspace .variation-record{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.85fr);column-gap:24px;row-gap:8px}
+.workspace .variation-record>.badge{grid-column:1;justify-self:start}
+.workspace .variation-record h3{grid-column:1;margin:0;font-size:24px}
+.workspace .variation-record>.variation-amount{grid-column:2;grid-row:1/span 2;text-align:right;font-size:28px;font-weight:700}
+.workspace .variation-record>p{grid-column:1;margin:0}
+.workspace .variation-record>.action{grid-column:2;grid-row:3/span 2;align-self:end;width:100%;margin:0}
+.workspace .variation-record>.notice{grid-column:1/-1;margin-top:8px;background:none;padding:0;color:var(--muted)}
+.workspace .diary-record{border:0;padding:0;margin-top:24px}
+.workspace .diary-record .heading{justify-content:flex-start}
+.workspace .diary-record .heading h3{font-size:16px;font-weight:400;letter-spacing:normal}
+.workspace .photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;border-top:1px solid var(--rule);padding-top:18px;margin-top:16px}
+.workspace .photos:empty{display:none}
+.workspace .photos a{min-width:0;display:grid;align-content:start;gap:8px;font-size:13px;color:var(--muted);text-decoration:none;overflow-wrap:anywhere}
+.workspace .photos img{width:100%;height:240px;object-fit:cover;border-radius:10px;display:block}
+@media(max-width:900px){.workspace .variation-record{display:block}.workspace .variation-record h3{margin:12px 0 4px}.workspace .variation-record>.variation-amount{display:block;text-align:left;margin-bottom:8px}.workspace .variation-record>.action{margin-top:16px}.workspace .variation-record>.notice{margin-top:16px}}
+@media(max-width:700px){.workspace .record{padding:16px;margin-top:20px}.workspace .claim-heading{align-items:flex-start;flex-direction:column;gap:12px}.workspace .reconciliation>div{font-size:16px;gap:12px;padding:7px 0}.workspace .reconciliation dt{overflow-wrap:normal}.workspace .variation-record h3{font-size:22px}.workspace .variation-record>.action{display:grid;width:100%}.workspace .variation-record>.action button{padding-left:12px;padding-right:12px}.workspace .diary-record{padding:0}.workspace .photos{gap:12px}.workspace .photos img{height:170px}.workspace .claim-record>.action{display:grid;width:100%}}

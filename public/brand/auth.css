@@ -1,0 +1,18 @@
+/* Seed styling for Base's unchanged, server-rendered authentication pages. */
+html.rer-themed body { background:var(--paper); color:var(--ink); font-family:var(--font-body); font-size:16px; }
+html.rer-themed main:has(>.brand) { position:relative; width:100%; max-width:600px; padding:40px 52px 100px; border:1px solid var(--rule); border-radius:14px; overflow:hidden; box-shadow:var(--card-shadow); }
+html.rer-themed main:has(>.brand)::after { content:""; position:absolute; inset:auto 0 0; height:40px; background:url('/brand/terrazzo.webp') center/512px; }
+html.rer-themed .brand { flex-direction:column; align-items:center; font-size:30px; font-weight:800; line-height:1; margin:0 0 56px; color:var(--ink); }
+html.rer-themed .brand::before { width:54px; height:36px; }
+html.rer-themed main:has(>.brand) h1 { font-size:40px; line-height:1.12; font-weight:800; letter-spacing:-.03em; text-align:center; margin-bottom:40px; }
+html.rer-themed main:has(>.brand) label { font-size:15px; font-weight:500; }
+html.rer-themed main:has(>.brand) input { min-height:48px; border:1px solid var(--rer-border); border-radius:10px; background:var(--card); color:var(--ink); }
+html.rer-themed main:has(>.brand) input[type=checkbox] { min-height:20px; accent-color:var(--jade); }
+html.rer-themed main:has(>.brand) button,html.rer-themed main:has(>.brand) .action { min-height:48px; border-radius:999px; font-size:16px; font-weight:600; }
+html.rer-themed main:has(>.brand) .notice { border-color:var(--jade); background:var(--jade-tint); color:var(--jade-ink); }
+html.rer-themed :focus-visible { outline:2px solid var(--focus); outline-offset:3px; }
+@media(max-width:600px) {
+  html.rer-themed main:has(>.brand) { padding:32px 20px 80px; }
+  html.rer-themed main:has(>.brand) h1 { font-size:30px; margin-bottom:32px; }
+  html.rer-themed .brand { font-size:26px; margin-bottom:32px; }
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Job } from '../plinth/model'
-import { api, Action, dateTime, money } from './shared'
+import { api, Action, Badge, dateTime, money } from './shared'
 import { Quotes, Variations } from './scope'
 import { SchedulePanel, DiaryPanel } from './site'
 import { Orders, Claims } from './money'
@@ -21,7 +21,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   }
   if (!job) return <p role={error ? 'alert' : 'status'}>{error || 'Opening job…'}</p>
   const props = {job, manager, mutate}, quote = job.quotes.find(q => q.status === 'accepted'), total = (quote?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum,v) => sum + v.amount_cents,0)
-  return <main><button className="text-button" onClick={onBack}>← All jobs</button><div className="heading"><div><p className="eyebrow">{job.status === 'active' ? 'Active job' : 'Quote preparation'}</p><h1>{job.name}</h1><p>{job.address}</p><p className="muted">Client: {job.client_email}</p></div><div className="total"><span>Approved contract</span><strong>{money(total)}</strong><small>Revision {job.version}</small></div></div>
+  return <main className="job-workspace"><button className="text-button" onClick={onBack}>← All jobs</button><div className="heading job-heading"><div><p className="eyebrow"><Badge status={job.status}>{job.status === 'active' ? 'Active job' : 'Quote preparation'}</Badge></p><h1>{job.name}</h1><p>{job.address}</p><p className="muted">Client: {job.client_email}</p></div><div className="total"><span>Approved contract</span><strong>{money(total)}</strong><small>Revision {job.version}</small></div></div>
     <nav className="tabs" aria-label="Job sections">{sections.map(s => <button key={s} aria-current={section === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}</button>)}</nav>
     {section === 'Quote' && <Quotes {...props} />}
     {section === 'Trades' && <SchedulePanel {...props} />}

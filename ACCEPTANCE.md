@@ -7,4 +7,6 @@
 - The owner dry-runs, approves, journals and undoes an Accepted jobs CSV import; edited jobs survive undo.
 - The owner exports and restores the job archive including photos, or erases a job and its import custody; a later erasure journal prevents restoring an older archive.
 
-Not needed: brand/homepage design, a run site or domain purchase, real provider calls, accounting or payments, statutory payment claims, takeoff/BIM, safety certification, warranty insurance or independent release review.
+- The static run site offers Run Plinth and Markdown owner guides; the installed Lobby, setup and workspace share the Plinth design at desktop and phone widths.
+
+Not needed: domain purchase, real provider calls, accounting or payments, statutory payment claims, takeoff/BIM, safety certification, warranty insurance or independent release review.

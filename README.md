@@ -16,8 +16,6 @@ rer dev
 
 The first run installs the locked dependencies, selects Node 22.20.0 and pnpm 10.12.4, prepares D1 and creates your local owner. Open the printed `RER_OPEN` link to sign in, finish the short setup screen, then open **Jobs**. That link is a credential: keep it private. Setup and mail are local; no external messages are sent. A compatible repeated `rer dev` reuses the server. Stop it with `rer dev --stop` or Ctrl-C.
 
-Known launcher issue in RER 0.2.15: on a busy macOS host, the three-second process-inspection timeout can report “Another process answered” even when the application owns its port. Setup fails closed. Check actual port ownership before retrying; the upstream fix must distinguish an inspection timeout from a collision. Linux uses a different inspection path.
-
 For an installation using your real mailbox, run `rer install`, then `rer setup` and enter the owner's email at the prompt. `rer dev --login` uses ordinary email-link authentication: open the printed local outbox, choose the latest message and confirm sign-in. The app's **People & access** page sends client and manager invitations to that outbox locally.
 
 ## Take a job through the first release
@@ -62,4 +60,10 @@ Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, l
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.15**. The Base theme, auth, installer, import kit, archive and deployment paths are reused; a distinct visual design comes later.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.18**. The Base auth, installer, import kit, archive and deployment paths are reused. Plinth’s shared Albert Sans, jade and terrazzo theme covers its run site, setup and workspace.
+
+## Run site and guides
+
+`rer build --site` builds the public homepage, `/run` instructions and `/docs` from the Markdown in `docs/`. The installed `/` remains the Lobby. `rer dev` prints a separate `RER_SITE` address for the public site. Start with [Getting started](docs/GETTING-STARTED.md), [the main flows](docs/MAIN-FLOWS.md), [Move in](docs/MOVE-IN.md) and [Backup and restore](docs/BACKUP-RESTORE.md).
+
+The run-site deployment workflow is disabled until the site gate enables it. No deployment is needed to use the local copy.
