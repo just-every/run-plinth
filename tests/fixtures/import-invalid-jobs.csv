@@ -1,0 +1,2 @@
+external_id,title,client_email,site_address,quote_cents,accepted_on
+MOVE-INVALID,Invalid amount,client@example.test,1 Example Street,1250.50,2026-09-12

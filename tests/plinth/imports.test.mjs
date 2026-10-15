@@ -1,0 +1,104 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { createFixture } from './helpers.mjs'
+
+const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
+const invalid = await readFile(new URL('../fixtures/import-invalid-jobs.csv', import.meta.url), 'utf8')
+const prefix = '/api/plinth/imports'
+
+test('Reviewed CSV move-in, native adoption, reversible custody and erasure through HTTP', async t => {
+  const f = await createFixture()
+  const call = (suffix, body, method = 'POST') => f.json(prefix + suffix, { method, cookie: f.owner, ...(body === undefined ? {} : { body }) })
+  const nativeJobs = async () => (await f.json('/api/plinth/jobs', { cookie: f.owner })).value.jobs
+  const review = async value => { const r = await call('/preview', { csv: value }); assert.equal(r.status, 200, JSON.stringify(r.value)); return r.value }
+  const commit = async (value, preview) => { const r = await call('/commit', { csv: value, fingerprint: preview.fingerprint }); assert.equal(r.status, 200, JSON.stringify(r.value)); return r.value.job }
+  try {
+    let preview, journal, edited
+    await t.test('only a person owner can review; malformed rows and changed approval leave native jobs untouched', async () => {
+      assert.equal((await f.request(prefix)).status, 401)
+      const client = await f.invite('unrelated@example.test')
+      assert.equal((await f.request(prefix + '/preview', { method: 'POST', cookie: client, body: { csv } })).status, 403)
+      const agent = await f.agent()
+      assert.equal((await f.request(prefix + '/commit', { method: 'POST', token: agent, body: { csv, fingerprint: '0'.repeat(64) } })).status, 403)
+      assert.equal((await f.request(prefix + '/preview', { method: 'POST', cookie: f.owner, headers: { origin: 'https://other.example' }, body: { csv } })).status, 403)
+      assert.equal((await call('/preview', { csv: invalid })).status, 400)
+      assert.equal((await call('/preview', { csv: csv.replace('2026-09-12', '2026-02-30') })).status, 400)
+      preview = await review(csv)
+      assert.equal(preview.rows.length, 2)
+      assert.equal((await nativeJobs()).length, 0)
+      assert.equal((await call('', undefined, 'GET')).value.jobs.length, 0)
+      assert.equal((await call('/commit', { csv: csv.replace('Northside extension', 'Changed title'), fingerprint: preview.fingerprint })).status, 409)
+      assert.equal((await nativeJobs()).length, 0)
+    })
+    await t.test('approved upload retains exact original, imports inert quotes and replays without duplicates', async () => {
+      journal = await commit(csv, preview)
+      assert.equal(journal.state, 'completed')
+      const jobs = await nativeJobs()
+      assert.equal(jobs.length, 2)
+      for (const job of jobs) {
+        assert.equal(job.status, 'quoting')
+        assert.equal(job.quotes[0].status, 'draft')
+        assert.equal(job.import_evidence.acceptance_verified, false)
+        assert.equal(job.approvals.length, 0)
+      }
+      edited = jobs.find(job => job.import_evidence.external_id === 'MOVE-001')
+      const blocked = await f.json(`/api/plinth/jobs/${edited.id}/schedules`, { method: 'POST', cookie: f.owner, body: { expected_version: edited.version, trade: 'Electrician', start: '2026-11-01T08:00:00Z', end: '2026-11-01T09:00:00Z', description: 'Cannot book an unaccepted source quote' } })
+      assert.equal(blocked.status, 409)
+      assert.equal((await commit(csv, preview)).id, journal.id)
+      assert.equal((await nativeJobs()).length, 2)
+      const originals = await call(`/${journal.id}/originals`, undefined, 'GET')
+      assert.equal(originals.status, 200)
+      assert.equal(Buffer.from(originals.value.originals[0].original.base64, 'base64').toString('utf8'), csv)
+    })
+    await t.test('undo preserves a quote explicitly accepted in the native job and removes unchanged imported peers', async () => {
+      const accepted = await f.json(`/api/plinth/jobs/${edited.id}/quotes/${edited.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: edited.version, method: 'email', evidence: 'Owner reviewed the original client acceptance email before adoption.' } })
+      assert.equal(accepted.status, 200)
+      edited = accepted.value.job
+      const undo = await call(`/${journal.id}/undo`)
+      assert.equal(undo.status, 200, JSON.stringify(undo.value))
+      assert.equal(undo.value.job.state, 'undone')
+      assert.equal(undo.value.report.dispositions.filter(d => d.disposition === 'retained').length, 1)
+      assert.equal(undo.value.report.dispositions.filter(d => d.disposition === 'reversed').length, 1)
+      assert.deepEqual(await nativeJobs(), [edited])
+      assert.equal((await call(`/${journal.id}/undo`)).status, 200)
+    })
+    await t.test('bounded apply resumes from its durable journal without another upload', async () => {
+      const upload = 'external_id,title,client_email,site_address,quote_cents,accepted_on\n' + Array.from({ length: 12 }, (_, i) => `BATCH-${i},Batch job ${i},batch${i}@example.test,,100000,2026-10-01`).join('\n') + '\n'
+      const batch = await commit(upload, await review(upload))
+      assert.equal(batch.state, 'applying')
+      assert.ok(batch.checkpoint > 0 && batch.checkpoint < batch.total)
+      const resumed = await call(`/${batch.id}/resume`)
+      assert.equal(resumed.status, 200, JSON.stringify(resumed.value))
+      assert.equal(resumed.value.job.state, 'completed')
+      assert.equal((await nativeJobs()).filter(job => job.import_evidence?.external_id.startsWith('BATCH-')).length, 12)
+      const undone = await call(`/${batch.id}/undo`)
+      assert.equal(undone.status, 200, JSON.stringify(undone.value))
+      if (undone.value.job.state !== 'undone') assert.equal((await call(`/${batch.id}/resume`)).value.job.state, 'undone')
+      assert.equal((await nativeJobs()).filter(job => job.import_evidence?.external_id.startsWith('BATCH-')).length, 0)
+    })
+    await t.test('native erasure removes source custody, withdraws shared originals and leaves peers reversible', async () => {
+      const upload = csv.replaceAll('MOVE-', 'ERASE-')
+      const imported = await commit(upload, await review(upload))
+      const target = (await nativeJobs()).find(job => job.import_evidence?.external_id === 'ERASE-001')
+      const erased = await f.json(`/api/plinth/jobs/${target.id}`, { method: 'DELETE', cookie: f.owner, body: { expected_version: target.version } })
+      assert.equal(erased.status, 200, JSON.stringify(erased.value))
+      assert.equal((await f.request(`/api/plinth/jobs/${target.id}`, { cookie: f.owner })).status, 404)
+      const state = await call(`/${imported.id}`, undefined, 'GET')
+      assert.equal(state.status, 200, JSON.stringify(state.value))
+      assert.equal(state.value.job.erasedRecords, 1)
+      const originals = await call(`/${imported.id}/originals`, undefined, 'GET')
+      assert.equal(originals.status, 200)
+      assert.equal(originals.value.originals[0].original.status, 'unavailable')
+      const receipts = await call('/erasure-journal', undefined, 'GET')
+      assert.equal(receipts.status, 200)
+      assert.ok(receipts.value.entries.some(entry => entry.recordsErased > 0))
+      assert.ok(!JSON.stringify(receipts.value).includes(target.client_email))
+      assert.equal((await call(`/${imported.id}/undo`)).status, 200)
+      assert.ok(!(await nativeJobs()).some(job => job.import_evidence?.external_id.startsWith('ERASE-')))
+      const repeat = await call('/commit', { csv: upload, fingerprint: (await review(upload)).fingerprint })
+      assert.equal(repeat.status, 200, JSON.stringify(repeat.value))
+      assert.ok(!(await nativeJobs()).some(job => job.id === target.id))
+    })
+  } finally { await f.close() }
+})
