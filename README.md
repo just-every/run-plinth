@@ -16,7 +16,7 @@ rer dev
 
 The first run installs the locked dependencies, selects Node 22.20.0 and pnpm 10.12.4, prepares D1 and creates your local owner. Open the printed `RER_OPEN` link to sign in, finish the short setup screen, then open **Jobs**. That link is a credential: keep it private. Setup and mail are local; no external messages are sent. A compatible repeated `rer dev` reuses the server. Stop it with `rer dev --stop` or Ctrl-C.
 
-For an installation using your real mailbox, run `rer install`, then `rer setup` and enter the owner's email at the prompt. `rer dev --login` uses ordinary email-link authentication: open the printed local outbox, choose the latest message and confirm sign-in. The app's **People & access** page sends client and manager invitations to that outbox locally.
+For an installation using your real mailbox, run `rer install`, then `rer setup` and enter the owner's email at the prompt. `rer dev` opens signed in automatically, including with the legacy `--login` flag. Local mail is silently suppressed. A hosted installation sends client and manager invitations through its configured mail provider.
 
 ## Take a job through the first release
 
@@ -60,10 +60,14 @@ Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, l
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.18**. The Base auth, installer, import kit, archive and deployment paths are reused. Plinth’s shared Albert Sans, jade and terrazzo theme covers its run site, setup and workspace.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.21**. The Base auth, installer, import kit, archive and deployment paths are reused. Plinth’s shared Albert Sans, jade and terrazzo theme covers its run site, setup and workspace.
 
 ## Run site and guides
 
 `rer build --site` builds the public homepage, `/run` instructions and `/docs` from the Markdown in `docs/`. The installed `/` remains the Lobby. `rer dev` prints a separate `RER_SITE` address for the public site. Start with [Getting started](docs/GETTING-STARTED.md), [the main flows](docs/MAIN-FLOWS.md), [Move in](docs/MOVE-IN.md) and [Backup and restore](docs/BACKUP-RESTORE.md).
 
 The public site is at https://run-plinth.com. Updates to `main` publish it automatically through GitHub Actions. No deployment is needed to use the local copy.
+
+## Try a fresh workspace
+
+After setup, `rer demo` opens signed in to **Plinth Demo** with realistic job records. Stop with `rer demo --stop`; every start is isolated from your saved workspace. See [Demo mode](DEMO.md) for sample data, effects and hosting.

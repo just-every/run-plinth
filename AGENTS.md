@@ -10,7 +10,7 @@ Without `rer`, install it once using `npx -y @runeditrun/rer cli install` and ad
 
 Read README.md and ACCEPTANCE.md. This is contractor job management, with human approvals and external bookkeeping. The run site and workspace use Plinth’s Albert Sans, jade and terrazzo theme; shared tokens live in public/brand/tokens.css.
 
-For a real owner installation use `rer install`, `rer setup` (enter the owner's email privately), then `rer dev`. Local sign-in mail appears in the local development outbox and sends no external messages. `rer dev --login` exercises ordinary email links; the `client` persona uses `client@dev.localhost`. Never send a dev sign-in link outside the owner's private session.
+For a real owner installation use `rer install`, `rer setup` (enter the owner's email privately), then `rer dev`. Local mail is silently suppressed. `rer dev` opens signed in automatically, including with the legacy `--login` flag; the `client` persona uses `client@dev.localhost`. Never send a dev sign-in link outside the owner's private session.
 
 Run `rer check` for command contract inspection and `rer verify` for CI-equivalent integration checks. While iterating, test only what you touched. The suite is capped at 200 and tests public HTTP or CLI doors with real D1; no pin tests or mocked application behavior. Build and deploy never run tests. Stop your dev/preview server before verification.
 

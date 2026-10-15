@@ -14,3 +14,6 @@ dist/
 research/
 evidence/
 .cache/
+
+.rer/demo/
+.rer/demo-host/
