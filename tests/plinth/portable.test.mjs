@@ -11,6 +11,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
+  // These are separate installations; each command must acquire its own lock.
+  delete env.RER_LOCAL_OPERATION
   const rer = join(root,'node_modules/@runeditrun/rer/global/rer.mjs')
   async function checkout(target) {
     for (const file of ['package.json','pnpm-lock.yaml','.node-version','OPERATIONS.json','rer-setup.json','wrangler.jsonc','vite.config.ts','deploy.json','deploy-site.json','scripts','src','public','migrations','README.md','ACCEPTANCE.md','RUN-LOCALLY.md','OPERATIONS.md','SEED-COMMAND-CONTRACT.md','CONTRACT.md','seed.json']) await cp(join(root,file),join(target,file),{recursive:true})
