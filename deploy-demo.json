@@ -2,7 +2,7 @@
   "version": 1,
   "domain": "run-plinth.com",
   "name": "Plinth",
-  "instanceType": "basic",
+  "instanceType": "standard-1",
   "settings": {
     "MAIL_FROM": "Plinth <hello@plinth.example>"
   }
