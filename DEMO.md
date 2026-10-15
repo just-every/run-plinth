@@ -13,9 +13,9 @@ Stop with `rer demo --stop`. Each start gets a fresh `.rer/demo/` database;
 the owner's `.wrangler/state` is unchanged. No demo bar, timer or outbox is
 injected. Ordinary local dev is labelled Plinth Dev.
 
-The runtime is published `@runeditrun/rer` 0.2.21 in package mode. All vendored
-Base modules are copied together from `rer-v0.2.21`, commit
-`756bf5a8544d792a51bb76f6e90a8ee5908a32a5`, recorded through Base's
+The runtime is published `@runeditrun/rer` 0.2.22 in package mode. All vendored
+Base modules are copied together from `rer-v0.2.22`, commit
+`1ce15dd8cbb7c8cf2d83ebfde2b4a8a130ff9d74`, recorded through Base's
 `edition-authoring/cli.mjs record-base` in `base-copies.json`. The legacy
 composition record retains the original foundation and applied migrations;
 its superseded module entries are replaced by that current copy record.
