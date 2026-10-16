@@ -24,4 +24,4 @@ The mark is original Plinth artwork. The terrazzo source crop comes from 12ui’
 
 ## Demo runtime adoption
 
-The current vendored Base modules are copied together, byte-for-byte, from `rer-v0.2.24` (`1ee378e41142c673a9098f60af21664c6d8477d1`); `base-copies.json` records their paths and hashes. This replaces the module entries of the legacy composition source lock. Applied migrations retain their original bytes and provenance. Demo samples are Plinth domain records; [DEMO.md](../DEMO.md) describes their lifecycle and outbound policy.
+The current vendored Base modules are copied together, byte-for-byte, from `rer-v0.2.30` (`d434ea67989fe10b6ddff01daba8bb350975e54a`); `base-copies.json` records their paths and hashes. This replaces the module entries of the legacy composition source lock. Applied migrations retain their original bytes and provenance. Demo samples are Plinth domain records; [DEMO.md](../DEMO.md) describes their lifecycle and outbound policy.
