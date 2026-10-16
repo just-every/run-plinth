@@ -2,8 +2,9 @@
   "version": 1,
   "domain": "run-plinth.com",
   "name": "Plinth",
-  "instanceType": "standard-3",
+  "instanceType": "basic",
   "settings": {
     "MAIL_FROM": "Plinth <hello@plinth.example>"
-  }
+  },
+  "ownerEmail": "alex@banksiabuild.example"
 }

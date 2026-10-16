@@ -81,3 +81,23 @@ jobs:
             sleep 15
           done
           ! curl --silent --show-error --doh-url "$doh" -D - -o /dev/null "https://$domain/" | grep -qi '^set-cookie:'
+      # The ten-start cohort needs an empty admission window. Observe on the
+      # credentialled runner; the local harness starts once the quiet step passes.
+      - name: Observe quiet test-host window
+        if: inputs.test_only && !inputs.remove
+        run: node scripts/demo-observe.mjs quiet demo-quiet.jsonl
+        env:
+          CLOUDFLARE_ACCOUNT_ID: b20c0ca9cab0c2b70e13d7cf724b89bd
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Observe test-host cohort
+        if: inputs.test_only && !inputs.remove
+        run: node scripts/demo-observe.mjs cohort demo-cohort.jsonl
+        env:
+          CLOUDFLARE_ACCOUNT_ID: b20c0ca9cab0c2b70e13d7cf724b89bd
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && inputs.test_only && !inputs.remove
+        with:
+          name: demo-observations
+          path: demo-*.jsonl
+          if-no-files-found: ignore
