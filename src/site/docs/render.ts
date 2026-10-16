@@ -14,6 +14,16 @@ function linkHref(href: string, source: string): string {
   return `${published?.path ?? `${repository}/blob/main/${resolved}`}${hash ? `#${hash}` : ''}`
 }
 
+/** Strip tags until none remain, so nested sequences like `<<b>b>` cannot reassemble a tag. */
+function stripTags(text: string): string {
+  let previous: string
+  do {
+    previous = text
+    text = text.replace(/<[^>]*>/g, '')
+  } while (text !== previous)
+  return text
+}
+
 export interface Heading { id: string; title: string }
 
 /** Render the same committed Markdown GitHub displays; no runtime data or client JavaScript. */
@@ -23,7 +33,7 @@ export function renderDoc(doc: Doc): { html: string; headings: Heading[] } {
   const renderer = new Renderer()
   renderer.html = ({ text }) => escapeHtml(text)
   renderer.heading = function ({ tokens, depth, text }) {
-    const stem = text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s+/g, '-')
+    const stem = stripTags(text.toLowerCase()).replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s+/g, '-')
     const count = counts.get(stem) ?? 0
     counts.set(stem, count + 1)
     const id = count ? `${stem}-${count}` : stem
