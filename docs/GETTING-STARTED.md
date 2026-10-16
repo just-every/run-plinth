@@ -4,20 +4,13 @@ Run Plinth on your computer, confirm the owner and open your first job. You need
 
 ## Run Plinth
 
-Install the shared Run Edit Run command once:
+One line installs the shared Run Edit Run command, gets the source and starts Plinth:
 
 ```sh
-npx -y @runeditrun/rer cli install
-export PATH="$HOME/.local/bin:$PATH"
+npx -y @runeditrun/rer dev just-every/run-plinth
 ```
 
-Then get the source and start Plinth:
-
-```sh
-git clone https://github.com/just-every/run-plinth.git
-cd run-plinth
-rer dev
-```
+To start it again later, run `cd run-plinth && rer dev`.
 
 The first launch installs dependencies, prepares the local database and creates your local owner. Allow it to finish. The terminal prints the application address as `RER_READY` and a sign-in link as `RER_OPEN`.
 

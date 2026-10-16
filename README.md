@@ -4,15 +4,13 @@ Contractor project management for a small residential builder: accepted quotes, 
 
 ## Clone and run
 
-Install Git and Node 22 or newer. Install the shared command once if you don't have `rer`:
+Install Git and Node 22 or newer, then run one line. It installs the shared command if you don't have `rer`, clones Plinth and starts it:
 
 ```sh
-npx -y @runeditrun/rer cli install
-export PATH="$HOME/.local/bin:$PATH"
-git clone https://github.com/just-every/run-plinth.git
-cd run-plinth
-rer dev
+npx -y @runeditrun/rer dev just-every/run-plinth
 ```
+
+To start it again later, run `cd run-plinth && rer dev`.
 
 The first run installs the locked dependencies, selects Node 22.20.0 and pnpm 10.12.4, prepares D1 and creates your local owner. Open the printed `RER_OPEN` link to sign in, finish the short setup screen, then open **Jobs**. That link is a credential: keep it private. Setup and mail are local; no external messages are sent. A compatible repeated `rer dev` reuses the server. Stop it with `rer dev --stop` or Ctrl-C.
 
