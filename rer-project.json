@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "projectId": "just-every/run-plinth",
+  "name": "Plinth",
+  "sourceRepository": "https://github.com/just-every/run-plinth",
+  "license": "MIT"
+}
