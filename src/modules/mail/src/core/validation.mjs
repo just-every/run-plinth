@@ -50,12 +50,17 @@ export function validateConfig(config, dependencies = {}) {
 
 export function parseAddress(value) {
   bounded(value, 998, 'invalid_address');
-  const text = value.trim(); const open = text.lastIndexOf('<');
-  let name, email = '';
-  if (open >= 0 && text.endsWith('>')) {
-    const prefix = text.slice(0, open).trimEnd(); const inner = text.slice(open + 1, -1);
-    if (inner && !/[<>]/.test(inner) && !/[\u2028\u2029]/.test(prefix)) { name = prefix; email = inner.trim(); }
-  } else if (!/[<>]/.test(text)) email = text;
+  const text = value.trim();
+  let email = '', name;
+  if (text.endsWith('>')) {
+    // Display name, then the last '<' opens the angle address.
+    const open = text.lastIndexOf('<');
+    const inner = text.slice(open + 1, -1);
+    const display = text.slice(0, Math.max(open, 0)).trimEnd();
+    if (open >= 0 && inner && !inner.includes('>') && !/[\u2028\u2029]/.test(display)) {
+      email = inner.trim(); name = display;
+    }
+  } else if (text && !text.includes('<') && !text.includes('>')) email = text;
   // Conservative mailbox subset; never serialize multiple mailboxes as one.
   const parts = email.split('@');
   if (parts.length !== 2 || !parts[0] || parts[0].length > 64 || email.length > 254 ||
