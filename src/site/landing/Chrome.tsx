@@ -6,7 +6,7 @@ export function Actions() {
   return <><div className="site-actions"><a className="site-pill" href="/run">Run Plinth <span aria-hidden="true">→</span></a><a className="site-pill" href="https://demo.run-plinth.com/">Try the demo <span aria-hidden="true">→</span></a><a className="site-link" href="/docs">Read the docs</a></div><p className="site-small">Free and open source, MIT licensed.</p></>
 }
 export function Header() {
-  return <header className="site-header"><Brand /><nav aria-label="Site"><a href="/docs">Docs</a><a href={source}>Source</a></nav></header>
+  return <header className="site-header"><Brand /><nav aria-label="Site"><a href="/docs">Docs</a><a href="/contract">Contract</a><a href={source}>Source</a></nav></header>
 }
 export function Footer() {
   return <footer className="site-footer"><div><Brand /><p className="site-small">Free and open source, MIT licensed.</p></div><nav aria-label="Footer"><a href="/docs">Docs</a><a href={source}>Source</a></nav></footer>

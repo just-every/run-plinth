@@ -19,7 +19,7 @@ function document(doc: Doc, index: number): string {
 <title>${e(doc.title)} · Plinth</title><meta name="description" content="${e(doc.description)}">
 <link rel="icon" href="/brand/mark.svg"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/brand/tokens.css"><style>${docCss}</style></head>
 <body class="docs-site"><a class="docs-skip" href="#content">Skip to content</a>
-<header class="docs-header"><a class="docs-brand" href="/" aria-label="Plinth home"><img src="/brand/mark.svg" alt="" width="28" height="24"><span>Plinth</span></a><nav aria-label="Site"><a href="/docs" aria-current="page">Docs</a><a href="${repository}">Source</a><a class="docs-run" href="/run">Run Plinth <span aria-hidden="true">→</span></a></nav></header>
+<header class="docs-header"><a class="docs-brand" href="/" aria-label="Plinth home"><img src="/brand/mark.svg" alt="" width="28" height="24"><span>Plinth</span></a><nav aria-label="Site"><a href="/docs" aria-current="page">Docs</a><a href="/contract">Contract</a><a href="${repository}">Source</a><a class="docs-run" href="/run">Run Plinth <span aria-hidden="true">→</span></a></nav></header>
 <div class="docs-layout"><aside class="docs-sidebar"><nav aria-label="Documentation"><p class="docs-label">Plinth guides</p><ul>${links}</ul></nav></aside>
 <main id="content" class="docs-main" tabindex="-1"><details class="docs-mobile-nav"><summary>All guides</summary><nav aria-label="Documentation"><ul>${links}</ul></nav></details>
 <p class="docs-eyebrow">Documentation</p><article class="docs-article">${html}</article>
