@@ -4,17 +4,17 @@ Contractor project management for a small residential builder: accepted quotes, 
 
 ## Clone and run
 
-Install Git and Node 22 or newer, then run one line. It installs the shared command if you don't have `rer`, clones Plinth and starts it:
+Install Git, then run one line. It installs the shared command if you don't have `rer`, clones Plinth and starts it:
 
 ```sh
 npx -y @runeditrun/rer dev just-every/run-plinth
 ```
 
-To start it again later, run `cd run-plinth && rer dev`.
+Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-plinth` does the same. To start it again later, run `cd run-plinth && rer dev`.
 
 The first run installs the locked dependencies, selects Node 22.20.0 and pnpm 10.12.4, prepares D1 and creates your local owner. Open the printed `RER_OPEN` link to sign in, finish the short setup screen, then open **Jobs**. That link is a credential: keep it private. Setup and mail are local; no external messages are sent. A compatible repeated `rer dev` reuses the server. Stop it with `rer dev --stop` or Ctrl-C.
 
-For an installation using your real mailbox, run `rer install`, then `rer setup` and enter the owner's email at the prompt. `rer dev` opens signed in automatically, including with the legacy `--login` flag. Local mail is silently suppressed. A hosted installation sends client and manager invitations through its configured mail provider.
+For an installation using your real mailbox, run `npx -y @runeditrun/rer install just-every/run-plinth`, then `rer setup` from the checkout and enter the owner's email at the prompt. `rer dev` opens signed in automatically, including with the legacy `--login` flag. Local mail is silently suppressed. A hosted installation sends client and manager invitations through its configured mail provider.
 
 ## Take a job through the first release
 

@@ -10,7 +10,7 @@ One line installs the shared Run Edit Run command, gets the source and starts Pl
 npx -y @runeditrun/rer dev just-every/run-plinth
 ```
 
-To start it again later, run `cd run-plinth && rer dev`.
+Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-plinth` does the same. To start it again later, run `cd run-plinth && rer dev`.
 
 The first launch installs dependencies, prepares the local database and creates your local owner. Allow it to finish. The terminal prints the application address as `RER_READY` and a sign-in link as `RER_OPEN`.
 
@@ -20,10 +20,9 @@ Local sign-in mail and invitations go to the development outbox. No external ema
 
 ## Use your own owner email
 
-For an installation using your actual owner mailbox, run these commands from the checkout:
+For an installation using your actual owner mailbox, run `npx -y @runeditrun/rer install just-every/run-plinth`, then these commands from the checkout:
 
 ```sh
-rer install
 rer setup
 rer dev
 ```
