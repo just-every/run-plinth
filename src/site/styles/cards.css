@@ -58,7 +58,9 @@
 .term-dots i:nth-child(2) { background: #febc2e; }
 .term-dots i:nth-child(3) { background: #28c840; }
 .terminal pre { padding: 18px 22px 22px; font: 500 15px/1.75 var(--mono); white-space: pre-wrap; }
+.terminal code { font: inherit; }
 .terminal .prompt { color: #8ea6b8; }
+.terminal .word { white-space: nowrap; }
 .terminal .comment { color: #8ea6b8; }
 
 @media (max-width: 760px) {

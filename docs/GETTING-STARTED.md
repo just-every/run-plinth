@@ -47,7 +47,7 @@ Open the printed local outbox, choose the latest sign-in message, then follow th
 
 In **People & access**, enter their full name and email, choose **Client** or **Project manager**, then press **Send invitation**. Only the owner can invite a project manager. A client must use the same email as the client email on their job.
 
-The invitation gives the person a sign-in path to this installation. A client sees only their own published job records and can approve their own variations. A manager handles job records, supplier commitments and claims.
+The invitation gives the person a sign-in path to this installation. A client sees only their own published job records and can approve their own change orders. A manager handles job records, supplier commitments and pay apps.
 
 For a local client walkthrough, create a job using the development client email `client@dev.localhost`, then run:
 

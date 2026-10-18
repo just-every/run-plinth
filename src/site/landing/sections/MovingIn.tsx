@@ -45,7 +45,7 @@ export function MovingIn() {
       <Copy eyebrow="Moving in · Fri Oct 9" title={<>Eight live jobs, <br />out of Buildertrend.</>}>Plinth reads the Buildertrend exports, attaches what has no home and flags what it could not read. Every balance opens where it left off.</Copy>
       <div className="terminal" role="group" aria-label="Start Plinth on your computer">
         <p className="term-dots" aria-hidden="true"><i /><i /><i /></p>
-        <pre><code><span className="prompt" aria-hidden="true">$ </span>{START}{'\n'}<span className="comment"># clones, installs and starts Plinth on your computer</span></code></pre>
+        <pre><code><span className="prompt" aria-hidden="true">$ </span>{START.split(' ').map((word, i) => <span key={i}>{i ? ' ' : ''}<span className="word">{word}</span></span>)}{'\n'}<span className="comment"># clones, installs and starts Plinth on your computer</span></code></pre>
       </div>
     </div>
   </Section>

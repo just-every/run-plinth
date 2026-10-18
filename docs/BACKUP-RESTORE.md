@@ -1,6 +1,6 @@
 # Backup and restore
 
-Export a private archive before moving installations or removing local state. It carries your jobs, approval records, diary photos and retained import history.
+Export a private archive before moving installations or removing local state. It carries your jobs, approval records, daily-log photos and retained import history.
 
 ## Make a local backup
 
@@ -15,8 +15,8 @@ If you are running a preview server, stop it with `rer preview --stop` as well. 
 
 The archive contains:
 
-- Jobs, quotes, variations, schedules, diary entries, purchase orders, receipts, claims and approval snapshots.
-- Diary photo bytes.
+- Jobs, quotes, change orders, schedules, daily logs, purchase orders, receipts, pay apps and approval snapshots.
+- Daily-log photo bytes.
 - Import original-byte custody, plans and journals, including erasure history.
 - Durable account metadata.
 
@@ -36,7 +36,7 @@ rer dev
 
 Replace `/private/path/plinth.rer` with the archive's actual private path. Enter the destination owner's email privately during setup. Configure its mail and private settings again; the archive does not carry them. Open the newly printed private sign-in link and complete the setup screen if prompted.
 
-Check **Jobs**, accepted quotes, approvals and downloaded diary photos. Open **Move in → Import journal** to inspect retained imports. Use the destination's new owner session to manage retained imports.
+Check **Jobs**, accepted quotes, approvals and downloaded daily-log photos. Open **Move in → Import journal** to inspect retained imports. Use the destination's new owner session to manage retained imports.
 
 ## Erase a job and carry the erasure forward
 
