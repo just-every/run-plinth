@@ -1,18 +1,24 @@
-/* Seed styling for Base's unchanged, server-rendered authentication pages. */
-html.rer-themed body { background:var(--paper); color:var(--ink); font-family:var(--font-body); font-size:16px; }
-html.rer-themed main:has(>.brand) { position:relative; width:100%; max-width:600px; padding:40px 52px 100px; border:1px solid var(--rule); border-radius:14px; overflow:hidden; box-shadow:var(--card-shadow); }
-html.rer-themed main:has(>.brand)::after { content:""; position:absolute; inset:auto 0 0; height:40px; background:url('/brand/terrazzo.webp') center/512px; }
-html.rer-themed .brand { flex-direction:column; align-items:center; font-size:30px; font-weight:800; line-height:1; margin:0 0 56px; color:var(--ink); }
-html.rer-themed .brand::before { width:54px; height:36px; }
-html.rer-themed main:has(>.brand) h1 { font-size:40px; line-height:1.12; font-weight:800; letter-spacing:-.03em; text-align:center; margin-bottom:40px; }
-html.rer-themed main:has(>.brand) label { font-size:15px; font-weight:500; }
-html.rer-themed main:has(>.brand) input { min-height:48px; border:1px solid var(--rer-border); border-radius:10px; background:var(--card); color:var(--ink); }
-html.rer-themed main:has(>.brand) input[type=checkbox] { min-height:20px; accent-color:var(--jade); }
-html.rer-themed main:has(>.brand) button,html.rer-themed main:has(>.brand) .action { min-height:48px; border-radius:999px; font-size:16px; font-weight:600; }
-html.rer-themed main:has(>.brand) .notice { border-color:var(--jade); background:var(--jade-tint); color:var(--jade-ink); }
-html.rer-themed :focus-visible { outline:2px solid var(--focus); outline-offset:3px; }
+/* Seed styling for Base's unchanged, server-rendered authentication pages
+   (sign in, confirm, account): the Lobby's family, on the drafting grid above
+   the chalk-line elevation, with hairline fields and the oxblood action. */
+html.rer-themed body { position:relative; isolation:isolate; min-height:100vh; min-height:100dvh; box-sizing:border-box; padding-bottom:220px; background:var(--grid-paper), var(--paper); color:var(--ink); font-family:var(--font); font-size:16px; }
+html.rer-themed body::after { content:""; position:absolute; z-index:-1; left:0; right:0; bottom:0; height:200px; background:url('/site/band-1536.webp') center 88%/cover no-repeat; -webkit-mask-image:linear-gradient(to bottom, transparent, #000 30%); mask-image:linear-gradient(to bottom, transparent, #000 30%); pointer-events:none; }
+html.rer-themed main:has(>.brand) { position:relative; width:100%; max-width:560px; padding:40px 44px 40px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper); box-shadow:var(--shadow-float); }
+html.rer-themed .brand { justify-content:center; font-size:34px; font-weight:800; letter-spacing:-.045em; line-height:1; margin:0 0 36px; color:var(--ink); }
+html.rer-themed .brand::before { width:34px; height:38px; }
+html.rer-themed main:has(>.brand) h1 { font-size:38px; line-height:1.1; font-weight:800; letter-spacing:-.045em; text-align:center; margin-bottom:28px; }
+html.rer-themed main:has(>.brand) label { font-size:14px; font-weight:600; color:var(--text); }
+html.rer-themed main:has(>.brand) input { min-height:46px; border:1px solid var(--rer-border); border-radius:var(--radius); background:var(--paper); color:var(--ink); }
+html.rer-themed main:has(>.brand) input:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent); }
+html.rer-themed main:has(>.brand) input[type=checkbox] { min-height:20px; accent-color:var(--ox); }
+html.rer-themed main:has(>.brand) button, html.rer-themed main:has(>.brand) .action { min-height:50px; border-radius:var(--radius); font-size:17px; font-weight:650; }
+html.rer-themed main:has(>.brand) .notice { border-color:var(--line); border-left:3px solid var(--teal); background:var(--sea); color:var(--text); }
+html.rer-themed :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
 @media(max-width:600px) {
-  html.rer-themed main:has(>.brand) { padding:32px 20px 80px; }
-  html.rer-themed main:has(>.brand) h1 { font-size:30px; margin-bottom:32px; }
-  html.rer-themed .brand { font-size:26px; margin-bottom:32px; }
+  html.rer-themed body { padding-bottom:170px; }
+  html.rer-themed body::after { height:160px; }
+  html.rer-themed main:has(>.brand) { padding:32px 20px 28px; }
+  html.rer-themed main:has(>.brand) h1 { font-size:30px; margin-bottom:24px; }
+  html.rer-themed .brand { font-size:29px; margin-bottom:28px; }
+  html.rer-themed .brand::before { width:29px; height:32px; }
 }

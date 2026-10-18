@@ -1,0 +1,97 @@
+/* A job: the heavy title, fact chips and tabs, the agent strip, then a main
+   column beside a 302px side panel (the pick's composition). */
+.workspace .job-head { margin: 0 -20px; padding: 12px 24px 0; border-bottom: 1px solid var(--line); background: var(--paper); }
+.workspace .job-head h1 { margin-bottom: 10px; }
+.workspace .tabs { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 12px; }
+.workspace .tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--body); font-size: 15.5px; font-weight: 500; }
+.workspace .tabs button:hover { color: var(--ink); }
+.workspace .tabs button[aria-current] { border-bottom-color: var(--blue); color: var(--ink); font-weight: 700; }
+.workspace .count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--ox-tint); color: var(--ox); font-size: 12.5px; font-weight: 700; text-align: center; }
+.workspace .job-body { padding-top: 16px; display: grid; gap: 12px; }
+
+/* The agent strip: not a chat. What the agent prepared and what waits on whom. */
+.workspace .agent-strip { display: flex; align-items: center; gap: 16px; min-height: 66px; padding: 10px 16px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--blue-tint); color: var(--blue); }
+.workspace .spark { width: 30px; height: 30px; flex: none; fill: currentColor; stroke: none; color: var(--bar); }
+.workspace .agent-strip p { color: var(--text); font-size: 15px; line-height: 1.4; }
+.workspace .agent-strip strong { color: var(--ink); font-weight: 700; }
+.workspace .agent-strip .agent-sub { margin-top: 2px; color: var(--body); font-size: 14px; }
+.workspace .agent-sub > .strip-link + .strip-link::before, .workspace .agent-sub span .strip-link + .strip-link::before { content: '·'; display: inline-block; margin: 0 8px; color: var(--muted); text-decoration: none; }
+.workspace .agent-sub > span { display: inline; }
+.workspace .agent-sub > .strip-link ~ span::before { content: ''; display: block; }
+.workspace .strip-link { text-align: left; }
+
+.workspace .split { display: grid; grid-template-columns: minmax(0, 1fr) 302px; align-items: start; gap: 12px; }
+.workspace .split > :only-child { grid-column: 1 / -1; }
+.workspace .stack { display: grid; gap: 12px; min-width: 0; }
+.workspace .under { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.workspace .under > :only-child { grid-column: 1 / -1; }
+
+/* Side panel: the selected item, its decision and who it waits on. */
+.workspace .side { position: sticky; top: 82px; padding: 12px 13px 14px; }
+.workspace .side > h2 { font-size: 21px; letter-spacing: -.03em; }
+.workspace .side > .card-lead { margin-top: 6px; }
+.workspace .side > h2 + :is(form, .action, .record, details) { margin-top: 14px; }
+.workspace .side-status { display: flex; align-items: flex-start; gap: 12px; margin: 12px 0 14px; }
+.workspace .side-status .icon { width: 30px; height: 30px; color: var(--blue); }
+.workspace .side-status .spark { width: 28px; height: 28px; }
+.workspace .side-status p { display: grid; font-size: 14px; line-height: 1.4; }
+.workspace .side-status strong { font-size: 15px; color: var(--ink); }
+.workspace .side-status span { color: var(--body); }
+.workspace .side-status.is-late { padding: 12px; border: 1px solid var(--ox); border-radius: 8px; background: linear-gradient(120deg, var(--paper), var(--ox-tint)); }
+.workspace .side-status.is-late .spark, .workspace .side-status.is-late strong { color: var(--ox); }
+.workspace .facts { display: grid; gap: 6px; }
+.workspace .facts > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 13px; }
+.workspace .facts dt { color: var(--muted); }
+.workspace .facts dd { color: var(--text); overflow-wrap: anywhere; }
+.workspace .side-actions { margin-top: 14px; }
+.workspace .side-actions .action, .workspace .side-actions .primary { display: flex; width: 100%; margin-top: 0; }
+.workspace .side-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.workspace .side-section h3 { margin-bottom: 8px; overflow-wrap: anywhere; }
+.workspace .trades button, .workspace .waiting button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 3px 2px; border: 0; background: none; text-align: left; font-size: 13px; color: var(--text); }
+.workspace .trades button:hover span, .workspace .waiting button:hover span { color: var(--blue); }
+.workspace .trades button > span:not(.badge) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.workspace .state-icon { width: 20px; height: 20px; padding: 3px; border-radius: 50%; background: var(--green); color: var(--paper); stroke-width: 2.6; }
+.workspace .state-icon.is-open { background: none; padding: 0; color: var(--muted); stroke-width: 1.8; }
+.workspace .trades .badge { font-size: 11px; min-height: 20px; border-radius: var(--radius); }
+.workspace .chev { width: 16px; height: 16px; color: var(--muted); }
+.workspace .waiting button { justify-content: space-between; align-items: baseline; gap: 12px; }
+.workspace .waiting span { min-width: 0; overflow-wrap: anywhere; }
+.workspace .waiting strong { white-space: nowrap; }
+.workspace .danger-zone summary { cursor: pointer; font-size: 17px; font-weight: 700; color: var(--ox); }
+.workspace .danger-zone p { margin: 10px 0 4px; color: var(--body); font-size: 14px; }
+
+/* Under the chart: the job log and the booking form. */
+.workspace .card .card-head h3 { font-size: 15px; }
+.workspace .log { display: grid; gap: 9px; }
+.workspace .log li { display: grid; grid-template-columns: 10px 98px minmax(0, 1fr); gap: 4px 10px; font-size: 13.5px; color: var(--body); }
+.workspace .log li::before { content: ''; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--bar); }
+.workspace .log li + li::before { background: var(--soft); }
+.workspace .log time { color: var(--muted); }
+.workspace .book h3 { margin-bottom: 12px; }
+.workspace .book .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+@media (max-width: 1239px) {
+  .workspace .split { grid-template-columns: minmax(0, 1fr); }
+  .workspace .side { position: static; scroll-margin-top: 140px; }
+  .workspace .under { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 899px) {
+  .workspace .job-head { margin: 0 -16px; padding: 14px 16px 0; }
+  .workspace .tabs { gap: 0 4px; }
+  .workspace .tabs button { min-height: 42px; padding: 0 8px; font-size: 14.5px; }
+}
+/* Phones: the strip, then the decision, then the chart and the rest. */
+@media (max-width: 760px) {
+  .workspace .split:has(> .booking-panel) > .stack { display: contents; }
+  .workspace .split > .stack > .agent-strip { order: -2; }
+  .workspace .split > .booking-panel { order: -1; }
+}
+@media (max-width: 600px) {
+  .workspace .agent-strip { align-items: flex-start; gap: 12px; padding: 12px 14px; }
+  .workspace .agent-strip p { font-size: 14.5px; }
+  .workspace .spark { width: 24px; height: 24px; }
+  .workspace .book .fields { grid-template-columns: minmax(0, 1fr); }
+  .workspace .log li { grid-template-columns: 10px minmax(0, 1fr); }
+  .workspace .log li span { grid-column: 2; }
+  .workspace .chips li { font-size: 14px; min-height: 34px; padding: 5px 11px; }
+}

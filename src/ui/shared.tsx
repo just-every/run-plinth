@@ -10,7 +10,9 @@ export async function api(path: string, body?: unknown, method = 'POST') {
   if (!response.ok) throw new Error(data.message || data.error?.message || data.error || data.code || `Request failed (${response.status})`)
   return data
 }
-export const money = (cents: number = 0) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
+/** Plinth keeps money in USD cents; the screen, the pay app CSV and the export all say so. */
+export const CURRENCY = 'USD'
+export const money = (cents: number = 0) => new Intl.NumberFormat('en-US', { style: 'currency', currency: CURRENCY }).format(cents / 100)
 export const cents = (value: FormDataEntryValue | null) => {
   const raw = String(value ?? '')
   if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error('Enter a positive amount with at most two decimal places.')
@@ -20,6 +22,12 @@ export const cents = (value: FormDataEntryValue | null) => {
   return result
 }
 export const dateTime = (value: string | number) => new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+/** "Mon Oct 12": the weekday and date, in the viewer's time. */
+export const day = (value: string | number | Date) => new Date(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '')
+/** A stored YYYY-MM-DD date (a daily log's), read as that calendar day. */
+export const calendarDay = (value: string) => day(value + 'T12:00:00')
+export const time = (value: string | number) => new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()
+export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('')
 export function Field({ label, name, type = 'text', required = true, ...props }: {label: string; name: string; type?: string; required?: boolean; [key: string]: unknown}) {
   return <label>{label}<input name={name} type={type} required={required} {...props} /></label>
 }
@@ -44,5 +52,6 @@ export function Download({ filename, data, label }: {filename: string; data: str
 
 export function Badge({ children, status = String(children) }: { children: ReactNode; status?: string }) {
   const checked = ['accepted', 'approved', 'published', 'booked', 'exported', 'issued', 'completed'].includes(status.toLowerCase())
-  return <span className={`badge status-${status.toLowerCase().replace(/[^a-z-]/g, '')}`}><span className={checked ? 'badge-icon is-check' : 'badge-icon'} aria-hidden="true">{checked ? '✓' : ''}</span>{children}</span>
+  const label = typeof children === 'string' && children ? children[0]!.toUpperCase() + children.slice(1) : children
+  return <span className={`badge status-${status.toLowerCase().replace(/[^a-z-]/g, '')}`}><span className={checked ? 'badge-icon is-check' : 'badge-icon'} aria-hidden="true">{checked ? '✓' : ''}</span>{label}</span>
 }

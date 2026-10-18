@@ -2,7 +2,7 @@ import { active, cents, find, need, object, recordApproval, stamp, sum, text, ty
 import { requireManager } from './auth'
 /** Adapted from Glove quote revisions/accept and Locket immutable version custody. */
 export function prepareQuote(job:Job,actor:Actor,input:Input):Quote {
- requireManager(actor,true);need(job.status==='quoting','An accepted quote is frozen; use a variation',409,'quote_frozen')
+ requireManager(actor,true);need(job.status==='quoting','An accepted quote is frozen; use a change order',409,'quote_frozen')
  need(Array.isArray(input.lines)&&input.lines.length>0&&input.lines.length<=100,'Provide 1–100 quote lines')
  const lines=input.lines.map(value=>{const row=object(value);const quantity=cents(row.quantity,'quantity');need(quantity>0&&quantity<=100000,'Quantity must be a positive whole number');const unit=cents(row.unit_cents,'unit_cents');return {description:text(row.description,'description',500),quantity,unit_cents:unit,total_cents:sum([quantity*unit])}})
  const quote:Quote={id:crypto.randomUUID(),revision:job.quotes.length+1,lines,total_cents:sum(lines.map(l=>l.total_cents)),notes:text(input.notes,'notes',4000,true),status:'draft',prepared_by:stamp(actor)}
@@ -18,10 +18,10 @@ export function acceptQuote(job:Job,actor:Actor,id:string,input:Input) {
  quote.status='accepted';quote.acceptance=acceptance;job.status='active';return quote
 }
 /** A proposed term never changes the contract until the actual client confirms it. */
-export function prepareVariation(job:Job,actor:Actor,input:Input){requireManager(actor,true);active(job);const row={id:crypto.randomUUID(),revision:1,description:text(input.description,'description',4000),amount_cents:cents(input.amount_cents,'amount_cents',true),status:'draft' as const,prepared_by:stamp(actor)};need(row.amount_cents!==0,'Variation must change the contract amount');job.variations.push(row);return row}
+export function prepareVariation(job:Job,actor:Actor,input:Input){requireManager(actor,true);active(job);const row={id:crypto.randomUUID(),revision:1,description:text(input.description,'description',4000),amount_cents:cents(input.amount_cents,'amount_cents',true),status:'draft' as const,prepared_by:stamp(actor)};need(row.amount_cents!==0,'A change order must change the contract amount');job.variations.push(row);return row}
 export function approveVariation(job:Job,actor:Actor,id:string) {
- need(actor.role==='member'&&actor.email.toLowerCase()===job.client_email,'The client assigned to this job must approve this variation',403,'client_required');active(job);const row=find(job.variations,id);need(row.status==='draft','Variation already approved and immutable',409,'immutable')
+ need(actor.role==='member'&&actor.email.toLowerCase()===job.client_email,'The client assigned to this job must approve this change order',403,'client_required');active(job);const row=find(job.variations,id);need(row.status==='draft','Change order already approved and immutable',409,'immutable')
  const base=find(job.quotes,job.quotes.find(q=>q.status==='accepted')!.id).total_cents
- need(sum([base,...job.variations.filter(v=>v.status==='approved').map(v=>v.amount_cents),row.amount_cents])>=Math.max(0,...job.claims.filter(c=>c.status!=='draft').map(c=>c.cumulative_cents)),'This variation would reduce the contract below approved claims',409,'contract_balance')
+ need(sum([base,...job.variations.filter(v=>v.status==='approved').map(v=>v.amount_cents),row.amount_cents])>=Math.max(0,...job.claims.filter(c=>c.status!=='draft').map(c=>c.cumulative_cents)),'This change order would reduce the contract below billed pay apps',409,'contract_balance')
  recordApproval(job,actor,'variation',row,{description:row.description,amount_cents:row.amount_cents,client_email:job.client_email});row.status='approved';row.approved_by=stamp(actor);return row
 }

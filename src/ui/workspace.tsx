@@ -1,26 +1,35 @@
-import { useEffect, useState } from 'react'
-import { api, Badge, Field, Form } from './shared'
+import { useEffect, useRef, useState } from 'react'
+import type { Job } from '../plinth/model'
+import { api, Field, Form } from './shared'
 import { JobWorkspace } from './job'
 import { Imports } from './imports'
+import { Jobs } from './jobs'
+import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
 
 export function Workspace() {
-  const [jobs, setJobs] = useState<any[]>([]), [role, setRole] = useState(''), [selected, setSelected] = useState(''), [view, setView] = useState('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false)
+  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
+  const create = useRef<HTMLElement>(null)
   async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setRole(result.role); setReady(true) }
-  useEffect(() => { refresh().catch(e => setError(e.message)) }, [])
+  useEffect(() => { const job = new URLSearchParams(window.location.search).get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
+  // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
+  useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
+  const go = (to: View) => { setView(to); setSelected(''); setMenu(false); if (to === 'jobs') refresh() }
+  const open = (id: string) => { const url = new URL(window.location.href); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
+  const words = query.trim().toLowerCase(), shown = words ? jobs.filter(j => [j.name, j.client_email, j.address].join(' ').toLowerCase().includes(words)) : jobs
+  if (!ready) return <div className="workspace is-loading">{error ? <p role="alert" className="error">{error}</p> : <p role="status">Opening your workspace…</p>}</div>
   return <div className="workspace">
-    <header className="topbar"><a className="wordmark" href="/app"><img src="/brand/mark.svg" alt="" /><span data-rer-name>Plinth</span></a><span>Building jobs, clearly recorded</span><a href="/auth/settings/identity">Account</a><button className="secondary" onClick={async () => { await api('/auth/signout',{}); window.location.assign('/signin') }}>Sign out</button></header>
-    <nav className="main-nav" aria-label="Workspace"><button aria-current={view === 'jobs' ? 'page' : undefined} onClick={() => { setView('jobs'); setSelected(''); refresh() }}>Jobs</button>{manager && <>{role === 'owner' && <button aria-current={view === 'imports' ? 'page' : undefined} onClick={() => setView('imports')}>Move in</button>}<button aria-current={view === 'people' ? 'page' : undefined} onClick={() => setView('people')}>People & access</button></>}</nav>
-    {error && <p role="alert" className="error">{error}</p>}
-    {!ready && !error && <p role="status">Opening your workspace…</p>}
-    {ready && view === 'imports' && <Imports onChange={refresh} />}
-    {ready && view === 'people' && <section className="panel people-panel"><h1>People & access</h1><p>Invite a client using the email on their job. Clients see only their jobs and approve their own variations. Managers can prepare job records.</p><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></Form></section>}
-    {ready && view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => {setSelected(''); refresh()}} onChange={refresh} /> : <>
-      <div className="heading jobs-heading"><div><p className="eyebrow">Project workspace</p><h1>Your building jobs</h1><p>Keep the agreed scope, daily record and next claim together.</p></div><span className="badge job-count">{jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}</span></div>
-      <div className="dashboard"><section aria-label="Jobs" className="job-list">{jobs.length === 0 && <div className="panel empty-jobs"><span className="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 3h8l4 4v14H6zM14 3v5h4" /></svg></span><h2>{manager ? 'Start with an agreed job' : 'No jobs shared yet'}</h2><p>{manager ? 'Create the job, prepare its quote, then record the client’s acceptance.' : 'Your builder must use your sign-in email as the client on the job.'}</p></div>}{jobs.map(job => <button key={job.id} className="job-card" onClick={() => setSelected(job.id)}><Badge>{job.status || 'Draft'}</Badge><h2>{job.name}</h2><p>{job.address || 'Site address not entered'}</p><p className="muted">{job.client_email}</p><span className="open-job">Open job →</span></button>)}</section>
-      {manager && <section className="panel"><h2>Create a job</h2><Form submit="Create job" action={async f => { const result = await api('/jobs', {name:f.get('name'),client_email:f.get('email'),address:f.get('address')}); await refresh(); setSelected(result.job?.id || result.id) }}><Field name="name" label="Job name" placeholder="Hartley kitchen remodel" maxLength={160} /><Field name="email" label="Client email" type="email" /><Field name="address" label="Site address" required={false} maxLength={300} /></Form></section>}</div>
-    </>)}
-    <footer>Plinth · Claim exports are working records for your external books.</footer>
+    <Rail view={view} role={role} me={me} jobs={jobs} selected={selected} open={menu} onView={go} onJob={open} onClose={() => setMenu(false)} />
+    {menu && <div className="scrim" onClick={() => setMenu(false)} />}
+    <div className="main-col">
+      <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />
+      <main className="content">
+        {error && <p role="alert" className="error">{error}</p>}
+        {view === 'imports' && <Imports onChange={refresh} />}
+        {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Project managers can prepare job records."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></div></Form></section></Page>}
+        {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}
+      </main>
+    </div>
   </div>
 }

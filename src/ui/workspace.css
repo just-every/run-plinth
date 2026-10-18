@@ -1,6 +1,9 @@
-/* Approved Claims conversion adapted to Plinth's existing components. */
-@import './workspace-core.css';
+/* Plinth's workspace in the owner-picked app look (desk pick A, 18 Oct 2026):
+   white surfaces, chalk-blue hairlines, near-black ink, oxblood for the one
+   action and the exception, pale olive bars and mint confirmed chips. Every
+   colour, face and radius is a token from public/brand/tokens.css. */
+@import './workspace-base.css';
 @import './workspace-shell.css';
-@import './workspace-forms.css';
+@import './workspace-job.css';
+@import './workspace-gantt.css';
 @import './workspace-records.css';
-@import './workspace-access.css';

@@ -1,12 +1,16 @@
 # Plinth demo
 
 Run `rer demo` after setup, then open its private `RER_OPEN` link. The workspace
-opens signed in as Alex Morgan of Banksia Build, named **Plinth Demo**, with
-four realistic Minneapolis-area jobs.
-Three accepted jobs have booked trades, published site diaries, client-approved
-and pending variations, supplier orders, partial receipts and reconciled claims.
-The fourth job has a revised quote awaiting acceptance. Dates are relative to
-the start. These are real editable Plinth records, created with the same domain
+opens signed in as Erik Lindgren, owner of a Minneapolis remodeler, named
+**Plinth Demo**, with five Minneapolis-area jobs. The first is Job 2214, Ana
+Alvarez's second story in Linden Hills: ten trades on its schedule (Halvorsen
+Roofing, Larkin Exteriors and the rest), the window slip in its daily logs, a
+siding booking the Plinth agent drafted for approval, a client-approved and a
+pending change order, Northfield Window Supply's PO and a pay app to approve.
+Three more accepted jobs carry bookings, daily logs, change orders, POs, receipts
+and pay apps; Lindqvist kitchen has a revised quote awaiting acceptance. Every
+date is a weekday counted from the Monday of the week the demo starts (a
+weekend start rolls to the coming Monday). These are real editable Plinth records, created with the same domain
 commands as ordinary work and persisted with fixed IDs and insert-only writes.
 The hook completes first run and never fetches.
 

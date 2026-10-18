@@ -1,0 +1,75 @@
+/* Type, cards, buttons, fields, badges and chips. */
+.workspace, .workspace *, .workspace *::before, .workspace *::after { box-sizing: border-box; }
+body:has(.workspace) { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font: 400 15px/1.5 var(--font); font-optical-sizing: auto; -webkit-font-smoothing: antialiased; }
+.workspace { min-height: 100vh; min-height: 100dvh; }
+/* Tabular figures only where numbers line up: Inter's tnum also widens hyphens. */
+.workspace :is(.g-date, .amount, .reconciliation dd, .lines td, .facts dd, time, .rail-count, .count, .job-facts dd) { font-variant-numeric: tabular-nums; }
+.workspace.is-loading { display: grid; place-items: center; color: var(--muted); }
+.workspace :where(h1, h2, h3, p, ol, ul, dl, dd, figure) { margin: 0; }
+.workspace :where(ol, ul) { padding: 0; list-style: none; }
+.workspace h1 { font-size: 42px; line-height: 1.12; font-weight: 800; letter-spacing: -.045em; color: var(--ink); text-wrap: balance; }
+.workspace h2 { font-size: 20px; line-height: 1.25; font-weight: 750; letter-spacing: -.025em; color: var(--ink); }
+.workspace h3 { font-size: 15px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+.workspace a { color: var(--blue); }
+.workspace .muted { color: var(--muted); }
+.workspace .late { color: var(--ox); }
+.workspace .pre-wrap { white-space: pre-wrap; }
+.workspace .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.workspace :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.workspace .icon { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Cards: white, 1px hairline, faint shadow. */
+.workspace .card { min-width: 0; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: 0 1px 2px rgba(6, 19, 32, .04); padding: 18px 20px; }
+.workspace .card-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; }
+.workspace .card-head > .muted, .workspace .card-head > .link-button { margin-left: auto; font-size: 13.5px; }
+.workspace .card-lead { color: var(--body); margin-bottom: 16px; max-width: 70ch; }
+.workspace .card.narrow { max-width: 760px; }
+.workspace .empty { padding: 28px 4px; color: var(--muted); }
+.workspace .notice { padding: 12px 14px; margin: 12px 0; border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: var(--radius); background: var(--sea); color: var(--text); }
+.workspace .error { color: var(--ox); font-weight: 600; }
+.workspace .hint { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+/* Buttons: oxblood for the one action, hairline white for the rest. */
+.workspace button { font: inherit; color: inherit; cursor: pointer; }
+.workspace button:disabled { cursor: progress; opacity: .7; }
+.workspace form button[type=submit], .workspace .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 20px; border: 0; border-radius: var(--radius); background: var(--ox); color: #fff; font-weight: 650; box-shadow: 0 1px 0 rgba(255, 255, 255, .14) inset, 0 10px 20px -14px rgba(128, 16, 48, .9); transition: background-color .15s; }
+.workspace form button[type=submit]:hover, .workspace .primary:hover { background: var(--ox-hover); }
+.workspace .secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; border: 1px solid var(--rer-border); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-weight: 600; }
+.workspace .secondary:hover { border-color: var(--blue); color: var(--blue); }
+.workspace .danger-button { min-height: 42px; padding: 0 18px; border: 1px solid var(--ox); border-radius: var(--radius); background: var(--paper); color: var(--ox); font-weight: 650; }
+.workspace .link-button, .workspace .strip-link { padding: 0; border: 0; background: none; color: var(--blue); font-weight: 550; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.workspace .icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: none; border: 1px solid transparent; border-radius: var(--radius); background: none; color: var(--body); }
+.workspace .icon-button:hover { border-color: var(--line); background: var(--blue-tint); }
+.workspace .action { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.workspace .button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+/* Fields: 1px quiet border, 6px radius, a clear blue focus ring. */
+.workspace fieldset { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.workspace fieldset > button[type=submit] { justify-self: start; }
+.workspace .fields { display: grid; gap: 14px; }
+.workspace label { display: grid; gap: 6px; min-width: 0; color: var(--text); font-size: 13.5px; font-weight: 600; }
+.workspace :where(input:not([type=checkbox], [type=radio], [type=file]), select, textarea) { width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; border: 1px solid var(--rer-border); border-radius: var(--radius); background-color: var(--paper); color: var(--ink); font: 400 15px/1.4 var(--font); transition: border-color .15s, box-shadow .15s; }
+.workspace textarea { resize: vertical; }
+.workspace :where(input, select, textarea)::placeholder { color: var(--soft); }
+.workspace :where(input:not([type=checkbox], [type=radio], [type=file]), select, textarea):focus-visible { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent); }
+.workspace input[type=file] { width: 100%; max-width: 100%; font: 400 14px var(--font); color: var(--body); }
+.workspace input[type=file]::file-selector-button { margin-right: 12px; min-height: 36px; padding: 0 14px; border: 1px solid var(--rer-border); border-radius: var(--radius); background: var(--paper); color: var(--ink); font: 600 14px var(--font); cursor: pointer; }
+.workspace form [role=status] { margin-top: 10px; color: var(--green-ink); font-weight: 600; }
+.workspace form .error { margin-top: 10px; }
+/* every single-choice select; multiple and size>1 lists keep their native look (Base #247 foundation/runtime/select-style.ts) */
+.workspace select:not([multiple],[size]:not([size="1"])){--rer-select-ink:var(--rer-muted);-webkit-appearance:none;appearance:none;padding-inline-end:40px;line-height:normal;text-overflow:ellipsis;background-image:linear-gradient(to top right,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px)),linear-gradient(to top left,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px));background-repeat:no-repeat;background-position:right 20px center,right 14px center;background-size:6px 6px}
+.workspace select:not([multiple],[size]:not([size="1"])):focus-visible{--rer-select-ink:var(--rer-text)}
+.workspace select:not([multiple],[size]:not([size="1"])):disabled{--rer-select-ink:color-mix(in srgb,var(--rer-muted) 55%,transparent)}
+
+/* Status badges and fact chips. */
+.workspace .badge { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; border-radius: 999px; background: var(--line-soft); color: var(--body); font-size: 12.5px; font-weight: 650; line-height: 1.2; white-space: nowrap; }
+.workspace .badge-icon:empty { display: none; }
+.workspace .badge-icon.is-check { font-size: 11px; }
+.workspace .badge:is(.status-accepted, .status-approved, .status-published, .status-booked, .status-exported, .status-issued, .status-completed, .status-active) { background: color-mix(in srgb, var(--mint) 55%, #fff); color: #13513f; }
+.workspace .badge:is(.status-draft, .status-quoting) { background: var(--olive); color: #5c5821; }
+.workspace .badge.status-superseded { background: var(--ghost); color: var(--muted); }
+.workspace .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.workspace .chips li { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--text); font-size: 15px; overflow-wrap: anywhere; }
+.workspace .chips .icon { width: 19px; height: 19px; color: var(--blue); }
+.workspace .chips li.is-late { border-color: color-mix(in srgb, var(--ox) 40%, #fff); color: var(--ox); }
+.workspace .chips li.is-late .icon { color: var(--ox); }

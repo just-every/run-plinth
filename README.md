@@ -2,7 +2,7 @@
 
 # Plinth
 
-Construction management for a small US residential builder or remodeler: accepted quotes, scheduled trades, site diaries, client-approved variations, supplier orders and reconciled progress-claim exports. MIT licensed; data lives in your own installation.
+Construction management for a small US residential builder or remodeler: accepted quotes, a trade schedule, daily logs, client-approved change orders, supplier orders and reconciled pay app exports. MIT licensed; data lives in your own installation.
 
 ## Clone and run
 
@@ -22,10 +22,10 @@ For an installation using your real mailbox, run `npx -y @runeditrun/rer install
 ## Take a job through the first release
 
 1. In **Jobs**, create a job with the client's email and site address. Open **Quote**, enter scope and total, then prepare the revision. Record the actual client acceptance method and reference. The accepted quote stays fixed.
-2. In **Trades**, book a subcontractor with start and end times. The same trade cannot overlap another booking, even on another job. In **Site diary**, publish notes and PNG/JPEG photos (up to 2 MB each).
-3. In **People & access**, invite the job's client as **Client**. Prepare a change in **Variations**. The client follows their invitation, opens their job and approves that exact amount and scope. A manager cannot approve on the client's behalf. For a local walkthrough, use `client@dev.localhost` on the job and run `rer dev --as client` to obtain a separate local client sign-in. Run `rer dev --as owner` to return to the builder.
+2. In **Schedule**, book a subcontractor with start and end times; the chart shows every booking against today. The same trade cannot overlap another booking, even on another job. In **Daily logs**, publish notes and PNG/JPEG photos (up to 2 MB each).
+3. In **People & access**, invite the job's client as **Client**. Prepare a change order in **Changes**. The client follows their invitation, opens their job and approves that exact amount and scope. A manager cannot approve on the client's behalf. For a local walkthrough, use `client@dev.localhost` on the job and run `rer dev --as client` to obtain a separate local client sign-in. Run `rer dev --as owner` to return to the builder.
 4. In **Purchasing**, prepare and issue a PO. Send the approved details to the supplier through your usual channel, then record delivery references and received value. This records a commitment; it does not send an order or pay anyone.
-5. In **Claims**, enter the cumulative work value to date. Review the accepted quote, approved variations, earlier claims and supplier totals. Approve, record the export, then download CSV and the full JSON reconciliation. Re-downloads keep the same approved record. Amounts include sales tax if your quote does; Plinth does not calculate tax or prepare statutory payment claims.
+5. In **Billing**, enter the work billed to date. Review the accepted quote, approved change orders, earlier pay apps and supplier totals. Approve, record the export, then download CSV and the full JSON reconciliation. Re-downloads keep the same approved record. Amounts include sales tax if your quote does; Plinth does not calculate tax or issue invoices. Exports are in USD.
 6. **History** shows the exact records and people behind approvals. [Agent commands](docs/COMMANDS.md) allow draft preparation with a scoped credential; human approval remains required.
 
 The owner can use **Move in** to dry-run and approve an [Accepted jobs CSV](docs/IMPORT.md). Documented-shape fixtures live under `tests/fixtures/`. Imported acceptance evidence is kept, but native jobs remain drafts until a manager confirms acceptance. The import journal supports resume and undo; native edits survive undo.

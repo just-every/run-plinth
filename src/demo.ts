@@ -6,7 +6,7 @@ import { demoJobs } from './demo/jobs'
 export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail: string; now: Date }): Promise<void> {
   const owner = await env.DB.prepare("SELECT id, version FROM oa_operators WHERE email=? AND role='owner'").bind(ownerEmail.toLowerCase()).first<{ id: string; version: number }>()
   if (!owner) throw new Error('The demo owner does not exist yet')
-  const name = 'Alex Morgan'
+  const name = 'Erik Lindgren'
   await env.DB.prepare('UPDATE oa_operators SET display_name=? WHERE id=?').bind(name, owner.id).run()
   const actor: Actor = { id: owner.id, email: ownerEmail.toLowerCase(), name, role: 'owner', version: owner.version }
   const jobs = await demoJobs(env.DB, actor, now)

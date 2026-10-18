@@ -5,6 +5,6 @@ import type { DevPersona } from './modules/operator-auth/dev/index.mjs'
 export function devPersonas(): DevPersona[] {
  return [
   { as: 'admin', role: 'admin', displayName: 'Dev admin' },
-  { as: 'client', role: 'member', displayName: 'Alex Morgan' },
+  { as: 'client', role: 'member', displayName: 'Ana Alvarez' },
  ]
 }

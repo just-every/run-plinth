@@ -41,7 +41,7 @@ Import creates draft jobs and quotes. It retains the source's acceptance date an
 
 Open **Jobs**, inspect each imported job and open **Quote**. Review the retained source evidence and quote. Record the client's actual acceptance method and reference through **Record client acceptance** before proceeding with active job work.
 
-Invite the client separately through **People & access**, using the email on their job. Follow [Run a job](MAIN-FLOWS.md) for variations, trade bookings and claims.
+Invite the client separately through **People & access**, using the email on their job. Follow [Run a job](MAIN-FLOWS.md) for change orders, trade bookings and pay apps.
 
 ## Resume an interrupted import
 

@@ -1,0 +1,72 @@
+/* The schedule chart: Task / Sub, Start, Finish and a weekly track per row.
+   Booked work is a pale olive bar, an unapproved draft a dashed olive outline
+   on an oxblood-edged row, today a dashed oxblood line with its own badge
+   lane above the week headers. Below 760px every row stacks with its own
+   track and today tick. */
+.workspace .schedule-card { padding: 0; overflow: hidden; }
+.workspace .schedule-card > .card-head { align-items: baseline; margin: 0; padding: 10px 16px; }
+.workspace .schedule-card h2 { font-size: 22px; letter-spacing: -.035em; }
+.workspace .schedule-card .range { color: var(--body); font-size: 12px; }
+.workspace .schedule-card .card-meta { margin-left: auto; color: var(--muted); font-size: 12px; }
+.workspace .schedule-card > .empty { padding: 24px 18px 30px; border-top: 1px solid var(--line); }
+.workspace .gantt { --table: 364px; container-type: inline-size; border-top: 1px solid var(--line); }
+@container (max-width: 860px) {
+  .workspace .gantt .g-mon { display: none; }
+}
+.workspace .gantt.is-long .g-mon { display: none; }
+.workspace .g-head, .workspace .g-row { display: grid; grid-template-columns: 172px 96px 96px minmax(0, 1fr); }
+.workspace .g-head { border-bottom: 1px solid var(--line); color: var(--text); font-size: 13px; }
+.workspace .g-col { align-self: end; padding: 0 12px 9px; border-right: 1px solid var(--line-soft); }
+.workspace .g-head .g-task { padding-left: 18px; }
+.workspace .g-scale { position: relative; display: grid; grid-template-rows: 26px 24px 24px; }
+.workspace .g-today-badge { position: absolute; top: 28px; left: calc(var(--now) * 100%); transform: translateX(-50%); padding: 2px 6px; border-radius: 4px; background: var(--ox); color: var(--paper); font-size: 11.5px; font-weight: 650; line-height: 1.3; white-space: nowrap; }
+.workspace .g-months, .workspace .g-weeks { grid-row: 1; display: grid; grid-template-columns: repeat(var(--weeks), minmax(0, 1fr)); }
+.workspace .g-weeks { grid-row: 3; }
+.workspace .g-months span { padding: 4px 8px; border-left: 1px solid var(--line-soft); color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; overflow: hidden; }
+.workspace .g-weeks span { padding: 6px 0 0 6px; border-left: 1px solid var(--line-soft); color: var(--body); font-size: 12px; white-space: nowrap; overflow: hidden; }
+.workspace .g-body { position: relative; }
+.workspace .g-row { width: 100%; min-height: 44px; padding: 0; border: 0; border-bottom: 1px solid var(--line-soft); background: none; text-align: left; font-size: 13px; color: var(--text); }
+.workspace .g-row:hover { background: color-mix(in srgb, var(--blue-tint) 55%, var(--paper)); }
+.workspace .g-row.is-selected { background: var(--blue-tint); }
+.workspace .g-row.is-draft { background: color-mix(in srgb, var(--ox-tint) 70%, var(--paper)); box-shadow: inset 3px 0 0 var(--ox); }
+.workspace .g-row.is-draft.is-selected { background: var(--ox-tint); }
+.workspace .g-row > span:not(.g-track) { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 5px 10px; border-right: 1px solid var(--line-soft); min-width: 0; overflow-wrap: anywhere; }
+.workspace .g-row > .g-task { padding-left: 18px; }
+.workspace .g-task strong { font-size: 13px; font-weight: 650; color: var(--ink); line-height: 1.3; }
+.workspace .g-task span { color: var(--muted); font-size: 12.5px; }
+.workspace .g-date { color: var(--body); font-size: 12px; }
+.workspace .g-date em { font-style: normal; font-size: 12px; font-weight: 650; color: var(--ox); }
+.workspace .g-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.workspace .g-track { position: relative; min-height: 42px; background-image: linear-gradient(to right, var(--line-soft) 1px, transparent 1px); background-size: calc(100% / var(--weeks)) 100%; }
+.workspace .g-bar { position: absolute; top: 50%; left: calc(var(--a) * 100%); width: max(8px, calc((var(--b) - var(--a)) * 100%)); height: 16px; transform: translateY(-50%); border: 1px solid var(--olive-bar); border-radius: 3px; background: var(--olive); }
+.workspace .is-past .g-bar { background: color-mix(in srgb, var(--olive) 70%, var(--paper)); }
+.workspace .is-draft .g-bar { border: 1.5px dashed var(--olive-ink); background: color-mix(in srgb, var(--olive) 30%, var(--paper)); }
+.workspace .is-selected .g-bar { outline: 2px solid color-mix(in srgb, var(--blue) 45%, transparent); outline-offset: 2px; }
+.workspace .is-draft.is-selected .g-bar { outline-color: var(--ox); }
+.workspace .g-diamond, .workspace .legend .diamond { position: absolute; top: 50%; left: calc(var(--a) * 100%); width: 11px; height: 11px; transform: translate(-50%, -50%) rotate(45deg); border: 1.5px solid var(--green); background: color-mix(in srgb, var(--mint) 70%, var(--paper)); }
+.workspace .g-tick { display: none; }
+.workspace .g-today { position: absolute; top: 0; bottom: 0; left: calc(var(--table) + (100% - var(--table)) * var(--now)); width: 0; border-left: 1.5px dashed var(--ox); pointer-events: none; }
+.workspace .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; color: var(--body); font-size: 12px; }
+.workspace .legend li { display: inline-flex; align-items: center; gap: 8px; }
+.workspace .legend .swatch { width: 30px; height: 12px; border: 1px solid var(--olive-bar); border-radius: 2px; background: var(--olive); }
+.workspace .legend .swatch.is-draft { border: 1.5px dashed var(--olive-ink); background: color-mix(in srgb, var(--olive) 30%, var(--paper)); }
+.workspace .legend .diamond { position: static; transform: rotate(45deg); }
+.workspace .legend .today-key { width: 0; height: 18px; margin: 0 6px; border-left: 1.5px dashed var(--ox); }
+
+@media (max-width: 760px) {
+  .workspace .schedule-card > .card-head { padding: 14px; }
+  .workspace .schedule-card .card-meta { margin-left: 0; flex-basis: 100%; }
+  .workspace .g-head, .workspace .g-today { display: none; }
+  .workspace .g-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'task task' 'start finish' 'track track'; gap: 4px 12px; padding: 12px 14px 14px; }
+  .workspace .g-row > span:not(.g-track) { padding: 0; border: 0; }
+  .workspace .g-row > .g-task { grid-area: task; padding: 0; }
+  .workspace .g-row.is-draft { box-shadow: inset 4px 0 0 var(--ox); }
+  .workspace .g-task strong { font-size: 15px; }
+  .workspace .g-task span { font-size: 13.5px; }
+  .workspace .g-date { font-size: 13.5px; }
+  .workspace .g-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; color: var(--muted); }
+  .workspace .g-track { grid-area: track; min-height: 16px; margin-top: 8px; border-radius: 3px; background-color: color-mix(in srgb, var(--line-soft) 45%, var(--paper)); }
+  .workspace .g-bar { height: 12px; }
+  .workspace .g-tick { display: block; position: absolute; top: -4px; bottom: -4px; left: calc(var(--now) * 100%); border-left: 1.5px dashed var(--ox); }
+  .workspace .legend { gap: 8px 16px; padding: 12px 14px; font-size: 12.5px; }
+}

@@ -15,8 +15,8 @@ If you are running a preview server, stop it with `rer preview --stop` as well. 
 
 The archive contains:
 
-- Jobs, quotes, variations, schedules, diary entries, purchase orders, receipts, claims and approval snapshots.
-- Diary photo bytes.
+- Jobs, quotes, change orders, schedules, daily logs, purchase orders, receipts, pay apps and approval snapshots.
+- Daily log photo bytes.
 - Import original-byte custody, plans and journals, including erasure history.
 - Durable account metadata.
 

@@ -1,35 +1,94 @@
-.workspace .badge{display:inline-flex;align-items:center;gap:8px;border:0;background:var(--jade-tint);color:var(--jade-ink);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;line-height:1.4;white-space:nowrap;vertical-align:middle}
-.workspace .badge-icon{display:block;flex:none;width:8px;height:8px;border-radius:50%;background:var(--jade)}
-.workspace .badge-icon.is-check{display:grid;place-items:center;width:17px;height:17px;color:white;font-size:12px;line-height:1}
-.workspace .badge.status-quoting{background:var(--card-inset);color:var(--muted)}
-.workspace .status-quoting .badge-icon{background:var(--muted)}
-.workspace .record{border:1px solid var(--rule);border-radius:10px;padding:20px;overflow-wrap:anywhere;margin-top:20px;background:var(--card);min-width:0}
-.workspace .record p:last-child{margin-bottom:0}
-.workspace .record .heading{margin-bottom:12px;justify-content:flex-start;gap:16px}
-.workspace .record .heading h3{margin:0}
-.workspace .record>strong{font-variant-numeric:tabular-nums}
-.workspace .claim-heading{display:flex;align-items:center;gap:20px;margin-bottom:12px}
-.workspace .claim-heading h3{margin:0}
-.workspace .reconciliation{margin:12px 0 16px}
-.workspace .reconciliation>div{display:flex;gap:16px;justify-content:space-between;align-items:baseline;padding:4px 0;border-top:1px solid var(--rule);line-height:1.4;font-size:16px}
-.workspace .reconciliation>div:last-child{border-bottom:1px solid var(--rule)}
-.workspace .reconciliation dt{color:var(--muted)}
-.workspace .reconciliation dd{font-variant-numeric:tabular-nums;margin:0;text-align:right;white-space:nowrap;font-weight:400}
-.workspace .reconciliation .is-key dt,.workspace .reconciliation .is-key dd{font-weight:700;color:var(--ink)}
-.workspace .claim-record>.action{min-width:min(100%,320px)}
-.workspace .variation-record{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.85fr);column-gap:24px;row-gap:8px}
-.workspace .variation-record>.badge{grid-column:1;justify-self:start}
-.workspace .variation-record h3{grid-column:1;margin:0;font-size:24px}
-.workspace .variation-record>.variation-amount{grid-column:2;grid-row:1/span 2;text-align:right;font-size:28px;font-weight:700}
-.workspace .variation-record>p{grid-column:1;margin:0}
-.workspace .variation-record>.action{grid-column:2;grid-row:3/span 2;align-self:end;width:100%;margin:0}
-.workspace .variation-record>.notice{grid-column:1/-1;margin-top:8px;background:none;padding:0;color:var(--muted)}
-.workspace .diary-record{border:0;padding:0;margin-top:24px}
-.workspace .diary-record .heading{justify-content:flex-start}
-.workspace .diary-record .heading h3{font-size:16px;font-weight:400;letter-spacing:normal}
-.workspace .photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;border-top:1px solid var(--rule);padding-top:18px;margin-top:16px}
-.workspace .photos:empty{display:none}
-.workspace .photos a{min-width:0;display:grid;align-content:start;gap:8px;font-size:13px;color:var(--muted);text-decoration:none;overflow-wrap:anywhere}
-.workspace .photos img{width:100%;height:240px;object-fit:cover;border-radius:10px;display:block}
-@media(max-width:900px){.workspace .variation-record{display:block}.workspace .variation-record h3{margin:12px 0 4px}.workspace .variation-record>.variation-amount{display:block;text-align:left;margin-bottom:8px}.workspace .variation-record>.action{margin-top:16px}.workspace .variation-record>.notice{margin-top:16px}}
-@media(max-width:700px){.workspace .record{padding:16px;margin-top:20px}.workspace .claim-heading{align-items:flex-start;flex-direction:column;gap:12px}.workspace .reconciliation>div{font-size:16px;gap:12px;padding:7px 0}.workspace .reconciliation dt{overflow-wrap:normal}.workspace .variation-record h3{font-size:22px}.workspace .variation-record>.action{display:grid;width:100%}.workspace .variation-record>.action button{padding-left:12px;padding-right:12px}.workspace .diary-record{padding:0}.workspace .photos{gap:12px}.workspace .photos img{height:170px}.workspace .claim-record>.action{display:grid;width:100%}}
+/* Records inside cards: dense hairline rows, quote line tables, the pay app
+   reconciliation, daily log entries and the jobs grid. */
+.workspace .record { padding: 16px 0; border-top: 1px solid var(--line); }
+.workspace .card-head + .record, .workspace .card-lead + .record { border-top: 1px solid var(--line); }
+.workspace .record-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+.workspace .record-head h3 { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.workspace .record > .muted { margin-top: 8px; font-size: 14px; }
+.workspace .lines { width: 100%; border-collapse: collapse; font-size: 14px; }
+.workspace .lines th, .workspace .lines td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
+.workspace .lines thead th { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.workspace .lines td:last-child, .workspace .lines th:last-child { text-align: right; white-space: nowrap; }
+.workspace .lines td:nth-child(2) { color: var(--body); white-space: nowrap; }
+.workspace .lines tfoot th, .workspace .lines tfoot td { border-bottom: 0; font-weight: 750; color: var(--ink); }
+.workspace .inline-form { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--sea) 60%, #fff); }
+.workspace .inline-form .fields { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); }
+
+.workspace .rows { border-top: 1px solid var(--line); }
+.workspace .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+.workspace .row.is-waiting { margin: 0 -20px; padding: 14px 20px 14px 17px; border-left: 3px solid var(--ox); background: color-mix(in srgb, var(--ox-tint) 55%, #fff); }
+.workspace .row-main { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.workspace .row-main > strong { font-size: 15px; color: var(--ink); }
+.workspace .row-main > .muted { font-size: 13.5px; }
+.workspace .row-main details { margin-top: 4px; }
+.workspace .row-end { display: grid; justify-items: end; align-content: start; gap: 6px; }
+.workspace .amount { font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.workspace .meter { height: 6px; margin: 6px 0 2px; max-width: 320px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.workspace .meter span { display: block; height: 100%; background: var(--teal); }
+.workspace .receipt { font-size: 13px; }
+.workspace details summary { cursor: pointer; color: var(--blue); font-size: 13.5px; font-weight: 550; }
+.workspace pre { max-width: 100%; overflow-x: auto; margin: 8px 0 0; padding: 12px; border-radius: var(--radius); background: var(--sea); color: var(--text); font: 12.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.workspace .csv-header { display: block; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--sea); font: 13px/1.5 var(--mono); overflow-wrap: anywhere; }
+.workspace .preview { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.workspace .preview > h3 { margin-bottom: 8px; }
+.workspace .preview > p { margin: 12px 0 0; color: var(--body); }
+.workspace .id { font: 12.5px/1.4 var(--mono); overflow-wrap: anywhere; }
+
+.workspace .reconciliation { display: grid; max-width: 620px; margin-top: 4px; }
+.workspace .reconciliation div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.workspace .reconciliation dt { color: var(--body); }
+.workspace .reconciliation dd { color: var(--ink); font-weight: 600; white-space: nowrap; }
+.workspace .reconciliation .is-key { margin: 6px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--olive-bar) 60%, #fff); border-radius: var(--radius); background: color-mix(in srgb, var(--olive) 45%, #fff); }
+.workspace .reconciliation .is-key :is(dt, dd) { color: var(--ink); font-weight: 750; font-size: 15px; }
+
+.workspace .timeline { border-top: 1px solid var(--line); }
+.workspace .log-entry { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line-soft); }
+.workspace .log-date { display: grid; justify-items: start; gap: 6px; align-content: start; }
+.workspace .log-date time { font-weight: 700; color: var(--ink); }
+.workspace .log-body { display: grid; gap: 6px; min-width: 0; color: var(--text); }
+.workspace .photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.workspace .photos a { display: grid; gap: 4px; width: 120px; color: var(--body); font-size: 12.5px; text-decoration: none; overflow-wrap: anywhere; }
+.workspace .photos img { width: 120px; height: 90px; object-fit: cover; border: 1px solid var(--line); border-radius: var(--radius); }
+
+/* Jobs: a create bar, then a grid of job cards. */
+.workspace .create-job { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: center; gap: 16px; margin-bottom: 16px; }
+.workspace .create-job h2 { font-size: 17px; }
+.workspace .create-job fieldset { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.workspace .create-job fieldset > button[type=submit] { align-self: end; }
+.workspace .create-job .fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.workspace .create-job form > [role] { grid-column: 1 / -1; }
+.workspace .job-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.workspace .job-card { display: grid; gap: 4px; width: 100%; height: 100%; align-content: start; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper); box-shadow: 0 1px 2px rgba(6, 19, 32, .04); text-align: left; color: var(--text); transition: border-color .15s, box-shadow .15s; }
+.workspace .job-card:hover { border-color: color-mix(in srgb, var(--blue) 45%, #fff); box-shadow: var(--shadow); }
+.workspace .job-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.workspace .waiting-chip { padding: 2px 9px; border-radius: 999px; background: var(--ox-tint); color: var(--ox); font-size: 12.5px; font-weight: 700; }
+.workspace .job-name { font-size: 19px; font-weight: 750; letter-spacing: -.025em; color: var(--ink); line-height: 1.25; }
+.workspace .job-card > .muted { font-size: 13.5px; overflow-wrap: anywhere; }
+.workspace .job-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 14px; margin: 10px 0 2px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.workspace .job-facts div { display: contents; }
+.workspace .job-facts dt { color: var(--muted); font-size: 13px; }
+.workspace .job-facts dd { color: var(--ink); font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.workspace .span-track { position: relative; height: 8px; margin: 10px 0 4px; border-radius: 3px; background: var(--line-soft); }
+.workspace .span-track span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--olive); border: 1px solid var(--olive-bar); }
+.workspace .span-track i { position: absolute; top: -4px; bottom: -4px; border-left: 1.5px dashed var(--ox); }
+.workspace .open-job { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--blue); font-size: 14px; font-weight: 600; }
+.workspace .open-job .icon { width: 16px; height: 16px; }
+.workspace .empty-state { display: grid; justify-items: start; gap: 8px; padding: 28px; }
+.workspace .empty-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 10px; background: var(--blue-tint); color: var(--blue); }
+.workspace .empty-icon .icon { width: 24px; height: 24px; }
+.workspace .empty-state p { color: var(--body); max-width: 56ch; }
+
+@media (max-width: 1100px) {
+  .workspace .create-job { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .workspace .card { padding: 16px 14px; }
+  .workspace .row.is-waiting { margin: 0 -14px; padding: 14px 14px 14px 11px; }
+  .workspace .create-job fieldset, .workspace .create-job .fields, .workspace .inline-form .fields { grid-template-columns: minmax(0, 1fr); }
+  .workspace .row { grid-template-columns: minmax(0, 1fr); }
+  .workspace .row-end { justify-items: start; grid-auto-flow: column; justify-content: start; align-items: center; gap: 10px; }
+  .workspace .log-entry { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .workspace .log-date { grid-auto-flow: column; justify-content: start; align-items: center; }
+  .workspace .lines td:nth-child(2) { white-space: normal; }
+  .workspace .job-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -2,22 +2,6 @@
 @import url('/brand/tokens.css');
 @import url('/brand/auth.css');
 
-/* Shared by the run site, installation and workspace. */
-:root {
-  --rer-font-body: var(--font-body);
-  --rer-font-heading: var(--font-body);
-  --rer-page: var(--paper);
-  --rer-surface: var(--card);
-  --rer-text: var(--ink);
-  --rer-muted: var(--muted);
-  --rer-border: #C9C4BA;
-  --rer-focus: var(--focus);
-  --rer-link: var(--jade-ink);
-  --rer-accent: var(--jade);
-  --rer-accent-text: var(--card);
-  --rer-radius: 14px;
-  --rer-button-radius: 999px;
-  --rer-logo: url('/brand/mark.svg');
-  --rer-wordmark-weight: 800;
-  --rer-wordmark-tracking: -.03em;
-}
+/* The installed app's theme: the Lobby, Finish setup, Base's sign-in and
+   account pages and the workspace. Every value is a token from
+   public/brand/tokens.css; Base's --rer-* names are mapped there too. */
