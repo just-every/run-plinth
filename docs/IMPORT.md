@@ -14,7 +14,7 @@ external_id,title,client_email,site_address,quote_cents,accepted_on
 Each row represents one job. `external_id` is a stable, unique source identifier
 (up to 200 characters); `title` is up to 200 characters; `client_email` is a valid
 email up to 254 characters; `site_address` is optional, up to 500 characters.
-`quote_cents` is a whole nonnegative AUD cents amount up to 1,000,000,000,000.
+`quote_cents` is a whole nonnegative amount in cents, up to 1,000,000,000,000.
 `accepted_on` is a real calendar date in `YYYY-MM-DD` form. Header order is fixed.
 RFC 4180 quoted commas, escaped quotes and embedded newlines are supported;
 UTF-8 BOM, LF and CRLF are accepted. Required fields cannot have surrounding

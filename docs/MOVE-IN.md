@@ -18,7 +18,7 @@ Each row represents one job:
 | `title` | The job's name, up to 200 characters. |
 | `client_email` | The client's valid email, up to 254 characters. |
 | `site_address` | An optional site address, up to 500 characters. |
-| `quote_cents` | A whole, nonnegative AUD cents amount. $48,000.00 is `4800000`. |
+| `quote_cents` | A whole, nonnegative amount in cents. $48,000.00 is `4800000`. |
 | `accepted_on` | The source acceptance date as `YYYY-MM-DD`. |
 
 Keep required values free of leading or trailing spaces. Quote fields containing commas or newlines using normal CSV quoting. The file may contain at most 100 data rows and must be no larger than 256 KiB. Duplicate identifiers and invalid rows reject the upload before writes.

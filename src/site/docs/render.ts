@@ -43,6 +43,8 @@ export function renderDoc(doc: Doc): { html: string; headings: Heading[] } {
   renderer.link = function ({ href, title, tokens }) {
     return `<a href="${escapeHtml(linkHref(href, doc.source))}"${title ? ` title="${escapeHtml(title)}"` : ''}>${this.parser.parseInline(tokens)}</a>`
   }
+  // Code cards: the command, and a Copy button the page's script reveals.
+  renderer.code = ({ text, lang }) => `<div class="docs-code"${lang ? ` data-lang="${escapeHtml(lang)}"` : ''}><pre><code>${escapeHtml(text)}</code></pre><button class="docs-copy" type="button" hidden>Copy</button></div>\n`
   renderer.table = function (token) {
     return `<div class="docs-table" role="region" tabindex="0" aria-label="Reference table">${Renderer.prototype.table.call(this, token)}</div>`
   }

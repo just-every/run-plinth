@@ -1,0 +1,81 @@
+/* 12 · The map interlude and 14 · the closing room: HTML over text-free plates. */
+.mapband { position: relative; container-type: inline-size; background: #f4f8f8; }
+.map-stage, .map-frame { position: relative; }
+.map-art img { width: 100%; height: auto; }
+.map-pin { position: absolute; z-index: 2; display: block; color: var(--blue); }
+.map-pin svg { width: 100%; height: 100%; fill: var(--blue); stroke: none; }
+.map-pin svg circle { fill: #fff; }
+.map-pin b { display: none; }
+.map-shop i { display: block; width: 100%; height: 100%; border: 2px solid #fff; border-radius: 50%; background: var(--blue); }
+.map-leaders { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.map-leaders line { stroke: #1d5f8d; stroke-width: 1.4; }
+.map-card { border-radius: 3px; border-color: #c4d9e4; box-shadow: 0 10px 24px -16px rgba(10, 60, 90, .45); }
+.map-card > div { min-width: 0; }
+.map-num { display: none; }
+.map-title { color: var(--ink); font-weight: 650; line-height: 1.3; }
+.map-trade { color: var(--blue); font-weight: 600; line-height: 1.35; }
+.map-note { color: var(--muted); line-height: 1.35; }
+.shop-card { background: #fbfaf1; }
+.map-summary h2 { margin-top: 10px; font-weight: 850; letter-spacing: -.045em; line-height: 1.08; }
+.map-summary .eyebrow { letter-spacing: .14em; }
+
+@container (min-width: 1180px) {
+  .mapband > * { --u: calc(100cqw / 1536); }
+  .map-summary { position: absolute; z-index: 3; left: calc(var(--u) * 36); top: calc(var(--u) * 36); width: calc(var(--u) * 470); padding: calc(var(--u) * 22) calc(var(--u) * 26) calc(var(--u) * 24); border-radius: 3px; }
+  .map-summary .eyebrow { font-size: max(11px, calc(var(--u) * 13.5)); }
+  .map-summary h2 { margin-top: calc(var(--u) * 8); font-size: calc(var(--u) * 31); }
+  .map-summary .muted { margin-top: calc(var(--u) * 8); font-size: max(13px, calc(var(--u) * 18)); }
+  .map-pin { left: calc(var(--x) * var(--u)); top: calc(var(--y) * var(--u)); width: calc(var(--u) * 24); height: calc(var(--u) * 32); transform: translate(-50%, -100%); }
+  .map-shop { width: calc(var(--u) * 12); height: calc(var(--u) * 12); transform: translate(-50%, -50%); }
+  .map-card { position: absolute; z-index: 3; left: calc(var(--x) * var(--u)); top: calc(var(--y) * var(--u)); width: calc(var(--w) * var(--u)); padding: calc(var(--u) * 13) calc(var(--u) * 16) calc(var(--u) * 13); }
+  .map-title { font-size: max(12.5px, calc(var(--u) * 16.5)); }
+  .map-trade { margin-top: calc(var(--u) * 2); font-size: max(11.5px, calc(var(--u) * 14.5)); }
+  .map-note { margin-top: calc(var(--u) * 2); font-size: max(11.5px, calc(var(--u) * 14.5)); }
+}
+@container (max-width: 1179.98px) {
+  .map-summary { max-width: 640px; margin: 72px var(--gutter) 22px; padding: 20px 22px; }
+  .map-summary h2 { font-size: clamp(26px, 4.4cqw, 36px); }
+  .map-summary .muted { margin-top: 6px; font-size: 16px; }
+  .map-art img { aspect-ratio: 1460 / 880; object-fit: cover; }
+  .map-leaders { display: none; }
+  .map-pin { left: calc(var(--px) * 100%); top: calc(var(--py) * 100%); width: 30px; height: 40px; transform: translate(-50%, -100%); }
+  .map-pin b { position: absolute; top: 4px; left: 0; right: 0; display: block; color: var(--blue); text-align: center; font-size: 13px; line-height: 20px; font-weight: 750; }
+  .map-shop { width: 26px; height: 26px; transform: translate(-50%, -50%); }
+  .map-shop i { border-radius: 50%; }
+  .map-shop b { top: 0; color: #fff; line-height: 22px; font-size: 12px; }
+  .map-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px var(--gutter) 0; padding-bottom: 64px; }
+  .map-card { display: flex; gap: 14px; padding: 14px 16px; }
+  .map-num { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 13.5px; font-weight: 700; }
+  .map-title { font-size: 16px; }
+  .map-trade, .map-note { margin-top: 2px; font-size: 14.5px; }
+  .map-stage { margin: 0; }
+}
+@container (max-width: 640px) {
+  .map-summary { margin: 56px 16px 18px; padding: 16px 18px; }
+  .map-cards { grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 18px 16px 0; padding-bottom: 48px; }
+  .map-pin { width: 24px; height: 32px; }
+  .map-pin b { top: 2px; font-size: 11.5px; line-height: 17px; }
+  .map-shop { width: 20px; height: 20px; }
+  .map-shop b { line-height: 16px; font-size: 11px; }
+}
+
+/* 14 · Closing */
+.closing { background: #fff; }
+.closing-copy { padding: 128px var(--gutter) 0; text-align: center; }
+.closing h2 { margin: 0; font-size: 80px; font-weight: 850; letter-spacing: -.055em; line-height: 1.02; }
+.closing .lead { margin-top: 18px; }
+.closing .hero-actions { margin-top: 30px; }
+.closing-stage { position: relative; max-width: 1920px; margin: 8px auto 0; }
+.closing-art img { width: 100%; height: auto; }
+.handover-tag { position: absolute; left: 50.2%; top: 52.4%; display: inline-flex; align-items: center; gap: 9px; padding: 7px 14px 7px 9px; border: 1px solid #c9d6de; border-radius: 3px; background: #fff; box-shadow: 0 6px 14px -8px rgba(6, 19, 32, .4); color: var(--ink); font-size: clamp(12px, 1.05vw, 17px); font-weight: 600; white-space: nowrap; transform: rotate(-1.2deg); }
+.handover-tag .done { width: 1.35em; height: 1.35em; }
+.handover-tag .done .tick { width: .8em; height: .8em; }
+@media (max-width: 1100px) { .closing h2 { font-size: 60px; } .closing-copy { padding-top: 104px; } }
+@media (max-width: 760px) {
+  .closing-copy { padding: 72px 16px 0; }
+  .closing h2 { font-size: 42px; line-height: 1.04; letter-spacing: -.05em; }
+  .closing .hero-actions { gap: 18px 28px; }
+  .closing .btn-run { flex: 1 0 100%; justify-content: center; }
+  .closing-stage { margin-top: 18px; }
+  .handover-tag { left: 50%; top: 50%; transform: translateX(-50%) rotate(-1.2deg); font-size: 12.5px; padding: 5px 10px 5px 7px; }
+}

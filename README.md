@@ -1,16 +1,19 @@
+<img src="public/brand/mark.svg" alt="" width="54" height="60">
+
 # Plinth
 
-Contractor project management for a small residential builder: accepted quotes, scheduled trades, site diaries, client-approved variations, supplier orders and reconciled progress-claim exports. MIT licensed; data lives in your own installation.
+Construction management for a small US residential builder or remodeler: accepted quotes, scheduled trades, site diaries, client-approved variations, supplier orders and reconciled progress-claim exports. MIT licensed; data lives in your own installation.
 
 ## Clone and run
 
-Install Git, then run one line. It installs the shared command if you don't have `rer`, clones Plinth and starts it:
+Two lines, the same as the [Run page](https://run-plinth.com/run). Install `rer`, the Run Edit Run command (it brings its own Node if you have no Node 22 or later; if it prints an `export PATH=…` line, run that line first), then start Plinth:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-plinth
+curl -fsSL https://runeditrun.com/install.sh | sh
+rer dev just-every/run-plinth
 ```
 
-Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-plinth` does the same. To start it again later, run `cd run-plinth && rer dev`.
+Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-plinth` does both in one line. It runs on macOS, Linux or Windows with WSL2, with git. To start it again later, run `cd run-plinth && rer dev`.
 
 The first run installs the locked dependencies, selects Node 22.20.0 and pnpm 10.12.4, prepares D1 and creates your local owner. Open the printed `RER_OPEN` link to sign in, finish the short setup screen, then open **Jobs**. That link is a credential: keep it private. Setup and mail are local; no external messages are sent. A compatible repeated `rer dev` reuses the server. Stop it with `rer dev --stop` or Ctrl-C.
 
@@ -18,11 +21,11 @@ For an installation using your real mailbox, run `npx -y @runeditrun/rer install
 
 ## Take a job through the first release
 
-1. In **Jobs**, create a job with the client's email and site address. Open **Quote**, enter scope and total in AUD, then prepare the revision. Record the actual client acceptance method and reference. The accepted quote stays fixed.
+1. In **Jobs**, create a job with the client's email and site address. Open **Quote**, enter scope and total, then prepare the revision. Record the actual client acceptance method and reference. The accepted quote stays fixed.
 2. In **Trades**, book a subcontractor with start and end times. The same trade cannot overlap another booking, even on another job. In **Site diary**, publish notes and PNG/JPEG photos (up to 2 MB each).
 3. In **People & access**, invite the job's client as **Client**. Prepare a change in **Variations**. The client follows their invitation, opens their job and approves that exact amount and scope. A manager cannot approve on the client's behalf. For a local walkthrough, use `client@dev.localhost` on the job and run `rer dev --as client` to obtain a separate local client sign-in. Run `rer dev --as owner` to return to the builder.
 4. In **Purchasing**, prepare and issue a PO. Send the approved details to the supplier through your usual channel, then record delivery references and received value. This records a commitment; it does not send an order or pay anyone.
-5. In **Claims**, enter the cumulative work value to date. Review the accepted quote, approved variations, earlier claims and supplier totals. Approve, record the export, then download CSV and the full JSON reconciliation. Re-downloads keep the same approved record. Amounts include GST if your quote does; Plinth does not calculate tax or prepare statutory payment claims.
+5. In **Claims**, enter the cumulative work value to date. Review the accepted quote, approved variations, earlier claims and supplier totals. Approve, record the export, then download CSV and the full JSON reconciliation. Re-downloads keep the same approved record. Amounts include sales tax if your quote does; Plinth does not calculate tax or prepare statutory payment claims.
 6. **History** shows the exact records and people behind approvals. [Agent commands](docs/COMMANDS.md) allow draft preparation with a scoped credential; human approval remains required.
 
 The owner can use **Move in** to dry-run and approve an [Accepted jobs CSV](docs/IMPORT.md). Documented-shape fixtures live under `tests/fixtures/`. Imported acceptance evidence is kept, but native jobs remain drafts until a manager confirms acceptance. The import journal supports resume and undo; native edits survive undo.
@@ -58,7 +61,7 @@ Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, l
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.30**. The Base auth, installer, import kit, archive and deployment paths are reused. Plinth’s shared Albert Sans, jade and terrazzo theme covers its run site, setup and workspace.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.30**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
 
 ## Run site and guides
 

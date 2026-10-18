@@ -49,7 +49,7 @@ export function acceptedJobsSource(csv: string): { source: SourceBundle; rows: A
     if (row.external_id.length > 200 || row.title.length > 200 || row.site_address.length > 500 || row.client_email.length > 254) invalid(`Row ${rowNumber}: a field exceeds its supported length`)
     if (/[\x00-\x1f\x7f]/.test(row.external_id)) invalid(`Row ${rowNumber}: invalid external_id`)
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.client_email)) invalid(`Row ${rowNumber}: invalid client_email`)
-    if (!/^(0|[1-9]\d*)$/.test(row.quote_cents) || !Number.isSafeInteger(Number(row.quote_cents)) || Number(row.quote_cents) > 1_000_000_000_000) invalid(`Row ${rowNumber}: quote_cents must be whole nonnegative AUD cents`)
+    if (!/^(0|[1-9]\d*)$/.test(row.quote_cents) || !Number.isSafeInteger(Number(row.quote_cents)) || Number(row.quote_cents) > 1_000_000_000_000) invalid(`Row ${rowNumber}: quote_cents must be whole nonnegative cents`)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(row.accepted_on) || !Number.isFinite(Date.parse(row.accepted_on)) || new Date(row.accepted_on).toISOString().slice(0, 10) !== row.accepted_on) invalid(`Row ${rowNumber}: accepted_on must be a valid YYYY-MM-DD date`)
     if (seen.has(row.external_id)) invalid(`Row ${rowNumber}: duplicate external_id`)
     seen.add(row.external_id)

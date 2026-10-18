@@ -1,16 +1,22 @@
 # Getting started
 
-Run Plinth on your computer, confirm the owner and open your first job. You need Git and Node 22 or later. The launcher installs the project's pinned tools and dependencies.
+Run Plinth on your computer, confirm the owner and open your first job. It runs on macOS, Linux or Windows with WSL2, with git. The installer brings Node when it is missing, and `rer` brings pnpm and the project's pinned dependencies.
 
 ## Run Plinth
 
-One line installs the shared Run Edit Run command, gets the source and starts Plinth:
+Two lines, the same as on the [Run page](https://run-plinth.com/run). First install `rer`, the Run Edit Run command:
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-plinth
+curl -fsSL https://runeditrun.com/install.sh | sh
 ```
 
-Without Node, `curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-plinth` does the same. To start it again later, run `cd run-plinth && rer dev`.
+It installs `rer` for you alone, with its own Node if you have no Node 22 or later. If it prints an `export PATH=…` line, run that line before the next step. Then start Plinth:
+
+```sh
+rer dev just-every/run-plinth
+```
+
+`rer` gets Plinth, installs everything, makes you the owner and prints a link that opens Plinth signed in. Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-plinth` does both steps in one line. To start it again later, run `cd run-plinth && rer dev`.
 
 The first launch installs dependencies, prepares the local database and creates your local owner. Allow it to finish. The terminal prints the application address as `RER_READY` and a sign-in link as `RER_OPEN`.
 

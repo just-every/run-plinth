@@ -1,0 +1,88 @@
+/* 01 · The hero. From 1180 px the plate is the stage and everything on it is
+   placed in plate units (--u = one pixel of the 1536 × 1024 plate), so the copy,
+   cards and leader lines keep the desk's composition at every width; past
+   1680 px the stage stops growing and its edges fade into the page. Below
+   1180 px the copy, the drawing and the cards stack. */
+.hero { container-type: inline-size; background: var(--paper); }
+.hero-stage { position: relative; }
+.hero-art img { width: 100%; height: auto; }
+.hero h1 { font-size: 92px; line-height: 1; font-weight: 820; letter-spacing: -.042em; word-spacing: .02em; color: var(--ink); text-wrap: balance; }
+.hero-sub { color: var(--text); text-wrap: balance; }
+.hero-alt { color: var(--text); }
+.hero-alt b { font-weight: 700; color: var(--ink); }
+
+.hcard { display: flex; gap: 14px; align-items: flex-start; background: #fff; border: 1px solid #a9c9dc; border-radius: 3px; box-shadow: 0 10px 24px -18px rgba(10, 84, 130, .45); color: var(--text); }
+.hcard .icon { flex: none; width: 26px; height: 26px; margin-top: 1px; fill: none; stroke: var(--blue); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.hcard-title { font-weight: 600; color: var(--ink); line-height: 1.32; }
+.hcard-body { color: var(--muted); line-height: 1.38; }
+.hcard-ox { border: 1.5px solid var(--ox); }
+.hcard-ox .icon { stroke: var(--ox); }
+.hcard-ox .hcard-title { color: var(--ox); }
+.hcard .tick { display: inline-block; width: .82em; height: .82em; vertical-align: -.04em; }
+.hero-leaders line { stroke: #2f73a6; stroke-width: 1.5; }
+.hero-leaders circle { fill: #1d6aa3; }
+.hero-leaders .ox line { stroke: var(--ox); }
+.hero-leaders .ox circle { fill: var(--ox); }
+.dim { position: absolute; color: var(--blue); font-weight: 500; letter-spacing: .06em; white-space: nowrap; }
+
+@container (min-width: 1180px) {
+  .hero-stage { --u: calc(min(100cqw, 1680px) / 1536); width: min(100cqw, 1680px); height: calc(var(--u) * 1024); margin: 0 auto; }
+  .hero-art { position: absolute; inset: 0; }
+  .hero-art img { height: 100%; }
+  .site-bar { position: absolute; z-index: 2; top: 0; left: calc(var(--u) * 50); right: calc(var(--u) * 50); height: calc(var(--u) * 53); padding: 0 calc(var(--u) * 25) 0 calc(var(--u) * 22); border-bottom: 1px solid var(--hair); }
+  .site-bar .lockup { gap: calc(var(--u) * 12); font-size: calc(var(--u) * 29); }
+  .site-bar .lockup img { width: calc(var(--u) * 36); height: calc(var(--u) * 40); }
+  .site-links { gap: calc(var(--u) * 48); font-size: max(15px, calc(var(--u) * 19)); }
+  .hero-copy { position: absolute; z-index: 1; top: calc(var(--u) * 93); left: 0; right: 0; text-align: center; }
+  .hero h1 { font-size: calc(var(--u) * 89); }
+  .hero-sub { max-width: calc(var(--u) * 960); margin: calc(var(--u) * 10) auto 0; font-size: calc(var(--u) * 25.5); line-height: 1.3; }
+  .hero-alt { margin-top: calc(var(--u) * 12); font-size: calc(var(--u) * 22.5); }
+  .hero-copy .hero-actions { margin-top: calc(var(--u) * 21); gap: calc(var(--u) * 40); }
+  .hero-copy .btn-run { min-height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 30); gap: calc(var(--u) * 10); font-size: calc(var(--u) * 20.5); }
+  .hero-copy .btn-run .arrow { width: calc(var(--u) * 18); height: calc(var(--u) * 14); }
+  .hero-copy .text-link { font-size: calc(var(--u) * 20.5); text-underline-offset: calc(var(--u) * 6); }
+  .hero-leaders { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hcard { position: absolute; left: calc(var(--x) * var(--u)); top: calc(var(--y) * var(--u)); width: calc(var(--w) * var(--u)); min-height: calc(var(--u) * 78); gap: calc(var(--u) * 15); padding: calc(var(--u) * 17) calc(var(--u) * 16) calc(var(--u) * 16) calc(var(--u) * 20); }
+  .hcard .icon { width: calc(var(--u) * 26); height: calc(var(--u) * 26); }
+  .hcard-title { font-size: max(12.5px, calc(var(--u) * 17)); }
+  .hcard-body { margin-top: calc(var(--u) * 3); font-size: max(11.5px, calc(var(--u) * 15)); }
+  .dim { z-index: 1; font-size: max(11px, calc(var(--u) * 13.5)); }
+  .dim-plate { left: calc(var(--u) * 1444); top: calc(var(--u) * 531); }
+  .dim-floor { left: calc(var(--u) * 1452); top: calc(var(--u) * 812); }
+}
+@container (min-width: 1700px) {
+  .hero-art { -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+}
+
+@container (max-width: 1179.98px) {
+  .hero-stage { display: flex; flex-direction: column; }
+  .site-bar { order: 1; }
+  .hero-copy { order: 2; }
+  .hero-art { order: 3; }
+  .hero-cards { order: 4; }
+  .site-bar { padding: 22px var(--gutter) 18px; border-bottom: 1px solid var(--hair); }
+  .hero-copy { padding: 52px var(--gutter) 0; text-align: center; }
+  .hero h1 { font-size: clamp(46px, 8.2cqw, 84px); }
+  .hero-sub { max-width: 760px; margin: 18px auto 0; font-size: clamp(17.5px, 2.4cqw, 23px); line-height: 1.42; }
+  .hero-alt { margin-top: 16px; font-size: clamp(15.5px, 2cqw, 19px); line-height: 1.5; }
+  .hero-copy .hero-actions { margin-top: 26px; }
+  .hero-art { display: block; margin-top: 30px; background: var(--grid-paper); }
+  .hero-art img { aspect-ratio: 940 / 630; object-fit: cover; }
+  .hero-leaders, .dim { display: none; }
+  .hero-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 18px var(--gutter) 8px; max-width: 980px; margin: 0 auto; }
+  .hcard { padding: 16px 18px; }
+  .hcard-title { font-size: 16px; }
+  .hcard-body { margin-top: 2px; font-size: 15px; }
+}
+@container (max-width: 640px) {
+  .site-bar { padding: 16px 16px 14px; }
+  .hero-copy { padding: 34px 16px 0; }
+  .hero h1 { font-size: 46px; line-height: 1.02; letter-spacing: -.05em; }
+  .hero-sub { margin-top: 16px; font-size: 17.5px; }
+  .hero-alt { font-size: 15.5px; }
+  .hero-copy .hero-actions { gap: 18px 30px; margin-top: 24px; }
+  .hero-copy .hero-actions .btn-run { flex: 1 0 100%; justify-content: center; min-height: 50px; }
+  .hero-copy .hero-actions .text-link { font-size: 17px; }
+  .hero-art { margin-top: 26px; }
+  .hero-cards { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px 16px 4px; }
+}

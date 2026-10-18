@@ -42,7 +42,7 @@ Check **Jobs**, accepted quotes, approvals and downloaded diary photos. Open **M
 
 Only the owner can permanently erase a job. In that job, open **History → Erase this job**, choose **Erase job permanently** and confirm.
 
-Erasure removes the job and its photo bytes, retires its imported source custody and records durable erasure history. If the job shared an imported CSV with other jobs, the whole original CSV becomes unavailable; the other jobs' normalised records remain. Undoing an import is different: undo retains its source custody.
+Erasure removes the job and its photo bytes, retires its imported source custody and records durable erasure history. If the job shared an imported CSV with other jobs, the whole original CSV becomes unavailable; the other jobs' normalized records remain. Undoing an import is different: undo retains its source custody.
 
 An older offline backup cannot learn about a later erasure by itself. Keep a new archive made after erasure as a trusted later journal:
 

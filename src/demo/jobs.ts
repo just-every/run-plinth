@@ -6,10 +6,10 @@ import { prepareClaim, approveClaim, exportClaim } from '../plinth/claims'
 
 const day = 86_400_000
 const projects = [
-  { key: 'ashgrove', name: 'Ashgrove kitchen renovation', client: 'Amelia Hart', email: 'amelia.hart@example.com', address: '24 Banksia Street, Ashgrove QLD', stage: 3, offset: 0 },
-  { key: 'paddington', name: 'Paddington bathroom & laundry', client: 'Daniel Nguyen', email: 'daniel.nguyen@example.com', address: '8 Fern Terrace, Paddington QLD', stage: 2, offset: 2 },
-  { key: 'wilston', name: 'Wilston deck and pergola', client: 'Sofia Brooks', email: 'sofia.brooks@example.com', address: '61 Grove Road, Wilston QLD', stage: 1, offset: 4 },
-  { key: 'redhill', name: 'Red Hill studio fitout', client: 'Oliver Reed', email: 'oliver.reed@example.com', address: '17 Terrace Lane, Red Hill QLD', stage: 0, offset: 6 },
+  { key: 'ashgrove', name: 'Hart kitchen remodel', client: 'Amelia Hart', email: 'amelia.hart@example.com', address: '4512 Upton Avenue South, Minneapolis, MN 55410', stage: 3, offset: 0 },
+  { key: 'paddington', name: 'Nguyen bathroom and laundry', client: 'Daniel Nguyen', email: 'daniel.nguyen@example.com', address: '2208 Grand Avenue, St. Paul, MN 55105', stage: 2, offset: 2 },
+  { key: 'wilston', name: 'Brooks deck and pergola', client: 'Sofia Brooks', email: 'sofia.brooks@example.com', address: '618 Valley View Road, Edina, MN 55424', stage: 1, offset: 4 },
+  { key: 'redhill', name: 'Reed studio build-out', client: 'Oliver Reed', email: 'oliver.reed@example.com', address: '1734 Marshall Street NE, Minneapolis, MN 55413', stage: 0, offset: 6 },
 ]
 
 /** Build with Plinth's real domain commands; stabilise IDs before persisting. */
@@ -35,40 +35,40 @@ export async function demoJobs(db: D1Database, owner: Actor, now: Date): Promise
       { description: 'Site preparation, protection and demolition', quantity: 1, unit_cents: 420_000 },
       { description: 'Carpentry, cabinetry and installation', quantity: 1, unit_cents: 1_850_000 },
       { description: 'Electrical and plumbing works', quantity: 1, unit_cents: 680_000 },
-      { description: 'Finishes, making good and handover', quantity: 1, unit_cents: 390_000 },
-    ], notes: 'Includes materials, labour and GST. Client selections as discussed at the site meeting.' })
+      { description: 'Finishes, patching and handover', quantity: 1, unit_cents: 390_000 },
+    ], notes: 'Includes materials, labor and sales tax. Client selections as discussed at the site meeting.' })
     backdate(33)
     if (!project.stage) {
       prepareQuote(job, owner, { lines: [...quote.lines.map(({ description, quantity, unit_cents }) => ({ description, quantity, unit_cents })), { description: 'Additional acoustic insulation to meeting room', quantity: 1, unit_cents: 195_000 }], notes: 'Revision 2 includes acoustic treatment requested by Oliver. Awaiting signed acceptance.' })
       backdate(2)
     } else {
-      acceptQuote(job, owner, quote.id, { method: 'signed', evidence: `${project.client} returned the signed quotation; scope and selections confirmed at the pre-start meeting.` })
+      acceptQuote(job, owner, quote.id, { method: 'signed', evidence: `${project.client} returned the signed quote; scope and selections confirmed at the preconstruction meeting.` })
       backdate(30)
       for (let i = 0; i < 3; i++) {
-        prepareSchedule(job, owner, { trade: ['Banksia Carpentry', 'Northside Electrical', 'Clearwater Plumbing'][i], start: date(project.offset + i + 1, 21), end: date(project.offset + i + 2, 3), description: ['Cabinetry and final fit-off', 'Fit-off and test circuits', 'Connect fixtures and pressure test'][i] }, result)
+        prepareSchedule(job, owner, { trade: ['Lake Street Carpentry', 'Northside Electric', 'Clearwater Plumbing'][i], start: date(project.offset + i + 1, 21), end: date(project.offset + i + 2, 3), description: ['Cabinetry and final trim-out', 'Trim-out and test circuits', 'Connect fixtures and pressure test'][i] }, result)
         backdate(7)
       }
       const notes = [
         'Site established and floor protection laid. Client walkthrough confirmed access and material storage. No changes to the agreed scope.',
-        'Demolition complete. Existing framing inspected and measurements checked against the joinery shop drawings. Waste collected before close.',
-        'Rough-in complete and inspected. Benchtop templating booked; client confirmed the warm white finish for cabinetry.',
-        'Joinery delivered and checked against the order. Final fit-off scheduled with the electrician and plumber; handover checklist prepared.',
+        'Demolition complete. Existing framing inspected and measurements checked against the cabinet shop drawings. Debris hauled before close.',
+        'Rough-in complete and inspected. Countertop templating booked; client confirmed the warm white finish for cabinetry.',
+        'Cabinetry delivered and checked against the order. Final trim-out scheduled with the electrician and plumber; handover checklist prepared.',
       ]
       for (let i = 0; i < project.stage + 1; i++) {
         await prepareDiary(db, job, owner, { date: date(-12 + i * 3).slice(0, 10), note: notes[i] })
         backdate(12 - i * 3)
       }
-      const variation = prepareVariation(job, owner, { description: 'Client selected stone benchtop upgrade including matching splashback', amount_cents: 285_000 })
+      const variation = prepareVariation(job, owner, { description: 'Client selected quartz countertop upgrade including matching backsplash', amount_cents: 285_000 })
       backdate(11)
       approveVariation(job, client, variation.id)
       backdate(10)
       prepareVariation(job, owner, { description: 'Additional under-cabinet lighting requested at the site meeting; awaiting client approval', amount_cents: 78_000 })
       backdate(1)
-      const order = prepareOrder(job, owner, { supplier: 'Bluegum Joinery', description: 'Made-to-measure cabinetry and hardware, quote BJ-2417', amount_cents: 1_180_000 })
+      const order = prepareOrder(job, owner, { supplier: 'Lakeside Cabinet Co.', description: 'Custom cabinetry and hardware, quote LC-2417', amount_cents: 1_180_000 })
       backdate(18)
       issueOrder(job, owner, order.id)
       backdate(17)
-      receiveOrder(job, owner, order.id, { amount_cents: project.stage === 3 ? 1_180_000 : 590_000, reference: `BJ delivery docket ${project.key.toUpperCase()}-104` })
+      receiveOrder(job, owner, order.id, { amount_cents: project.stage === 3 ? 1_180_000 : 590_000, reference: `LC delivery ticket ${1040 + projects.indexOf(project)}` })
       backdate(4)
       const fittings = prepareOrder(job, owner, { supplier: 'Trade Supply Co.', description: 'Fixtures and fittings to approved client selection schedule', amount_cents: 245_000 })
       backdate(3)

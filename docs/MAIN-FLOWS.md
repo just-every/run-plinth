@@ -5,7 +5,7 @@ Start with the client's accepted quote. Add approved changes, keep site records 
 ## Agree the quote
 
 1. In **Jobs**, create a job with its name, client email and site address.
-2. Open **Quote**. Enter **Scope of work**, **Quote total (AUD, including GST if applicable)** and any **Terms and inclusions**.
+2. Open **Quote**. Enter **Scope of work**, **Quote total (including sales tax if applicable)** and any **Terms and inclusions**.
 3. Press **Prepare quote revision**. You can prepare a new revision before acceptance; only the latest draft can be accepted.
 4. After the client agrees, select the actual **Acceptance method** and enter a **Client acceptance reference** identifying that agreement.
 5. Press **Record client acceptance**.
@@ -14,7 +14,7 @@ The job becomes active. The accepted quote and its recorded acceptance stay fixe
 
 ## Get a variation approved
 
-1. In **Variations**, describe the exact change in **Change and agreed scope** and enter the **Additional amount (AUD)**.
+1. In **Variations**, describe the exact change in **Change and agreed scope** and enter the **Additional amount**.
 2. Press **Prepare variation for client**.
 3. Invite the client through **People & access**, using the email on the job. They follow their invitation, sign in and open the job's **Variations** tab.
 4. The client reviews the scope and amount, then presses **Approve this variation for…**.
@@ -33,21 +33,21 @@ A manager's booking is published directly. Plinth refuses overlapping bookings f
 
 In **Site diary**, select the site date and record the work, conditions and decisions. Add up to five PNG or JPEG photos, each no larger than 2 MB. Press **Publish diary entry**.
 
-Published entries and their photos are available to the job's authorised people. Open a photo to retrieve it. An agent can prepare an entry, but a manager must publish that draft. Photo bytes are included in the installation's [backup archive](BACKUP-RESTORE.md).
+Published entries and their photos are available to the job's authorized people. Open a photo to retrieve it. An agent can prepare an entry, but a manager must publish that draft. Photo bytes are included in the installation's [backup archive](BACKUP-RESTORE.md).
 
 ## Record supplier commitments and deliveries
 
 1. In **Purchasing**, enter the supplier, goods or services and order amount. Press **Prepare purchase order**.
 2. Review the draft and press **Approve and issue PO**.
 3. Send the approved details to the supplier through your usual channel.
-4. As deliveries arrive, enter the **Received value (AUD)** and **Delivery docket or receipt reference**, then press **Record supplier receipt**.
+4. As deliveries arrive, enter the **Received value** and **Delivery ticket or receipt reference**, then press **Record supplier receipt**.
 
 Issuing records a commitment in Plinth; it does not send an order or pay the supplier. A receipt adds the delivered value against the issued order. The claim reconciliation shows supplier commitments, receipts and the outstanding balance.
 
 ## Prepare and export a progress claim
 
 1. In **Claims**, enter a milestone in **Claim description or milestone**.
-2. Enter **Cumulative work claimed (AUD)**: the total work claimed to date, including earlier claims.
+2. Enter **Cumulative work claimed**: the total work claimed to date, including earlier claims.
 3. Press **Prepare reconciled claim**.
 4. Review the accepted quote, approved variations, earlier claims, supplier commitments and receipts. Check **This claim** and **Contract remaining**.
 5. Press **Approve reconciled claim**, then **Record claim export**.
@@ -69,7 +69,7 @@ An approved claim reserves its cumulative position even before export. Complete 
 
 If the contract, earlier claims or PO receipts change after preparation, approval asks you to prepare a fresh claim. Approved records stay fixed. Once exported, download the same approved record again whenever needed.
 
-Use the same GST basis as the accepted quote. Plinth does not calculate tax, issue invoices, collect payments or prepare statutory payment claims.
+Use the same sales tax basis as the accepted quote. Plinth does not calculate tax, issue invoices, collect payments or prepare statutory payment claims.
 
 ## Inspect the history
 

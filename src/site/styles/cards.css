@@ -1,0 +1,73 @@
+/* The product drawn in HTML: white hairline cards at Uptime's density, chips,
+   ticks, avatars, tables, the phone and the terminal. */
+.card { position: relative; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); color: var(--text); }
+.card h3 { font-size: 24px; line-height: 1.25; font-weight: 750; letter-spacing: -.028em; color: var(--ink); text-wrap: balance; }
+.card .muted, .muted { color: var(--muted); }
+.card-foot { color: var(--muted); font-size: 15.5px; line-height: 1.45; }
+.icon { width: 24px; height: 24px; flex: none; fill: none; stroke: var(--blue); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.tick { display: inline-block; width: .9em; height: .9em; vertical-align: -.08em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tick.green { color: var(--green); }
+.done { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--green); color: #fff; }
+.done .tick { width: 15px; height: 15px; stroke-width: 2.2; }
+.done.big { width: 36px; height: 36px; }
+.done.big .tick { width: 19px; height: 19px; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 13px; line-height: 1.35; font-weight: 600; white-space: nowrap; }
+.chip-green { background: var(--green); color: #fff; }
+.chip-pale { background: var(--green-tint); color: var(--green-ink); }
+.chip-ox { background: var(--ox); color: #fff; border-radius: 3px; }
+.chip .tick { width: 11px; height: 11px; stroke-width: 2; }
+
+.avatar { display: inline-grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 50%; font-size: 17px; font-weight: 600; letter-spacing: .02em; }
+.avatar-blue { background: #d6eaf6; color: var(--blue); }
+.avatar-green { background: var(--green-tint); color: var(--green-ink); }
+.dot { display: inline-block; flex: none; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; }
+.dot-blue { background: var(--bar); }
+.dot-grey { background: #c5d0d8; width: 26px; height: 26px; }
+.dot-amber { background: var(--amber); }
+.dot-ox { background: #c8102e; width: 11px; height: 11px; }
+.ox-text { color: var(--ox); }
+.green-text { color: var(--green-ink); font-weight: 600; }
+.amber-text { color: var(--amber-ink); }
+
+/* A green "done" panel: icon, bold green text. */
+.ok { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius); background: var(--green-tint); color: var(--green-ink); font-weight: 600; font-size: 16.5px; line-height: 1.35; }
+
+/* Tables in cards: hairline rows, figures in tabular numerals, right aligned. */
+.table-scroll { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 17px; line-height: 1.35; }
+.tbl th { white-space: nowrap; }
+.sov td:nth-child(n+2), .ctc td:nth-child(n+2), .records td:nth-child(2), .due dd { font-variant-numeric: tabular-nums; }
+.tbl th { padding: 0 12px 12px; text-align: left; color: var(--muted); font-weight: 600; font-size: 16px; border-bottom: 1px solid var(--line); }
+.tbl td { padding: 15px 12px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
+.tbl th:first-child, .tbl td:first-child { padding-left: 0; }
+.tbl th:last-child, .tbl td:last-child { padding-right: 0; }
+
+/* The phone: a dark rounded frame, a white screen, a status line. */
+.phone { flex: none; width: 300px; padding: 11px; border-radius: 46px; background: #15181c; box-shadow: 0 0 0 2px #2c3036 inset, var(--shadow-float); }
+.phone-screen { position: relative; overflow: hidden; min-height: 100%; padding: 14px 20px 22px; border-radius: 36px; background: #fff; }
+.phone-screen::before { content: ''; position: absolute; top: 9px; left: 50%; width: 92px; height: 26px; margin-left: -46px; border-radius: 14px; background: #15181c; }
+.phone-status { display: flex; justify-content: space-between; align-items: center; height: 26px; padding: 0 8px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.phone-status i { width: 44px; height: 10px; background: linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px, var(--ink) 5px 8px, transparent 8px 10px, var(--ink) 10px 13px, transparent 13px 24px, var(--ink) 24px 44px); border-radius: 2px; clip-path: inset(0 round 2px); }
+
+/* The terminal: the one-line start, then a plain comment. */
+.terminal { border-radius: var(--radius-lg); background: var(--terminal); color: var(--terminal-text); box-shadow: var(--shadow-float); overflow: hidden; }
+.term-dots { display: flex; gap: 8px; padding: 16px 18px 0; }
+.term-dots i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+.term-dots i:nth-child(2) { background: #febc2e; }
+.term-dots i:nth-child(3) { background: #28c840; }
+.terminal pre { padding: 18px 22px 22px; font: 500 15px/1.75 var(--mono); white-space: pre-wrap; }
+.terminal .prompt { color: #8ea6b8; }
+.terminal .comment { color: #8ea6b8; }
+
+@media (max-width: 760px) {
+  .card h3 { font-size: 20px; }
+  .tbl { font-size: 15px; }
+  .tbl th { font-size: 14px; padding-bottom: 10px; }
+  .tbl td { padding: 12px 8px; }
+  .ok { font-size: 15px; padding: 12px 14px; }
+  .card-foot { font-size: 14px; }
+  .avatar { width: 40px; height: 40px; font-size: 15px; }
+  .terminal pre { padding: 14px 16px 18px; font-size: 13px; white-space: pre-wrap; overflow-wrap: normal; word-break: normal; }
+}

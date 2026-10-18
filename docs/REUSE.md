@@ -20,7 +20,7 @@ Each direct `/api/plinth/**` request authenticates using Base's native session o
 
 ## Plinth visual assets
 
-The mark is original Plinth artwork. The terrazzo source crop comes from 12ui’s conversion of Plinth’s selected hero slab. `scripts/brand/terrazzo.py` recreates both the seamless texture and empty Lobby slab; diary examples use neutral empty photo tiles. Albert Sans is self-hosted under its OFL licence, with provenance in `public/fonts/README.md`. The run-site section components and app styling implement the selected Plinth design. The native operator-auth source remains byte-exact to the recorded Base revision; Plinth styles it through its declared theme.
+The stepladder mark (public/brand/mark.svg, with hand-tuned 16 and 32 px favicons) is original Plinth artwork vectorised from the design desk's approved raster; the run site's plates are the desk's approved drawings with their copy removed and rebuilt in HTML. The terrazzo source crop comes from 12ui’s conversion of Plinth’s selected hero slab. `scripts/brand/terrazzo.py` recreates both the seamless texture and empty Lobby slab; diary examples use neutral empty photo tiles. Albert Sans is self-hosted under its OFL licence, with provenance in `public/fonts/README.md`. The run-site section components and app styling implement the selected Plinth design. The native operator-auth source remains byte-exact to the recorded Base revision; Plinth styles it through its declared theme.
 
 ## Demo runtime adoption
 

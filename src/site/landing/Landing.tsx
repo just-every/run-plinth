@@ -1,18 +1,45 @@
-import { renderToStaticMarkup } from 'react-dom/server'
-import { Header, Footer, Actions } from './Chrome'
+// The run-site homepage: one job at one remodeler, Job 2214 at Minnehaha
+// Design-Build, in the desk's order (page-s1, approved 18 Oct 2026).
+import '../styles/site.css'
+import '../styles/hero.css'
+import '../styles/cards.css'
+import '../styles/gantt.css'
+import '../styles/sections.css'
+import '../styles/scenes.css'
 import { Hero } from './Hero'
-import { Free, Variations, Claims, Trades, Diary, MoveIn } from './Features'
-import { Included } from './Included'
-import { Card } from './Card'
-import { Slab } from './Slab'
-import './landing.css'
+import { Schedule } from './sections/Schedule'
+import { ChangeOrder } from './sections/ChangeOrder'
+import { Slip } from './sections/Slip'
+import { Billing } from './sections/Billing'
+import { Field } from './sections/Field'
+import { Subs } from './sections/Subs'
+import { Selections } from './sections/Selections'
+import { Verified } from './sections/Verified'
+import { JobCost } from './sections/JobCost'
+import { NextJob } from './sections/NextJob'
+import { MapInterlude } from './sections/Map'
+import { MovingIn } from './sections/MovingIn'
+import { Closing, Footer } from './sections/Closing'
 
-export function Closing() {
-  return <section className="site-closing"><Slab><Card><h2>Put your next job on solid ground.</h2><Actions /></Card></Slab></section>
-}
 export function Landing() {
-  return <><a className="site-skip" href="#top">Skip to content</a><Header /><main><Hero /><div className="landing-region" id="free-variations"><Free /><Variations /></div><div className="landing-region" id="claims-trades"><Claims /><Trades /></div><div className="landing-region" id="diary-movein"><Diary /><MoveIn /></div><Included /><Closing /></main><Footer /></>
-}
-export function landingHtml(styles: string[]) {
-  return '<!doctype html>' + renderToStaticMarkup(<html lang="en"><head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Plinth — Every job on solid ground</title><meta name="description" content="Free, open source job management for residential builders: quotes, trades, site diaries, client-approved variations and reconciled progress claims." /><link rel="icon" href="/brand/mark.svg" /><link rel="stylesheet" href="/rer-theme.css" />{styles.map(href => <link key={href} rel="stylesheet" href={href} />)}</head><body className="plinth-site"><Landing /></body></html>)
+  return <>
+    <a className="skip" href="#schedule">Skip to content</a>
+    <Hero />
+    <main>
+      <Schedule />
+      <ChangeOrder />
+      <Slip />
+      <Billing />
+      <Field />
+      <Subs />
+      <Selections />
+      <Verified />
+      <JobCost />
+      <NextJob />
+      <MapInterlude />
+      <MovingIn />
+      <Closing />
+    </main>
+    <Footer />
+  </>
 }

@@ -1,0 +1,93 @@
+/* The Gantt (02, 04). --label is the task column, --row a row's height and
+   --frac where a bar sits in its row; every bar, chip and elbow is placed with
+   them, so a phone can swipe the same drawing at a fixed week width with each
+   task name above its bar. */
+.gantt-card { margin-top: 52px; padding: 20px 26px 22px; }
+.legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 30px; padding-bottom: 16px; color: var(--muted); font-size: 15.5px; }
+.legend span { display: inline-flex; align-items: center; gap: 10px; }
+.sw { display: inline-block; width: 36px; height: 17px; border-radius: 3px; }
+.sw-ghost { background: var(--ghost); }
+.sw-blue { background: var(--bar); }
+.sw-ox { background: var(--ox); }
+.sw-float { background: repeating-linear-gradient(135deg, #a9cfe3 0 3px, #e3f0f6 3px 6px); }
+.sw-dash { background: #eaf4f9; border: 1.5px dashed #6c9dbd; }
+.views { display: none; }
+.g-swipe { display: none; }
+.gantt-card > .card-foot { margin-top: 16px; }
+
+.gantt { --label: 352px; --row: 49px; --frac: .5; --wk: 1fr; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.g-weeks { display: grid; grid-template-columns: var(--label) repeat(10, minmax(0, 1fr)); height: 46px; border-bottom: 1px solid var(--line); background: #fbfdfe; }
+.g-weeks span { display: grid; place-items: center; border-left: 1px solid var(--line-soft); font-size: 15.5px; font-weight: 500; color: var(--ink); white-space: nowrap; }
+.g-weeks .g-corner { border-left: 0; }
+.g-rows { position: relative; padding-bottom: 30px; background: linear-gradient(90deg, transparent var(--label), transparent 0); }
+.g-row { display: grid; grid-template-columns: var(--label) minmax(0, 1fr); height: var(--row); border-bottom: 1px solid var(--line-soft); }
+.g-label { display: flex; align-items: center; padding: 0 14px; color: var(--text); font-size: 16px; line-height: 1.25; }
+.g-label b { font-weight: 500; }
+.g-diff .g-label b { font-weight: 650; color: var(--ink); }
+.g-track { position: relative; background: repeating-linear-gradient(90deg, var(--line-soft) 0 1px, transparent 1px 10%); }
+.g-rows::after { content: ''; position: absolute; left: var(--label); right: 0; bottom: 0; height: 30px; background: repeating-linear-gradient(90deg, var(--line-soft) 0 1px, transparent 1px 10%); }
+
+.g-track > * { position: absolute; z-index: 1; top: calc(var(--frac) * var(--row)); transform: translateY(-50%); }
+.g-bar { height: 18px; border-radius: 3px; background: var(--bar); }
+.g-olive { background: var(--olive-bar); }
+.g-ox { background: var(--ox); }
+.g-float { border-radius: 0 2px 2px 0; background: repeating-linear-gradient(135deg, #a9cfe3 0 3px, #e3f0f6 3px 6px); }
+.g-ghost { z-index: 0; height: 17px; border-radius: 3px; background: var(--ghost); transform: translate(-4px, -50%) translateY(6px); }
+.g-ghost.g-dashed { z-index: 1; background: #eaf4f9; border: 1.5px dashed #6c9dbd; transform: translateY(-50%); }
+.g-track > .g-lane-up { top: calc(var(--frac) * var(--row) - 10px); }
+.g-track > .g-lane-down { top: calc(var(--frac) * var(--row) + 10px); }
+.g-diamond { width: 17px; height: 17px; background: var(--blue); transform: translate(-50%, -50%) rotate(45deg); border-radius: 2px; }
+.g-diamond.g-ox { background: var(--ox); }
+.g-chip { margin-left: 2px; }
+.g-note { font-size: 14.5px; line-height: 1.2; white-space: nowrap; }
+.g-note.g-above { transform: translateY(-50%) translateY(-24px); }
+.g-note.g-below { transform: translateY(-50%) translateY(23px); }
+.g-note-olive { color: var(--olive-ink); font-weight: 600; margin-left: 2px; }
+.g-note-ox { color: var(--ox); font-weight: 500; }
+.g-note-ox b { font-weight: 650; }
+.g-note-ink { color: var(--ink); font-weight: 500; }
+.g-move { height: 0; border-top: 1.6px solid #2f73a6; transform: translateY(-50%); }
+.g-move::after { content: ''; position: absolute; right: -1px; top: -5.5px; border-left: 8px solid #2f73a6; border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+.g-move.g-back::after { right: auto; left: -1px; border-left: 0; border-right: 8px solid #2f73a6; }
+
+.g-links { position: absolute; z-index: 0; top: 0; bottom: 0; left: var(--label); right: 0; pointer-events: none; }
+.g-ln { position: absolute; background: var(--blue); }
+.g-h { height: 1.6px; transform: translateY(-50%); }
+.g-v { width: 1.6px; transform: translateX(-50%); }
+.g-ar { width: 0; height: 0; background: none; border-left: 8px solid var(--blue); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; transform: translate(-100%, -50%); }
+.g-ad { width: 0; height: 0; background: none; border-top: 8px solid var(--blue); border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; transform: translate(-50%, -8px); }
+
+/* The slip's diff: taller rows so a moved bar's old outline sits above it. */
+.g-diff { --row: 56px; background: #f6fbfd; }
+.diff-card { margin-top: 44px; background: #fbfdfe; }
+.diff-card .g-weeks { background: #f2f8fb; }
+
+@media (max-width: 1100px) {
+  .gantt { --label: 250px; }
+  .g-label { font-size: 14.5px; }
+  .g-weeks span { font-size: 14px; }
+}
+@media (max-width: 860px) {
+  .views { display: inline-flex; margin-top: 26px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; font-size: 15px; }
+  .views span { padding: 8px 16px; color: var(--muted); background: #fff; }
+  .views .on { background: var(--blue); color: #fff; font-weight: 600; }
+  .gantt-card { margin-top: 18px; padding: 14px 0 16px; }
+  .legend { justify-content: flex-start; gap: 6px 18px; padding: 0 14px 12px; font-size: 13.5px; }
+  .sw { width: 22px; height: 11px; }
+  .gantt { --label: 0px; --row: 70px; --frac: .7; border-width: 1px 0; border-radius: 0; }
+  .g-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  .g-inner { width: calc(10 * 96px); }
+  .g-diff .g-inner { width: calc(10 * 68px); }
+  .g-diff { --row: 78px; --frac: .72; }
+  .g-weeks { height: 36px; }
+  .g-weeks span { place-items: center start; padding-left: 8px; font-size: 13px; color: var(--muted); }
+  .g-row { position: relative; display: block; }
+  .g-label { position: sticky; z-index: 3; left: 0; display: block; width: max-content; max-width: calc(100vw - 52px); padding: 9px 14px 0; font-size: 13.5px; line-height: 1.35; white-space: nowrap; }
+  .g-track { position: absolute; inset: 0; }
+  .g-swipe { display: block; padding: 12px 14px 0; text-align: right; color: var(--blue); font-size: 14px; font-weight: 500; }
+  .g-note { font-size: 13px; }
+  .g-bar { height: 15px; }
+  .g-ghost { height: 14px; }
+  .gantt-card > .card-foot { padding: 0 14px; }
+  .diff-card .card-foot { margin-top: 14px; }
+}

@@ -2,7 +2,7 @@
 
 Run `rer demo` after setup, then open its private `RER_OPEN` link. The workspace
 opens signed in as Alex Morgan of Banksia Build, named **Plinth Demo**, with
-four realistic Brisbane jobs.
+four realistic Minneapolis-area jobs.
 Three accepted jobs have booked trades, published site diaries, client-approved
 and pending variations, supplier orders, partial receipts and reconciled claims.
 The fourth job has a revised quote awaiting acceptance. Dates are relative to

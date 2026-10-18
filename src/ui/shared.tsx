@@ -10,7 +10,7 @@ export async function api(path: string, body?: unknown, method = 'POST') {
   if (!response.ok) throw new Error(data.message || data.error?.message || data.error || data.code || `Request failed (${response.status})`)
   return data
 }
-export const money = (cents: number = 0) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(cents / 100)
+export const money = (cents: number = 0) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 export const cents = (value: FormDataEntryValue | null) => {
   const raw = String(value ?? '')
   if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error('Enter a positive amount with at most two decimal places.')
@@ -19,7 +19,7 @@ export const cents = (value: FormDataEntryValue | null) => {
   if (!Number.isSafeInteger(result)) throw new Error('Amount is too large.')
   return result
 }
-export const dateTime = (value: string | number) => new Date(value).toLocaleString('en-AU')
+export const dateTime = (value: string | number) => new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 export function Field({ label, name, type = 'text', required = true, ...props }: {label: string; name: string; type?: string; required?: boolean; [key: string]: unknown}) {
   return <label>{label}<input name={name} type={type} required={required} {...props} /></label>
 }
