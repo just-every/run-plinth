@@ -9,12 +9,12 @@ A signed-in owner first completes Base's credential step-up (`POST /auth/step-up
 | `/quotes` | `lines:[{description,quantity,unit_cents}], notes?` | Builder records actual client agreement in Quote, `/quotes/:id/accept` with `method` and `evidence` |
 | `/schedules` | `trade,start,end,description` (ISO timestamps) | Builder approves the trade booking, `/schedules/:id/approve` |
 | `/diary` | `date,note,attachments?:[{name,mime,base64}]` | Builder publishes the daily log, `/diary/:id/approve` |
-| `/variations` | `description,amount_cents` | Change order; the matching signed-in client approves `/variations/:id/approve` |
+| `/variations` | `description,amount_cents` (a change order) | Matching signed-in client approves the change order, `/variations/:id/approve` |
 | `/orders` | `supplier,description,amount_cents` | Builder issues `/orders/:id/issue` |
-| `/claims` | `description,cumulative_cents` | Pay app; builder reviews and approves `/claims/:id/approve`, then records `/claims/:id/export` |
+| `/claims` | `description,cumulative_cents` (a pay app) | Builder reviews and approves the pay app, `/claims/:id/approve`, then records `/claims/:id/export` |
 
-Dates use `YYYY-MM-DD`. Photos are PNG or JPEG, five maximum per entry and 2 MB each. Quantities are whole positive numbers. Negative change-order cents are allowed as credits when they do not reduce the contract below amounts already approved for claiming.
+Dates use `YYYY-MM-DD`. Photos are PNG or JPEG, five maximum per entry and 2 MB each. Quantities are whole positive numbers. Negative change-order cents are allowed as credits when they do not reduce the contract below amounts already approved for billing.
 
 Managers using a human session publish their own trade bookings and daily logs directly; agent-prepared versions wait for explicit approval. Approval history records preparer, approver, time and the exact snapshot. A client only sees published job records for their own email. Every mutation and file retrieval checks authority on the server, independently of the screen.
 
-Purchase receipts use `/orders/:id/receive` with `amount_cents` and `reference`. Pay app exports return an immutable `report`; repeating export returns the same report with no new approval or economic effect. The UI downloads CSV and full JSON. No provider is contacted by these product commands.
+Purchase receipts use `/orders/:id/receive` with `amount_cents` and `reference`. Pay-app exports return an immutable `report`; repeating export returns the same report with no new approval or economic effect. The UI downloads CSV and full JSON. No provider is contacted by these product commands.

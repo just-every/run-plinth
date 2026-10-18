@@ -20,8 +20,13 @@ body:has(> main > .intro) .facts a, body:has(> main > .intro) .go a, body:has(> 
 body:has(> main) .btn { background: var(--ox); box-shadow: 0 10px 22px -14px rgba(128, 16, 48, .8); }
 body:has(> main) .btn:hover { background: var(--ox-hover); }
 body > .art img { object-position: center 88%; }
+/* A command wraps only between its words (src/site/pages.ts marks them), from
+   the width where a step's line no longer fits beside its Copy button. */
+body:has(> main) code .word { white-space: nowrap; }
+@media (max-width: 960px) {
+  body:has(> main > .intro) .code pre { white-space: pre-wrap; overflow-wrap: normal; }
+}
 @media (max-width: 760px) {
-  body:has(> main > .intro) .code pre { white-space: pre; overflow-wrap: normal; overflow-x: auto; }
   body:has(> main) .brand img { width: 29px; height: 32px; }
   body:has(> main) .bar { padding-bottom: 14px; }
 }

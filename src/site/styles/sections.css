@@ -39,9 +39,9 @@
 .approve-card .avatar { width: 40px; height: 40px; font-size: 14.5px; }
 
 /* 05 · Progress billing */
-.billing .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 214px minmax(0, 380px); gap: 24px; align-items: start; }
+.billing .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 200px minmax(0, 384px); gap: 24px; align-items: start; }
 .billing .steps-rail { position: relative; z-index: 2; }
-.payapp { padding: 32px 30px 24px; }
+.payapp { padding: 32px 28px 24px; }
 .sov { font-size: 16px; }
 .sov td:first-child { white-space: nowrap; }
 .sov th { font-size: 15px; }
@@ -141,7 +141,12 @@
 .promises td:nth-child(3) { white-space: nowrap; }
 .promises td:first-child { width: 38%; }
 .promises td:nth-child(2) { width: 22%; }
-.observed .tick { width: 15px; height: 15px; margin-left: 4px; }
+@media (max-width: 1400px) {
+  .verified .wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 40px; }
+  .case-card { padding: 34px 30px 26px; }
+}
+/* No percentage max-width on the tick, so it counts toward Observed's column width. */
+.observed .tick { width: 15px; height: 15px; max-width: none; margin-left: 4px; }
 .residual { display: flex; align-items: center; gap: 14px; margin-top: 22px; color: var(--text); font-size: 17px; }
 .residual .dot { width: 20px; height: 20px; }
 .verified-copy { padding-top: 6px; }
@@ -234,24 +239,33 @@
   .takeoff-card { grid-column: 1 / -1; }
   .agent-card { margin: 48px 0 0; }
 }
-@media (max-width: 1340px) {
+/* 05 runs in three columns only where the pay app's four columns and the
+   two-line heading both fit; narrower desktops put the copy above. */
+@media (min-width: 1440px) {
+  .billing .copy h2 { font-size: 60px; }
+  .sov th:not(:first-child), .sov td:not(:first-child) { padding-left: 10px; }
+  .sov th:not(:last-child), .sov td:not(:last-child) { padding-right: 10px; }
+}
+@media (max-width: 1439px) {
   .billing .wrap { grid-template-columns: minmax(0, 1fr) 230px; }
   .billing .copy { grid-column: 1 / -1; grid-row: 1; max-width: 760px; margin-bottom: 8px; }
+}
+@media (max-width: 1340px) {
   .change .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
   .change-copy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 40px; align-items: center; padding-top: 0; }
   .change-copy .prop-skylight { margin: 0; }
   .change-stage { max-width: 980px; }
 }
 @media (max-width: 1240px) {
-  .moving .wrap, .subs .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-  .subs-copy { padding-top: 0; }
+  .moving .wrap, .subs .wrap, .jobcost .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .subs-copy, .jobcost-copy { padding-top: 0; }
   .prop-siding { max-width: 420px; margin: 28px 0 0; }
   .moving-copy { order: -1; }
   .prop-skylight { max-width: 420px; margin: 28px 0 0; }
 }
 @media (max-width: 1100px) {
-  .subs .wrap, .verified .wrap, .jobcost .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-  .change-copy, .subs-copy, .jobcost-copy { padding-top: 0; }
+  .subs .wrap, .verified .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .change-copy, .subs-copy { padding-top: 0; }
   .prop-skylight, .prop-siding { max-width: 420px; margin: 28px 0 0; }
   .verified-copy { order: -1; }
   .prop-window { display: none; }
