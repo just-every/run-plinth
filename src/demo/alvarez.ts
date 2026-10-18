@@ -8,13 +8,14 @@ import type { Action, Project, Step } from './timeline'
 // covers Oct 1 – Oct 16 and is issued Mon Oct 19, 8:30 am.
 export function alvarez({ named: d }: Calendar): Project {
   const moveIn = (minute: number, action: Action): Step => ({ at: [-10, 16, 35 + minute], by: 'rosa', ...action })
-  const changes: [string, number][] = [
-    ['sister the undersized ceiling joists found at demolition', 248_000],
-    ['relocate the HVAC return to the new hall closet', 135_000],
-    ['two recessed lights and a dimmer in the stair hall', 86_000],
-    ['LVL header over the new stair opening, per the engineer’s revision', 312_000],
-    ['closed-cell spray foam at the rim joists in place of batts', 194_000],
-    ['hose bib and exterior outlet on the north wall', 187_000],
+  // [scope, amount, the day Ana signed it in Buildertrend]: all before pay apps 1–3, billed through Wed Sep 30.
+  const changes: [string, number, number][] = [
+    ['sister the undersized ceiling joists found at demolition', 248_000, -61],
+    ['relocate the HVAC return to the new hall closet', 135_000, -54],
+    ['two recessed lights and a dimmer in the stair hall', 86_000, -47],
+    ['LVL header over the new stair opening, per the engineer’s revision', 312_000, -40],
+    ['closed-cell spray foam at the rim joists in place of batts', 194_000, -33],
+    ['hose bib and exterior outlet on the north wall', 187_000, -26],
   ]
   const booked: [string, string, number, number][] = [
     ['Peak Electric', 'Electrical rough-in', -7, -3], ['Riverbend Plumbing', 'Plumbing rough-in', -7, -3], ['Cedar Insulation', 'Insulation', 3, 4], ['Twin Cities Drywall', 'Drywall', 7, 25],
@@ -27,7 +28,7 @@ export function alvarez({ named: d }: Calendar): Project {
       moveIn(0, { do: 'quote', lines: [['Demolition, shoring and site protection', 3_840_000], ['Framing, sheathing and roof structure', 11_260_000], ['Windows, roofing and exterior envelope', 9_680_000], ['Electrical, plumbing and HVAC', 7_130_000], ['Insulation, drywall and finish carpentry', 6_290_000], ['Tile, paint and finishes', 3_660_000]], notes: 'Includes materials, labor and sales tax. Carried over from Buildertrend at the move-in.' }),
       moveIn(3, { do: 'accept', method: 'signed', evidence: `Ana and Marco Alvarez e-signed the contract ${d(-66)}; carried over from Buildertrend.` }),
       ...changes.map(([scope, cents], i) => moveIn(10 + i, { do: 'change', key: `co${i + 1}`, description: `Change order ${i + 1} · ${scope}`, cents })),
-      ...changes.map((_, i) => ({ at: [-10, 17, 20 + i], by: 'client', do: 'sign', key: `co${i + 1}` }) as Step),
+      ...changes.map(([, , signed], i) => ({ at: [-10, 16, 45 + i], by: 'client', do: 'sign', key: `co${i + 1}`, carried: `signed by Ana Alvarez in Buildertrend ${d(signed)}` }) as Step),
       { at: [-10, 17, 40], by: 'rosa', do: 'bill', key: 'pa1-3', description: `Pay apps 1–3 · demolition through framing, billed through ${d(-19)} in Buildertrend`, cumulative: 9_641_000 },
       { at: [-10, 17, 41], by: 'rosa', do: 'approve bill', key: 'pa1-3' },
       { at: [-10, 17, 42], by: 'rosa', do: 'export bill', key: 'pa1-3' },

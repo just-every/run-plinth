@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Schedule as Booking } from '../plinth/model'
-import { Action, Badge, day, dateTime, Field, Form, money, time } from './shared'
+import { Action, Badge, clientName, day, dateTime, Field, Form, money, time } from './shared'
 import { Icon } from './icons'
 import { Gantt, weeks } from './gantt'
 import { JobLog } from './history'
@@ -52,6 +52,6 @@ function BookingPanel({ job, manager, mutate, go, booking, onPick }: JobProps & 
     </dl>
     {manager && draft && <div className="side-actions"><Action className="primary" action={() => mutate('/schedules/' + booking.id + '/approve')}>Approve trade booking</Action><p className="hint">Approval checks every job: a trade can’t be booked twice at the same time.</p></div>}
     <section className="side-section"><h3>Trades on this job</h3><ul className="trades">{trades.map(s => { const all = job.schedules.filter(x => x.trade.toLowerCase() === s.trade.toLowerCase()), open = all.some(x => x.status === 'draft'); return <li key={s.id}><button type="button" onClick={() => onPick((all.find(x => x.status === 'draft') ?? all[0]!).id)}><Icon name={open ? 'clock' : 'check'} className={`state-icon${open ? ' is-open' : ''}`} /><span>{s.trade}</span><Badge status={open ? 'draft' : 'booked'}>{open ? 'Draft' : all.length > 1 ? `${all.length} booked` : 'Booked'}</Badge><Icon name="chevron" className="chev" /></button></li> })}</ul></section>
-    <section className="side-section"><h3>{manager ? `Waiting on ${job.client_email}` : 'Waiting on you'}</h3>{changes.length === 0 ? <p className="muted">No change orders waiting on the client.</p> : <ul className="waiting">{changes.map(v => <li key={v.id}><button type="button" onClick={() => go('Changes')}><span>{v.description}</span><strong>{money(v.amount_cents)}</strong></button></li>)}</ul>}</section>
+    <section className="side-section"><h3>{manager ? `Waiting on ${clientName(job)}` : 'Waiting on you'}</h3>{changes.length === 0 ? <p className="muted">No change orders waiting on the client.</p> : <ul className="waiting">{changes.map(v => <li key={v.id}><button type="button" onClick={() => go('Changes')}><span>{v.description}</span><strong>{money(v.amount_cents)}</strong></button></li>)}</ul>}</section>
   </aside>
 }

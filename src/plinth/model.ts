@@ -8,7 +8,7 @@ export interface Quote { id: string; revision: number; lines: Line[]; total_cent
 export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked'; prepared_by: Stamp }
 export interface Attachment { id: string; name: string; mime: string; checksum: string; size: number }
 export interface Diary { id: string; date: string; note: string; attachments: Attachment[]; status: 'draft' | 'published'; prepared_by: Stamp }
-export interface Variation { id: string; revision: number; description: string; amount_cents: number; status: 'draft' | 'approved'; prepared_by: Stamp; approved_by?: Stamp }
+export interface Variation { id: string; revision: number; description: string; amount_cents: number; status: 'draft' | 'approved'; prepared_by: Stamp; approved_by?: Stamp; carried_over?: string }
 export interface Receipt { id: string; amount_cents: number; reference: string; recorded_by: Stamp }
 export interface Order { id: string; supplier: string; description: string; amount_cents: number; status: 'draft' | 'issued'; receipts: Receipt[]; prepared_by: Stamp; issued_by?: Stamp }
 export interface Reconciliation { currency: 'USD'; base_cents: number; variation_cents: number; contract_cents: number; previous_cents: number; cumulative_cents: number; current_cents: number; remaining_cents: number; commitments_cents: number; received_cents: number; outstanding_cents: number; accepted_quote_id: string; variations: {id:string;amount_cents:number}[]; orders: {id:string;amount_cents:number;received_cents:number}[] }

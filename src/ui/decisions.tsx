@@ -1,5 +1,5 @@
 import type { Job } from '../plinth/model'
-import { calendarDay, money } from './shared'
+import { calendarDay, clientName, money } from './shared'
 import { Icon } from './icons'
 import type { Section } from './job'
 
@@ -31,7 +31,7 @@ export function DecisionStrip({ job, manager, go }: { job: Job; manager: boolean
     <Icon name="spark" className="spark" />
     <div>
       <p>{lead}</p>
-      <p className="agent-sub">{yours.length > 0 && <>{yours.map((r, i) => <button key={i} className="strip-link" onClick={() => go(r.section)}>{r.label}</button>)}</>}{client.length > 0 && <span>Waiting on {job.client_email}: {client.map((r, i) => <button key={i} className="strip-link" onClick={() => go(r.section)}>{r.label}</button>)}</span>}{rows.length === 0 && 'Agents prepare drafts; a person approves each one.'}</p>
+      <p className="agent-sub">{yours.length > 0 && <>{yours.map((r, i) => <button key={i} className="strip-link" onClick={() => go(r.section)}>{r.label}</button>)}</>}{client.length > 0 && <span>Waiting on {clientName(job)}: {client.map((r, i) => <button key={i} className="strip-link" onClick={() => go(r.section)}>{r.label}</button>)}</span>}{rows.length === 0 && 'Agents prepare drafts; a person approves each one.'}</p>
     </div>
   </section>
 }

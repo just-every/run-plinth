@@ -6,7 +6,7 @@ const kinds: Record<string, string> = { quote: 'recorded the client’s quote ac
 const subject = (a: Approval) => { const s = a.snapshot as Record<string, any>; return s?.description ?? s?.trade ?? s?.supplier ?? s?.reference ?? (s?.revision ? `Quote ${s.revision}` : '') }
 /** Newest first by the time of the decision, not by when the record was stored. */
 export const newest = (approvals: Approval[]) => [...approvals].sort((a, b) => b.approved_by.at.localeCompare(a.approved_by.at))
-export const logLine = (a: Approval) => `${a.approved_by.name} ${kinds[a.kind] ?? a.kind.replaceAll('_', ' ') + ' approved'}`
+export const logLine = (a: Approval) => { const carried = (a.snapshot as Record<string, any>)?.carried_over; return carried ? `Change order carried over, ${carried}` : `${a.approved_by.name} ${kinds[a.kind] ?? a.kind.replaceAll('_', ' ') + ' approved'}` }
 
 /** The latest approvals, newest first: the job's own worklog. */
 export function JobLog({ job, go, limit }: Pick<JobProps, 'job' | 'go'> & { limit: number }) {

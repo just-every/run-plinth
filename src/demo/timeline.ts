@@ -15,7 +15,7 @@ export type Action =
   | { do: 'book'; trade: string; work: string; from: number; to: number; hours?: [start: When[1], end: When[1]] }
   | { do: 'log'; note: string }
   | { do: 'change'; key: string; description: string; cents: number }
-  | { do: 'sign'; key: string }
+  | { do: 'sign'; key: string; carried?: string }
   | { do: 'order'; key: string; supplier: string; description: string; cents: number }
   | { do: 'issue'; key: string }
   | { do: 'receive'; key: string; cents: number; reference: string }
@@ -47,7 +47,7 @@ export async function playJob(db: D1Database, project: Project, people: Record<E
       case 'book': { const [start, end] = step.hours ?? [7, 15.5]; prepareSchedule(job, by, { trade: step.trade, description: step.work, start: shift(step.from, Math.floor(start), (start % 1) * 60), end: shift(step.to, Math.floor(end), (end % 1) * 60) }, [...others, job]); break }
       case 'log': await prepareDiary(db, job, by, { date: calendar.date(step.at[0]), note: step.note }); break
       case 'change': keyed.set(step.key, prepareVariation(job, by, { description: step.description, amount_cents: step.cents }).id); break
-      case 'sign': approveVariation(job, by, keyed.get(step.key)!); break
+      case 'sign': approveVariation(job, by, keyed.get(step.key)!, step.carried); break
       case 'order': keyed.set(step.key, prepareOrder(job, by, { supplier: step.supplier, description: step.description, amount_cents: step.cents }).id); break
       case 'issue': issueOrder(job, by, keyed.get(step.key)!); break
       case 'receive': receiveOrder(job, by, keyed.get(step.key)!, { amount_cents: step.cents, reference: step.reference }); break

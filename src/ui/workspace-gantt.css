@@ -10,10 +10,8 @@
 .workspace .schedule-card .card-meta { margin-left: auto; color: var(--muted); font-size: 12px; }
 .workspace .schedule-card > .empty { padding: 24px 18px 30px; border-top: 1px solid var(--line); }
 .workspace .gantt { --table: 364px; container-type: inline-size; border-top: 1px solid var(--line); }
-@container (max-width: 860px) {
-  .workspace .gantt .g-mon { display: none; }
-}
-.workspace .gantt.is-long .g-mon { display: none; }
+/* As in the pick ("Mon 19, 26, Mon 2"): the first week and each month's first week name the weekday when the columns have room. */
+.workspace .gantt:not(.has-room) .g-mon { display: none; }
 .workspace .g-head, .workspace .g-row { display: grid; grid-template-columns: 172px 96px 96px minmax(0, 1fr); }
 .workspace .g-head { border-bottom: 1px solid var(--line); color: var(--text); font-size: 13px; }
 .workspace .g-col { align-self: end; padding: 0 12px 9px; border-right: 1px solid var(--line-soft); }
@@ -23,7 +21,7 @@
 .workspace .g-months, .workspace .g-weeks { grid-row: 1; display: grid; grid-template-columns: repeat(var(--weeks), minmax(0, 1fr)); }
 .workspace .g-weeks { grid-row: 3; }
 .workspace .g-months span { padding: 4px 8px; border-left: 1px solid var(--line-soft); color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; overflow: hidden; }
-.workspace .g-weeks span { padding: 6px 0 0 6px; border-left: 1px solid var(--line-soft); color: var(--body); font-size: 12px; white-space: nowrap; overflow: hidden; }
+.workspace .g-weeks > span { padding: 6px 0 0 6px; border-left: 1px solid var(--line-soft); color: var(--body); font-size: 12px; white-space: nowrap; overflow: hidden; }
 .workspace .g-body { position: relative; }
 .workspace .g-row { width: 100%; min-height: 44px; padding: 0; border: 0; border-bottom: 1px solid var(--line-soft); background: none; text-align: left; font-size: 13px; color: var(--text); }
 .workspace .g-row:hover { background: color-mix(in srgb, var(--blue-tint) 55%, var(--paper)); }
