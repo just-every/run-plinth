@@ -7,6 +7,10 @@
 .workspace fieldset{padding:0;border:0;display:grid;gap:24px;min-width:0;margin:24px 0 0}
 .workspace label{display:grid;gap:8px;font-size:15px;font-weight:500;min-width:0;color:var(--ink)}
 .workspace input,.workspace textarea,.workspace select{width:100%;min-width:0;min-height:48px;border:1px solid var(--rer-border);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:16px;font-weight:400}
+/* every single-choice select; multiple and size>1 lists keep their native look (Base #247 foundation/runtime/select-style.ts) */
+.workspace select:not([multiple],[size]:not([size="1"])){--rer-select-ink:var(--rer-muted);-webkit-appearance:none;appearance:none;padding-inline-end:40px;line-height:normal;text-overflow:ellipsis;background-image:linear-gradient(to top right,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px)),linear-gradient(to top left,transparent calc(50% - 1.1px),var(--rer-select-ink) calc(50% - .55px),var(--rer-select-ink) calc(50% + .55px),transparent calc(50% + 1.1px));background-repeat:no-repeat;background-position:right 20px center,right 14px center;background-size:6px 6px}
+.workspace select:not([multiple],[size]:not([size="1"])):focus-visible{--rer-select-ink:var(--rer-text)}
+.workspace select:not([multiple],[size]:not([size="1"])):disabled{--rer-select-ink:color-mix(in srgb,var(--rer-muted) 55%,transparent)}
 .workspace input::placeholder,.workspace textarea::placeholder{color:var(--muted);opacity:.8}
 .workspace input[type=file]{font-size:14px;padding:12px;border-style:dashed;white-space:normal;overflow:hidden}
 .workspace input[type=file]::file-selector-button{font:inherit;background:var(--card-inset);color:var(--ink);border:1px solid var(--rule);border-radius:999px;padding:8px 12px;margin:0 12px 4px 0;cursor:pointer}
