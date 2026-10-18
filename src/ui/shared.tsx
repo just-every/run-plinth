@@ -29,8 +29,8 @@ export const day = (value: string | number | Date) => new Date(value).toLocaleDa
 /** A stored YYYY-MM-DD date (a daily log's), read as that calendar day. */
 export const calendarDay = (value: string) => day(value + 'T12:00:00')
 export const time = (value: string | number) => new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()
-/** The client's name as their own approvals carry it; their email until they have approved something. */
-export const clientName = (job: Job) => job.approvals.find(a => a.approved_by.role === 'member')?.approved_by.name ?? job.client_email
+/** The client's name from People & access or their own approvals; their email until Plinth knows it. */
+export const clientName = (job: Job) => job.client_name ?? job.approvals.find(a => a.approved_by.role === 'member')?.approved_by.name ?? job.client_email
 export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('')
 export function Field({ label, name, type = 'text', required = true, ...props }: {label: string; name: string; type?: string; required?: boolean; [key: string]: unknown}) {
   return <label>{label}<input name={name} type={type} required={required} {...props} /></label>
