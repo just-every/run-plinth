@@ -1,6 +1,9 @@
 import { Badge, Action, calendarDay, Field, Form } from './shared'
 import type { JobProps } from './job'
 
+/** Today's date where the viewer is, YYYY-MM-DD (not the UTC date). */
+const localDate = () => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10) }
+
 export function DailyLogs({job,manager,mutate}: JobProps) {
   return <div className="split"><section className="card"><div className="card-head"><h2>Daily logs</h2><span className="muted">{job.diary.length} {job.diary.length === 1 ? 'entry' : 'entries'}</span></div>
     {job.diary.length === 0 && <p className="empty">No daily logs yet. Record what happened on site, with photos.</p>}
@@ -13,5 +16,5 @@ export function DailyLogs({job,manager,mutate}: JobProps) {
       attachments.push({name:file.name,mime:file.type,base64})
     }
     return mutate('/diary',{date:f.get('date'),note:f.get('note'),attachments})
-  }}><Field label="Log date" name="date" type="date" defaultValue={new Date().toISOString().slice(0,10)} /><label>Work, conditions and decisions<textarea name="note" required rows={5} /></label><label>Photos (PNG or JPEG, up to 2 MB each)<input type="file" name="photos" accept="image/png,image/jpeg" multiple /></label></Form></aside>}</div>
+  }}><Field label="Log date" name="date" type="date" defaultValue={localDate()} /><label>Work, conditions and decisions<textarea name="note" required rows={5} /></label><label>Photos (PNG or JPEG, up to 2 MB each)<input type="file" name="photos" accept="image/png,image/jpeg" multiple /></label></Form></aside>}</div>
 }

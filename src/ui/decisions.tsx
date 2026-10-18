@@ -1,5 +1,5 @@
 import type { Job } from '../plinth/model'
-import { money } from './shared'
+import { calendarDay, money } from './shared'
 import { Icon } from './icons'
 import type { Section } from './job'
 
@@ -12,7 +12,7 @@ export function waiting(job: Job, manager: boolean): Waiting[] {
   if (manager) {
     if (job.status === 'quoting' && latest?.status === 'draft') rows.push({ label: `Quote ${latest.revision} needs the client's acceptance recorded`, section: 'Quote', agent: latest.prepared_by.role === 'agent' })
     for (const s of job.schedules.filter(s => s.status === 'draft')) rows.push({ label: `${s.trade}: ${s.description}`, section: 'Schedule', agent: s.prepared_by.role === 'agent' })
-    for (const d of job.diary.filter(d => d.status === 'draft')) rows.push({ label: `Daily log for ${d.date} to publish`, section: 'Daily logs', agent: d.prepared_by.role === 'agent' })
+    for (const d of job.diary.filter(d => d.status === 'draft')) rows.push({ label: `Daily log for ${calendarDay(d.date)} to publish`, section: 'Daily logs', agent: d.prepared_by.role === 'agent' })
     for (const o of job.orders.filter(o => o.status === 'draft')) rows.push({ label: `PO to ${o.supplier} for ${money(o.amount_cents)}`, section: 'Purchasing', agent: o.prepared_by.role === 'agent' })
     for (const c of job.claims.filter(c => c.status === 'draft')) rows.push({ label: `${c.description} for ${money(c.reconciliation.current_cents)}`, section: 'Billing', agent: c.prepared_by.role === 'agent' })
     for (const c of job.claims.filter(c => c.status === 'approved')) rows.push({ label: `${c.description}: record its export`, section: 'Billing', agent: false })

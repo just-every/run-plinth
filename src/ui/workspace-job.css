@@ -15,7 +15,7 @@
 .workspace .agent-strip p { color: var(--text); font-size: 15px; line-height: 1.4; }
 .workspace .agent-strip strong { color: var(--ink); font-weight: 700; }
 .workspace .agent-strip .agent-sub { margin-top: 2px; color: var(--body); font-size: 14px; }
-.workspace .agent-sub > .strip-link + .strip-link::before, .workspace .agent-sub span .strip-link + .strip-link::before { content: '·'; display: inline-block; margin: 0 8px; color: var(--muted); text-decoration: none; }
+.workspace .agent-sub .strip-link:has(+ .strip-link)::after { content: '·'; display: inline-block; margin: 0 8px; color: var(--muted); text-decoration: none; }
 .workspace .agent-sub > span { display: inline; }
 .workspace .agent-sub > .strip-link ~ span::before { content: ''; display: block; }
 .workspace .strip-link { text-align: left; }

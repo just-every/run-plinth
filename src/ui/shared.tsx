@@ -21,7 +21,8 @@ export const cents = (value: FormDataEntryValue | null) => {
   if (!Number.isSafeInteger(result)) throw new Error('Amount is too large.')
   return result
 }
-export const dateTime = (value: string | number) => new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+/** "Oct 14, 2026, 9:20 am": the same lower-case time as everywhere else. */
+export const dateTime = (value: string | number) => `${new Date(value).toLocaleDateString('en-US', { dateStyle: 'medium' })}, ${time(value)}`
 /** "Mon Oct 12": the weekday and date, in the viewer's time. */
 export const day = (value: string | number | Date) => new Date(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '')
 /** A stored YYYY-MM-DD date (a daily log's), read as that calendar day. */
