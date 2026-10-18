@@ -53,7 +53,7 @@ Issuing records a commitment in Plinth; it does not send an order or pay the sup
 3. Press **Prepare pay app**.
 4. Review the accepted quote, approved change orders, earlier billing, supplier commitments and receipts. Check **This pay app** and **Balance to finish**.
 5. Press **Approve pay app**, then **Record export to your books**.
-6. Download **Download pay app CSV** and **Download full reconciliation** for your books. Amounts are in USD.
+6. Press **Download pay app CSV** and **Download full reconciliation** for your books. Amounts are in USD.
 
 With a current contract of $421,840.00, earlier exported pay apps of $96,410.00 and $142,350.00 billed to date, the reconciliation is:
 
