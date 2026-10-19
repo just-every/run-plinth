@@ -4,7 +4,7 @@ import { Icon, type IconName } from './icons'
 
 export type View = 'jobs' | 'imports' | 'people' | 'customers' | 'vendors'
 export type Me = { displayName: string; email: string; role: string }
-const roles: Record<string, string> = { owner: 'Owner', admin: 'Project manager', client: 'Client', member: 'Client' }
+const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', client: 'Client', member: 'Client' }
 
 type RailProps = { view: View; role: string; me?: Me; jobs: { id: string; name: string }[]; selected: string; open: boolean; onView: (view: View) => void; onJob: (id: string) => void; onClose: () => void }
 

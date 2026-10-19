@@ -1,6 +1,6 @@
 import { scheduleBlockers, requireScheduleClearance } from './schedule-constraints'
 import { latestActual, taskActualDates } from './schedule-baseline-model'
-import { requireManager } from './auth'
+import { requireJobManager } from './auth'
 import { active, need, object, recordApproval, stamp, text, type Actor, type Input, type Job, type Schedule } from './model'
 import { scheduleTime } from './operations'
 import { addWork, nextWork, subtractWork, workingCalendar, workingMinutes } from './schedule-calendar'
@@ -50,7 +50,7 @@ function ordered(tasks: Schedule[]): Schedule[] {
  tasks.forEach(visit); return result
 }
 export async function previewSchedule(job: Job, actor: Actor, input: Input, all: Job[]): Promise<SchedulePreview> {
- requireManager(actor, true); active(job)
+ requireJobManager(actor, true); active(job)
  const calendar = workingCalendar(input.calendar ?? job.schedule_calendar, job.time_zone), tasks = normalize(job, actor, input), sorted = ordered(tasks), byId = new Map(tasks.map(s => [s.id, s]))
  need(!all.some(other => other.id !== job.id && other.schedules.some(task => byId.has(task.id))), 'Task identities must be unique across jobs', 409, 'schedule_identity')
  for (const task of sorted) {
@@ -85,7 +85,7 @@ export async function previewSchedule(job: Job, actor: Actor, input: Input, all:
  return { blockers: scheduleBlockers(job, tasks), tasks, calendar, changes, conflicts, completion_before: finish(job.schedules), completion_after: completion, critical_path: critical.reverse(), digest }
 }
 export async function publishSchedule(job: Job, actor: Actor, input: Input, all: Job[]) {
- requireManager(actor)
+ requireJobManager(actor)
  const preview = await previewSchedule(job, actor, input, all)
  need(input.digest === preview.digest, 'Preview these exact dates before publishing', 409, 'schedule_review')
  need(!preview.conflicts.length, 'Resolve the reviewed trade conflicts before publishing', 409, 'schedule_conflict', { conflicts: preview.conflicts })

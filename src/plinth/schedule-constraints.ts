@@ -1,4 +1,4 @@
-import { requireManager } from './auth'
+import { requireJobManager } from './auth'
 import { digest, fromBase64 } from './attachments'
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Attachment, type Input, type Job, type Schedule } from './model'
 import type { ConstraintEvent, ScheduleBlocker, ScheduleConstraint } from './schedule-constraint-model'
@@ -39,7 +39,7 @@ async function documents(db: D1Database, job: Job, input: Input) {
  return { metadata, writes }
 }
 export async function constraintAction(db: D1Database, job: Job, actor: Actor, input: Input, id?: string) {
- requireManager(actor); active(job)
+ requireJobManager(actor); active(job)
  const constraints = job.schedule_constraints ??= []
  need(constraints.length < 200 || id, 'This job has reached its constraint limit')
  let row: ScheduleConstraint
@@ -61,7 +61,7 @@ export async function constraintAction(db: D1Database, job: Job, actor: Actor, i
  return { record: row, writes: files.writes }
 }
 export async function constraintFile(db: D1Database, job: Job, actor: Actor, id: string) {
- requireManager(actor, true)
+ requireJobManager(actor, true)
  const metadata = job.schedule_constraints?.flatMap(c => c.events.flatMap(e => e.documents)).find(f => f.id === id)
  need(metadata, 'Document not found', 404, 'not_found')
  const stored = await db.prepare('SELECT bytes FROM pl_schedule_constraint_files WHERE id=? AND job_id=?').bind(id, job.id).first<{ bytes: ArrayBuffer }>()

@@ -18,7 +18,7 @@ export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'a
 
 export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: string; onBack: () => void; onChange: () => Promise<void>}) {
   const [job, setJob] = useState<Job>(), [section, setSection] = useState<Section>(), [error, setError] = useState('')
-  const manager = ['owner', 'admin', 'manager'].includes(role)
+  const manager = ['owner', 'admin', 'project_manager'].includes(role)
   async function refresh() { const result = await api('/jobs/' + id); setJob(result.job) }
   useEffect(() => { const tab = new URLSearchParams(window.location.search).get('tab'); setJob(undefined); setSection(sections.find(s => s === tab)); refresh().catch(e => setError(e.message)) }, [id])
   useEffect(() => { if (!section) return; const url = new URL(window.location.href); url.searchParams.set('tab', section); window.history.replaceState(null, '', url) }, [section])

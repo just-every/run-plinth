@@ -48,6 +48,12 @@ export function operatorAuth(env: Bindings) {
 }
 
 const privateHeaders = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow' }
+/** ROLE-001: a project manager is a Base administrator narrowed by Plinth, so Base's people and access routes refuse them. */
+const peopleRoutes = ['/auth/invite', '/auth/invite/cancel', '/auth/operators', '/auth/operator/status', '/auth/operator/role']
+async function projectManager(request: Request, env: Bindings) {
+ const session = await operatorAuth(env).getSession(request)
+ return session?.operator.role === 'admin' && !!await env.DB.prepare('SELECT 1 AS ok FROM pl_team WHERE operator_id=?').bind(session.operator.id).first()
+}
 async function handleAuthResponse(request: Request, original: Bindings): Promise<Response | null> {
  const env = runtimeBindings(original), url = new URL(request.url)
  if (url.pathname.startsWith('/.well-known/rer-') || url.pathname.startsWith('/auth/dependencies/')) {
@@ -63,6 +69,7 @@ async function handleAuthResponse(request: Request, original: Bindings): Promise
   })(request)
   if (page) return fontDocumentResponse(page)
  }
+ if (peopleRoutes.includes(url.pathname) && await projectManager(request, env)) return Response.json({ error: 'forbidden', message: 'Project managers do not manage people or access' }, { status: 403, headers: privateHeaders })
  if (url.pathname.startsWith('/auth/')) return fontDocumentResponse(await createAuthHandler(operatorAuth(env))(request))
  if (url.pathname === '/setup' || url.pathname === '/app' || url.pathname.startsWith('/app/')) {
   const setup = await firstRunResponse(request, env, operatorAuth(env), { theme })

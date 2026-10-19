@@ -1,4 +1,4 @@
-import { requireManager } from './auth'
+import { requireJobManager, requireManager } from './auth'
 import { date } from './catalog-input'
 import { need, object, usdOnly, recordApproval, stamp, text, type Actor, type Input, type Job, type Quote } from './model'
 import { calculatePricing, pricingPercent, pricingRules, type PricingRate, type PricingRateRevision, type PricingSnapshot } from './pricing-model'
@@ -34,7 +34,7 @@ export async function pricingResponse(request: Request, db: D1Database, actor: A
 }
 async function digest(value: unknown) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2, '0')).join('') }
 export async function previewPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
- requireManager(actor, true); usdOnly(job)
+ requireJobManager(actor, true); usdOnly(job)
  const current = job.quotes.at(-1); need(current, 'Prepare an estimate before pricing', 409, 'quote_required')
  need(input.quote_id === undefined || input.quote_id === current.id, 'Price the current quote revision', 409, 'revision')
  need(input.basis === undefined || input.basis === 'sell' || input.basis === 'cost', 'Choose sell or cost pricing basis')
@@ -58,7 +58,7 @@ export async function previewPricing(db: D1Database, job: Job, actor: Actor, inp
  return { proposal, previous_total_cents: current.total_cents, total_delta_cents: calculated.total_cents - current.total_cents, sold: job.status !== 'quoting', digest: await digest([job.id, job.version, proposal]) }
 }
 export async function applyPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
- requireManager(actor); usdOnly(job)
+ requireJobManager(actor); usdOnly(job)
  const preview = await previewPricing(db, job, actor, input)
  need(input.digest === preview.digest, 'Quote, pricing inputs or reviewed rate revisions changed; preview again before approving', 409, 'pricing_review')
  need(!preview.sold, 'Sold estimates stay frozen; use a change order', 409, 'quote_frozen')

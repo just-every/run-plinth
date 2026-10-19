@@ -1,11 +1,11 @@
 import { requireScheduleClearance } from './schedule-constraints'
-import { requireManager } from './auth'
+import { requireJobManager } from './auth'
 import { find, need, recordApproval, type Actor, type Input, type Job } from './model'
 import { checkConflicts, scheduleTime } from './operations'
 
 /** A human decision changes published work without replacing its calendar identity. */
 export function changeSchedule(job: Job, actor: Actor, id: string, input: Input, action: string, all: Job[]) {
-  requireManager(actor)
+  requireJobManager(actor)
   const row = find(job.schedules, id)
   need(row.duration_minutes === undefined && !job.schedules.some(s => s.predecessors?.some(d => d.id === id)), 'Review dependent shifts in the schedule planner before publishing', 409, 'schedule_review')
   need(row.status === 'booked', 'Only a booked trade can be moved or cancelled', 409, 'schedule_state')

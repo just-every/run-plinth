@@ -4,7 +4,8 @@ import { catalogPreview, applyCatalog } from './catalog-quote'
 import { costCodeReport, costCodeCsv, projectEstimateCosts } from './estimate-report'
 import { constraintAction, constraintFile } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
-import { authorize, requireManager, requireOwner } from './auth'
+import { authorize, requireJobManager, requireManager, requireOwner } from './auth'
+import { teamResponse } from './team'
 import { emptyJob, DomainError, need, object, type Actor, type Input, type Job } from './model'
 import { insertJob, jobOf, jobs, readClock, saveJob, transaction } from './store'
 import { acceptQuote, approveVariation, prepareQuote, prepareVariation } from './quotes'
@@ -39,6 +40,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const team=await teamResponse(request,env.DB,actor,parts,body);if(team)return team
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
  const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
@@ -46,7 +48,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
- if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(()=>true);const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
+ if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>actor.role!=='project_manager'||actor.team!.job_ids.includes(job.id));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(parts.length===3&&parts[2]==='customer'&&method==='GET'){requireManager(actor);return json({customer:previous.customer_id?await getCustomer(env.DB,previous.customer_id):null})}
@@ -67,7 +69,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   await eraseJob(env.DB,actor,previous)
   return json({erased:true,job_id:previous.id})
  }
- need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
+ need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireJobManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
  need(input.expected_version===previous.version,'Job changed. Reload before applying this action.',409,'stale_version')
  if(parts.length===4&&parts[2]==='pricing'&&parts[3]==='preview')return json({preview:await previewPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})

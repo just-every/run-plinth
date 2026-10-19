@@ -1,5 +1,5 @@
 import { templateTaskId } from './schedule-baseline-model'
-import { requireManager } from './auth'
+import { requireJobManager, requireManager } from './auth'
 import { active, emptyJob, find, need, object, recordApproval, stamp, text, type Actor, type Input, type Job } from './model'
 import { workingCalendar } from './schedule-calendar'
 import { previewSchedule, publishSchedule } from './schedule-plan'
@@ -113,7 +113,7 @@ export async function previewScheduleTemplate(job: BaselineJob, actor: Actor, in
  return {...preview,digest:await templateDigest(preview.digest,template)}
 }
 export async function applyScheduleTemplate(job: BaselineJob, actor: Actor, input: Input, template: ScheduleTemplate, all: Job[]) {
- requireManager(actor)
+ requireJobManager(actor)
  const proposal = await templateScheduleInput(job, template, input)
  const reviewed = await previewSchedule(job, actor, proposal, all)
  need(input.digest === await templateDigest(reviewed.digest,template),'The source template changed. Preview its current revision before applying.',409,'schedule_review')
@@ -127,7 +127,7 @@ export async function applyScheduleTemplate(job: BaselineJob, actor: Actor, inpu
 
 /** Call immediately after publishSchedule; a failed validation must prevent saving the cloned job. */
 export function recordRevision(job: BaselineJob, actor: Actor, input: Input): ScheduleRevision | undefined {
- requireManager(actor)
+ requireJobManager(actor)
  const suppliedName = text(input.revision_name, 'Revision name', 200, true), suppliedReason = text(input.reason, 'Revision reason', 4000, true)
  if (!job.schedule_baselines?.length && !suppliedName && !suppliedReason) return
  const publication = job.approvals.findLast(approval => approval.kind === 'schedule.publish')
@@ -143,7 +143,7 @@ export function recordRevision(job: BaselineJob, actor: Actor, input: Input): Sc
 
 /** Actual evidence and baseline decisions append history; neither changes a published feed. */
 export async function scheduleBaselineAction(job: BaselineJob, actor: Actor, input: Input, action: 'baseline' | 'actuals', all: Job[]) {
- requireManager(actor); active(job)
+ requireJobManager(actor); active(job)
  if (action === 'baseline') {
   need(job.schedules.some(task => task.status === 'booked') && job.schedules.every(task => task.status !== 'draft'), 'Publish the reviewed schedule before recording a baseline', 409, 'schedule_review')
   const baseline: ScheduleBaseline = { id: crypto.randomUUID(), revision: (job.schedule_baselines?.length ?? 0) + 1, name: uniqueName(job.schedule_baselines ?? [], input.name, 'baseline name'), reason: text(input.reason, 'Baseline reason', 4000), approval_id: '', approved_by: stamp(actor), ...snapshot(job) }
