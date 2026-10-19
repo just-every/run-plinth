@@ -10,6 +10,8 @@ import { emptyJob, DomainError, need, object, type Actor, type Input, type Job }
 import { insertJob, jobOf, jobs, readClock, saveJob, transaction } from './store'
 import { acceptQuote, approveVariation, prepareQuote, prepareVariation } from './quotes'
 import { approveSchedule, issueOrder, prepareOrder, prepareSchedule, receiveOrder } from './operations'
+import { orderAction, orderResponse } from './purchase-orders'
+import { sendOrder } from './purchase-order-send'
 import { approveDiary, prepareDiary, serveAttachment } from './attachments'
 import { customersResponse } from './customers'
 import { getCustomer } from './customers'
@@ -59,6 +61,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   return new Response(costCodeCsv(report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename=estimate-${report.revision}-cost-codes.csv`}})
  }
  if(parts.length===5&&parts[2]==='claims'&&parts[4]==='packet'&&method==='GET')return packetResponse(env.DB,previous,actor,parts[3]!)
+ if(parts[2]==='orders'&&(parts.length===4||parts.length===5&&parts[4]==='document')&&method==='GET')return orderResponse(previous,actor,parts[3]!,parts.length===5)
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
@@ -75,6 +78,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='schedule-template'&&parts[3]==='preview')return json({preview:await previewScheduleTemplate(previous,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))})
  if(parts.length===4&&parts[2]==='schedule'&&parts[3]==='preview')return json({preview:await previewSchedule(previous,actor,input,await jobs(env.DB))})
+ if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  if(category==='pricing'&&id==='apply'&&parts.length===4)record=await applyPricing(env.DB,job,actor,input)
  else if(category==='estimate-template'&&id==='apply'&&parts.length===4)record=await applyCatalog(env.DB,job,actor,input)
@@ -84,7 +88,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  else if(category==='subcontracts'&&parts.length>=5&&['lien','draws'].includes(action!)){const result=await lienAction(env.DB,job,actor,parts.slice(3),input);record=result.record;writes=result.writes}
  else if(parts.length===3&&['schedule-baseline','schedule-actuals'].includes(category))record=await scheduleBaselineAction(job,actor,input,category==='schedule-baseline'?'baseline':'actuals',await jobs(env.DB))
  else if(parts.length===3){switch(category){case 'customer':record=await linkCustomer(env.DB,job,actor,input);break;case 'subcontracts':{const awarded=await awardSubcontract(env.DB,job,actor,input);record=awarded.row;writes=awarded.writes;break}case 'quotes':record=prepareQuote(job,actor,input);break;case 'schedules':record=prepareSchedule(job,actor,input,await jobs(env.DB));break;case 'diary':{const prepared=await prepareDiary(env.DB,job,actor,input);record=prepared.row;writes=prepared.writes;break}case 'variations':record=prepareVariation(job,actor,input);break;case 'orders':record=prepareOrder(job,actor,input);break;case 'claims':record=prepareClaim(job,actor,input);break;default:throw new DomainError('not_found','Unknown action',404)}}
- else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
+ else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'orders/acknowledge':case 'orders/promise':case 'orders/ship':case 'orders/return':case 'orders/cancel':case 'orders/amend':case 'orders/approve-amendment':record=orderAction(job,actor,id!,action!,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
  await saveJob(env.DB,actor,previous,job,writes,clock)
  return json({job:display((await named(env.DB,[job]))[0]!,actor),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
 }

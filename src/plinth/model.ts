@@ -5,6 +5,7 @@ import type { TaskDependency, WorkingCalendar } from './schedule-model'
 import { timeZone } from './time-zone'
 import type { Subcontract } from './subcontracts'
 import type { LienPacket } from './lien-waiver-model'
+import type { LineQuantity, PoAmendment, PoLine, PoReturn, PoShipment, PoSource } from './purchase-order-model'
 /** Money of a job: USD unless it is a labelled historical import. */
 export const currencyOf = (job: { currency?: Currency }): Currency => job.currency ?? 'USD'
 export type Input = Record<string, unknown>
@@ -18,8 +19,9 @@ export interface Schedule { id: string; trade: string; start: string; end: strin
 export interface Attachment { id: string; name: string; mime: string; checksum: string; size: number }
 export interface Diary { id: string; date: string; note: string; attachments: Attachment[]; status: 'draft' | 'published'; prepared_by: Stamp }
 export interface Variation { id: string; revision: number; description: string; amount_cents: number; status: 'draft' | 'approved'; prepared_by: Stamp; approved_by?: Stamp; carried_over?: string }
-export interface Receipt { id: string; amount_cents: number; reference: string; recorded_by: Stamp }
-export interface Order { id: string; supplier: string; description: string; amount_cents: number; status: 'draft' | 'issued'; receipts: Receipt[]; prepared_by: Stamp; issued_by?: Stamp }
+export interface Receipt { id: string; amount_cents: number; reference: string; recorded_by: Stamp; lines?: LineQuantity[]; received_on?: string }
+/** SUB-005 fields are optional so NATIVE-006 single-amount orders stay readable. */
+export interface Order { id: string; supplier: string; description: string; amount_cents: number; status: 'draft' | 'issued' | 'cancelled'; receipts: Receipt[]; prepared_by: Stamp; issued_by?: Stamp; source?: PoSource; lines?: PoLine[]; vendor_email?: string; delivery?: import('./purchase-order-send').PoDelivery; acknowledgment?: { acknowledged_on: string; by_name: string; reference: string; recorded_by: Stamp }; promised_on?: string; promise_history?: { from?: string; to: string; reason: string; recorded_by: Stamp }[]; shipments?: PoShipment[]; returns?: PoReturn[]; amendments?: PoAmendment[]; cancelled?: { reason: string; released_cents: number; by: Stamp } }
 export type Currency = 'USD' | 'AUD'
 export interface Reconciliation { currency: Currency; base_cents: number; variation_cents: number; contract_cents: number; previous_cents: number; cumulative_cents: number; current_cents: number; remaining_cents: number; commitments_cents: number; received_cents: number; outstanding_cents: number; accepted_quote_id: string; variations: {id:string;amount_cents:number}[]; orders: {id:string;amount_cents:number;received_cents:number}[] }
 export interface Claim { id: string; description: string; cumulative_cents: number; status: 'draft' | 'approved' | 'exported'; prepared_by: Stamp; reconciliation: Reconciliation; approved_by?: Stamp; exported_by?: Stamp; export?: {format:'plinth-progress-claim-v1';purpose:string;job_id:string;job_name:string;claim_id:string;description:string;reconciliation:Reconciliation;approved_by:Stamp;lien_waivers:LienPacket} }
