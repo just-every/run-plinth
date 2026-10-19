@@ -1,0 +1,101 @@
+// SCH-001 browser journey against an actual rer dev installation with native owner sign-in.
+// PLINTH_URL and PLINTH_STATE point to that installation and a private Playwright storage state.
+import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+import { chromium, expect } from '@playwright/test'
+const base = process.env.PLINTH_URL, state = process.env.PLINTH_STATE, shots = process.env.PLINTH_SCREENSHOTS
+assert.ok(base && state && shots, 'Set PLINTH_URL, PLINTH_STATE and PLINTH_SCREENSHOTS outside the repository')
+await mkdir(shots, { recursive: true })
+const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
+try {
+ const context = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 1100 } }), page = await context.newPage()
+ await page.goto(base + '/app')
+ const name = 'Maple Street whole-home renovation — Morgan and Taylor Chen, phase one ' + Date.now()
+ await page.getByLabel('Job name', { exact: true }).fill(name)
+ await page.getByLabel('Client email', { exact: true }).fill('client@dev.localhost')
+ await page.getByLabel('Site address', { exact: true }).fill('2480 Maple Street, Burlington, VT 05401')
+ await page.getByRole('button', { name: 'Create job', exact: true }).click()
+ await page.getByLabel('Scope of work', { exact: true }).fill('Whole-home renovation: demolition, inspection and drywall, including reviewed permit milestone')
+ await page.getByLabel('Quote total (including sales tax if applicable)').fill('480000.00')
+ await page.getByRole('button', { name: 'Prepare quote revision', exact: true }).click()
+ await page.getByLabel('Client acceptance reference').fill('Signed agreement returned by Morgan and Taylor Chen, 19 October 2026')
+ await page.getByRole('button', { name: 'Record client acceptance', exact: true }).click()
+ await page.getByRole('navigation', { name: 'Job sections', exact: true }).getByRole('button', { name: 'Schedule', exact: true }).click()
+ await page.getByText('Working calendar · UTC', { exact: true }).click()
+ await page.getByLabel('Holidays (YYYY-MM-DD, one per line)').fill('2026-11-26')
+ for (const width of [1440, 390]) { await page.setViewportSize({width,height:1100}); await page.waitForTimeout(250); await page.evaluate(() => scrollTo(0,0)); await page.screenshot({ animations: 'disabled',path:`${shots}/SCH-001-calendar-editor-${width}.png`,fullPage:true}) }
+ await page.getByRole('button', { name: 'Stage working calendar', exact: true }).click()
+ await page.getByText('Working calendar · UTC', { exact: true }).click()
+ const add = async (description, trade, start, minutes, predecessors = []) => {
+  await page.getByRole('button', { name: 'Add task or milestone', exact: true }).click()
+  const editor = page.getByRole('complementary', { name: 'Schedule task editor' })
+  await editor.getByLabel('Task name', { exact: true }).fill(description)
+  await editor.getByLabel('Responsible person', { exact: true }).fill('Alex Rivera — project superintendent')
+  await editor.getByLabel('Trade or subcontractor', { exact: true }).fill(trade + ' / ' + name.slice(-13))
+  await editor.getByLabel('Earliest start (UTC)', { exact: true }).fill(start)
+  if (!minutes) await editor.getByLabel('Milestone (zero duration)', { exact: true }).check()
+  else await editor.getByLabel('Working duration (minutes)', { exact: true }).fill(String(minutes))
+  for (const predecessor of predecessors) await editor.getByLabel(predecessor, { exact: true }).check()
+  if (predecessors.length) for (const width of [1440, 390]) { await page.setViewportSize({width,height:1100}); await page.waitForTimeout(250); await page.evaluate(() => scrollTo(0,0)); await page.screenshot({ animations: 'disabled',path:`${shots}/SCH-001-task-editor-${predecessors.length}-${width}.png`,fullPage:true}) }
+  await editor.getByRole('button', { name: 'Stage task', exact: true }).click()
+  await expect(page.getByRole('list', { name: 'Tasks in schedule plan' }).getByRole('button', { name: description, exact: true })).toBeVisible()
+ }
+ await add('Demolition and safe removal', 'Maple Demolition', '2026-11-06T08:00', 540)
+ await add('Rough inspection', 'Burlington inspections', '2026-11-06T08:00', 120, ['Demolition and safe removal'])
+ await add('Permit released', 'Permit coordination', '2026-11-06T08:00', 0)
+ await add('Drywall installation with fire-rated stair enclosure', 'North Country Drywall', '2026-11-06T08:00', 540, ['Rough inspection', 'Permit released'])
+ await page.getByRole('button', { name: 'Preview schedule', exact: true }).click()
+ await expect(page.getByRole('heading', { name: 'Review schedule before publishing' })).toBeVisible()
+ await expect(page.getByText('Proposed client completion', { exact: true }).locator('..')).toContainText('Nov 10, 2026')
+ const captureViews = async (phase, width) => {
+  await page.setViewportSize({ width, height: 1100 })
+  for (const view of ['Gantt', 'Calendar', 'List']) {
+   await page.getByRole('navigation', { name: 'Schedule views' }).getByRole('button', { name: view, exact: true }).click()
+   const screen = view === 'Gantt' ? page.getByRole('list', { name: 'Tasks by start date, UTC' }) : view === 'Calendar' ? page.getByRole('region', { name: 'Schedule calendar', exact: true }) : page.getByRole('list', { name: 'Schedule task list', exact: true })
+   await expect(screen).toContainText('Drywall installation with fire-rated stair enclosure')
+   await expect(screen).toContainText('Permit released')
+   await expect(screen).toContainText('Milestone')
+   await expect(screen).toContainText('Critical path')
+   if (view === 'List') await expect(screen.getByRole('listitem').filter({ hasText: 'Drywall installation' })).toContainText(phase === 'delayed' ? 'Nov 12, 2026' : 'Nov 10, 2026')
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${view} fits ${width}px`)
+   await page.evaluate(() => scrollTo(0,0))
+   await page.screenshot({ animations: 'disabled', path: `${shots}/SCH-001-${phase}-${view}-${width}.png`, fullPage: true })
+  }
+ }
+ for (const width of [1440, 390]) await captureViews('preview', width)
+ await page.getByRole('button', { name: 'Publish reviewed schedule', exact: true }).click()
+ await expect(page.getByText(/4 tasks · Published dates/)).toBeVisible()
+ const plan = page.getByRole('list', { name: 'Tasks in schedule plan' })
+ await plan.getByRole('button', { name: 'Rough inspection', exact: true }).click()
+ const editor = page.getByRole('complementary', { name: 'Schedule task editor' })
+ await editor.getByLabel('Earliest start (UTC)', { exact: true }).fill('2026-11-11T08:00')
+ await editor.getByRole('button', { name: 'Stage task', exact: true }).click()
+ await page.getByRole('button', { name: 'Preview schedule', exact: true }).click()
+ await expect(page.getByText('Proposed client completion', { exact: true }).locator('..')).toContainText('Nov 12, 2026')
+ for (const width of [1440, 390]) await captureViews('delayed', width)
+ await page.getByRole('button', { name: 'Publish reviewed schedule', exact: true }).click()
+ await expect(page.getByText(/4 tasks · Published dates/)).toBeVisible()
+ await page.reload()
+ await page.getByRole('navigation', { name: 'Schedule views' }).getByRole('button', { name: 'List', exact: true }).click()
+ await expect(page.getByRole('list', { name: 'Schedule task list' })).toContainText('Nov 12, 2026')
+ // A cycle is exercised through the same editor; await page.waitForTimeout(250); no publication is offered for a refused preview.
+ await page.getByRole('list', { name: 'Tasks in schedule plan' }).getByRole('button', { name: 'Demolition and safe removal', exact: true }).click()
+ await page.getByRole('complementary', { name: 'Schedule task editor' }).getByLabel('Drywall installation with fire-rated stair enclosure', { exact: true }).check()
+ await page.getByRole('button', { name: 'Stage task', exact: true }).click()
+ await page.getByRole('button', { name: 'Preview schedule', exact: true }).click()
+ await expect(page.getByRole('alert').filter({ hasText: 'cycle' })).toBeVisible()
+ await expect(page.getByRole('button', { name: 'Publish reviewed schedule', exact: true })).toHaveCount(0)
+ for (const width of [1440, 390]) { await page.setViewportSize({width,height:1100}); await page.waitForTimeout(250); await page.evaluate(() => scrollTo(0,0)); await page.screenshot({ animations: 'disabled',path:`${shots}/SCH-001-cycle-${width}.png`,fullPage:true}) }
+ await page.getByRole('button', { name: 'Discard staged changes', exact: true }).click()
+ await page.getByRole('list', { name: 'Tasks in schedule plan' }).getByRole('button', { name: 'Drywall installation with fire-rated stair enclosure', exact: true }).click()
+ await page.getByLabel('Cancel this task', { exact: true }).check()
+ await page.getByRole('button', { name: 'Stage task', exact: true }).click()
+ await page.getByRole('button', { name: 'Preview schedule', exact: true }).click()
+ await page.getByRole('button', { name: 'Publish reviewed schedule', exact: true }).click()
+ await expect(page.getByText(/4 tasks · Published dates/)).toBeVisible()
+ await page.getByRole('navigation', { name: 'Schedule views' }).getByRole('button', { name: 'List', exact: true }).click()
+ await expect(page.getByRole('list', {name:'Schedule task list'}).getByRole('listitem').filter({hasText:'Drywall installation'})).toContainText('Cancelled')
+ for (const width of [1440, 390]) { await page.setViewportSize({width,height:1100}); await page.waitForTimeout(250); await page.evaluate(() => scrollTo(0,0)); await page.screenshot({ animations: 'disabled',path:`${shots}/SCH-001-cancelled-${width}.png`,fullPage:true}) }
+ console.log('SCH-001 browser journey passed at 1440 and 390: create, preview, all views, publish, delay, reload and cycle refusal')
+ await context.close()
+} finally { await browser.close() }

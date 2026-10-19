@@ -2,7 +2,7 @@ import type { Approval } from '../plinth/model'
 import { api, Action, dateTime, day, time } from './shared'
 import type { JobProps } from './job'
 
-const kinds: Record<string, string> = { 'client.contacts': 'updated authorized job contacts', quote: 'recorded the client’s quote acceptance', schedule: 'approved a trade booking', 'schedule.move': 'approved new booking dates', 'schedule.cancel': 'cancelled a trade booking', diary: 'published a daily log', variation: 'approved a change order', purchase_order: 'issued a purchase order', receipt: 'recorded a supplier receipt', claim: 'approved a pay app' }
+const kinds: Record<string, string> = { 'schedule.publish': 'published reviewed schedule dates', 'client.contacts': 'updated authorized job contacts', quote: 'recorded the client’s quote acceptance', schedule: 'approved a trade booking', 'schedule.move': 'approved new booking dates', 'schedule.cancel': 'cancelled a trade booking', diary: 'published a daily log', variation: 'approved a change order', purchase_order: 'issued a purchase order', receipt: 'recorded a supplier receipt', claim: 'approved a pay app' }
 const subject = (a: Approval) => { const s = a.snapshot as Record<string, any>; return s?.after?.description ?? s?.description ?? s?.trade ?? s?.supplier ?? s?.reference ?? (s?.revision ? `Quote ${s.revision}` : '') }
 /** Newest first by the time of the decision, not by when the record was stored. */
 export const newest = (approvals: Approval[]) => [...approvals].sort((a, b) => b.approved_by.at.localeCompare(a.approved_by.at))

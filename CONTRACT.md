@@ -96,7 +96,7 @@ Every page, API, file, webhook, automation and export enforces current authority
 
 ### Scheduling and field delivery
 
-- **SCH-001 — Gantt tasks dependencies and milestones.** Plan jobs in Gantt, calendar and list views with owners, durations, milestones, predecessor relationships, lag, working calendars and critical path. Move a predecessor and preview dependent shifts, conflicts and client completion impact before publishing. Cycles are refused. Approved tasks inherit INT-006 scoped calendar publication, stable event identity, UTC time, update and cancellation semantics. **Acceptance evidence:** Create demolition-to-inspection-to-drywall dependencies, add a permit milestone, delay inspection and compare all views. Publish the reviewed dates and reject a dependency cycle. Subscribe through INT-006, move and cancel a published task, and verify the same UID with its new sequence and cancellation state.
+- **SCH-001 — Gantt tasks dependencies and milestones.** Plan jobs in Gantt, calendar and list views with owners, durations, milestones, predecessor relationships, lag, working calendars and critical path. Move a predecessor and preview dependent shifts, conflicts and client completion impact before publishing. Cycles are refused. Scheduling uses finish-to-start links and nonnegative whole working-minute lag; positive whole working-minute duration excludes nights, nonworking weekdays and configured holiday dates, while milestones have zero duration. Each job’s working calendar explicitly states its UTC hours and weekdays. Requested starts are earliest dates: dependency changes push successors later, and never silently pull an existing promise earlier. Critical tasks have no working-minute float against the proposed job finish. A preview shows the full candidate schedule, trade conflicts and old/new completion without changing published records; human publication binds that exact proposal to the current job version and checks conflicts again atomically. Cancelling a predecessor requires removing or replacing its dependent links in the same reviewed plan. Approved tasks inherit INT-006 scoped calendar publication, stable event identity, UTC time, update and cancellation semantics. **Acceptance evidence:** Create demolition-to-inspection-to-drywall dependencies, add a permit milestone, delay inspection and compare all views. Publish the reviewed dates and reject a dependency cycle. Subscribe through INT-006, move and cancel a published task, and verify the same UID with its new sequence and cancellation state.
 
 - **SCH-002 — Schedule baselines templates and variance.** Reuse a schedule template on sale, record a human-approved baseline and compare actual starts/finishes and forecasts with that baseline. Approved changes create named revisions; history still shows original promised dates and why they moved. Template and baseline revisions inherit INT-006 scoped feed publication, update and cancellation semantics. **Acceptance evidence:** Apply a remodel template when a job sells, baseline it, record delayed framing and publish a revised finish. Compare baseline/current/actual and open the authorizing decision. Fetch the INT-006 subscription after a published revision and cancellation: retain the task UID, increment its sequence and expose the new dates or cancellation.
 
@@ -340,8 +340,8 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 2 | 29 | 89 | 120 |
-| All | 16 | 29 | 89 | 134 |
+| Target and push further | 3 | 28 | 89 | 120 |
+| All | 17 | 28 | 89 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -380,7 +380,7 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | `BID-001` | Bid requests and subcontractor responses | target | missing |  | No bid requests and subcontractor responses workflow exists. |
 | `BID-002` | Comparable scope and award decisions | target | missing |  | No comparable scope and award decisions workflow exists. |
 | `BID-003` | Bid follow-up and procurement lead times | target | missing |  | No bid follow-up and procurement lead times workflow exists. |
-| `SCH-001` | Gantt tasks dependencies and milestones | target | partial | `src/plinth/operations.ts`; `src/ui/job.tsx` | Trade intervals exist; task owners, Gantt, dependencies and critical path do not. |
+| `SCH-001` | Gantt tasks dependencies and milestones | target | done | `src/plinth/schedule-plan.ts`; `src/plinth/schedule-calendar.ts`; `src/plinth/schedule-model.ts`; `src/ui/schedule.tsx`; `src/ui/schedule-editor.tsx`; `src/ui/schedule-views.tsx`; `tests/plinth/schedule.test.mjs`; `tests/journeys/schedule.mjs` | |
 | `SCH-002` | Schedule baselines templates and variance | target | missing |  | No schedule baselines templates and variance workflow exists. |
 | `SCH-003` | Cross-job capacity and trade confirmations | target | partial | `src/plinth/operations.ts`; `tests/plinth/domain.test.mjs` | Same-trade overlap refusal exists; availability calendars, capacity, travel and confirmation workflow are absent. |
 | `SCH-004` | Published schedule changes and acknowledgements | target | missing |  | No published schedule changes and acknowledgements workflow exists. |

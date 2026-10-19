@@ -1,3 +1,4 @@
+import type { TaskDependency, WorkingCalendar } from './schedule-model'
 export type Input = Record<string, unknown>
 export type Role = 'owner' | 'admin' | 'member' | 'agent'
 export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string; client_job_id?: string }
@@ -5,7 +6,7 @@ export interface Stamp { id: string; name: string; role: Role; at: string }
 export interface Approval { id: string; kind: string; subject_id: string; revision: number; prepared_by: Stamp; approved_by: Stamp; decision: 'approved'; snapshot: unknown }
 export interface Line { description: string; quantity: number; unit_cents: number; total_cents: number }
 export interface Quote { id: string; revision: number; lines: Line[]; total_cents: number; notes: string; status: 'draft' | 'accepted' | 'superseded'; prepared_by: Stamp; acceptance?: { method: string; evidence: string; client_email: string; recorded_by: Stamp } }
-export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked' | 'cancelled'; prepared_by: Stamp; revision?: number; updated_at?: string }
+export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked' | 'cancelled'; prepared_by: Stamp; revision?: number; updated_at?: string; owner?: string; duration_minutes?: number; milestone?: boolean; predecessors?: TaskDependency[] }
 export interface Attachment { id: string; name: string; mime: string; checksum: string; size: number }
 export interface Diary { id: string; date: string; note: string; attachments: Attachment[]; status: 'draft' | 'published'; prepared_by: Stamp }
 export interface Variation { id: string; revision: number; description: string; amount_cents: number; status: 'draft' | 'approved'; prepared_by: Stamp; approved_by?: Stamp; carried_over?: string }
@@ -13,7 +14,7 @@ export interface Receipt { id: string; amount_cents: number; reference: string; 
 export interface Order { id: string; supplier: string; description: string; amount_cents: number; status: 'draft' | 'issued'; receipts: Receipt[]; prepared_by: Stamp; issued_by?: Stamp }
 export interface Reconciliation { currency: 'USD'; base_cents: number; variation_cents: number; contract_cents: number; previous_cents: number; cumulative_cents: number; current_cents: number; remaining_cents: number; commitments_cents: number; received_cents: number; outstanding_cents: number; accepted_quote_id: string; variations: {id:string;amount_cents:number}[]; orders: {id:string;amount_cents:number;received_cents:number}[] }
 export interface Claim { id: string; description: string; cumulative_cents: number; status: 'draft' | 'approved' | 'exported'; prepared_by: Stamp; reconciliation: Reconciliation; approved_by?: Stamp; exported_by?: Stamp; export?: {format:'plinth-progress-claim-v1';purpose:string;job_id:string;job_name:string;claim_id:string;description:string;reconciliation:Reconciliation;approved_by:Stamp} }
-export interface Job { id: string; version: number; name: string; client_email: string; address: string; status: 'quoting' | 'active'; created_by: Stamp; quotes: Quote[]; schedules: Schedule[]; diary: Diary[]; variations: Variation[]; orders: Order[]; claims: Claim[]; approvals: Approval[]; import_evidence?: Record<string, unknown>; client_name?: string; customer_id?: string; property_id?: string; client_contact_ids?: string[] }
+export interface Job { id: string; version: number; name: string; client_email: string; address: string; status: 'quoting' | 'active'; created_by: Stamp; quotes: Quote[]; schedules: Schedule[]; diary: Diary[]; variations: Variation[]; orders: Order[]; claims: Claim[]; approvals: Approval[]; import_evidence?: Record<string, unknown>; client_name?: string; customer_id?: string; property_id?: string; client_contact_ids?: string[]; schedule_calendar?: WorkingCalendar; schedule_critical_path?: string[] }
 export class DomainError extends Error { constructor(public code:string, message:string, public status=400, public details?:unknown){super(message)} }
 export function need(value:unknown,message:string,status=400,code='invalid',details?:unknown): asserts value {if(!value)throw new DomainError(code,message,status,details)}
 export function object(value:unknown): Input {need(!!value&&typeof value==='object'&&!Array.isArray(value),'Expected an object'); return value as Input}

@@ -1,61 +1,89 @@
+import { useEffect, useRef, useState } from 'react'
+import type { Schedule as Booking } from '../plinth/model'
+import { defaultCalendar, type SchedulePreview, type WorkingCalendar } from '../plinth/schedule-model'
 import { CalendarSubscription } from './calendar'
 import { BookingChanges } from './booking-changes'
-import { useState } from 'react'
-import type { Schedule as Booking } from '../plinth/model'
-import { Action, Badge, clientName, day, dateTime, Field, Form, money, time } from './shared'
+import { Action, Badge, clientName, dateTime, money } from './shared'
 import { Icon } from './icons'
 import { Gantt, weeks } from './gantt'
 import { JobLog } from './history'
 import { DecisionStrip } from './decisions'
+import { CalendarEditor, TaskEditor, type TaskInput } from './schedule-editor'
+import { ScheduleCalendar, ScheduleList, scheduleDate, scheduleInstant, TaskDetails } from './schedule-views'
+import { ScheduleReview } from './schedule-review'
 import type { JobProps } from './job'
 
-const workdays = (s: Booking) => { let n = 0; for (let t = new Date(s.start); t <= new Date(s.end); t.setDate(t.getDate() + 1)) if (t.getDay() % 6) n++; return n }
-
-/** The Schedule tab: the chart, the job's log and the booking form under it, and the selected booking beside it. */
+/** Published dates stay visible until the server produces a reviewed proposal. */
 export function Schedule(props: JobProps) {
   const { job, manager, mutate, go } = props
   const [now] = useState(() => Date.now())
-  const logs = job.diary.filter(d => d.status === 'published').sort((a, b) => a.date.localeCompare(b.date))
-  const fallback = job.schedules.find(s => s.status === 'draft') ?? [...job.schedules].sort((a, b) => a.start.localeCompare(b.start)).find(s => Date.parse(s.end) >= now) ?? job.schedules[0]
+  const [tasks, setTasks] = useState<TaskInput[]>(job.schedules)
+  const [calendar, setCalendar] = useState<WorkingCalendar>(job.schedule_calendar ?? defaultCalendar)
+  const [preview, setPreview] = useState<SchedulePreview>()
+  const [dirty, setDirty] = useState(false)
+  const [view, setView] = useState<'Gantt' | 'Calendar' | 'List'>('Gantt')
   const [picked, setPicked] = useState<string>()
-  const selected = job.schedules.find(s => s.id === picked) ?? fallback
-  const grid = weeks(job.schedules, logs, now), drafts = job.schedules.filter(s => s.status === 'draft').length
+  const [editor, setEditor] = useState<string | 'new'>()
+  const generation = useRef(0)
+  useEffect(() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setDirty(false); setEditor(undefined) }, [job.id, job.version])
+  useEffect(() => { if (editor && window.innerWidth < 1240) document.getElementById('booking-panel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [editor])
+  const shown = preview?.tasks ?? job.schedules
+  const critical = preview?.critical_path ?? job.schedule_critical_path ?? []
+  const logs = job.diary.filter(d => d.status === 'published').sort((a, b) => a.date.localeCompare(b.date))
+  const selected = shown.find(s => s.id === picked) ?? shown.find(s => s.status === 'draft') ?? [...shown].sort((a, b) => a.start.localeCompare(b.start)).find(s => Date.parse(s.end) >= now) ?? shown[0]
+  const grid = weeks(shown, logs, now)
+  const pick = (id: string) => { setPicked(id); setEditor(undefined); if (window.innerWidth < 1240) document.getElementById('booking-panel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }
+  const stage = (task: TaskInput) => {
+    generation.current++
+    setTasks(current => current.some(t => t.id === task.id) ? current.map(t => t.id === task.id ? task : t) : [...current, task])
+    setPreview(undefined); setDirty(true); setEditor(undefined)
+  }
+  async function review() {
+    const requested = generation.current
+    const result = await mutate('/schedule/preview', { calendar, tasks })
+    if (generation.current === requested) setPreview(result.preview)
+  }
   return <div className="split">
     <div className="stack">
       <DecisionStrip job={job} manager={manager} go={go} />
       <section className="card schedule-card" aria-labelledby="schedule-title">
-        <div className="card-head"><h2 id="schedule-title">Schedule</h2><p className="range">{day(grid.start)} – {day(grid.end)}, {new Date(grid.end).getFullYear()}</p>
-          <p className="card-meta">{job.schedules.length} {job.schedules.length === 1 ? 'booking' : 'bookings'}{drafts > 0 && <> · <span className="late">{drafts} draft</span></>} · overlaps refused across all jobs</p></div>
-        {job.status !== 'active' ? <p className="empty">Accept the quote before booking trades. The schedule starts with the first booking.</p>
-          : job.schedules.length === 0 && logs.length === 0 ? <p className="empty">No trades booked yet. Book the first trade below; Plinth refuses a trade booked twice at the same time on any job.</p>
-          : <Gantt schedules={job.schedules} logs={logs} now={now} selected={selected?.id} onSelect={id => { setPicked(id); if (window.innerWidth < 1240) document.getElementById('booking-panel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }} onLogs={() => go('Daily logs')} />}
+        <div className="card-head"><h2 id="schedule-title">Schedule</h2><p className="range">{scheduleDate(grid.start)} – {scheduleDate(grid.end)}</p><p className="card-meta">{shown.length} tasks · {preview ? 'Proposed dates' : 'Published dates'} · UTC</p></div>
+        <nav className="tabs" aria-label="Schedule views">{(['Gantt', 'Calendar', 'List'] as const).map(name => <button type="button" key={name} aria-current={view === name ? 'page' : undefined} onClick={() => setView(name)}>{name}</button>)}</nav>
+        {job.status !== 'active' ? <p className="empty">Accept the quote before planning job work.</p>
+          : !shown.length && !logs.length ? <p className="empty">No tasks published. Add tasks and milestones, then preview and publish the schedule.</p>
+          : view === 'Gantt' ? <Gantt schedules={shown} logs={logs} now={now} critical={critical} selected={selected?.id} onSelect={pick} onLogs={() => go('Daily logs')} />
+          : view === 'Calendar' ? <ScheduleCalendar key={preview?.digest ?? job.version} tasks={shown} critical={critical} select={pick} />
+          : <ScheduleList tasks={shown} critical={critical} select={pick} />}
       </section>
-      <div className="under">
-        <JobLog job={job} go={go} limit={4} />
-        {manager && job.status === 'active' && <section className="card book"><h3>Book a trade</h3><Form submit="Book trade" action={async f => mutate('/schedules', { trade: f.get('trade'), start: new Date(String(f.get('start'))).toISOString(), end: new Date(String(f.get('end'))).toISOString(), description: f.get('description') })}><div className="fields"><Field label="Trade or subcontractor" name="trade" placeholder="Halvorsen Roofing" /><Field label="Work to complete" name="description" placeholder="Roof dry-in" /><Field label="Starts (your local time)" name="start" type="datetime-local" /><Field label="Ends (your local time)" name="end" type="datetime-local" /></div></Form></section>}
-      </div>
+      {manager && job.status === 'active' && <>
+        <section className="card"><h3>Plan tasks and milestones</h3>
+          <p>Assign responsible people, connect predecessors and review the effect on the client’s completion date. Working times and lag use UTC.</p>
+          {dirty && !preview && <p role="status">Unreviewed changes are staged. The views above still show the published schedule.</p>}
+          <div className="button-row"><button type="button" className="secondary" onClick={() => setEditor('new')}>Add task or milestone</button><Action className="secondary" action={review}>Preview schedule</Action>{dirty && <button type="button" className="secondary" onClick={() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setDirty(false); setEditor(undefined) }}>Discard staged changes</button>}</div>
+          {!!tasks.length && <ul className="rows" aria-label="Tasks in schedule plan">{tasks.map(task => <li className="row" key={task.id}><div className="row-main"><span><button type="button" className="link-button" onClick={() => setEditor(task.id)}>{task.description}</button></span><span>{task.owner ?? task.trade}{task.milestone && ' · Milestone'}{task.status === 'cancelled' && ' · Cancelled'}</span></div></li>)}</ul>}
+        </section>
+        <CalendarEditor calendar={calendar} save={next => { generation.current++; setCalendar(next); setPreview(undefined); setDirty(true) }} />
+        {preview && <ScheduleReview preview={preview} publish={async () => { await mutate('/schedule/publish', { calendar, tasks, digest: preview.digest }) }} discard={() => setPreview(undefined)} />}
+      </>}
+      <JobLog job={job} go={go} limit={4} />
       <CalendarSubscription mutate={mutate} />
     </div>
-    {selected && <BookingPanel {...props} booking={selected} onPick={setPicked} />}
+    {manager && editor ? <aside className="card side booking-panel" id="booking-panel" aria-label="Schedule task editor"><TaskEditor key={editor} task={editor === 'new' ? undefined : tasks.find(t => t.id === editor)} tasks={tasks} save={stage} close={() => setEditor(undefined)} /></aside>
+      : selected && <BookingPanel {...props} booking={selected} tasks={shown} critical={critical.includes(selected.id)} onPick={pick} edit={() => setEditor(selected.id)} />}
   </div>
 }
 
-function BookingPanel({ job, manager, mutate, go, booking, onPick }: JobProps & { booking: Booking; onPick: (id: string) => void }) {
-  const draft = booking.status === 'draft', cancelled = booking.status === 'cancelled', approval = job.approvals.find(a => a.kind === 'schedule' && a.subject_id === booking.id)
-  const trades = [...new Map(job.schedules.map(s => [s.trade.toLowerCase(), s])).values()]
+function BookingPanel({ job, manager, go, booking, tasks, critical, onPick, edit }: JobProps & { booking: Booking; tasks: Booking[]; critical: boolean; onPick: (id: string) => void; edit: () => void }) {
+  const draft = booking.status === 'draft', cancelled = booking.status === 'cancelled'
+  const approval = job.approvals.find(a => a.kind === 'schedule' && a.subject_id === booking.id)
+  const trades = [...new Map(tasks.map(s => [s.trade.toLowerCase(), s])).values()]
   const changes = job.variations.filter(v => v.status === 'draft')
   return <aside className="card side booking-panel" id="booking-panel" aria-label="Selected booking">
     <h2>{booking.description}</h2>
-    <div className={`side-status${draft ? ' is-late' : ''}`}><Icon name={draft ? 'spark' : 'hammer'} /><p><strong>{draft ? `Draft from ${booking.prepared_by.role === 'agent' ? 'Plinth agent' : booking.prepared_by.name}` : cancelled ? `Cancelled · ${booking.trade}` : `Booked with ${booking.trade}`}</strong><span>{draft ? `${booking.trade} · needs your approval` : `${workdays(booking)} working ${workdays(booking) === 1 ? 'day' : 'days'}`}</span></p></div>
-    <dl className="facts">
-      <div><dt>Starts</dt><dd>{day(booking.start)}, {time(booking.start)}</dd></div>
-      <div><dt>Ends</dt><dd>{day(booking.end)}, {time(booking.end)}</dd></div>
-      <div><dt>Prepared</dt><dd>{booking.prepared_by.name} · {dateTime(booking.prepared_by.at)}</dd></div>
-      {approval && <div><dt>Approved</dt><dd>{approval.approved_by.name} · {dateTime(approval.approved_by.at)}</dd></div>}
-    </dl>
-    {manager && draft && <div className="side-actions"><Action className="primary" action={() => mutate('/schedules/' + booking.id + '/approve')}>Approve trade booking</Action><p className="hint">Approval checks every job: a trade can’t be booked twice at the same time.</p></div>}
-    {manager && booking.status === 'booked' && <BookingChanges booking={booking} mutate={mutate} />}
-    <section className="side-section"><h3>Trades on this job</h3><ul className="trades">{trades.map(s => { const all = job.schedules.filter(x => x.trade.toLowerCase() === s.trade.toLowerCase()), open = all.some(x => x.status === 'draft'); return <li key={s.id}><button type="button" onClick={() => onPick((all.find(x => x.status === 'draft') ?? all[0]!).id)}><Icon name={open ? 'clock' : 'check'} className={`state-icon${open ? ' is-open' : ''}`} /><span>{s.trade}</span><Badge status={open ? 'draft' : 'booked'}>{open ? 'Draft' : all.every(x => x.status === 'cancelled') ? 'Cancelled' : `${all.filter(x => x.status === 'booked').length} booked`}</Badge><Icon name="chevron" className="chev" /></button></li> })}</ul></section>
+    <div className={`side-status${draft ? ' is-late' : ''}`}><Icon name={draft ? 'spark' : 'hammer'} /><div><p><strong>{draft ? `Draft from ${booking.prepared_by.name}` : cancelled ? 'Cancelled' : booking.milestone ? 'Milestone' : `Booked with ${booking.trade}`}</strong></p><TaskDetails task={booking} tasks={tasks} critical={critical} /></div></div>
+    <dl className="facts"><div><dt>Starts</dt><dd>{scheduleInstant(booking.start)}</dd></div><div><dt>Ends</dt><dd>{scheduleInstant(booking.end)}</dd></div><div><dt>Prepared</dt><dd>{booking.prepared_by.name} · {dateTime(booking.prepared_by.at)}</dd></div>{approval && <div><dt>Approved</dt><dd>{approval.approved_by.name} · {dateTime(approval.approved_by.at)}</dd></div>}</dl>
+    {manager && !cancelled && <BookingChanges booking={booking} edit={edit} />}
+    <section className="side-section"><h3>Trades on this job</h3><ul className="trades">{trades.map(s => { const all = tasks.filter(x => x.trade.toLowerCase() === s.trade.toLowerCase()), open = all.some(x => x.status === 'draft'); return <li key={s.id}><button type="button" onClick={() => onPick((all.find(x => x.status === 'draft') ?? all[0]!).id)}><Icon name={open ? 'clock' : 'check'} className={`state-icon${open ? ' is-open' : ''}`} /><span>{s.trade}</span><Badge status={open ? 'draft' : 'booked'}>{open ? 'Draft' : all.every(x => x.status === 'cancelled') ? 'Cancelled' : `${all.filter(x => x.status === 'booked').length} booked`}</Badge><Icon name="chevron" className="chev" /></button></li> })}</ul></section>
     <section className="side-section"><h3>{manager ? `Waiting on ${clientName(job)}` : 'Waiting on you'}</h3>{changes.length === 0 ? <p className="muted">No change orders waiting on the client.</p> : <ul className="waiting">{changes.map(v => <li key={v.id}><button type="button" onClick={() => go('Changes')}><span>{v.description}</span><strong>{money(v.amount_cents)}</strong></button></li>)}</ul>}</section>
   </aside>
 }
