@@ -1,11 +1,12 @@
 import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Schedule } from './model'
 import { requireManager } from './auth'
+export const scheduleTime=(input:Input,key:string)=>{const value=text(input[key],key,60);need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value)),`${key} requires a date, time and timezone`);return new Date(value).toISOString()}
 /** Glove dispatch conflicts: the same trade may not be committed twice in overlapping slots. */
 export function checkConflicts(all:Job[],job:Job,row:Schedule){const conflicts=all.flatMap(j=>j.schedules.filter(s=>!(j.id===job.id&&s.id===row.id)&&s.status==='booked'&&s.trade.toLowerCase()===row.trade.toLowerCase()&&s.start<row.end&&s.end>row.start).map(s=>({job_id:j.id,job_name:j.name,schedule_id:s.id,trade:s.trade,start:s.start,end:s.end})));need(!conflicts.length,'This trade is already scheduled during this time',409,'schedule_conflict',{conflicts})}
 export function prepareSchedule(job:Job,actor:Actor,input:Input,all:Job[]) {
  requireManager(actor,true);active(job)
- const parse=(key:string)=>{const value=text(input[key],key,60);need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value)),`${key} requires a date, time and timezone`);return new Date(value).toISOString()}
- const row:Schedule={id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:parse('start'),end:parse('end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
+
+ const row:Schedule={id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
  need(row.end>row.start,'Schedule must end after it starts');job.schedules.push(row)
  if(actor.role!=='agent')approveSchedule(job,actor,row.id,all)
  return row

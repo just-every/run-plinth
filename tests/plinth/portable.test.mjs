@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -32,6 +32,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const csv=await readFile(new URL('../fixtures/import-accepted-jobs.csv',import.meta.url),'utf8')
     const preview=await f.json('/api/plinth/imports/preview',{method:'POST',cookie:f.owner,body:{csv}});assert.equal(preview.status,200)
     r=await f.json('/api/plinth/imports/commit',{method:'POST',cookie:f.owner,body:{csv,fingerprint:preview.value.fingerprint}});assert.equal(r.status,200)
+    r=await f.json(`/api/plinth/jobs/${job.id}/calendar`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,action:'rotate'}});assert.equal(r.status,200);const feedPath=r.value.urlPath
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
     succeeds(command(source,'export','--output',before))
@@ -48,6 +49,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
     assert.ok(serialized.includes('Ashgrove kitchen')); assert.ok(serialized.includes(png)); assert.ok(serialized.includes('accepted-jobs.csv'))
+    assert.ok(!serialized.includes(feedPath.split('/').at(-1).replace('.ics','')))
+    assert.ok(!restored[0].tables.some(t=>t.name==='pl_calendar_tokens'))
     assert.ok(!serialized.includes('test-session-secret-for-plinth-integration-only-2026'))
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)

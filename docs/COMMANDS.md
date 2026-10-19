@@ -18,3 +18,9 @@ Dates use `YYYY-MM-DD`. Photos are PNG or JPEG, five maximum per entry and 2 MB 
 Managers using a human session publish their own trade bookings and daily logs directly; agent-prepared versions wait for explicit approval. Approval history records preparer, approver, time and the exact snapshot. A client only sees published job records for their own email. Every mutation and file retrieval checks authority on the server, independently of the screen.
 
 Purchase receipts use `/orders/:id/receive` with `amount_cents` and `reference`. Pay-app exports return an immutable `report`; repeating export returns the same report with no new approval or economic effect. The UI downloads CSV and full JSON. No provider is contacted by these product commands.
+
+## Calendar subscriptions (INT-006)
+
+A signed-in person opens a job's Schedule and creates a private calendar link, then pastes it into their calendar client's subscription field. It contains approved trade names, work descriptions and dates for that job only. Treat the URL as a credential. Rotation invalidates the previous URL; revoke removes access. Current account/job grants are checked on every fetch, and restoring a private archive requires a new link.
+
+`POST /api/plinth/jobs/:id/calendar` with `expected_version` and `action: "rotate"` returns `urlPath` once; `action: "revoke"` revokes your subscription. Owners/admins and the assigned client manage their own link; bearer agents cannot. The URL serves read-only RFC 5545 iCalendar, with UTC instants, stable UIDs, incrementing sequences and cancellation tombstones. It contains no internal financial fields. A manager moves booked work through `/schedules/:id/move` with explicit-offset `start`/`end`, or cancels through `/schedules/:id/cancel`; both require `expected_version` and retain the previous decision in History. Moving still checks cross-job conflicts.

@@ -59,6 +59,9 @@ importers:
       esbuild:
         specifier: 0.28.1
         version: 0.28.1
+      ical.js:
+        specifier: 2.2.1
+        version: 2.2.1
       miniflare:
         specifier: 5.20260907.0-alpha
         version: 5.20260907.0-alpha(@types/node@22.18.6)
@@ -936,6 +939,9 @@ packages:
   hono@4.13.7:
     resolution: {integrity: sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==}
     engines: {node: '>=16.9.0'}
+
+  ical.js@2.2.1:
+    resolution: {integrity: sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==}
 
   isbot@5.2.2:
     resolution: {integrity: sha512-iQcBXcd+Rv/pkubRyGh2utW2j1oPG5hZY6TUhVPpqK4G+o3IbxpJNx04hgksjc/N7GK5pEorUxDeg31cFgEk/w==}
@@ -2116,6 +2122,8 @@ snapshots:
       srvx: 0.11.22
 
   hono@4.13.7: {}
+
+  ical.js@2.2.1: {}
 
   isbot@5.2.2: {}
 

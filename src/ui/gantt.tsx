@@ -39,10 +39,10 @@ export function Gantt({ schedules, logs, now, selected, onSelect, onLogs }: Prop
       {rows.map(s => {
         const a = grid.at(Date.parse(s.start)), b = grid.at(Date.parse(s.end)), draft = s.status === 'draft'
         return <li key={s.id}><button type="button" className={`g-row${draft ? ' is-draft' : ''}${selected === s.id ? ' is-selected' : ''}${Date.parse(s.end) < now ? ' is-past' : ''}`} aria-pressed={selected === s.id} onClick={() => onSelect(s.id)}>
-          <span className="g-task"><strong>{s.description}</strong><span>{s.trade}</span></span>
+          <span className="g-task"><strong>{s.description}</strong><span>{s.trade}{s.status === 'cancelled' && ' · Cancelled'}</span></span>
           <span className="g-date"><span className="g-label">Start </span>{day(s.start)}</span>
           <span className="g-date"><span className="g-label">Finish </span>{day(s.end)}{draft && <em>Needs approval</em>}</span>
-          <span className="g-track"><span className="g-bar" style={vars({ '--a': a, '--b': b })} /><span className="g-tick" /></span>
+          <span className="g-track">{s.status !== 'cancelled' && <span className="g-bar" style={vars({ '--a': a, '--b': b })} />}<span className="g-tick" /></span>
         </button></li>
       })}
       {logs.length > 0 && <li><button type="button" className="g-row g-logs" onClick={onLogs}>

@@ -5,7 +5,7 @@ export interface Stamp { id: string; name: string; role: Role; at: string }
 export interface Approval { id: string; kind: string; subject_id: string; revision: number; prepared_by: Stamp; approved_by: Stamp; decision: 'approved'; snapshot: unknown }
 export interface Line { description: string; quantity: number; unit_cents: number; total_cents: number }
 export interface Quote { id: string; revision: number; lines: Line[]; total_cents: number; notes: string; status: 'draft' | 'accepted' | 'superseded'; prepared_by: Stamp; acceptance?: { method: string; evidence: string; client_email: string; recorded_by: Stamp } }
-export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked'; prepared_by: Stamp }
+export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked' | 'cancelled'; prepared_by: Stamp; revision?: number; updated_at?: string }
 export interface Attachment { id: string; name: string; mime: string; checksum: string; size: number }
 export interface Diary { id: string; date: string; note: string; attachments: Attachment[]; status: 'draft' | 'published'; prepared_by: Stamp }
 export interface Variation { id: string; revision: number; description: string; amount_cents: number; status: 'draft' | 'approved'; prepared_by: Stamp; approved_by?: Stamp; carried_over?: string }

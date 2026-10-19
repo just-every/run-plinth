@@ -17,8 +17,8 @@ export function Jobs({ jobs, all, query, manager, create, onOpen, onCreated }: P
     {all === 0 ? <section className="card empty-state"><span className="empty-icon" aria-hidden="true"><Icon name="folder" /></span><h2>{manager ? 'Start with an agreed job' : 'No jobs shared yet'}</h2><p>{manager ? 'Create the job, prepare its quote, then record the client’s acceptance.' : 'Your builder must use your sign-in email as the client on the job.'}</p></section>
       : jobs.length === 0 ? <section className="card empty-state"><h2>No jobs match “{query}”</h2><p>Search looks at job names, clients and addresses.</p></section>
       : <ul className="job-grid" aria-label="Jobs">{jobs.map(job => {
-        const times = job.schedules.flatMap(s => [Date.parse(s.start), Date.parse(s.end)]), first = Math.min(...times), last = Math.max(...times)
-        const next = [...job.schedules].filter(s => Date.parse(s.end) >= now).sort((a, b) => a.start.localeCompare(b.start))[0], mine = waiting(job, manager).filter(w => !w.onClient).length
+        const times = job.schedules.filter(s => s.status === 'booked').flatMap(s => [Date.parse(s.start), Date.parse(s.end)]), first = Math.min(...times), last = Math.max(...times)
+        const next = [...job.schedules].filter(s => s.status === 'booked' && Date.parse(s.end) >= now).sort((a, b) => a.start.localeCompare(b.start))[0], mine = waiting(job, manager).filter(w => !w.onClient).length
         return <li key={job.id}><button className="job-card" onClick={() => onOpen(job.id)}>
           <span className="job-card-top"><Badge>{job.status}</Badge>{mine > 0 && <span className="waiting-chip">{mine} waiting</span>}</span>
           <strong className="job-name">{job.name}</strong>
