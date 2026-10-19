@@ -7,9 +7,10 @@ import { Quotes, Changes } from './scope'
 import { Schedule } from './schedule'
 import { DailyLogs } from './site'
 import { Orders, Billing } from './money'
+import { JobCustomer } from './job-customer'
 import { History } from './history'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Purchasing', 'Billing', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Purchasing', 'Billing', 'Customer', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -39,7 +40,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
         <li><Icon name="money" />{job.status === 'active' ? <>Contract {money(contractTotal(job))}</> : 'Quote preparation'}</li>
         <li><Icon name="mail" />Client {job.client_email}</li>
       </ul>
-      <nav className="tabs" aria-label="Job sections">{sections.map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
+      <nav className="tabs" aria-label="Job sections">{sections.filter(s => s !== 'Customer' || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
     <div className="job-body">
       {open !== 'Schedule' && <DecisionStrip job={job} manager={manager} go={setSection} />}
@@ -49,6 +50,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Purchasing' && <Orders {...props} />}
       {open === 'Billing' && <Billing {...props} />}
+      {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'History' && <History {...props} onErased={onBack} />}
     </div>
   </div>

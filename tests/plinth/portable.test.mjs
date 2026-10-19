@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -26,6 +26,8 @@ test('INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, p
     await checkout(source); await checkout(destination); await checkout(erased)
     execFileSync(process.execPath,[join(root,'node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','DB','--local','--persist-to',join(source,'.wrangler/state'),'--config',join(source,'wrangler.jsonc')],{env,stdio:'pipe'})
     f=await createFixture({persistTo:source}); let job=await createActiveJob(f,'Ashgrove kitchen','client@example.com',4_800_000)
+    let customer=await f.json('/api/plinth/customers',{method:'POST',cookie:f.owner,body:{name:'Chen household archive',kind:'household',contacts:[{id:'archive-client',name:'Client Chen',email:'client@example.com'}],properties:[{id:'archive-home',label:'Home',address:'148 Maple Street, Portland, OR 97205'}],owner_contact_ids:['archive-client'],billing_contact_ids:['archive-client']}});assert.equal(customer.status,201)
+    let linked=await f.json(`/api/plinth/jobs/${job.id}/customer`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,customer_id:customer.value.customer.id,property_id:'archive-home',client_contact_ids:['archive-client']}});assert.equal(linked.status,200);job=linked.value.job
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
     let r=await f.json(`/api/plinth/jobs/${job.id}/diary`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,date:'2026-10-15',note:'Framing inspected; ready for electrical rough-in.',attachments:[{name:'framing.png',mime:'image/png',base64:png}]}})
     assert.equal(r.status,200); job=r.value.job
@@ -48,6 +50,7 @@ test('INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, p
     assert.deepEqual(rows(restored),expected)
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
+    assert.ok(serialized.includes('Chen household archive'));assert.ok(serialized.includes('archive-client'));
     assert.ok(serialized.includes('Ashgrove kitchen')); assert.ok(serialized.includes(png)); assert.ok(serialized.includes('accepted-jobs.csv'))
     assert.ok(!serialized.includes(feedPath.split('/').at(-1).replace('.ics','')))
     assert.ok(!restored[0].tables.some(t=>t.name==='pl_calendar_tokens'))

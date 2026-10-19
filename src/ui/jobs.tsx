@@ -1,6 +1,7 @@
+import { NewJob } from './new-job'
 import type { RefObject } from 'react'
 import type { Job } from '../plinth/model'
-import { api, Badge, day, Field, Form, money } from './shared'
+import { Badge, day, money } from './shared'
 import { Icon } from './icons'
 import { Page } from './shell'
 import { contractTotal } from './job'
@@ -13,7 +14,7 @@ export function Jobs({ jobs, all, query, manager, create, onOpen, onCreated }: P
   const active = jobs.filter(j => j.status === 'active').length, decisions = jobs.reduce((n, j) => n + waiting(j, manager).filter(w => !w.onClient).length, 0)
   const now = Date.now()
   return <Page title="Jobs" lead="Keep the agreed scope, daily logs and the next pay app together." aside={<ul className="chips" aria-label="Job counts"><li><Icon name="folder" />{active} active</li><li><Icon name="calendar" />{jobs.length - active} quoting</li><li className={decisions ? 'is-late' : undefined}><Icon name="spark" />{decisions} waiting on you</li></ul>}>
-    {manager && <section className="card create-job" ref={create} aria-labelledby="create-title"><h2 id="create-title">Create a job</h2><Form submit="Create job" action={async f => { const result = await api('/jobs', {name:f.get('name'),client_email:f.get('email'),address:f.get('address')}); await onCreated(); onOpen(result.job?.id || result.id) }}><div className="fields"><Field name="name" label="Job name" placeholder="Hartley kitchen remodel" maxLength={160} /><Field name="email" label="Client email" type="email" /><Field name="address" label="Site address" required={false} maxLength={300} /></div></Form></section>}
+    {manager && <NewJob create={create} onCreated={onCreated} onOpen={onOpen} />}
     {all === 0 ? <section className="card empty-state"><span className="empty-icon" aria-hidden="true"><Icon name="folder" /></span><h2>{manager ? 'Start with an agreed job' : 'No jobs shared yet'}</h2><p>{manager ? 'Create the job, prepare its quote, then record the client’s acceptance.' : 'Your builder must use your sign-in email as the client on the job.'}</p></section>
       : jobs.length === 0 ? <section className="card empty-state"><h2>No jobs match “{query}”</h2><p>Search looks at job names, clients and addresses.</p></section>
       : <ul className="job-grid" aria-label="Jobs">{jobs.map(job => {

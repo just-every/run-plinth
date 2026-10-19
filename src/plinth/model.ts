@@ -1,6 +1,6 @@
 export type Input = Record<string, unknown>
 export type Role = 'owner' | 'admin' | 'member' | 'agent'
-export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string }
+export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string; client_job_id?: string }
 export interface Stamp { id: string; name: string; role: Role; at: string }
 export interface Approval { id: string; kind: string; subject_id: string; revision: number; prepared_by: Stamp; approved_by: Stamp; decision: 'approved'; snapshot: unknown }
 export interface Line { description: string; quantity: number; unit_cents: number; total_cents: number }
@@ -13,11 +13,11 @@ export interface Receipt { id: string; amount_cents: number; reference: string; 
 export interface Order { id: string; supplier: string; description: string; amount_cents: number; status: 'draft' | 'issued'; receipts: Receipt[]; prepared_by: Stamp; issued_by?: Stamp }
 export interface Reconciliation { currency: 'USD'; base_cents: number; variation_cents: number; contract_cents: number; previous_cents: number; cumulative_cents: number; current_cents: number; remaining_cents: number; commitments_cents: number; received_cents: number; outstanding_cents: number; accepted_quote_id: string; variations: {id:string;amount_cents:number}[]; orders: {id:string;amount_cents:number;received_cents:number}[] }
 export interface Claim { id: string; description: string; cumulative_cents: number; status: 'draft' | 'approved' | 'exported'; prepared_by: Stamp; reconciliation: Reconciliation; approved_by?: Stamp; exported_by?: Stamp; export?: {format:'plinth-progress-claim-v1';purpose:string;job_id:string;job_name:string;claim_id:string;description:string;reconciliation:Reconciliation;approved_by:Stamp} }
-export interface Job { id: string; version: number; name: string; client_email: string; address: string; status: 'quoting' | 'active'; created_by: Stamp; quotes: Quote[]; schedules: Schedule[]; diary: Diary[]; variations: Variation[]; orders: Order[]; claims: Claim[]; approvals: Approval[]; import_evidence?: Record<string, unknown>; client_name?: string }
+export interface Job { id: string; version: number; name: string; client_email: string; address: string; status: 'quoting' | 'active'; created_by: Stamp; quotes: Quote[]; schedules: Schedule[]; diary: Diary[]; variations: Variation[]; orders: Order[]; claims: Claim[]; approvals: Approval[]; import_evidence?: Record<string, unknown>; client_name?: string; customer_id?: string; property_id?: string; client_contact_ids?: string[] }
 export class DomainError extends Error { constructor(public code:string, message:string, public status=400, public details?:unknown){super(message)} }
 export function need(value:unknown,message:string,status=400,code='invalid',details?:unknown): asserts value {if(!value)throw new DomainError(code,message,status,details)}
 export function object(value:unknown): Input {need(!!value&&typeof value==='object'&&!Array.isArray(value),'Expected an object'); return value as Input}
-export function text(value:unknown,name:string,max=4000,optional=false):string {if(optional&&(value===undefined||value===null))return '';need(typeof value==='string'&&value.trim().length>0&&value.length<=max,`${name} is required (up to ${max} characters)`);return value.trim()}
+export function text(value:unknown,name:string,max=4000,optional=false):string {if(optional&&(value===undefined||value===null||value===''))return '';need(typeof value==='string'&&value.trim().length>0&&value.length<=max,`${name} is required (up to ${max} characters)`);return value.trim()}
 export function cents(value:unknown,name='amount_cents',negative=false):number {need(typeof value==='number'&&Number.isSafeInteger(value)&&(negative||value>=0)&&Math.abs(value)<=1_000_000_000_000,`${name} must be integer cents within the supported range`);return value}
 export function sum(values:number[]):number {const n=values.reduce((a,b)=>a+b,0);need(Number.isSafeInteger(n)&&Math.abs(n)<=1_000_000_000_000,'Money total exceeds supported range');return n}
 export function stamp(actor:Actor):Stamp{return {id:actor.id,name:actor.name,role:actor.role,at:new Date().toISOString()}}

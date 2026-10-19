@@ -3,6 +3,7 @@ import type { Job } from '../plinth/model'
 import { api, Field, Form } from './shared'
 import { JobWorkspace } from './job'
 import { Imports } from './imports'
+import { Customers } from './customers'
 import { Jobs } from './jobs'
 import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
@@ -26,6 +27,7 @@ export function Workspace() {
       <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
+        {view === 'customers' && manager && <Customers />}
         {view === 'imports' && <Imports onChange={refresh} />}
         {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Project managers can prepare job records."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></div></Form></section></Page>}
         {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}

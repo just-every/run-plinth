@@ -1,5 +1,6 @@
 import type { Bindings } from '../auth.server'
 import { need, type Actor, type Input, type Job } from './model'
+import { clientAccess } from './job-customers'
 import { transaction } from './store'
 
 const prefix = '/api/plinth/calendar/'
@@ -16,9 +17,9 @@ async function digest(token: string): Promise<string> {
 }
 
 /** A person manages only their own subscription to the supplied, current job. */
-export async function manageCalendar(db: D1Database, actor: Actor, job: Job, input: Input): Promise<{ urlPath?: string; revoked: boolean }> {
+export async function manageCalendar(db: D1Database, actor: Actor, job: Job, input: Input, clock?: number): Promise<{ urlPath?: string; revoked: boolean }> {
  need(!actor.credential_id && ['owner', 'admin', 'member'].includes(actor.role), 'A person must manage calendar subscriptions', 403, 'human_required')
- need(actor.role !== 'member' || actor.email.toLowerCase() === job.client_email.toLowerCase(), 'Job not found', 404, 'not_found')
+ need(actor.role !== 'member' || await clientAccess(db,job,actor.email), 'Job not found', 404, 'not_found')
  need(input.expected_version === job.version, 'Job changed. Reload before applying this action.', 409, 'stale_version')
  need(input.action === 'rotate' || input.action === 'revoke', 'Choose rotate or revoke')
  const writes = [db.prepare('DELETE FROM pl_calendar_tokens WHERE person_id=? AND job_id=?').bind(actor.id, job.id)]
@@ -27,7 +28,7 @@ export async function manageCalendar(db: D1Database, actor: Actor, job: Job, inp
   token = hex(crypto.getRandomValues(new Uint8Array(32)))
   writes.push(db.prepare('INSERT INTO pl_calendar_tokens(token_hash,person_id,job_id) VALUES(?,?,?)').bind(await digest(token), actor.id, job.id))
  }
- await transaction(db, actor, job, writes)
+ await transaction(db, actor, job, writes, clock)
  return token ? { urlPath: `${prefix}${token}.ics`, revoked: false } : { revoked: true }
 }
 
@@ -84,14 +85,14 @@ export async function calendarFeed(request: Request, env: Bindings): Promise<Res
  const match = /^\/api\/plinth\/calendar\/([a-f0-9]{64})\.ics$/.exec(path)
  if (!match) return new Response(null, { status: 404, headers })
  const row = await env.DB.prepare(`
-  SELECT j.data FROM pl_calendar_tokens t
+  SELECT j.data,p.email,p.role FROM pl_calendar_tokens t
   JOIN oa_operators p ON p.id=t.person_id
   JOIN pl_jobs j ON j.id=t.job_id
   WHERE t.token_hash=? AND p.status='active'
-   AND (p.role IN ('owner','admin') OR (p.role='member' AND lower(p.email)=lower(json_extract(j.data,'$.client_email'))))
+   AND p.role IN ('owner','admin','member')
    AND NOT EXISTS(SELECT 1 FROM pl_erased_jobs e WHERE e.job_id=j.id)
- `).bind(await digest(match[1]!)).first<{ data: string }>()
- if (!row) return new Response(null, { status: 404, headers })
+ `).bind(await digest(match[1]!)).first<{ data: string; email: string; role: string }>()
+ if (!row || row.role === 'member' && !await clientAccess(env.DB,JSON.parse(row.data) as Job,row.email)) return new Response(null, { status: 404, headers })
  return new Response(calendar(JSON.parse(row.data) as Job), {
   headers: { ...headers, 'content-type': 'text/calendar; charset=utf-8' },
  })

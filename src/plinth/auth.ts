@@ -18,7 +18,7 @@ export async function authorize(request:Request,original:Bindings):Promise<Actor
 }
 export function requireManager(actor:Actor,allowAgent=false){need(actor.role==='owner'||actor.role==='admin'||allowAgent&&actor.role==='agent','Builder manager access required',403,'forbidden')}
 export function requireOwner(actor:Actor){need(actor.role==='owner','Only the owner may do this',403,'forbidden')}
-export function visible(actor:Actor,job:Job){need(actor.role!=='member'||actor.email.toLowerCase()===job.client_email,'Job not found',404,'not_found')}
+export function visible(actor:Actor,job:Job){need(actor.role!=='member'||(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'Job not found',404,'not_found')}
 export function actorPredicate(actor:Actor):{sql:string;params:unknown[]} {
  const person="EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND status='active' AND role=?)"
  const role=actor.role==='agent'?null:actor.role

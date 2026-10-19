@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { api, initials } from './shared'
 import { Icon, type IconName } from './icons'
 
-export type View = 'jobs' | 'imports' | 'people'
+export type View = 'jobs' | 'imports' | 'people' | 'customers'
 export type Me = { displayName: string; email: string; role: string }
 const roles: Record<string, string> = { owner: 'Owner', admin: 'Project manager', client: 'Client', member: 'Client' }
 
@@ -17,6 +17,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
     <ul className="rail-nav">
       {item('jobs', 'folder', 'Jobs', jobs.length)}
       {role === 'owner' && item('imports', 'upload', 'Move in')}
+      {manager && item('customers', 'people', 'Customers')}
       {manager && item('people', 'people', 'People & access')}
       <li><a href="/auth/settings/identity"><Icon name="account" />Account</a></li>
     </ul>
