@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -36,6 +36,7 @@ test('EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carrie
     r=await f.json('/api/plinth/imports/commit',{method:'POST',cookie:f.owner,body:{csv,fingerprint:preview.value.fingerprint}});assert.equal(r.status,200)
     r=await f.json(`/api/plinth/jobs/${job.id}/calendar`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,action:'rotate'}});assert.equal(r.status,200);const feedPath=r.value.urlPath
     const catalog=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'rate',name:'Archive wallboard rate',reason:'Reviewed vendor quote',value:{vendor:'Cascade Supply',effective_on:'2026-10-01',unit:'square feet',cost_cents:125,sell_cents:200,reference:'CS-1042'}}});assert.equal(catalog.status,201)
+    const taxRate=await f.json('/api/plinth/pricing-rates',{method:'POST',cookie:f.owner,body:{effective_on:'2026-10-01',jurisdiction:'Synthetic archive jurisdiction',kind:'sales',percent:'7.5',reference:'Reviewed archive fixture rate schedule',human_reviewed:true}});assert.equal(taxRate.status,201)
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
     succeeds(command(source,'export','--output',before))
@@ -51,6 +52,7 @@ test('EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carrie
     assert.deepEqual(rows(restored),expected)
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
+    assert.ok(serialized.includes(taxRate.value.rate.id)&&serialized.includes('Reviewed archive fixture rate schedule'),'EST-003 reviewed jurisdiction source and dated rate revisions survive CLI recovery')
     assert.ok(serialized.includes(catalog.value.entry.id)&&serialized.includes('CS-1042'),'EST-002 catalog source identities and dated revisions survive CLI recovery')
     assert.ok(serialized.includes('Chen household archive'));assert.ok(serialized.includes('archive-client'));
     assert.ok(serialized.includes('Ashgrove kitchen')); assert.ok(serialized.includes(png)); assert.ok(serialized.includes('accepted-jobs.csv'))

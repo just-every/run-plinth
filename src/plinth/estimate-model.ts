@@ -15,6 +15,8 @@ export interface EstimateLineFields {
  included?: boolean
 }
 export interface EstimateQuoteFields {
+ pricing?: import('./pricing-model').PricingSnapshot
+ selling_adjusted?: boolean
  cost_catalog?: import('./catalog-model').CatalogSource
  cost_total_cents?: number
  inclusions?: string[]
