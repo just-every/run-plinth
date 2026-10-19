@@ -131,3 +131,67 @@ test('EST-001 — exact coded multi-trade costs/sell, selected alternates, immut
   assert.equal(legacyExport.value.cost_codes[0].cost_code, null)
  } finally { await f.close() }
 })
+
+test('EST-002 — dated vendor catalogs, waste/productivity assemblies and dimensioned templates update only reviewed draft jobs', async () => {
+ const f=await createFixture()
+ try {
+  const client=await f.invite('catalog-client@example.com'),agent=await f.agent()
+  const post=(path,body,options={})=>f.json(path,{method:'POST',cookie:f.owner,body,...options})
+  const catalog=async(kind,name,value)=>{const r=await post('/api/plinth/estimate-catalog',{kind,name,value,reason:'Estimator reviewed source rates and construction method'});assert.equal(r.status,201,JSON.stringify(r.value));return r.value.entry}
+  const material=await catalog('rate','Cascade drywall board',{vendor:'Cascade Supply',effective_on:'2026-10-01',unit:'square feet',cost_cents:125,sell_cents:200,reference:'Supplier quote CS-1042'})
+  const labor=await catalog('rate','Wall crew hourly',{vendor:'Northwest Interiors',effective_on:'2026-10-01',unit:'hour',cost_cents:6000,sell_cents:9000,reference:'Crew agreement NW-26'})
+  const part=(id,rate_id,category,productivity,waste_percent)=>({id,rate_id,description:category==='labor'?'Hang and finish wall':'Drywall board',cost_code:category==='labor'?'09-L':'09-M',phase:'Interior walls',category,units_per_dimension:'1',productivity,waste_percent})
+  const assembly=await catalog('assembly','Interior wall assembly',{unit:'square feet',parts:[part('board',material.id,'material','1','10'),part('crew',labor.id,'labor','40','0')]})
+  const template=await catalog('template','Occupied remodel walls',{kind:'remodel',dimensions:{wall_area:'400'},items:[{id:'walls',assembly_id:assembly.id,dimension:'wall_area'}]})
+  const house=await catalog('template','New house walls',{kind:'house',dimensions:{wall_area:'800'},items:[{id:'house-walls',assembly_id:assembly.id,dimension:'wall_area'}]})
+  const newJob=async name=>{const r=await post('/api/plinth/jobs',{name,client_email:'catalog-client@example.com',address:'148 Maple Street, Portland, OR 97205'});assert.equal(r.status,201);return r.value.job}
+  let a=await newJob('Chen occupied remodel'),b=await newJob('Rivera kitchen extension')
+  const request={template_id:template.id,as_of:'2026-10-19',dimensions:{wall_area:'400'}}
+  const preview=async(job,input=request,options={})=>{const r=await post(`/api/plinth/jobs/${job.id}/estimate-template/preview`,{expected_version:job.version,...input},options);assert.equal(r.status,200,JSON.stringify(r.value));return r.value.preview}
+  const apply=async(job,review,input=request,options={})=>post(`/api/plinth/jobs/${job.id}/estimate-template/apply`,{...input,expected_version:job.version,digest:review.digest},options)
+  const original=await preview(a)
+  assert.equal(original.proposal.lines[0].cost_total_cents,55000);assert.equal(original.proposal.lines[0].total_cents,88000)
+  assert.equal(original.proposal.lines[1].cost_total_cents,60000);assert.equal(original.proposal.lines[1].total_cents,90000)
+  assert.deepEqual(original.proposal.lines.map(line=>[line.phase,line.category,line.cost_code]),[['Interior walls','material','09-M'],['Interior walls','labor','09-L']]);assert.equal(original.proposal.cost_catalog.template_version,1)
+  assert.equal(original.proposal.cost_total_cents,115000);assert.equal(original.proposal.total_cents,178000)
+  assert.equal((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:f.owner})).value.job.quotes.length,0,'Preview never changes a job')
+  assert.equal((await apply(a,{digest:'unreviewed'})).status,409)
+  let r=await apply(a,original);assert.equal(r.status,200);a=r.value.job
+  const secondInput={...request,dimensions:{wall_area:'250.5'}}
+  let second=await preview(b,secondInput);r=await apply(b,second,secondInput);assert.equal(r.status,200);b=r.value.job
+  assert.equal(b.quotes[0].lines[0].cost_total_cents,34444,'250.5 × 1.1 × 125 rounds once half-up')
+  assert.equal(b.quotes[0].lines[1].cost_total_cents,37575,'Labor divides by exact production without rounding hours')
+  const soldQuote=structuredClone(a.quotes[0]);r=await post(`/api/plinth/jobs/${a.id}/quotes/${soldQuote.id}/accept`,{expected_version:a.version,method:'email',evidence:'Chen accepted exact wall scope and price'});assert.equal(r.status,200);a=r.value.job
+  const accepted=structuredClone(a.quotes[0]),acceptedApproval=structuredClone(a.approvals.find(row=>row.kind==='quote'))
+  const stale=await preview(b,secondInput)
+  r=await post('/api/plinth/estimate-catalog/'+material.id,{expected_version:1,name:material.name,reason:'Supplier price revision CS-1051',value:{...material.revisions[0].value,effective_on:'2026-10-15',cost_cents:150,sell_cents:240}});assert.equal(r.status,200);assert.equal(r.value.entry.revisions.length,2)
+  assert.equal((await apply(b,stale,secondInput)).status,409,'A changed source rate invalidates the reviewed digest')
+  second=await preview(b,secondInput);assert.equal(second.proposal.lines[0].cost_total_cents,41333);assert.equal(second.proposal.lines[0].total_cents,66132)
+  assert.equal(second.total_delta_cents,11022)
+  assert.equal((await f.json(`/api/plinth/jobs/${b.id}`,{cookie:f.owner})).value.job.quotes.length,1,'Rate save never rewrites job estimates')
+  const historical=await preview(b,{...secondInput,as_of:'2026-10-10'});assert.equal(historical.proposal.total_cents,b.quotes[0].total_cents)
+  const soldImpact=await preview(a);assert.equal(soldImpact.sold,true);assert.equal(soldImpact.total_delta_cents,17600)
+  assert.equal((await apply(a,soldImpact)).status,409)
+  assert.equal((await apply(b,second,secondInput,{cookie:undefined,token:agent})).status,403)
+  assert.equal((await preview(b,secondInput,{cookie:undefined,token:agent})).digest,second.digest)
+  r=await apply(b,second,secondInput);assert.equal(r.status,200);b=r.value.job
+  assert.equal(b.quotes[0].status,'superseded');assert.equal(b.quotes[1].revision,2);assert.equal(b.quotes[1].cost_catalog.rates[0].version,2)
+  assert.equal(b.approvals.at(-1).kind,'estimate.catalog');assert.equal(b.approvals.at(-1).approved_by.role,'owner')
+  assert.deepEqual((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:f.owner})).value.job.quotes[0],accepted)
+  assert.deepEqual((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:f.owner})).value.job.approvals.find(row=>row.kind==='quote'),acceptedApproval)
+  const changedDimension=await preview(b,{...request,dimensions:{wall_area:'500'}});assert.equal(changedDimension.proposal.lines[1].cost_total_cents,75000)
+  const housePreview=await preview(b,{template_id:house.id,as_of:'2026-10-19',dimensions:{wall_area:'800'}});assert.equal(housePreview.proposal.lines[1].cost_total_cents,120000)
+  // Assembly revisions retain the prior production/waste method and require fresh review too.
+  r=await post('/api/plinth/estimate-catalog/'+assembly.id,{expected_version:1,name:assembly.name,reason:'Updated production after estimator review',value:{unit:'square feet',parts:[part('board',material.id,'material','1','5'),part('crew',labor.id,'labor','50','0')]}});assert.equal(r.status,200)
+  assert.equal((await apply(b,changedDimension,{...request,dimensions:{wall_area:'500'}})).status,409)
+  r=await post('/api/plinth/estimate-catalog/'+template.id,{expected_version:1,name:template.name,reason:'Larger default room dimensions',value:{...template.revisions[0].value,dimensions:{wall_area:'600'}}});assert.equal(r.status,200)
+  const newDefault=await preview(b,{template_id:template.id,as_of:'2026-10-19'});assert.equal(newDefault.proposal.lines[1].cost_total_cents,72000);assert.equal(newDefault.proposal.cost_catalog.template_version,2)
+  assert.deepEqual((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:f.owner})).value.job.quotes[0],accepted,'Template and assembly revisions never rewrite the sold copy')
+  const listing=await f.json('/api/plinth/estimate-catalog',{cookie:f.owner});assert.equal(listing.status,200);assert.equal(listing.value.entries.find(e=>e.id===assembly.id).revisions.length,2)
+  assert.equal((await f.json('/api/plinth/estimate-catalog',{cookie:client})).status,403)
+  assert.equal((await f.json('/api/plinth/estimate-catalog')).status,401)
+  assert.equal((await post('/api/plinth/estimate-catalog',{kind:'rate',name:'No authority',value:material.revisions[0].value,reason:'Attempted agent approval'},{cookie:undefined,token:agent})).status,403)
+  assert.equal((await post(`/api/plinth/jobs/${a.id}/estimate-template/preview`,{...request,expected_version:a.version},{cookie:client})).status,403)
+  const visible=JSON.stringify((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:client})).value.job);assert.ok(!visible.includes('cost_catalog')&&!visible.includes('cost_total_cents'))
+ } finally {await f.close()}
+})

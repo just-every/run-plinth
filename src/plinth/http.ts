@@ -1,3 +1,5 @@
+import { catalogResponse } from './estimate-catalog'
+import { catalogPreview, applyCatalog } from './catalog-quote'
 import { costCodeReport, costCodeCsv, projectEstimateCosts } from './estimate-report'
 import { constraintAction, constraintFile } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
@@ -30,6 +32,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
  if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(()=>true);return json({role:role(actor),jobs:(await named(env.DB,all.filter((job,i)=>allowed[i]))).map(job=>display(job,actor))})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
@@ -53,10 +56,12 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  }
  need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
  need(input.expected_version===previous.version,'Job changed. Reload before applying this action.',409,'stale_version')
+ if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='schedule-template'&&parts[3]==='preview')return json({preview:await previewScheduleTemplate(previous,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))})
  if(parts.length===4&&parts[2]==='schedule'&&parts[3]==='preview')return json({preview:await previewSchedule(previous,actor,input,await jobs(env.DB))})
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
- if(category==='schedule-constraints'&&(parts.length===3||parts.length===4)){const result=await constraintAction(env.DB,job,actor,input,id);record=result.record;writes=result.writes}
+ if(category==='estimate-template'&&id==='apply'&&parts.length===4)record=await applyCatalog(env.DB,job,actor,input)
+ else if(category==='schedule-constraints'&&(parts.length===3||parts.length===4)){const result=await constraintAction(env.DB,job,actor,input,id);record=result.record;writes=result.writes}
  else if(parts.length===4&&category==='schedule'&&id==='publish'){record=await publishSchedule(job,actor,input,await jobs(env.DB));recordRevision(job,actor,input)}
  else if(parts.length===4&&category==='schedule-template'&&id==='apply')record=await applyScheduleTemplate(job,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))
  else if(parts.length===3&&['schedule-baseline','schedule-actuals'].includes(category))record=await scheduleBaselineAction(job,actor,input,category==='schedule-baseline'?'baseline':'actuals',await jobs(env.DB))
