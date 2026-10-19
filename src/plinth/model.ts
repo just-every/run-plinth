@@ -1,3 +1,4 @@
+import type { EstimateLineFields, EstimateQuoteFields } from './estimate-model'
 import type { ScheduleConstraint } from './schedule-constraint-model'
 import type { ScheduleBaselineFields } from './schedule-baseline-model'
 import type { TaskDependency, WorkingCalendar } from './schedule-model'
@@ -6,8 +7,8 @@ export type Role = 'owner' | 'admin' | 'member' | 'agent'
 export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string; client_job_id?: string }
 export interface Stamp { id: string; name: string; role: Role; at: string }
 export interface Approval { id: string; kind: string; subject_id: string; revision: number; prepared_by: Stamp; approved_by: Stamp; decision: 'approved'; snapshot: unknown }
-export interface Line { description: string; quantity: number; unit_cents: number; total_cents: number }
-export interface Quote { id: string; revision: number; lines: Line[]; total_cents: number; notes: string; status: 'draft' | 'accepted' | 'superseded'; prepared_by: Stamp; acceptance?: { method: string; evidence: string; client_email: string; recorded_by: Stamp } }
+export interface Line extends EstimateLineFields { description: string; quantity: number | string; unit_cents: number; total_cents: number }
+export interface Quote extends EstimateQuoteFields { id: string; revision: number; lines: Line[]; total_cents: number; notes: string; status: 'draft' | 'accepted' | 'superseded'; prepared_by: Stamp; acceptance?: { method: string; evidence: string; client_email: string; recorded_by: Stamp } }
 export interface Schedule { id: string; trade: string; start: string; end: string; description: string; status: 'draft' | 'booked' | 'cancelled'; prepared_by: Stamp; revision?: number; updated_at?: string; owner?: string; duration_minutes?: number; milestone?: boolean; predecessors?: TaskDependency[] }
 export interface Attachment { id: string; name: string; mime: string; checksum: string; size: number }
 export interface Diary { id: string; date: string; note: string; attachments: Attachment[]; status: 'draft' | 'published'; prepared_by: Stamp }

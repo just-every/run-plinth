@@ -92,3 +92,10 @@
   .workspace .lines td:nth-child(2) { white-space: normal; }
   .workspace .job-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Measured estimates retain exact long decimals within the job card at phone widths. */
+.workspace .lines.estimate-lines { table-layout: fixed; }
+.workspace .lines.estimate-lines :is(td, th) { overflow-wrap: anywhere; }
+.workspace .lines.estimate-lines td:nth-child(2), .workspace .lines.estimate-lines td:last-child { white-space: normal; }
+.workspace .lines.estimate-lines th:first-child { width: 40%; }
+.workspace .lines.estimate-lines th:nth-child(2) { width: 35%; }

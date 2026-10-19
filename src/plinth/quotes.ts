@@ -1,11 +1,10 @@
-import { active, cents, find, need, object, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Quote } from './model'
+import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Quote } from './model'
 import { requireManager } from './auth'
+import { estimateLines } from './estimate-input'
 /** Adapted from Glove quote revisions/accept and Locket immutable version custody. */
 export function prepareQuote(job:Job,actor:Actor,input:Input):Quote {
  requireManager(actor,true);need(job.status==='quoting','An accepted quote is frozen; use a change order',409,'quote_frozen')
- need(Array.isArray(input.lines)&&input.lines.length>0&&input.lines.length<=100,'Provide 1–100 quote lines')
- const lines=input.lines.map(value=>{const row=object(value);const quantity=cents(row.quantity,'quantity');need(quantity>0&&quantity<=100000,'Quantity must be a positive whole number');const unit=cents(row.unit_cents,'unit_cents');return {description:text(row.description,'description',500),quantity,unit_cents:unit,total_cents:sum([quantity*unit])}})
- const quote:Quote={id:crypto.randomUUID(),revision:job.quotes.length+1,lines,total_cents:sum(lines.map(l=>l.total_cents)),notes:text(input.notes,'notes',4000,true),status:'draft',prepared_by:stamp(actor)}
+ const quote:Quote={id:crypto.randomUUID(),revision:job.quotes.length+1,...estimateLines(input),notes:text(input.notes,'notes',4000,true),status:'draft',prepared_by:stamp(actor)}
  for(const previous of job.quotes)if(previous.status==='draft')previous.status='superseded'
  job.quotes.push(quote);return quote
 }
@@ -14,7 +13,7 @@ export function acceptQuote(job:Job,actor:Actor,id:string,input:Input) {
  need(quote.status==='draft'&&quote===job.quotes[job.quotes.length-1],'Accept the current draft revision',409,'revision')
  const method=text(input.method,'method',30);need(['signed','email','phone','in person'].includes(method),'Acceptance method must be signed, email, phone, or in person')
  const acceptance={method,evidence:text(input.evidence,'Client acceptance evidence',2000),client_email:job.client_email,recorded_by:stamp(actor)}
- recordApproval(job,actor,'quote',quote,{revision:quote.revision,lines:quote.lines,total_cents:quote.total_cents,acceptance})
+ recordApproval(job,actor,'quote',quote,{...quote,acceptance})
  quote.status='accepted';quote.acceptance=acceptance;job.status='active';return quote
 }
 /** A proposed term never changes the contract until the actual client confirms it. */

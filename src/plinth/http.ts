@@ -1,3 +1,4 @@
+import { costCodeReport, costCodeCsv, projectEstimateCosts } from './estimate-report'
 import { constraintAction, constraintFile } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireManager, requireOwner } from './auth'
@@ -22,7 +23,7 @@ async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await d
 function display(job:Job,actor:Actor) {
  if(actor.role!=='member')return job
  const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,reconciliation}})
- return {...job,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})}
+ return projectEstimateCosts({...job,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
 async function handle(request:Request,original:Bindings):Promise<Response>{const env=runtimeBindings(original),actor=await authorize(request,env),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
@@ -36,6 +37,11 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(parts.length===3&&parts[2]==='customer'&&method==='GET'){requireManager(actor);return json({customer:previous.customer_id?await getCustomer(env.DB,previous.customer_id):null})}
  if(parts.length===3&&parts[2]==='calendar'&&method==='POST'){const input=await body(request);need(input.expected_version===previous.version,'Job changed. Reload before changing the feed.',409,'stale_version');return json(await manageCalendar(env.DB,actor,previous,input,clock))}
+ if(parts.length===5&&parts[2]==='quotes'&&['cost-codes.json','cost-codes.csv'].includes(parts[4])&&method==='GET'){
+  const report=costCodeReport(previous,actor,parts[3])
+  if(parts[4]==='cost-codes.json')return json(report)
+  return new Response(costCodeCsv(report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename=estimate-${report.revision}-cost-codes.csv`}})
+ }
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
  if(parts[2]==='diary'&&parts[4]==='attachments'&&parts.length===6&&method==='GET')return serveAttachment(env.DB,previous,actor,parts[3],parts[5])

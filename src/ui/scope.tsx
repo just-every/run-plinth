@@ -1,18 +1,24 @@
 import { Badge, Action, cents, dateTime, day, Field, Form, money } from './shared'
 import type { JobProps } from './job'
+import { EstimateEditor } from './estimate-editor'
+import { EstimateComparison, EstimateTerms } from './estimate-revisions'
 
 export function Quotes({job,manager,mutate}: JobProps) {
   const accepted = job.quotes.some(q => q.status === 'accepted')
   return <div className="split"><section className="card"><div className="card-head"><h2>Quote revisions</h2><span className="muted">{job.quotes.length} {job.quotes.length === 1 ? 'revision' : 'revisions'}</span></div>
     {job.import_evidence && <p className="notice">Imported source acceptance is retained. Review and explicitly accept the native quote before work begins.</p>}
+    {manager && <EstimateComparison quotes={job.quotes} />}
     {job.quotes.length === 0 && <p className="empty">No quote prepared yet.</p>}
     {[...job.quotes].reverse().map(q => <article className="record" key={q.id}><div className="record-head"><h3>Quote {q.revision}</h3><Badge>{q.status}</Badge></div>
-      <table className="lines"><thead><tr><th scope="col">Scope</th><th scope="col">Qty × unit</th><th scope="col">Amount</th></tr></thead><tbody>{q.lines.map((l,i) => <tr key={i}><td>{l.description}</td><td>{l.quantity} × {money(l.unit_cents)}</td><td>{money(l.total_cents)}</td></tr>)}</tbody><tfoot><tr><th scope="row" colSpan={2}>Total</th><td>{money(q.total_cents)}</td></tr></tfoot></table>
+      <table className="lines estimate-lines"><thead><tr><th scope="col">Scope</th><th scope="col">Qty × unit</th><th scope="col">Amount</th></tr></thead><tbody>{q.lines.map((l,i) => <tr key={i}><td>{l.description}{l.cost_code && <p className="muted">{l.cost_code} · {l.phase} · {l.category}</p>}{l.alternate_group && <p>{l.alternate_group}: {l.alternate_option} · {l.included === false ? 'Not selected' : 'Included'}</p>}{manager && l.cost_unit_cents !== undefined && <p className="muted">Cost: {money(l.cost_unit_cents)} per {l.rate_unit ?? l.unit} · line {money(l.cost_total_cents)}</p>}</td><td>{l.quantity}{l.unit ? ` ${l.unit}` : ''} × {money(l.unit_cents)}{l.rate_unit && <> / {l.rate_unit}</>}{l.conversion && <p className="muted">Conversion {l.conversion.numerator} ÷ {l.conversion.denominator}</p>}</td><td>{money(l.total_cents)}</td></tr>)}</tbody><tfoot><tr><th scope="row" colSpan={2}>Total selling price</th><td>{money(q.total_cents)}</td></tr></tfoot></table>
+      {manager && <p>Included line cost: {q.cost_total_cents === undefined ? 'Not recorded for every included line' : money(q.cost_total_cents)}</p>}
+      <EstimateTerms quote={q} />
+      {manager && <p><a href={`/api/plinth/jobs/${job.id}/quotes/${q.id}/cost-codes.json`} download>Export cost-code JSON · quote {q.revision}</a> · <a href={`/api/plinth/jobs/${job.id}/quotes/${q.id}/cost-codes.csv`} download>Export cost-code CSV · quote {q.revision}</a></p>}
       {q.notes && <p className="muted">{q.notes}</p>}
       {q.acceptance && <p className="notice">Accepted by {q.acceptance.method}: {q.acceptance.evidence}<br />Recorded by {q.acceptance.recorded_by.name} · {dateTime(q.acceptance.recorded_by.at)}</p>}
       {manager && !accepted && q.status === 'draft' && q.id === job.quotes.at(-1)?.id && <div className="inline-form"><Form submit="Record client acceptance" action={async f => mutate('/quotes/'+q.id+'/accept',{method:f.get('method'),evidence:f.get('evidence')})}><div className="fields"><label>Acceptance method<select name="method"><option value="email">Email</option><option value="signed">Signed agreement</option><option value="phone">Phone</option><option value="in person">In person</option></select></label><Field label="Client acceptance reference" name="evidence" placeholder="Client email of October 15 agreeing scope and price" /></div></Form></div>}
     </article>)}</section>
-    {manager && !accepted && <aside className="card side"><h2>Prepare a quote</h2><p className="card-lead">Create an immutable revision. Record acceptance only when you have the client’s agreement.</p><Form submit="Prepare quote revision" action={async f => mutate('/quotes',{lines:[{description:f.get('description'),quantity:1,unit_cents:cents(f.get('amount'))}],notes:f.get('notes') || undefined})}><Field label="Scope of work" name="description" /><Field label="Quote total (including sales tax if applicable)" name="amount" inputMode="decimal" placeholder="48000.00" /><label>Terms and inclusions<textarea name="notes" rows={4} /></label></Form></aside>}</div>
+    {manager && !accepted && <aside className="card side"><h2>Prepare a quote</h2><p className="card-lead">Create an immutable revision. Record acceptance only when you have the client’s agreement.</p><Form submit="Prepare quote revision" action={async f => mutate('/quotes',{lines:[{description:f.get('description'),quantity:1,unit_cents:cents(f.get('amount'))}],notes:f.get('notes') || undefined})}><Field label="Scope of work" name="description" /><Field label="Quote total (including sales tax if applicable)" name="amount" inputMode="decimal" placeholder="48000.00" /><label>Terms and inclusions<textarea name="notes" rows={4} /></label></Form><EstimateEditor key={job.quotes.at(-1)?.id ?? 'new'} quote={job.quotes.at(-1)} mutate={mutate} /></aside>}</div>
 }
 
 export function Changes({job,manager,mutate}: JobProps) {

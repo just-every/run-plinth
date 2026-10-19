@@ -72,7 +72,7 @@ Every page, API, file, webhook, automation and export enforces current authority
 
 ### Estimating bids and contract formation
 
-- **EST-001 — Cost codes quantities and estimate revisions.** Estimate labor, material, equipment, subcontract and other costs by cost code, phase, quantity and unit, with separate cost and selling price, alternates, inclusions/exclusions and version comparison. Decimal quantities and conversions are exact; revision changes identify affected scope and totals. **Acceptance evidence:** Build a multi-trade estimate with fractional measurements, alternate finishes and cost/sell rates, revise quantities and compare versions. Export cost-code totals and independently reconcile rounded line costs and sell prices.
+- **EST-001 — Cost codes quantities and estimate revisions.** Estimate labor, material, equipment, subcontract and other costs by cost code, phase, quantity and unit, with separate cost and selling price, alternates, inclusions/exclusions and version comparison. Decimal quantities and conversions are exact; revision changes identify affected scope and totals. Measurements use exact decimal strings with up to 18 decimal places (whole-number JSON quantities remain accepted), and named measurement/rate units use an explicit positive decimal numerator/denominator conversion supplied for review. Cost and selling rates are nonnegative integer USD cents; multiply quantity and the full conversion exactly, round half-up once per line to cents, then sum included lines. Each coded line records cost code, phase and labor/material/equipment/subcontract/other category. Alternate group lines contribute only for the explicitly selected option; unselected options remain in revision history. Inclusions/exclusions and stable line IDs identify scope changes between immutable revisions. Legacy uncoded quotes and missing costs stay honestly labelled unknown rather than receiving invented costs. Owners/admins read costs, compare revisions and export line/code/estimate totals as JSON or CSV; agents retain draft preparation/read authority but cannot accept or export. Client job/list responses and approval snapshots contain only accepted selling lines, selected alternatives, quantities/units, selling totals and scope terms; internal cost codes, phases/categories, costs, margin and office comparisons/exports remain unavailable. Accepted estimates stay fixed. **Acceptance evidence:** Build a multi-trade estimate with fractional measurements, alternate finishes and cost/sell rates, revise quantities and compare versions. Export cost-code totals and independently reconcile rounded line costs and sell prices.
 
 - **EST-002 — Reusable catalogs assemblies and templates.** Maintain dated vendor rates, cost catalogs, phase groups and assemblies combining labor/material productivity and waste. Copy a house/remodel template into a job, change dimensions and review rate updates without rewriting approved estimates. **Acceptance evidence:** Create a wall assembly with waste and labor production, price it on two jobs, change a supplier rate and inspect the impact preview. Only approved draft updates take effect; the sold estimate stays unchanged.
 
@@ -340,8 +340,8 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 5 | 28 | 87 | 120 |
-| All | 19 | 28 | 87 | 134 |
+| Target and push further | 6 | 27 | 87 | 120 |
+| All | 20 | 27 | 87 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -369,7 +369,7 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | `ROLE-004` | Accountant reviewer and lender access | target | missing |  | No accountant reviewer and lender access workflow exists. |
 | `ROLE-005` | Audit search retention and access history | target | partial | `src/plinth/model.ts`; `src/plinth/import-erasure.ts`; `src/modules/operator-auth/accounts/store.mjs` | Job approvals and native auth audit exist; comprehensive event search, retention and legal holds are absent. |
 | `ROLE-006` | Custom roles and per-feature permissions | target | missing |  | Roles are fixed owner, admin and member values; copyable custom roles, per-feature permissions and approval limits are absent. |
-| `EST-001` | Cost codes quantities and estimate revisions | target | partial | `src/plinth/quotes.ts`; `src/ui/scope.tsx` | Numbered quantity/price quotes exist; cost codes, units, separate costs, alternates and comparison do not. |
+| `EST-001` | Cost codes quantities and estimate revisions | target | done | `src/plinth/quotes.ts`; `src/plinth/estimate-input.ts`; `src/plinth/estimate-math.ts`; `src/plinth/estimate-compare.ts`; `src/plinth/estimate-report.ts`; `src/ui/scope.tsx`; `src/ui/estimate-editor.tsx`; `src/ui/estimate-revisions.tsx`; `tests/plinth/estimates.test.mjs`; `tests/journeys/estimates.mjs` | |
 | `EST-002` | Reusable catalogs assemblies and templates | target | missing |  | No reusable catalogs assemblies and templates workflow exists. |
 | `EST-003` | Markups margin discounts and sales tax | target | missing |  | No markups margin discounts and sales tax workflow exists. |
 | `EST-004` | Drawing-based digital quantity takeoff | target | missing |  | No drawing-based digital quantity takeoff workflow exists. |
