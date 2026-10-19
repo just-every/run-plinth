@@ -130,3 +130,101 @@ test('SUB-003 — owner insurance and license rules hold an award with expired e
   assert.equal((await f.json(`/api/plinth/jobs/${job.id}`, { cookie: client })).value.job.subcontracts, undefined)
  } finally { await f.close() }
 })
+
+test('SUB-004 — conditional waiver for a sub draw, exact signed release, recorded payment, matching unconditional release and unresolved downstream waivers in the draw packet', async () => {
+ const f = await createFixture()
+ try {
+  const agent = await f.agent(), client = await f.invite('waiver-client@example.com'), admin = await f.invite('office@example.com', 'Office Admin', 'admin')
+  const api = (path, body, { method = 'POST', cookie = f.owner, token } = {}) => f.json('/api/plinth' + path, { method, ...(token ? { token } : { cookie }), ...(body ? { body } : {}) })
+  const year = new Date().getUTCFullYear(), passed = `${year - 1}-12-31`, ahead = `${year + 1}-06-30`
+  let r = await api('/vendors', { kind: 'subcontractor', name: 'Champlain Electric Inc', trades: ['Electrical'], contacts: [{ id: 'lee', name: 'Lee Park', email: 'lee@champlain.example' }] }); let vendor = r.value.vendor
+  r = await api(`/vendors/${vendor.id}/qualifications`, { expected_version: vendor.version, trade: 'Electrical', status: 'qualified', evidence: 'Master electrician license reviewed' }); assert.equal(r.status, 200)
+  let job = await createActiveJob(f, 'Essex kitchen electrical', 'waiver-client@example.com', 5_000_000)
+  const act = async (path, body = {}, credentials) => { const result = await api(`/jobs/${job.id}${path}`, { expected_version: job.version, ...body }, credentials); if (result.status === 200) job = result.value.job; return result }
+  r = await act('/subcontracts', { vendor_id: vendor.id, trade: 'Electrical', scope: 'Kitchen rewiring and panel upgrade', contact_ids: ['lee'], awarded_on: '2026-10-20', amount_cents: 2_000_000 }); const sub = r.value.record.id
+  assert.equal((await act(`/subcontracts/${sub}/release`)).status, 200)
+
+  // State and job waiver wording: owner-provided, the job's own wording wins over the state template.
+  const wording = (form, state = 'VT', job_id) => ({ name: `${state} ${form}${job_id ? ' (this job)' : ''}`, state, form, wording: `${form} release of lien rights for the amount and through-date stated.`, ...(job_id ? { job_id } : {}) })
+  const templates = { expected_version: 0, templates: [wording('conditional_progress'), wording('unconditional_progress'), wording('conditional_progress', 'VT', job.id)] }
+  for (const credentials of [{ token: agent }, { cookie: client }, { cookie: admin }]) assert.equal((await api('/lien-waiver-templates', templates, { method: 'PUT', ...credentials })).status, 403, 'Only the owner sets waiver wording')
+  r = await api('/lien-waiver-templates', templates, { method: 'PUT' }); assert.equal(r.status, 200, JSON.stringify(r.value))
+  assert.ok(r.value.templates.templates.every(t => t.source.includes('does not certify statutory')), 'Wording is never claimed as a certified statutory form')
+
+  // Draws need the lien setup: tier 1 is the awarded company, the supplier is tier 2 with an open notice deadline.
+  assert.equal((await act(`/subcontracts/${sub}/draws`, { through_date: '2026-10-31', amount_cents: 800_000 })).value.error, 'lien_setup')
+  const lien = { state: 'VT', notice_received_on: '2026-10-21', notice_deadline_on: ahead, lower_tiers: [{ id: 'wire', name: 'Northern Wire Supply', parent_id: vendor.id, notice_deadline_on: passed }] }
+  for (const credentials of [{ token: agent }, { cookie: client }]) assert.equal((await act(`/subcontracts/${sub}/lien`, lien, credentials)).status, 403)
+  r = await act(`/subcontracts/${sub}/lien`, lien, { cookie: admin }); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.deepEqual(r.value.record.parties.map(p => [p.id, p.tier]), [[vendor.id, 1], ['wire', 2]])
+  assert.equal((await act(`/subcontracts/${sub}/draws`, { through_date: '2026-10-31', amount_cents: 2_500_000 })).value.error, 'draw_balance')
+  r = await act(`/subcontracts/${sub}/draws`, { through_date: '2026-10-31', amount_cents: 800_000 }); assert.equal(r.status, 200); const draw = r.value.record.id
+  const waivers = `/subcontracts/${sub}/draws/${draw}/waivers`
+
+  // Conditional waiver for the draw; the unconditional waits for confirmed payment.
+  assert.equal((await act(waivers, { party_id: vendor.id, kind: 'unconditional' })).value.error, 'payment_unconfirmed')
+  r = await act(waivers, { party_id: vendor.id, kind: 'conditional' }); assert.equal(r.status, 200, JSON.stringify(r.value)); const conditional = r.value.record
+  assert.equal(conditional.amount_cents, 800_000); assert.equal(conditional.through_date, '2026-10-31')
+  assert.equal(conditional.template.name, 'VT conditional_progress (this job)', 'The job template wins over the state template'); assert.equal(conditional.template.state, 'VT')
+  assert.ok(job.subcontracts[0].draws[0].waivers[0].template && !('job_id' in conditional.template), 'The job wording snapshot is kept with the request')
+  assert.ok(conditional.delivery.startsWith('Prepared, not sent'), 'A waiver request is never claimed as sent')
+  assert.equal((await act(waivers, { party_id: vendor.id, kind: 'conditional' })).value.error, 'waiver_exists')
+  r = await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 800_000, reference: 'Check 1041' }); assert.equal(r.value.error, 'waiver_required')
+  assert.deepEqual(r.value.details.missing.map(p => p.party_id), [vendor.id, 'wire'])
+
+  // Signed release: through-date or amount that differs from the request is refused without a write.
+  const pdf = Buffer.from('%PDF-1.7\nConditional waiver signed by Lee Park\n%%EOF'), signed = (extra = {}) => ({ signer_name: 'Lee Park', amount_cents: 800_000, through_date: '2026-10-31', document: { name: 'conditional-1.pdf', base64: pdf.toString('base64') }, ...extra })
+  const release = id => `${waivers}/${id}/release`, before = job.version
+  assert.equal((await act(release(conditional.id), signed({ through_date: '2026-11-15' }))).value.error, 'waiver_mismatch')
+  r = await act(release(conditional.id), signed({ amount_cents: 850_000 })); assert.equal(r.value.error, 'waiver_mismatch'); assert.deepEqual(r.value.details.expected, { amount_cents: 800_000, through_date: '2026-10-31' })
+  assert.equal(job.version, before, 'Mismatched releases write nothing')
+  assert.equal((await act(release(conditional.id), signed(), { token: agent })).status, 403)
+  r = await act(release(conditional.id), signed()); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.equal(r.value.record.status, 'received')
+  assert.equal(r.value.record.release.signature, 'Signed release received; Plinth did not verify the signature')
+  const file = (credentials) => f.request(`/api/plinth/jobs/${job.id}/lien-waiver-files/${r.value.record.release.document.id}`, credentials)
+  let response = await file({ cookie: f.owner }); assert.equal(response.status, 200); assert.deepEqual(Buffer.from(await response.arrayBuffer()), pdf, 'The signed original returns unchanged')
+  for (const credentials of [{ token: agent }, { cookie: client }]) assert.equal((await file(credentials)).status, 403)
+  // The reviewer signs off by restating the exact figures.
+  assert.equal((await act(`${waivers}/${conditional.id}/accept`, { amount_cents: 800_000, through_date: '2026-10-30' })).value.error, 'waiver_mismatch')
+  r = await act(`${waivers}/${conditional.id}/accept`, { amount_cents: 800_000, through_date: '2026-10-31' }, { cookie: admin }); assert.equal(r.status, 200); assert.equal(r.value.record.accepted_by.role, 'admin')
+
+  // The draw packet shows the tier-2 supplier's waiver unresolved; the client and agents never reach it.
+  r = await act('/claims', { cumulative_cents: 1_500_000, description: 'Rough-in electrical draw' }); const claim = r.value.record.id
+  const packet = credentials => api(`/jobs/${job.id}/claims/${claim}/packet`, undefined, { method: 'GET', ...credentials })
+  for (const credentials of [{ token: agent }, { cookie: client }]) assert.equal((await packet(credentials)).status, 403)
+  r = await packet({ cookie: f.owner }); assert.equal(r.status, 200)
+  assert.deepEqual(r.value.lien_waivers.unresolved.map(w => [w.party_id, w.tier, w.kind, w.status]), [['wire', 2, 'conditional', 'not_requested']])
+  assert.deepEqual(r.value.lien_waivers.notices.map(n => [n.party_id, n.status]), [[vendor.id, 'received'], ['wire', 'past_deadline']])
+  r = await act(waivers, { party_id: 'wire', kind: 'conditional', amount_cents: 900_000 }); assert.equal(r.status, 400, 'A lower-tier amount stays within the draw')
+  r = await act(waivers, { party_id: 'wire', kind: 'conditional', amount_cents: 250_000 }); const supplier = r.value.record
+  assert.equal((await act(release(supplier.id), signed({ signer_name: 'Sam Wire', amount_cents: 250_000 }))).status, 200)
+  assert.equal((await act(`${waivers}/${supplier.id}/accept`, { amount_cents: 250_000, through_date: '2026-10-31' })).status, 200)
+
+  // Settle the payment, then request the matching unconditional release.
+  assert.equal((await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 700_000, reference: 'Check 1041' })).value.error, 'payment_amount')
+  r = await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 800_000, reference: 'Check 1041' }); assert.equal(r.status, 200)
+  assert.equal(r.value.record.label, 'Payment recorded by staff; Plinth did not send or verify funds')
+  assert.equal((await act(waivers, { party_id: 'wire', kind: 'conditional', amount_cents: 250_000 })).value.error, 'payment_recorded')
+  r = await act(waivers, { party_id: vendor.id, kind: 'unconditional' }); assert.equal(r.status, 200); const unconditional = r.value.record
+  assert.deepEqual([unconditional.amount_cents, unconditional.through_date, unconditional.template.form], [800_000, '2026-10-31', 'unconditional_progress'])
+  assert.equal((await act(release(unconditional.id), signed({ through_date: '2026-11-05', document: { name: 'unconditional-1.pdf', base64: pdf.toString('base64') } }))).value.error, 'waiver_mismatch')
+  assert.equal((await act(release(unconditional.id), signed({ document: { name: 'unconditional-1.pdf', base64: pdf.toString('base64') } }))).status, 200)
+  assert.equal((await act(`${waivers}/${unconditional.id}/accept`, { amount_cents: 800_000, through_date: '2026-10-31' })).status, 200)
+
+  // The exported draw packet still lists the supplier's missing unconditional release.
+  assert.equal((await act(`/claims/${claim}/approve`)).status, 200)
+  r = await act(`/claims/${claim}/export`); assert.equal(r.status, 200)
+  assert.deepEqual(r.value.report.lien_waivers.unresolved.map(w => [w.party_name, w.tier, w.kind, w.status]), [['Northern Wire Supply', 2, 'unconditional', 'not_requested']])
+  assert.deepEqual(r.value.report.lien_waivers.resolved.map(w => [w.tier, w.kind]), [[1, 'unconditional']])
+
+  // Paying without waivers needs the owner's recorded exception.
+  r = await act(`/subcontracts/${sub}/draws`, { through_date: '2026-10-15', amount_cents: 100_000 }); assert.equal(r.value.error, 'draw_order')
+  r = await act(`/subcontracts/${sub}/draws`, { through_date: '2026-11-30', amount_cents: 400_000 }); const second = r.value.record.id
+  assert.equal((await act(`/subcontracts/${sub}/draws/${second}/exception`, { reason: 'Emergency payment to keep the panel delivery' }, { cookie: admin })).status, 403)
+  r = await act(`/subcontracts/${sub}/draws/${second}/exception`, { reason: 'Emergency payment to keep the panel delivery' }); assert.equal(r.status, 200)
+  assert.ok(job.approvals.some(a => a.kind === 'lien_waiver.exception' && a.approved_by.role === 'owner'))
+  assert.equal((await act(`/subcontracts/${sub}/draws/${second}/payment`, { paid_on: '2026-12-02', amount_cents: 400_000, reference: 'ACH 88' })).status, 200)
+
+  r = await f.json(`/api/plinth/jobs/${job.id}`, { cookie: client }); assert.equal(r.status, 200)
+  assert.ok(!JSON.stringify(r.value).includes('Northern Wire') && !JSON.stringify(r.value).includes('lien_waivers'), 'Clients never see sub draws or waivers')
+ } finally { await f.close() }
+})

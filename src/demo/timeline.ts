@@ -53,7 +53,7 @@ export async function playJob(db: D1Database, project: Project, people: Record<E
       case 'receive': receiveOrder(job, by, keyed.get(step.key)!, { amount_cents: step.cents, reference: step.reference }); break
       case 'bill': keyed.set(step.key, prepareClaim(job, by, { description: step.description, cumulative_cents: step.cumulative }).id); break
       case 'approve bill': approveClaim(job, by, keyed.get(step.key)!); break
-      case 'export bill': exportClaim(job, by, keyed.get(step.key)!); break
+      case 'export bill': exportClaim(job, by, keyed.get(step.key)!, new Date(time).toISOString().slice(0, 10)); break
     }
     stampAll(new Date(time).toISOString())
   }

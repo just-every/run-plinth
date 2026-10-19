@@ -13,6 +13,7 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
   return retireImportedJob(db, actor, job, [
     { sql: `INSERT INTO pl_guard(ok) SELECT CASE WHEN (${current.sql}) AND EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=? AND data=?) THEN 1 ELSE 0 END`, params: [...current.params, job.id, job.version, row.data] },
     { sql: 'DELETE FROM pl_attachments WHERE job_id=?', params: [job.id] },
+    { sql: 'DELETE FROM pl_lien_waiver_files WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_jobs WHERE id=?', params: [job.id] },
     { sql: "INSERT INTO pl_erased_jobs(job_id,erased_at) VALUES(?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params: [job.id] },
     { sql: 'UPDATE pl_clock SET version=version+1 WHERE id=1' },

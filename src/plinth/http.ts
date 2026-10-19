@@ -22,7 +22,8 @@ import { company, companyResponse } from './company'
 import { currencyTotals } from './currency-report'
 import { vendorsResponse } from './vendors'
 import { awardSubcontract, releaseSubcontract } from './subcontracts'
-import { rulesResponse } from './compliance'
+import { rulesResponse, today } from './compliance'
+import { lienAction, packetResponse, releaseFile, templatesResponse } from './lien-waivers'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
@@ -39,6 +40,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
+ const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
  const pricing=await pricingResponse(request,env.DB,actor,parts,body);if(pricing)return pricing
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
@@ -54,6 +56,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   if(parts[4]==='cost-codes.json')return json(report)
   return new Response(costCodeCsv(report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename=estimate-${report.revision}-cost-codes.csv`}})
  }
+ if(parts.length===5&&parts[2]==='claims'&&parts[4]==='packet'&&method==='GET')return packetResponse(env.DB,previous,actor,parts[3]!)
+ if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
  if(parts[2]==='diary'&&parts[4]==='attachments'&&parts.length===6&&method==='GET')return serveAttachment(env.DB,previous,actor,parts[3],parts[5])
@@ -75,9 +79,10 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  else if(category==='schedule-constraints'&&(parts.length===3||parts.length===4)){const result=await constraintAction(env.DB,job,actor,input,id);record=result.record;writes=result.writes}
  else if(parts.length===4&&category==='schedule'&&id==='publish'){record=await publishSchedule(job,actor,input,await jobs(env.DB));recordRevision(job,actor,input)}
  else if(parts.length===4&&category==='schedule-template'&&id==='apply')record=await applyScheduleTemplate(job,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))
+ else if(category==='subcontracts'&&parts.length>=5&&['lien','draws'].includes(action!)){const result=await lienAction(env.DB,job,actor,parts.slice(3),input);record=result.record;writes=result.writes}
  else if(parts.length===3&&['schedule-baseline','schedule-actuals'].includes(category))record=await scheduleBaselineAction(job,actor,input,category==='schedule-baseline'?'baseline':'actuals',await jobs(env.DB))
  else if(parts.length===3){switch(category){case 'customer':record=await linkCustomer(env.DB,job,actor,input);break;case 'subcontracts':{const awarded=await awardSubcontract(env.DB,job,actor,input);record=awarded.row;writes=awarded.writes;break}case 'quotes':record=prepareQuote(job,actor,input);break;case 'schedules':record=prepareSchedule(job,actor,input,await jobs(env.DB));break;case 'diary':{const prepared=await prepareDiary(env.DB,job,actor,input);record=prepared.row;writes=prepared.writes;break}case 'variations':record=prepareVariation(job,actor,input);break;case 'orders':record=prepareOrder(job,actor,input);break;case 'claims':record=prepareClaim(job,actor,input);break;default:throw new DomainError('not_found','Unknown action',404)}}
- else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/export':record=exportClaim(job,actor,id);break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
+ else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
  await saveJob(env.DB,actor,previous,job,writes,clock)
  return json({job:display((await named(env.DB,[job]))[0]!,actor),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
 }
