@@ -16,7 +16,7 @@ test('SUB-005 — itemized cost-coded vendor PO from the budget: acknowledgment,
   // An itemized, cost-coded PO prepared against the accepted budget.
   const lines = [{ id: 'base', description: 'Base cabinets', cost_code: '12-350', quantity: '10', unit: 'each', unit_cents: 30_000 }, { id: 'pulls', description: 'Cabinet pulls', cost_code: '12-350', quantity: '40', unit: 'each', unit_cents: 1_250 }]
   const po = { supplier: 'Green Mountain Cabinet Co', description: 'Kitchen cabinets and hardware', vendor_email: 'orders@gmcabinet.example', source: { kind: 'budget', cost_code: '12-350' }, lines }
-  assert.equal((await act('/orders', { ...po, source: { kind: 'selection', selection_id: 'x' } })).status, 400, 'Selections arrive with CLIENT-002')
+  assert.equal((await act('/orders', { ...po, source: { kind: 'selection', selection_id: 'x' } })).status, 400, 'An incomplete selection source is refused')
   assert.equal((await act('/orders', { ...po, source: { kind: 'budget', cost_code: '99-999' } })).value.error, 'budget_code')
   assert.equal((await act('/orders', { ...po, lines: [{ ...lines[0], cost_code: '26-100' }] })).status, 400, 'Budget PO lines carry its cost code')
   r = await act('/orders', po, { token: agent }); assert.equal(r.status, 200, JSON.stringify(r.value)); const order = r.value.record

@@ -1,3 +1,4 @@
+import { Selections } from './selections'
 import { useEffect, useState } from 'react'
 import type { Job } from '../plinth/model'
 import { api, money } from './shared'
@@ -11,7 +12,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Purchasing', 'Billing', 'Customer', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -49,6 +50,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
+      {open === 'Selections' && <Selections {...props} />}
       {open === 'Purchasing' && <><Orders {...props} /><Subcontracts {...props} /></>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}

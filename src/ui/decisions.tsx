@@ -17,6 +17,10 @@ export function waiting(job: Job, manager: boolean): Waiting[] {
     for (const c of job.claims.filter(c => c.status === 'draft')) rows.push({ label: `${c.description} for ${money(c.reconciliation.current_cents, job.currency)}`, section: 'Billing', agent: c.prepared_by.role === 'agent' })
     for (const c of job.claims.filter(c => c.status === 'approved')) rows.push({ label: `${c.description}: record its export`, section: 'Billing', agent: false })
   }
+  for (const selection of job.selections ?? []) {
+    const current = selection.revisions.at(-1)
+    if (current && (current.status === 'presented' || manager && current.status === 'draft')) rows.push({ label: `${current.room} ${current.category}: ${current.status === 'draft' ? 'present options' : 'choose and sign'}`, section: 'Selections', agent: current.prepared_by.role === 'agent', onClient: manager && current.status === 'presented' })
+  }
   for (const v of job.variations.filter(v => v.status === 'draft')) rows.push({ label: `Change order for ${money(v.amount_cents, job.currency)}`, section: 'Changes', agent: v.prepared_by.role === 'agent', onClient: manager })
   return rows
 }
@@ -26,7 +30,7 @@ export function DecisionStrip({ job, manager, go }: { job: Job; manager: boolean
   const rows = waiting(job, manager), yours = rows.filter(r => !r.onClient), client = rows.filter(r => r.onClient), drafted = rows.filter(r => r.agent).length
   const lead = drafted
     ? <><strong>Plinth agent:</strong> prepared {drafted === 1 ? '1 draft' : `${drafted} drafts`} on this job; {yours.length === 1 ? '1 needs' : `${yours.length} need`} your approval</>
-    : yours.length ? <><strong>Waiting on you:</strong> {yours.length === 1 ? '1 draft needs' : `${yours.length} drafts need`} a decision</> : <><strong>Nothing waiting on you.</strong> Every draft on this job is decided.</>
+    : yours.length ? <><strong>Waiting on you:</strong> {yours.length === 1 ? '1 draft needs' : `${yours.length} drafts need`} a decision</> : <><strong>Nothing waiting on you.</strong> {client.length ? `${client.length} client decisions pending.` : 'Every draft on this job is decided.'}</>
   return <section className="agent-strip" aria-label="Decisions">
     <Icon name="spark" className="spark" />
     <div>

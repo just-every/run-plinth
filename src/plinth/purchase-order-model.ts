@@ -1,9 +1,10 @@
+import { selected } from './selection-model'
 import { cents, DomainError, find, need, object, stamp, sum, text, type Actor, type Input, type Job, type Order, type Stamp } from './model'
 
 /** Quantities are exact to a thousandth; a line total is quantity × unit price rounded half up to the cent; line receipts and returns are priced as the change in that rounded value. */
 export interface PoLine { id: string; description: string; cost_code: string; quantity: string; unit: string; unit_cents: number; total_cents: number }
 export interface LineQuantity { line_id: string; quantity: string }
-export type PoSource = { kind: 'award'; subcontract_id: string } | { kind: 'budget'; cost_code: string }
+export type PoSource = { kind: 'award'; subcontract_id: string } | { kind: 'budget'; cost_code: string } | { kind: 'selection'; selection_id: string; revision_id: string }
 export interface PoReturn { id: string; lines: LineQuantity[]; amount_cents: number; reason: string; reference: string; recorded_by: Stamp }
 export interface PoShipment { id: string; carrier: string; tracking: string; freight_cents: number; shipped_on: string; recorded_by: Stamp }
 export interface PoAmendment { id: string; revision: number; reason: string; previous: { lines: PoLine[]; amount_cents: number; promised_on?: string }; proposed: { lines: PoLine[]; amount_cents: number; promised_on?: string }; budget_impact_cents: number; date_impact_days: number; status: 'pending' | 'approved'; prepared_by: Stamp; approved_by?: Stamp }
@@ -36,7 +37,16 @@ export function poSource(job: Job, input: Input, lines: PoLine[], except?: strin
   need(award.amount_cents === undefined || ordered <= award.amount_cents, 'Orders would exceed the awarded amount', 409, 'award_balance')
   return { kind: 'award', subcontract_id: award.id }
  }
- need(s.kind === 'budget', 'source.kind must be award or budget (selections arrive with CLIENT-002)')
+ if (s.kind === 'selection') {
+  const selection_id = text(s.selection_id, 'selection_id', 100), revision_id = text(s.revision_id, 'revision_id', 100)
+  const { selection, revision, option } = selected(job, selection_id, revision_id)
+  need(selection.revisions.filter(r => r.status === 'signed').at(-1)?.id === revision.id, 'A newer signed choice requires a new PO', 409, 'selection_revision')
+  need(!job.orders.some(o => o.id !== except && o.status !== 'cancelled' && o.source?.kind === 'selection' && o.source.selection_id === selection_id && o.source.revision_id === revision_id), 'This signed selection already has a PO', 409, 'selection_ordered')
+  need(lines.length === 1 && lines[0]!.quantity === '1' && lines[0]!.unit === 'selection' && lines[0]!.unit_cents === option.price_cents && lines[0]!.cost_code === revision.cost_code && lines[0]!.description === option.name, 'The PO must retain the exact signed selection price, option and code', 409, 'selection_terms')
+  need(input.supplier === undefined || input.supplier === option.supplier, 'The PO supplier must match the signed choice', 409, 'selection_terms')
+  return { kind: 'selection', selection_id, revision_id }
+ }
+ need(s.kind === 'budget', 'source.kind must be award, budget or selection')
  const code = text(s.cost_code, 'cost_code', 40); need(budgetOf(job, code) > 0, `The accepted budget has no ${code} cost`, 409, 'budget_code')
  need(lines.every(l => l.cost_code === code), 'Every line of a budget PO carries its cost code')
  return { kind: 'budget', cost_code: code }
