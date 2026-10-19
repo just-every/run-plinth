@@ -71,3 +71,62 @@ test('SUB-001 — restricted subcontractor directory, private W-9 custody, revie
   assert.equal((await download({ cookie: f.owner })).status, 404)
  } finally { await f.close() }
 })
+
+test('SUB-003 — owner insurance and license rules hold an award with expired evidence, prepare an unsent renewal and release only after a designated reviewer verifies replacement coverage', async () => {
+ const f = await createFixture()
+ try {
+  const agent = await f.agent(), client = await f.invite('plumbing-client@example.com')
+  const api = (path, body, { method = 'POST', cookie = f.owner, token } = {}) => f.json('/api/plinth' + path, { method, ...(token ? { token } : { cookie }), ...(body ? { body } : {}) })
+  const year = new Date().getUTCFullYear(), past = `${year - 1}-01-01`, lapsed = `${year - 1}-12-31`, future = `${year + 1}-12-31`
+  const requirements = [{ trade: 'Plumbing', kind: 'general_liability', min_limit_cents: 100_000_000, enforcement: 'hold' }, { trade: '*', kind: 'workers_comp', enforcement: 'hold' }, { trade: 'Plumbing', kind: 'license', enforcement: 'flag' }]
+  const rules = { expected_version: 0, reviewers: [], requirements }
+  assert.equal((await api('/compliance-rules', rules, { method: 'PUT', token: agent })).status, 403)
+  assert.equal((await api('/compliance-rules', rules, { method: 'PUT', cookie: client })).status, 403)
+  let r = await api('/compliance-rules', rules, { method: 'PUT' }); assert.equal(r.status, 200, JSON.stringify(r.value))
+  r = await api('/vendors', { kind: 'subcontractor', name: 'Lakeside Plumbing Co', trades: ['Plumbing'], contacts: [{ id: 'kim', name: 'Kim Ortiz', email: 'kim@lakeside.example' }] }); let vendor = r.value.vendor
+  const post = async (path, body, credentials) => { const result = await api(`/vendors/${vendor.id}${path}`, { expected_version: vendor.version, ...body }, credentials); if (result.status === 200) vendor = result.value.vendor; return result }
+  assert.equal((await post('/qualifications', { trade: 'Plumbing', status: 'qualified', evidence: 'Master plumber references checked' })).status, 200)
+  const coi = (kind, extra = {}) => ({ kind, issuer: 'Vermont Mutual', reference: `${kind}-POL-77`, limit_cents: 200_000_000, endorsements: ['Additional insured: builder'], effective_on: past, expires_on: future, document: { name: `${kind}.pdf`, base64: Buffer.from(`%PDF-1.7\n${kind} certificate\n%%EOF`).toString('base64') }, ...extra })
+  assert.equal((await post('/compliance', { ...coi('general_liability'), verified: true })).status, 400, 'An upload cannot declare itself verified')
+  assert.equal((await post('/compliance', coi('general_liability', { expires_on: lapsed }))).status, 200, 'Expired COI is recorded as received')
+  r = await post('/compliance', coi('workers_comp')); assert.equal(r.status, 200); const comp = r.value.record
+  assert.equal(comp.review, undefined, 'Uploading a PDF never constitutes verification')
+  assert.equal((await post(`/compliance/${comp.id}/review`, { decision: 'verified', note: 'Called carrier' }, { token: agent })).status, 403)
+  assert.equal((await post(`/compliance/${comp.id}/review`, { decision: 'verified', note: 'Workers comp confirmed with Vermont Mutual' })).status, 200)
+  assert.equal((await post(`/compliance/${comp.id}/review`, { decision: 'rejected', note: 'again' })).status, 409, 'A decision is immutable')
+
+  let job = await createActiveJob(f, 'Colchester bath rough-in', 'plumbing-client@example.com')
+  const act = async (path, body = {}, credentials) => { const result = await api(`/jobs/${job.id}${path}`, { expected_version: job.version, ...body }, credentials); if (result.status === 200) job = result.value.job; return result }
+  r = await act('/subcontracts', { vendor_id: vendor.id, trade: 'Plumbing', scope: 'Rough-in plumbing for the primary bath', contact_ids: ['kim'], awarded_on: '2026-10-20', amount_cents: 1_250_000 }); assert.equal(r.status, 200, JSON.stringify(r.value))
+  const award = r.value.record
+  assert.equal(award.status, 'on_hold', 'The assignment is held')
+  assert.deepEqual(award.compliance.holds, [{ kind: 'general_liability', problem: 'expired' }])
+  assert.deepEqual(award.compliance.flags, [{ kind: 'license', problem: 'missing' }], 'Flag rules warn without holding')
+  vendor = (await api(`/vendors/${vendor.id}`, undefined, { method: 'GET' })).value.vendor
+  assert.deepEqual(vendor.renewal_requests.map(q => [q.kind, q.problem, q.job_id]).sort(), [['general_liability', 'expired', job.id], ['license', 'missing', job.id]])
+  assert.ok(vendor.renewal_requests.every(q => q.delivery.startsWith('Prepared, not sent')), 'Renewal requests are never claimed as sent')
+  r = await act(`/subcontracts/${award.id}/release`); assert.equal(r.status, 409); assert.equal(r.value.error, 'compliance_hold')
+
+  // Replacement coverage: unverified until a designated reviewer decides; an undesignated administrator cannot.
+  r = await post('/compliance', coi('general_liability', { limit_cents: 50_000_000 })); const thin = r.value.record
+  assert.equal((await post(`/compliance/${thin.id}/review`, { decision: 'verified', note: 'Certificate checked' })).status, 200)
+  r = await act(`/subcontracts/${award.id}/release`); assert.equal(r.status, 409); assert.deepEqual(r.value.details.holds, [{ kind: 'general_liability', problem: 'below_limit' }])
+  r = await post('/compliance', coi('general_liability')); const replacement = r.value.record
+  r = await act(`/subcontracts/${award.id}/release`); assert.deepEqual(r.value.details.holds, [{ kind: 'general_liability', problem: 'unverified' }])
+  // An administrator reviews only once the owner names them as a compliance reviewer.
+  const reviewerEmail = 'compliance-admin@example.com', reviewer = await f.invite(reviewerEmail, 'Jordan Lee', 'admin')
+  const decision = { decision: 'verified', note: 'Replacement GL certificate confirmed with carrier; additional insured endorsement present' }
+  assert.equal((await post(`/compliance/${replacement.id}/review`, decision, { cookie: reviewer })).status, 403, 'An undesignated administrator cannot verify')
+  assert.equal((await api('/compliance-rules', { expected_version: 1, reviewers: [reviewerEmail], requirements }, { method: 'PUT', cookie: reviewer })).status, 403, 'Only the owner sets rules and reviewers')
+  assert.equal((await api('/compliance-rules', { expected_version: 1, reviewers: [reviewerEmail], requirements }, { method: 'PUT' })).status, 200)
+  assert.equal((await post(`/compliance/${replacement.id}/review`, decision, { cookie: reviewer })).status, 200)
+  assert.equal((await act(`/subcontracts/${award.id}/release`, {}, { token: agent })).status, 403)
+  r = await act(`/subcontracts/${award.id}/release`); assert.equal(r.status, 200, JSON.stringify(r.value))
+  assert.equal(r.value.record.status, 'released'); assert.deepEqual(r.value.record.compliance.holds, [])
+  assert.ok(job.approvals.some(a => a.kind === 'subcontract.release' && a.approved_by.role === 'owner'))
+  const evidence = await f.request(`/api/plinth/vendors/${vendor.id}/compliance/${replacement.id}`, { cookie: f.owner })
+  assert.equal(evidence.status, 200); assert.equal(evidence.headers.get('x-plinth-verification'), 'Verified by Jordan Lee')
+  assert.equal((await f.request(`/api/plinth/vendors/${vendor.id}/compliance/${replacement.id}`, { cookie: client })).status, 403)
+  assert.equal((await f.json(`/api/plinth/jobs/${job.id}`, { cookie: client })).value.job.subcontracts, undefined)
+ } finally { await f.close() }
+})

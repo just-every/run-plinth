@@ -1,5 +1,6 @@
 import { cents, need, object, stamp, text, type Actor, type Input, type Stamp } from './model'
 import { nanp } from './us-conventions'
+import type { ComplianceRecord, RenewalRequest } from './compliance'
 
 export interface VendorContact { id: string; name: string; email: string; phone: string; phone_e164?: string }
 export interface VendorRate { id: string; description: string; unit: string; cents: number; effective_on: string; reference: string; reviewed_by: Stamp }
@@ -7,7 +8,7 @@ export interface Qualification { id: string; trade: string; status: 'qualified' 
 export interface VendorDocument { id: string; name: string; mime: string; checksum: string; size: number }
 /** Tax identity keeps the TIN type and last four digits only; the full TIN stays inside the private W-9 original. */
 export interface TaxIdentity { legal_name: string; tin_type: 'EIN' | 'SSN'; tin_last4: string; document: VendorDocument; received_by: Stamp; verification: 'W-9 received, TIN not checked with the IRS' }
-export interface Vendor { id: string; version: number; kind: 'subcontractor' | 'vendor'; name: string; trades: string[]; service_areas: string[]; contacts: VendorContact[]; rates: VendorRate[]; qualifications: Qualification[]; tax?: TaxIdentity; history: { action: string; at: string; by: Stamp }[] }
+export interface Vendor { compliance?: ComplianceRecord[]; renewal_requests?: RenewalRequest[]; id: string; version: number; kind: 'subcontractor' | 'vendor'; name: string; trades: string[]; service_areas: string[]; contacts: VendorContact[]; rates: VendorRate[]; qualifications: Qualification[]; tax?: TaxIdentity; history: { action: string; at: string; by: Stamp }[] }
 /** What a bearer agent may read: no contacts, rates or tax identity. */
 export type VendorSummary = Pick<Vendor, 'id' | 'version' | 'kind' | 'name' | 'trades' | 'service_areas' | 'qualifications'>
 
@@ -49,14 +50,14 @@ export function qualify(vendor: Vendor, input: Input, actor: Actor): Qualificati
  const row: Qualification = { id: crypto.randomUUID(), trade, status: input.status, evidence: text(input.evidence, 'qualification evidence', 2000), reviewed_by: stamp(actor) }
  vendor.qualifications.push(row); vendor.history.push({ action: `qualification.${row.status}`, at: row.reviewed_by.at, by: row.reviewed_by }); return row
 }
-function documentBytes(value: unknown) {
+export function documentBytes(value: unknown, label = "The W-9") {
  need(typeof value === 'string' && value.length > 0 && value.length <= 2_796_204 && /^[A-Za-z0-9+/]*={0,2}$/.test(value), 'Invalid base64 document')
  let raw = ''; try { raw = atob(value) } catch { need(false, 'Invalid base64 document') }
  need(btoa(raw) === value, 'Document base64 must be canonical')
- const bytes = Uint8Array.from(raw, c => c.charCodeAt(0)); need(bytes.length > 0 && bytes.length <= 2_097_152, 'The W-9 must be at most 2 MB')
+ const bytes = Uint8Array.from(raw, c => c.charCodeAt(0)); need(bytes.length > 0 && bytes.length <= 2_097_152, `${label} must be at most 2 MB`)
  const head = new TextDecoder().decode(bytes.slice(0, 5))
  const mime = head === '%PDF-' ? 'application/pdf' : bytes.slice(0, 8).join(',') === '137,80,78,71,13,10,26,10' ? 'image/png' : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? 'image/jpeg' : ''
- need(mime, 'The W-9 must be a PDF, PNG or JPEG file')
+ need(mime, `${label} must be a PDF, PNG or JPEG file`)
  return { bytes, mime }
 }
 export function taxIdentity(input: Input, actor: Actor) {
