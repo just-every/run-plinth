@@ -1,3 +1,4 @@
+import { Reports } from './reports'
 import { useEffect, useRef, useState } from 'react'
 import type { Job } from '../plinth/model'
 import { api, Field, Form } from './shared'
@@ -36,6 +37,7 @@ export function Workspace() {
         {view === 'vendors' && manager && <Vendors />}
         {view === 'imports' && <Imports onChange={refresh} />}
         {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Administrators manage company records and every job; the owner can narrow one to a project manager for assigned jobs."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Administrator</option>}</select></label></div></Form></section>{role === 'owner' && <TeamRoles jobs={jobs} />}{manager && <CompanySetup />}</Page>}
+        {view === 'jobs' && !selected && ['owner','admin','project_manager'].includes(role) && <Reports role={role} />}
         {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} totals={totals} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}
       </main>
     </div>

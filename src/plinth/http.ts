@@ -1,3 +1,5 @@
+import { reportsResponse } from './reports'
+import { reportNativeGate } from './report-store'
 import { selectionAction, selectionOrderInput, selectionProjection } from './selections'
 import { pricingResponse, previewPricing, applyPricing } from './estimate-pricing'
 import { catalogResponse } from './estimate-catalog'
@@ -44,6 +46,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const reports=await reportsResponse(request,env.DB,actor,parts,body);if(reports)return reports
  const team=await teamResponse(request,env.DB,actor,parts,body);if(team)return team
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
  const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
@@ -82,6 +85,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===4&&parts[2]==='schedule'&&parts[3]==='preview')return json({preview:await previewSchedule(previous,actor,input,await jobs(env.DB))})
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
+ await reportNativeGate(env.DB,previous,actor,category,id,action)
  if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)
  else if(category==='selections'&&parts.length===5){if(action==='order'){requireJobManager(actor,true);record=prepareOrder(job,actor,selectionOrderInput(job,id!,String(input.revision_id),input))}else record=selectionAction(job,actor,input,id,action)}
  else if(category==='pricing'&&id==='apply'&&parts.length===4)record=await applyPricing(env.DB,job,actor,input)
