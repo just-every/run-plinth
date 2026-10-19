@@ -1,5 +1,5 @@
 import { requireManager } from './auth'
-import { find, sum, type Actor, type Job, type Line, type Quote } from './model'
+import { currencyOf, find, sum, type Actor, type Job, type Line, type Quote } from './model'
 
 const included = (line: Line) => line.included !== false
 const cost = (lines: Line[]) => lines.every(line => line.cost_total_cents !== undefined) ? sum(lines.map(line => line.cost_total_cents!)) : null
@@ -18,7 +18,7 @@ export function costCodeReport(job: Job, actor: Actor, quoteId: string) {
   group.lines.push(line); grouped.set(key, group)
  }
  return {
-  format: 'plinth-estimate-cost-codes-v1', currency: 'USD', job_id: job.id, job_name: job.name, quote_id: quote.id, revision: quote.revision, status: quote.status,
+  format: 'plinth-estimate-cost-codes-v1', currency: currencyOf(job), job_id: job.id, job_name: job.name, quote_id: quote.id, revision: quote.revision, status: quote.status,
   rounding: quote.pricing ? 'Base measurements round half-up once per line. Scoped pricing stages round half-up, then allocate cents proportionally by largest remainder in source-line order; final line totals include reviewed tax.' : 'Exact quantity × conversion numerator ÷ conversion denominator × integer rate cents; round half-up once per line, then sum included lines.',
   ...(quote.pricing ? { pricing: quote.pricing } : {}),
   alternate_selections: quote.alternate_selections ?? {}, inclusions: quote.inclusions ?? [], exclusions: quote.exclusions ?? [],

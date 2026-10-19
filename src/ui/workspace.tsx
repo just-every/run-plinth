@@ -5,13 +5,16 @@ import { JobWorkspace } from './job'
 import { Imports } from './imports'
 import { Customers } from './customers'
 import { Jobs } from './jobs'
+import { CompanySetup } from './company'
+import type { CurrencyTotal } from '../plinth/currency-report'
 import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
 
 export function Workspace() {
   const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
   const create = useRef<HTMLElement>(null)
-  async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setRole(result.role); setReady(true) }
+  const [totals, setTotals] = useState<CurrencyTotal[]>([])
+  async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setTotals(result.currency_totals ?? []); setRole(result.role); setReady(true) }
   useEffect(() => { const job = new URLSearchParams(window.location.search).get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
   useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
@@ -29,8 +32,8 @@ export function Workspace() {
         {error && <p role="alert" className="error">{error}</p>}
         {view === 'customers' && manager && <Customers />}
         {view === 'imports' && <Imports onChange={refresh} />}
-        {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Project managers can prepare job records."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></div></Form></section></Page>}
-        {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}
+        {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Project managers can prepare job records."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></div></Form></section>{manager && <CompanySetup />}</Page>}
+        {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} totals={totals} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}
       </main>
     </div>
   </div>

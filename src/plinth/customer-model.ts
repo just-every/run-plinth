@@ -1,10 +1,14 @@
 import { find, need, object, stamp, text, type Actor, type Input, type Stamp } from './model'
+import { nanp } from './us-conventions'
+/** A phone written as a US number also carries its E.164 form; any other number stays exactly as written. */
+const phoneE164 = (phone: string) => { const e164 = phone ? nanp(phone) : null; return e164 ? { phone_e164: e164 } : {} }
 
 export interface CustomerContact {
  id: string
  name: string
  email: string
  phone: string
+ phone_e164?: string
  preferences: string
  external_id: string
 }
@@ -47,7 +51,7 @@ function contact(input: Input, previous?: CustomerContact): CustomerContact {
  const email = optionalText(values.email,'email',254).toLowerCase()
  need(!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),'Provide a valid contact email')
  return {id:previous?.id ?? identity(input.id),name:text(values.name,'name',200),email,
-  phone:optionalText(values.phone,'phone',100),preferences:optionalText(values.preferences,'preferences',4000),
+  phone:optionalText(values.phone,'phone',100),...phoneE164(optionalText(values.phone,'phone',100)),preferences:optionalText(values.preferences,'preferences',4000),
   external_id:optionalText(values.external_id,'external_id',500)}
 }
 function property(input: Input, previous?: CustomerProperty): CustomerProperty {

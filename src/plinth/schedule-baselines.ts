@@ -9,7 +9,7 @@ import type { BaselineJob, ScheduleActual, ScheduleBaseline, ScheduleRevision, S
 export * from './schedule-baseline-model'
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow' }
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers })
-const snapshot = (job: Job): ScheduleSnapshot => ({ calendar: workingCalendar(job.schedule_calendar), tasks: structuredClone(job.schedules) })
+const snapshot = (job: Job): ScheduleSnapshot => ({ calendar: workingCalendar(job.schedule_calendar, job.time_zone), tasks: structuredClone(job.schedules) })
 function utc(value: unknown, name: string): string {
  const raw = text(value, name, 40)
  need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z$/.test(raw) && Number.isFinite(Date.parse(raw)), `${name} requires an explicit UTC timestamp ending in Z`)

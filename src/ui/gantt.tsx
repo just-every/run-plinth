@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Diary, Schedule } from '../plinth/model'
 import { TaskDetails } from './schedule-views'
-const day = (value: string | number) => new Date(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).replace(',', '')
+const day = (value: string | number, zone = 'UTC') => new Date(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: zone }).replace(',', '')
 const calendarDay = (value: string) => day(value + 'T12:00:00Z')
 
 const WEEK = 7 * 86_400_000
@@ -20,10 +20,10 @@ export function weeks(schedules: Schedule[], logs: Diary[], now: number) {
   return { start, count, at, mondays, end: start + count * WEEK - 1 }
 }
 
-type Props = { schedules: Schedule[]; logs: Diary[]; now: number; selected?: string; critical?: string[]; onSelect: (id: string) => void; onLogs: () => void }
+type Props = { zone: string; schedules: Schedule[]; logs: Diary[]; now: number; selected?: string; critical?: string[]; onSelect: (id: string) => void; onLogs: () => void }
 
 /** The schedule chart: one row per booking with its bar on a weekly grid, a today line, and the daily logs as milestones. Below 760px the rows stack, each with its own track. */
-export function Gantt({ schedules, logs, now, selected, critical = [], onSelect, onLogs }: Props) {
+export function Gantt({ schedules, logs, now, selected, critical = [], onSelect, onLogs, zone }: Props) {
   const grid = weeks(schedules, logs, now), rows = [...schedules].sort((a, b) => a.start.localeCompare(b.start) || a.trade.localeCompare(b.trade))
   const scale = useRef<HTMLDivElement>(null), [room, setRoom] = useState(false)
   useEffect(() => { const el = scale.current; if (!el) return; const seen = new ResizeObserver(([entry]) => setRoom(entry!.contentRect.width / grid.count >= WEEKDAY_ROOM)); seen.observe(el); return () => seen.disconnect() }, [grid.count])
@@ -32,18 +32,18 @@ export function Gantt({ schedules, logs, now, selected, critical = [], onSelect,
     <div className="g-head" aria-hidden="true">
       <span className="g-col g-task">Task / Sub</span><span className="g-col">Start</span><span className="g-col">Finish</span>
       <div className="g-scale">
-        <span className="g-today-badge">{day(now)}</span>
+        <span className="g-today-badge">{day(now, zone)}</span>
         <div className="g-months">{months.map(m => <span key={m.label} style={vars({ gridColumn: `span ${m.span}` })}>{m.span > 1 ? m.label : m.label.slice(0, 3)}</span>)}</div>
         <div className="g-weeks" ref={scale}>{grid.mondays.map((d, i) => <span key={d.getTime()}>{(i === 0 || d.getUTCDate() <= 7) && <span className="g-mon">Mon </span>}{d.getUTCDate()}</span>)}</div>
       </div>
     </div>
-    <ol className="g-body" aria-label="Tasks by start date, UTC">
+    <ol className="g-body" aria-label={`Tasks by start date, ${zone}`}>
       {rows.map(s => {
         const a = grid.at(Date.parse(s.start)), b = grid.at(Date.parse(s.end)), draft = s.status === 'draft'
         return <li key={s.id}><button type="button" className={`g-row${draft ? ' is-draft' : ''}${selected === s.id ? ' is-selected' : ''}${Date.parse(s.end) < now ? ' is-past' : ''}`} aria-pressed={selected === s.id} onClick={() => onSelect(s.id)}>
           <span className="g-task"><strong>{s.description}</strong><TaskDetails task={s} tasks={schedules} critical={critical.includes(s.id)} /></span>
-          <span className="g-date"><span className="g-label">Start </span>{day(s.start)}</span>
-          <span className="g-date"><span className="g-label">Finish </span>{day(s.end)}{draft && <em>Needs approval</em>}</span>
+          <span className="g-date"><span className="g-label">Start </span>{day(s.start, zone)}</span>
+          <span className="g-date"><span className="g-label">Finish </span>{day(s.end, zone)}{draft && <em>Needs approval</em>}</span>
           <span className="g-track">{s.status !== 'cancelled' && <span className={s.milestone ? 'g-diamond' : 'g-bar'} style={vars({ '--a': a, '--b': b })} />}<span className="g-tick" /></span>
         </button></li>
       })}
@@ -60,7 +60,7 @@ export function Gantt({ schedules, logs, now, selected, critical = [], onSelect,
       <li><i className="swatch is-draft" />Draft, needs approval</li>
       {schedules.some(s => s.milestone) && <li><i className="diamond" />Milestone</li>}
       {logs.length > 0 && <li><i className="diamond" />Daily log</li>}
-      <li><i className="today-key" />Today ({day(now)})</li>
+      <li><i className="today-key" />Today ({day(now, zone)})</li>
     </ul>
   </div>
 }

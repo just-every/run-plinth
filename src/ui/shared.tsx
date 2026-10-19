@@ -11,9 +11,8 @@ export async function api(path: string, body?: unknown, method = 'POST') {
   if (!response.ok) throw new Error(data.message || data.error?.message || data.error || data.code || `Request failed (${response.status})`)
   return data
 }
-/** Plinth keeps money in USD cents; the screen, the pay app CSV and the export all say so. */
-export const CURRENCY = 'USD'
-export const money = (cents: number = 0) => new Intl.NumberFormat('en-US', { style: 'currency', currency: CURRENCY }).format(cents / 100)
+/** Plinth keeps money in cents of the job's currency: USD, or AUD on a labelled historical import. The screen, the pay app CSV and the export all say which. */
+export const money = (cents: number = 0, currency: string = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: currency === 'USD' ? 'symbol' : 'code' }).format(cents / 100)
 export const cents = (value: FormDataEntryValue | null) => {
   const raw = String(value ?? '')
   if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error('Enter a positive amount with at most two decimal places.')

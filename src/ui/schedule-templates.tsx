@@ -4,10 +4,11 @@ import { defaultCalendar, type SchedulePreview } from '../plinth/schedule-model'
 import type { JobProps } from './job'
 import { Action, api, Badge, Field } from './shared'
 import { ScheduleEntryForm } from './schedule-baseline-forms'
-import { scheduleInstant } from './schedule-views'
+import { fromLocalInput, jobZone, scheduleInstant } from './schedule-views'
 
 export type TemplatePreviewInput = { template_id: string; start: string }
 export function ScheduleTemplates({ job, mutate, onPreview }: { job: BaselineJob; mutate: JobProps['mutate']; onPreview: (preview: SchedulePreview, input: TemplatePreviewInput) => void }) {
+  const zone = jobZone(job)
   const [templates, setTemplates] = useState<ScheduleTemplate[]>([]), [selectedId, setSelectedId] = useState(''), [error, setError] = useState(''), [loading, setLoading] = useState(true)
   async function load() {
     setLoading(true); setError('')
@@ -22,21 +23,21 @@ export function ScheduleTemplates({ job, mutate, onPreview }: { job: BaselineJob
   const sourceReady = job.status === 'active' && tasks.length > 0 && job.schedules.every(task => task.status !== 'draft')
   return <section className="card" aria-labelledby="schedule-templates-title"><h3 id="schedule-templates-title">Schedule templates</h3>
     <p>Reuse published tasks, dependencies and working calendars on an accepted job. Preview the proposed dates before applying a template.</p>
-    {job.schedule_template && <p>Applied: {job.schedule_template.template_name} · version {job.schedule_template.template_version} · starts {scheduleInstant(job.schedule_template.start)} · approved by {job.schedule_template.approved_by.name}.</p>}
+    {job.schedule_template && <p>Applied: {job.schedule_template.template_name} · version {job.schedule_template.template_version} · starts {scheduleInstant(job.schedule_template.start, zone)} · approved by {job.schedule_template.approved_by.name}.</p>}
     {error && <p role="alert" className="error">{error}</p>}{loading && <p role="status">Loading schedule templates…</p>}
     <Action className="secondary" action={load}>Reload templates</Action>
     <label>Schedule template<select aria-label="Schedule template" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">Choose a template</option>{templates.map(template => <option key={template.id} value={template.id}>{template.name} · v{template.version}{template.archived ? ' · Archived' : ''}</option>)}</select></label>
     {!loading && !templates.length && <p>No templates saved yet.</p>}
     {selected && <div className="side-section">
       <div className="card-head"><h4>{selected.name}</h4><div className="row-end"><Badge>{selected.archived ? 'Archived' : 'Active'}</Badge></div></div>
-      <p>{selected.tasks.length} tasks · UTC working hours {selected.calendar.start_hour}:00–{selected.calendar.end_hour}:00.</p>
+      <p>{selected.tasks.length} tasks · working hours {selected.calendar.start_hour}:00–{selected.calendar.end_hour}:00 local time, applied in {zone}.</p>
       {!selected.archived && job.status === 'active' && <ScheduleEntryForm key={'apply-' + selected.id} submit="Preview template dates" action={async f => {
-        const input = { template_id: selected.id, start: new Date(String(f.get('start')) + 'Z').toISOString() }
+        const input = { template_id: selected.id, start: fromLocalInput(String(f.get('start')), zone) }
         const result = await mutate('/schedule-template/preview', input)
         onPreview(result.preview, input)
-      }}><Field label="Template start (UTC)" name="start" type="datetime-local" /></ScheduleEntryForm>}
+      }}><Field label={`Template start (${zone})`} name="start" type="datetime-local" /></ScheduleEntryForm>}
       {job.status !== 'active' && <p>Accept the job’s quote before applying a template.</p>}
-      <details><summary>Template revision history</summary><ol className="rows">{[...selected.revisions].reverse().map(revision => <li className="row" key={revision.revision}><div className="row-main"><strong>v{revision.revision} · {revision.name}</strong><span>{revision.reason || 'Initial template'}</span><span>{revision.approved_by.name} · {scheduleInstant(revision.approved_by.at)}</span><details><summary>Approved template snapshot</summary><pre>{JSON.stringify(revision, null, 2)}</pre></details></div><div className="row-end"><Badge>{revision.archived ? 'Archived' : 'Approved'}</Badge></div></li>)}</ol></details>
+      <details><summary>Template revision history</summary><ol className="rows">{[...selected.revisions].reverse().map(revision => <li className="row" key={revision.revision}><div className="row-main"><strong>v{revision.revision} · {revision.name}</strong><span>{revision.reason || 'Initial template'}</span><span>{revision.approved_by.name} · {scheduleInstant(revision.approved_by.at, zone)}</span><details><summary>Approved template snapshot</summary><pre>{JSON.stringify(revision, null, 2)}</pre></details></div><div className="row-end"><Badge>{revision.archived ? 'Archived' : 'Approved'}</Badge></div></li>)}</ol></details>
       {!selected.archived && <>
         <details><summary>Revise template from this job’s published tasks</summary><ScheduleEntryForm key={'revision-' + selected.id + ':' + selected.version} disabled={!sourceReady} submit="Save template revision" action={async f => {
           const localIds = [...new Set(selected.revisions.flatMap(revision => revision.tasks.map(task => task.id)))]

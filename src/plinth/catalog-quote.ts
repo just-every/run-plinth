@@ -3,7 +3,7 @@ import { exact, date } from './catalog-input'
 import { catalogEntry } from './estimate-catalog'
 import { decimal } from './estimate-math'
 import { estimateLines } from './estimate-input'
-import { need, object, recordApproval, stamp, text, type Actor, type Input, type Job } from './model'
+import { need, object, recordApproval, usdOnly, stamp, text, type Actor, type Input, type Job } from './model'
 import { prepareQuote } from './quotes'
 import type { Assembly, CatalogSource, EstimateTemplate, VendorRate } from './catalog-model'
 /** Decimal products retain every digit; division is deferred to the estimate's one rounding boundary. */
@@ -11,7 +11,7 @@ function product(...values:string[]):string {let n=1n,places=0;for(const v of va
 function wasteFactor(value:string):string {const r=decimal(value,'Waste percentage',false);const n=100n*r.denominator+r.numerator,places=String(r.denominator).length-1,raw=n.toString().padStart(places+1,'0');return places?raw.slice(0,-places)+'.'+raw.slice(-places):raw}
 async function digest(value:unknown) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))].map(b=>b.toString(16).padStart(2,'0')).join('')}
 export async function catalogPreview(db:D1Database,job:Job,actor:Actor,input:Input) {
- requireManager(actor,true)
+ requireManager(actor,true);usdOnly(job)
  const template=await catalogEntry(db,text(input.template_id,'Template id',80),'template'),definition=template.revisions.at(-1)!.value as EstimateTemplate
  const supplied=object(input.dimensions??definition.dimensions)
  need(Object.keys(supplied).length===Object.keys(definition.dimensions).length&&Object.keys(supplied).every(k=>Object.hasOwn(definition.dimensions,k)),'Supply exactly the template dimensions')
@@ -27,7 +27,7 @@ export async function catalogPreview(db:D1Database,job:Job,actor:Actor,input:Inp
  return {proposal,template_name:template.name,previous_total_cents:current?.total_cents??0,total_delta_cents:estimate.total_cents-(current?.total_cents??0),sold:job.status!=='quoting',digest:await digest([job.id,job.version,proposal])}
 }
 export async function applyCatalog(db:D1Database,job:Job,actor:Actor,input:Input) {
- requireManager(actor)
+ requireManager(actor);usdOnly(job)
  const preview=await catalogPreview(db,job,actor,input)
  need(input.digest===preview.digest,'Rates, assemblies, dimensions or quote changed; preview again before approving',409,'catalog_review')
  need(!preview.sold,'Sold estimates stay frozen; use a change order',409,'quote_frozen')

@@ -1,4 +1,5 @@
 import { cents, need, object, sum, text, type Input, type Line } from './model'
+import { standardConversion } from './us-conventions'
 import { decimal, lineCents, measurement } from './estimate-math'
 import type { EstimateCategory } from './estimate-model'
 
@@ -26,7 +27,8 @@ export function estimateLines(input: Input) {
     decimal(conversion.numerator, 'Conversion numerator'); decimal(conversion.denominator, 'Conversion denominator')
     line.conversion = { numerator: String(conversion.numerator), denominator: String(conversion.denominator) }
    }
-   need(line.unit === line.rate_unit || line.conversion, 'Different measurement and rate units require an explicit exact conversion')
+   if (!line.conversion) { const standard = standardConversion(line.unit, line.rate_unit); if (standard) line.conversion = standard }
+   need(line.unit === line.rate_unit || line.conversion, 'Different measurement and rate units require an explicit exact conversion (in, ft, yd, mm, cm, m and sq in, sq ft, sq yd, sq m convert automatically)')
    if (row.cost_unit_cents !== undefined) line.cost_unit_cents = cents(row.cost_unit_cents, 'cost_unit_cents')
    const group = text(row.alternate_group, 'Alternate group', 100, true), option = text(row.alternate_option, 'Alternate option', 100, true)
    need(!!group === !!option, 'An alternate needs both a group and option')

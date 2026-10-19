@@ -16,8 +16,8 @@ export function acceptedJobsMapping(actor: Actor): ImportMapping { return {
       id, version: 1, name: row.title, client_email: row.client_email.toLowerCase(), address: row.site_address,
       status: 'quoting', created_by: source,
       quotes: [{ id: `${id}-quote`, revision: 1, lines: [{ description: row.title, quantity: 1, unit_cents: amount, total_cents: amount }], total_cents: amount, notes: 'Imported source amount. Review and explicitly accept this quote before starting work.', status: 'draft', prepared_by: source }],
-      schedules: [], diary: [], variations: [], orders: [], claims: [], approvals: [],
-      import_evidence: { format: IMPORT_NAMESPACE, external_id: row.external_id, accepted_on: row.accepted_on, quote_cents: amount, acceptance_verified: false, artifact_sha256: record.artifactHash, reviewed_by: { id: actor.id, name: actor.name, role: actor.role } },
+      schedules: [], diary: [], variations: [], orders: [], claims: [], approvals: [], ...(row.currency === 'AUD' ? { currency: 'AUD' as const } : {}),
+      import_evidence: { format: IMPORT_NAMESPACE, external_id: row.external_id, accepted_on: row.accepted_on, quote_cents: amount, ...(row.currency ? { currency: row.currency } : {}), acceptance_verified: false, artifact_sha256: record.artifactHash, reviewed_by: { id: actor.id, name: actor.name, role: actor.role } },
     }
     return { effects: [{ targetKind: 'construction-project', targetId: id, value: { data: canonicalJson(job), version: 1, attachments: [] } }], unmapped: [{ field: 'accepted_on', reason: 'Source acceptance is preserved as unverified evidence; native quote acceptance requires a person.' }] }
   },

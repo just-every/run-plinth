@@ -18,6 +18,8 @@ import { changeSchedule } from './schedule-changes'
 import { previewSchedule, publishSchedule } from './schedule-plan'
 import { templateResponse, getScheduleTemplate, previewScheduleTemplate, applyScheduleTemplate, scheduleBaselineAction, recordRevision } from './schedule-baselines'
 import { approveClaim, exportClaim, prepareClaim } from './claims'
+import { company, companyResponse } from './company'
+import { currencyTotals } from './currency-report'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
@@ -33,11 +35,12 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
  const pricing=await pricingResponse(request,env.DB,actor,parts,body);if(pricing)return pricing
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
- if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(()=>true);return json({role:role(actor),jobs:(await named(env.DB,all.filter((job,i)=>allowed[i]))).map(job=>display(job,actor))})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
+ if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(()=>true);const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(parts.length===3&&parts[2]==='customer'&&method==='GET'){requireManager(actor);return json({customer:previous.customer_id?await getCustomer(env.DB,previous.customer_id):null})}

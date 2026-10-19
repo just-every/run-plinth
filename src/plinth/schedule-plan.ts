@@ -51,7 +51,7 @@ function ordered(tasks: Schedule[]): Schedule[] {
 }
 export async function previewSchedule(job: Job, actor: Actor, input: Input, all: Job[]): Promise<SchedulePreview> {
  requireManager(actor, true); active(job)
- const calendar = workingCalendar(input.calendar ?? job.schedule_calendar), tasks = normalize(job, actor, input), sorted = ordered(tasks), byId = new Map(tasks.map(s => [s.id, s]))
+ const calendar = workingCalendar(input.calendar ?? job.schedule_calendar, job.time_zone), tasks = normalize(job, actor, input), sorted = ordered(tasks), byId = new Map(tasks.map(s => [s.id, s]))
  need(!all.some(other => other.id !== job.id && other.schedules.some(task => byId.has(task.id))), 'Task identities must be unique across jobs', 409, 'schedule_identity')
  for (const task of sorted) {
   if (task.status === 'cancelled') continue

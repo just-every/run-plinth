@@ -12,13 +12,13 @@ import { Gantt, weeks } from './gantt'
 import { JobLog } from './history'
 import { DecisionStrip } from './decisions'
 import { CalendarEditor, TaskEditor, type TaskInput } from './schedule-editor'
-import { ScheduleCalendar, ScheduleList, scheduleDate, scheduleInstant, TaskDetails } from './schedule-views'
+import { jobZone, ScheduleCalendar, ScheduleList, scheduleDate, scheduleInstant, TaskDetails } from './schedule-views'
 import { ScheduleReview } from './schedule-review'
 import type { JobProps } from './job'
 
 /** Published dates stay visible until the server produces a reviewed proposal. */
 export function Schedule(props: JobProps) {
-  const { job, manager, mutate, go } = props
+  const { job, manager, mutate, go } = props, zone = jobZone(job)
   const [now] = useState(() => Date.now())
   const [tasks, setTasks] = useState<TaskInput[]>(job.schedules)
   const [calendar, setCalendar] = useState<WorkingCalendar>(job.schedule_calendar ?? defaultCalendar)
@@ -51,23 +51,23 @@ export function Schedule(props: JobProps) {
     <div className="stack">
       <DecisionStrip job={job} manager={manager} go={go} />
       <section className="card schedule-card" aria-labelledby="schedule-title">
-        <div className="card-head"><h2 id="schedule-title">Schedule</h2><p className="range">{scheduleDate(grid.start)} – {scheduleDate(grid.end)}</p><p className="card-meta">{shown.length} tasks · {preview ? 'Proposed dates' : 'Published dates'} · UTC</p></div>
+        <div className="card-head"><h2 id="schedule-title">Schedule</h2><p className="range">{scheduleDate(grid.start, zone)} – {scheduleDate(grid.end, zone)}</p><p className="card-meta">{shown.length} tasks · {preview ? 'Proposed dates' : 'Published dates'} · {zone}</p></div>
         <nav className="tabs" aria-label="Schedule views">{(['Gantt', 'Calendar', 'List'] as const).map(name => <button type="button" key={name} aria-current={view === name ? 'page' : undefined} onClick={() => setView(name)}>{name}</button>)}</nav>
         {job.status !== 'active' ? <p className="empty">Accept the quote before planning job work.</p>
           : !shown.length && !logs.length ? <p className="empty">No tasks published. Add tasks and milestones, then preview and publish the schedule.</p>
-          : view === 'Gantt' ? <Gantt schedules={shown} logs={logs} now={now} critical={critical} selected={selected?.id} onSelect={pick} onLogs={() => go('Daily logs')} />
-          : view === 'Calendar' ? <ScheduleCalendar key={preview?.digest ?? job.version} tasks={shown} critical={critical} select={pick} />
-          : <ScheduleList tasks={shown} critical={critical} select={pick} />}
+          : view === 'Gantt' ? <Gantt zone={zone} schedules={shown} logs={logs} now={now} critical={critical} selected={selected?.id} onSelect={pick} onLogs={() => go('Daily logs')} />
+          : view === 'Calendar' ? <ScheduleCalendar key={preview?.digest ?? job.version} zone={zone} tasks={shown} critical={critical} select={pick} />
+          : <ScheduleList zone={zone} tasks={shown} critical={critical} select={pick} />}
       </section>
       {manager && job.status === 'active' && <>
         <section className="card"><h3>Plan tasks and milestones</h3>
-          <p>Assign responsible people, connect predecessors and review the effect on the client’s completion date. Working times and lag use UTC.</p>
+          <p>Assign responsible people, connect predecessors and review the effect on the client’s completion date. Working times and lag use the job time zone, {zone}.</p>
           {dirty && !preview && <p role="status">Unreviewed changes are staged. The views above still show the published schedule.</p>}
           <div className="button-row"><button type="button" className="secondary" onClick={() => setEditor('new')}>Add task or milestone</button><Action className="secondary" action={review}>Preview schedule</Action>{dirty && <button type="button" className="secondary" onClick={() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setTemplateInput(undefined); setDirty(false); setEditor(undefined) }}>Discard staged changes</button>}</div>
           {!!tasks.length && <ul className="rows" aria-label="Tasks in schedule plan">{tasks.map(task => <li className="row" key={task.id}><div className="row-main"><span><button type="button" className="link-button" onClick={() => setEditor(task.id)}>{task.description}</button></span><span>{task.owner ?? task.trade}{task.milestone && ' · Milestone'}{task.status === 'cancelled' && ' · Cancelled'}</span></div></li>)}</ul>}
         </section>
-        <CalendarEditor calendar={calendar} save={next => { generation.current++; setCalendar(next); setPreview(undefined); setTemplateInput(undefined); setDirty(true) }} />
-        {preview && <ScheduleReview preview={preview} requiresRevision={!!job.schedule_baselines?.length} publish={async revision => { await mutate(templateInput ? '/schedule-template/apply' : '/schedule/publish', { ...(templateInput ?? { calendar, tasks }), digest: preview.digest, ...revision }) }} discard={() => { setTemplateInput(undefined); setPreview(undefined) }} />}
+        <CalendarEditor zone={zone} calendar={calendar} save={next => { generation.current++; setCalendar(next); setPreview(undefined); setTemplateInput(undefined); setDirty(true) }} />
+        {preview && <ScheduleReview zone={zone} preview={preview} requiresRevision={!!job.schedule_baselines?.length} publish={async revision => { await mutate(templateInput ? '/schedule-template/apply' : '/schedule/publish', { ...(templateInput ?? { calendar, tasks }), digest: preview.digest, ...revision }) }} discard={() => { setTemplateInput(undefined); setPreview(undefined) }} />}
         <ScheduleTemplates job={job} mutate={mutate} onPreview={(proposal, input) => { generation.current++; setPreview(proposal); setTemplateInput(input); setDirty(false) }} />
       </>}
       {manager && job.status === 'active' && <ScheduleConstraints job={job} mutate={mutate} />}
@@ -75,12 +75,13 @@ export function Schedule(props: JobProps) {
       <JobLog job={job} go={go} limit={4} />
       <CalendarSubscription mutate={mutate} />
     </div>
-    {manager && editor ? <aside className="card side booking-panel" id="booking-panel" aria-label="Schedule task editor"><TaskEditor key={editor} task={editor === 'new' ? undefined : tasks.find(t => t.id === editor)} tasks={tasks} save={stage} close={() => setEditor(undefined)} /></aside>
+    {manager && editor ? <aside className="card side booking-panel" id="booking-panel" aria-label="Schedule task editor"><TaskEditor zone={zone} key={editor} task={editor === 'new' ? undefined : tasks.find(t => t.id === editor)} tasks={tasks} save={stage} close={() => setEditor(undefined)} /></aside>
       : selected && <BookingPanel {...props} booking={selected} tasks={shown} critical={critical.includes(selected.id)} onPick={pick} edit={() => setEditor(selected.id)} />}
   </div>
 }
 
 function BookingPanel({ job, manager, go, booking, tasks, critical, onPick, edit }: JobProps & { booking: Booking; tasks: Booking[]; critical: boolean; onPick: (id: string) => void; edit: () => void }) {
+  const zone = jobZone(job)
   const draft = booking.status === 'draft', cancelled = booking.status === 'cancelled'
   const approval = job.approvals.find(a => a.kind === 'schedule' && a.subject_id === booking.id)
   const trades = [...new Map(tasks.map(s => [s.trade.toLowerCase(), s])).values()]
@@ -88,9 +89,9 @@ function BookingPanel({ job, manager, go, booking, tasks, critical, onPick, edit
   return <aside className="card side booking-panel" id="booking-panel" aria-label="Selected booking">
     <h2>{booking.description}</h2>
     <div className={`side-status${draft ? ' is-late' : ''}`}><Icon name={draft ? 'spark' : 'hammer'} /><div><p><strong>{draft ? `Draft from ${booking.prepared_by.name}` : cancelled ? 'Cancelled' : booking.milestone ? 'Milestone' : `Booked with ${booking.trade}`}</strong></p><TaskDetails task={booking} tasks={tasks} critical={critical} /></div></div>
-    <dl className="facts"><div><dt>Starts</dt><dd>{scheduleInstant(booking.start)}</dd></div><div><dt>Ends</dt><dd>{scheduleInstant(booking.end)}</dd></div><div><dt>Prepared</dt><dd>{booking.prepared_by.name} · {dateTime(booking.prepared_by.at)}</dd></div>{approval && <div><dt>Approved</dt><dd>{approval.approved_by.name} · {dateTime(approval.approved_by.at)}</dd></div>}</dl>
+    <dl className="facts"><div><dt>Starts</dt><dd>{scheduleInstant(booking.start, zone)}</dd></div><div><dt>Ends</dt><dd>{scheduleInstant(booking.end, zone)}</dd></div><div><dt>Prepared</dt><dd>{booking.prepared_by.name} · {dateTime(booking.prepared_by.at)}</dd></div>{approval && <div><dt>Approved</dt><dd>{approval.approved_by.name} · {dateTime(approval.approved_by.at)}</dd></div>}</dl>
     {manager && !cancelled && <BookingChanges booking={booking} edit={edit} />}
     <section className="side-section"><h3>Trades on this job</h3><ul className="trades">{trades.map(s => { const all = tasks.filter(x => x.trade.toLowerCase() === s.trade.toLowerCase()), open = all.some(x => x.status === 'draft'); return <li key={s.id}><button type="button" onClick={() => onPick((all.find(x => x.status === 'draft') ?? all[0]!).id)}><Icon name={open ? 'clock' : 'check'} className={`state-icon${open ? ' is-open' : ''}`} /><span>{s.trade}</span><Badge status={open ? 'draft' : 'booked'}>{open ? 'Draft' : all.every(x => x.status === 'cancelled') ? 'Cancelled' : `${all.filter(x => x.status === 'booked').length} booked`}</Badge><Icon name="chevron" className="chev" /></button></li> })}</ul></section>
-    <section className="side-section"><h3>{manager ? `Waiting on ${clientName(job)}` : 'Waiting on you'}</h3>{changes.length === 0 ? <p className="muted">No change orders waiting on the client.</p> : <ul className="waiting">{changes.map(v => <li key={v.id}><button type="button" onClick={() => go('Changes')}><span>{v.description}</span><strong>{money(v.amount_cents)}</strong></button></li>)}</ul>}</section>
+    <section className="side-section"><h3>{manager ? `Waiting on ${clientName(job)}` : 'Waiting on you'}</h3>{changes.length === 0 ? <p className="muted">No change orders waiting on the client.</p> : <ul className="waiting">{changes.map(v => <li key={v.id}><button type="button" onClick={() => go('Changes')}><span>{v.description}</span><strong>{money(v.amount_cents, job.currency)}</strong></button></li>)}</ul>}</section>
   </aside>
 }

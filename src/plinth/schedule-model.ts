@@ -1,7 +1,7 @@
 import type { Schedule } from './model'
 import type { ScheduleBlocker } from './schedule-constraint-model'
 
-export interface WorkingCalendar { weekdays: number[]; start_hour: number; end_hour: number; holidays: string[] }
+export interface WorkingCalendar { weekdays: number[]; start_hour: number; end_hour: number; holidays: string[]; time_zone?: string }
 export const defaultCalendar: WorkingCalendar = { weekdays: [1, 2, 3, 4, 5], start_hour: 8, end_hour: 17, holidays: [] }
 export interface TaskDependency { id: string; lag_minutes: number }
 export interface SchedulePreview {

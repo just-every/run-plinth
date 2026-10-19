@@ -6,7 +6,9 @@ export const IMPORT_NAMESPACE = 'accepted-jobs-csv'
 export const IMPORT_VERSION = 'accepted-jobs-csv-v1'
 export const IMPORT_LIMITS = { bytes: 262_144, rows: 100 } as const
 export const IMPORT_HEADER = ['external_id', 'title', 'client_email', 'site_address', 'quote_cents', 'accepted_on'] as const
-export interface AcceptedJobRow { external_id: string; title: string; client_email: string; site_address: string; quote_cents: string; accepted_on: string }
+/** Optional seventh column: the row's currency. Absent means USD; AUD marks a historical job kept in its own currency. */
+export const CURRENCY_HEADER = [...IMPORT_HEADER, 'currency'] as const
+export interface AcceptedJobRow { external_id: string; title: string; client_email: string; site_address: string; quote_cents: string; accepted_on: string; currency?: 'USD' | 'AUD' }
 const invalid = (message: string): never => { throw new DomainError('invalid_csv', message) }
 
 /** RFC 4180 quoting, including embedded newlines and doubled quotes. No trimming
@@ -38,13 +40,15 @@ export function acceptedJobsSource(csv: string): { source: SourceBundle; rows: A
   if (bytes.length > IMPORT_LIMITS.bytes) invalid('CSV exceeds 256 KiB')
   if (csv.includes('\0') || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(csv)) invalid('CSV contains invalid text')
   const table = cells(csv), header = table.shift()
-  if (!header || header.join(',') !== IMPORT_HEADER.join(',')) invalid(`Expected header: ${IMPORT_HEADER.join(',')}`)
+  const columns = header?.join(',') === CURRENCY_HEADER.join(',') ? CURRENCY_HEADER : IMPORT_HEADER
+  if (!header || header.join(',') !== columns.join(',')) invalid(`Expected header: ${IMPORT_HEADER.join(',')} (optionally followed by ,currency)`)
   if (!table.length) invalid('CSV must contain at least one job')
   const seen = new Set<string>()
   const rows = table.map((fields, index): AcceptedJobRow => {
     const rowNumber = index + 2
-    if (fields.length !== IMPORT_HEADER.length) invalid(`Row ${rowNumber}: expected six fields`)
-    const row = Object.fromEntries(IMPORT_HEADER.map((key, i) => [key, fields[i]])) as unknown as AcceptedJobRow
+    if (fields.length !== columns.length) invalid(`Row ${rowNumber}: expected ${columns.length === 7 ? 'seven' : 'six'} fields`)
+    const row = Object.fromEntries(columns.map((key, i) => [key, fields[i]])) as unknown as AcceptedJobRow
+    if (row.currency !== undefined && row.currency !== 'USD' && row.currency !== 'AUD') invalid(`Row ${rowNumber}: currency must be USD or AUD (historical)`)
     for (const key of ['external_id', 'title', 'client_email'] as const) if (!row[key].trim() || row[key] !== row[key].trim()) invalid(`Row ${rowNumber}: ${key} is required without surrounding spaces`)
     if (row.external_id.length > 200 || row.title.length > 200 || row.site_address.length > 500 || row.client_email.length > 254) invalid(`Row ${rowNumber}: a field exceeds its supported length`)
     if (/[\x00-\x1f\x7f]/.test(row.external_id)) invalid(`Row ${rowNumber}: invalid external_id`)
