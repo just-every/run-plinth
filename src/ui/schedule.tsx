@@ -1,3 +1,4 @@
+import { ScheduleConstraints } from './schedule-constraints'
 import { useEffect, useRef, useState } from 'react'
 import type { Schedule as Booking } from '../plinth/model'
 import { defaultCalendar, type SchedulePreview, type WorkingCalendar } from '../plinth/schedule-model'
@@ -69,6 +70,7 @@ export function Schedule(props: JobProps) {
         {preview && <ScheduleReview preview={preview} requiresRevision={!!job.schedule_baselines?.length} publish={async revision => { await mutate(templateInput ? '/schedule-template/apply' : '/schedule/publish', { ...(templateInput ?? { calendar, tasks }), digest: preview.digest, ...revision }) }} discard={() => { setTemplateInput(undefined); setPreview(undefined) }} />}
         <ScheduleTemplates job={job} mutate={mutate} onPreview={(proposal, input) => { generation.current++; setPreview(proposal); setTemplateInput(input); setDirty(false) }} />
       </>}
+      {manager && job.status === 'active' && <ScheduleConstraints job={job} mutate={mutate} />}
       <ScheduleBaselines job={job} mutate={mutate} manager={manager} forecast={preview?.tasks} />
       <JobLog job={job} go={go} limit={4} />
       <CalendarSubscription mutate={mutate} />

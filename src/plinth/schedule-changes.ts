@@ -1,3 +1,4 @@
+import { requireScheduleClearance } from './schedule-constraints'
 import { requireManager } from './auth'
 import { find, need, recordApproval, type Actor, type Input, type Job } from './model'
 import { checkConflicts, scheduleTime } from './operations'
@@ -14,6 +15,7 @@ export function changeSchedule(job: Job, actor: Actor, id: string, input: Input,
     row.end = scheduleTime(input, 'end')
     need(row.end > row.start, 'Schedule must end after it starts')
     checkConflicts(all, job, row)
+    requireScheduleClearance(job, [row])
   } else row.status = 'cancelled'
   row.revision = (row.revision ?? 0) + 1
   row.updated_at = new Date().toISOString()

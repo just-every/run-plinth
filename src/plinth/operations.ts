@@ -1,3 +1,4 @@
+import { requireScheduleClearance } from './schedule-constraints'
 import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Schedule } from './model'
 import { requireManager } from './auth'
 export const scheduleTime=(input:Input,key:string)=>{const value=text(input[key],key,60);need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value)),`${key} requires a date, time and timezone`);return new Date(value).toISOString()}
@@ -12,7 +13,7 @@ export function prepareSchedule(job:Job,actor:Actor,input:Input,all:Job[]) {
  if(actor.role!=='agent')approveSchedule(job,actor,row.id,all)
  return row
 }
-export function approveSchedule(job:Job,actor:Actor,id:string,all:Job[]){requireManager(actor);need(!job.schedule_calendar,'Review this booking in the schedule planner',409,'schedule_review');const row=find(job.schedules,id);need(row.status==='draft','Schedule already booked',409,'immutable');checkConflicts(all,job,row);recordApproval(job,actor,'schedule',row,{trade:row.trade,start:row.start,end:row.end,description:row.description});row.status='booked';return row}
+export function approveSchedule(job:Job,actor:Actor,id:string,all:Job[]){requireManager(actor);need(!job.schedule_calendar,'Review this booking in the schedule planner',409,'schedule_review');const row=find(job.schedules,id);need(row.status==='draft','Schedule already booked',409,'immutable');checkConflicts(all,job,row);requireScheduleClearance(job,[{...row,status:'booked'}]);recordApproval(job,actor,'schedule',row,{trade:row.trade,start:row.start,end:row.end,description:row.description});row.status='booked';return row}
 /** Purse orders: commitment is issued once; receipts consume only the outstanding commitment. */
 export function prepareOrder(job:Job,actor:Actor,input:Input){requireManager(actor,true);active(job);const row={id:crypto.randomUUID(),supplier:text(input.supplier,'supplier',200),description:text(input.description,'description',2000),amount_cents:cents(input.amount_cents),status:'draft' as const,receipts:[],prepared_by:stamp(actor)};need(row.amount_cents>0,'Order amount must be positive');job.orders.push(row);return row}
 export function issueOrder(job:Job,actor:Actor,id:string){requireManager(actor);const row=find(job.orders,id);need(row.status==='draft','Order has already been issued',409,'immutable');sum([row.amount_cents,...job.orders.filter(o=>o.status==='issued').map(o=>o.amount_cents)]);recordApproval(job,actor,'purchase_order',row,{supplier:row.supplier,description:row.description,amount_cents:row.amount_cents});row.status='issued';row.issued_by=stamp(actor);return row}

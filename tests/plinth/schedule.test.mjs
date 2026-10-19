@@ -3,6 +3,65 @@ import assert from 'node:assert/strict'
 import ICAL from 'ical.js'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
+test('SCH-006 — permit originals, inspection failure and rain holds gate every publication door with human clearance history', async () => {
+ const f = await createFixture()
+ try {
+  const agent = await f.agent(), client = await f.invite('holds-client@example.com'), stranger = await f.invite('other-site@example.com')
+  let job = await createActiveJob(f, 'Alvarez whole-home remodel — permit and rough inspection', 'holds-client@example.com')
+  const root = `/api/plinth/jobs/${job.id}`
+  const post = async (path, body = {}, credentials = {cookie:f.owner}) => { const result = await f.json(root+path, {method:'POST',...credentials,body:{expected_version:job.version,...body}}); if(result.status===200 && result.value.job)job=result.value.job; return result }
+  const file = {name:'Inspection result.pdf',mime:'application/pdf',base64:Buffer.from('%PDF-1.7\nOriginal signed inspection evidence\n%%EOF').toString('base64')}
+  let r = await post('/schedules', {trade:'Drywall crew',description:'Hang drywall after rough inspection',start:'2026-11-02T08:00:00Z',end:'2026-11-02T09:00:00Z'}, {token:agent}); assert.equal(r.status,200)
+  const drywall = job.schedules[0].id
+  const requirement = {kind:'inspection',title:'Rough inspection before drywall',jurisdiction:'City of Burlington, Vermont',accountable:'Alex Rivera, superintendent',task_ids:[drywall],reason:'Inspection requested for rough plumbing and wiring',documents:[file]}
+  assert.equal((await post('/schedule-constraints', requirement,{token:agent})).status,403)
+  assert.equal((await post('/schedule-constraints', requirement,{cookie:client})).status,403)
+  assert.equal((await post('/schedule-constraints', requirement,{cookie:stranger})).status,404)
+  r = await post('/schedule-constraints', requirement); assert.equal(r.status,200)
+  const inspection = r.value.record.id, original = r.value.record.events[0].documents[0]
+  assert.equal((await post(`/schedules/${drywall}/approve`)).status,409,'A pending request blocks legacy approval')
+  r = await post('/schedule-constraints/'+inspection,{action:'failed',reason:'Inspector found incomplete nail plates',documents:[file]}); assert.equal(r.status,200)
+  r = await post('/schedule-constraints',{kind:'weather',title:'Rain hold on open roof',jurisdiction:'Burlington site',accountable:'Morgan Chen, builder',task_ids:[drywall],reason:'Unsafe rain exposure until roof dry and weather reviewed'}); assert.equal(r.status,200); const rain=r.value.record.id
+  r = await post('/schedule-constraints',{kind:'permit',title:'City building permit',jurisdiction:'Burlington building department',accountable:'Alex Rivera',task_ids:[],reason:'Permit release required for job work',documents:[file]}); assert.equal(r.status,200); const permit=r.value.record.id
+  assert.equal((await post('/schedule-constraints/'+permit,{action:'cleared',reason:'Permit issued'})).status,400,'Unverified text is not original permit evidence')
+  r=await post('/schedule-constraints/'+permit,{action:'cleared',reason:'Permit issued, original attached',documents:[file]}); assert.equal(r.status,200)
+  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]}
+  let tasks=[{...job.schedules[0],owner:'Alex Rivera',duration_minutes:60},{id:'paint-after-drywall',trade:'Painting crew',owner:'Morgan Chen',description:'Paint after drywall',start:'2026-11-02T08:00:00Z',duration_minutes:60,predecessors:[{id:drywall,lag_minutes:0}]}]
+  r=await post('/schedule/preview',{calendar,tasks}); assert.equal(r.status,200); let preview=r.value.preview
+  assert.ok(preview.blockers.some(b=>b.constraint_id===inspection&&b.task_id==='paint-after-drywall'),'Inspection gates transitive successors')
+  assert.ok(preview.blockers.some(b=>b.constraint_id===rain&&b.task_id===drywall))
+  assert.equal((await post('/schedule/publish',{calendar,tasks:preview.tasks,digest:preview.digest})).status,409)
+  assert.equal(job.schedules.length,1,'Blocked publication does not commit candidate tasks')
+  assert.equal((await post('/schedule-constraints/'+inspection,{action:'cleared',reason:'Passed',documents:[file]},{token:agent})).status,403)
+  r=await post('/schedule-constraints/'+inspection,{action:'cleared',reason:'Inspector passed rough work after nail plates installed',documents:[file]}); assert.equal(r.status,200)
+  r=await post('/schedule/preview',{calendar,tasks}); assert.equal(r.status,200); assert.ok(r.value.preview.blockers.every(b=>b.constraint_id===rain),'Rain remains after passed inspection')
+  assert.equal((await post(`/schedules/${drywall}/approve`)).status,409)
+  r=await post('/schedule-constraints/'+rain,{action:'cleared',reason:'Builder reviewed dry site and safe weather conditions',documents:[file]}); assert.equal(r.status,200)
+  r=await post(`/schedules/${drywall}/approve`);assert.equal(r.status,200)
+  r=await post('/schedule-constraints',{kind:'site',title:'Temporary access exclusion',jurisdiction:'Burlington site',accountable:'Alex Rivera',task_ids:[drywall],reason:'Access unsafe during scaffold removal'});assert.equal(r.status,200);const site=r.value.record.id
+  assert.equal((await post(`/schedules/${drywall}/move`,{start:'2026-11-03T08:00:00Z',end:'2026-11-03T09:00:00Z'})).status,409,'Legacy move cannot bypass holds')
+  r=await post('/schedule-constraints/'+site,{action:'cleared',reason:'Scaffold removed and access reviewed',documents:[file]});assert.equal(r.status,200)
+  tasks=tasks.map(t=>({...t,start:'2026-11-04T08:00:00Z'}))
+  r=await post('/schedule/preview',{calendar,tasks});assert.equal(r.status,200);preview=r.value.preview;assert.deepEqual(preview.blockers,[])
+  r=await post('/schedule/publish',{calendar,tasks:preview.tasks,digest:preview.digest});assert.equal(r.status,200)
+  assert.equal(job.schedules.find(t=>t.id===drywall).start,'2026-11-04T08:00:00.000Z')
+  const response=await f.request(root+'/schedule-documents/'+original.id,{cookie:f.owner});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()).toString('base64'),file.base64)
+  assert.equal(response.headers.get('content-disposition').startsWith('attachment;'),true)
+  assert.equal((await f.request(root+'/schedule-documents/'+original.id,{cookie:client})).status,403)
+  assert.equal((await f.request(root+'/schedule-documents/'+original.id,{cookie:stranger})).status,404)
+  assert.equal((await f.request(root+'/schedule-documents/'+original.id)).status,401)
+  const reload=(await f.json(root,{cookie:f.owner})).value.job
+  assert.deepEqual(reload.schedule_constraints.find(c=>c.id===inspection).events.map(e=>e.action),['requested','failed','cleared'])
+  assert.equal(reload.schedule_constraints.find(c=>c.id===inspection).jurisdiction,'City of Burlington, Vermont')
+  assert.ok(reload.schedule_constraints.flatMap(c=>c.events).every(e=>e.recorded_by.id&&e.recorded_by.at&&e.recorded_by.role==='owner'))
+  const clientJob=(await f.json(root,{cookie:client})).value.job;assert.equal(clientJob.schedule_constraints,undefined);assert.ok(clientJob.approvals.every(a=>a.kind!=='schedule.constraint'))
+  assert.ok(reload.approvals.filter(a=>a.kind==='schedule.constraint').length>=9,'Every request, failure, hold and release has history')
+  r=await post('/schedule-constraints/'+rain,{action:'held',reason:'Rain returned'});assert.equal(r.status,200)
+  r=await post('/schedule/preview',{calendar,tasks:job.schedules});assert.equal(r.status,200)
+  assert.equal((await post('/schedule/publish',{calendar,tasks:r.value.preview.tasks,digest:r.value.preview.digest})).status,409,'A cleared constraint can be reopened without erasing its old release')
+ } finally {await f.close()}
+})
+
 test('SCH-001 — reviewed working-calendar dependencies, milestones, critical path and scoped calendar revisions', async () => {
  const f = await createFixture()
  try {

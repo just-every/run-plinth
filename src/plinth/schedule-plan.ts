@@ -1,3 +1,4 @@
+import { scheduleBlockers, requireScheduleClearance } from './schedule-constraints'
 import { latestActual, taskActualDates } from './schedule-baseline-model'
 import { requireManager } from './auth'
 import { active, need, object, recordApproval, stamp, text, type Actor, type Input, type Job, type Schedule } from './model'
@@ -81,13 +82,14 @@ export async function previewSchedule(job: Job, actor: Actor, input: Input, all:
  // Bind publication to the exact semantic proposal; preparer timestamps do not affect dates or review.
  const canonical = { calendar, tasks: tasks.map(({ prepared_by, revision, updated_at, ...task }) => task), version: job.version }
  const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(canonical)))), b => b.toString(16).padStart(2, '0')).join('')
- return { tasks, calendar, changes, conflicts, completion_before: finish(job.schedules), completion_after: completion, critical_path: critical.reverse(), digest }
+ return { blockers: scheduleBlockers(job, tasks), tasks, calendar, changes, conflicts, completion_before: finish(job.schedules), completion_after: completion, critical_path: critical.reverse(), digest }
 }
 export async function publishSchedule(job: Job, actor: Actor, input: Input, all: Job[]) {
  requireManager(actor)
  const preview = await previewSchedule(job, actor, input, all)
  need(input.digest === preview.digest, 'Preview these exact dates before publishing', 409, 'schedule_review')
  need(!preview.conflicts.length, 'Resolve the reviewed trade conflicts before publishing', 409, 'schedule_conflict', { conflicts: preview.conflicts })
+ requireScheduleClearance(job, preview.tasks)
  const before = { calendar: job.schedule_calendar, tasks: structuredClone(job.schedules), actuals: structuredClone(job.schedule_published_actuals ?? []) }
  for (const task of preview.tasks) {
   const old = job.schedules.find(s => s.id === task.id)

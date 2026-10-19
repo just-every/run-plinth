@@ -106,7 +106,7 @@ Every page, API, file, webhook, automation and export enforces current authority
 
 - **SCH-005 — Mobile daily work and look-ahead.** A field worker opens today's assigned work and a rolling look-ahead with site address, contacts, current drawings, safety/inspection prerequisites, materials due and their own open and overdue TODO-001 checklist items. Updates to task status and installed quantities retain actual time and evidence for schedule/cost forecasting. **Acceptance evidence:** At 390 pixels open a superintendent's daily plan, find the current sheet, complete an assigned to-do checklist item, record progress and inspect tomorrow's dependencies and updated office forecast. Unassigned job data stays hidden.
 
-- **SCH-006 — Inspection permit and weather constraints.** Track jurisdiction, permit documents, inspection requests/results and weather/site constraints as dependencies with accountable people. Failed inspection or unsafe-weather hold blocks affected tasks until a human records clearance; agents cannot certify compliance or physical completion. **Acceptance evidence:** Require an inspection before drywall, record failure and a rain hold, attempt to publish dependent work, then attach passed inspection evidence and reschedule. The history retains every hold and release.
+- **SCH-006 — Inspection permit and weather constraints.** Track jurisdiction, permit documents, inspection requests/results and weather/site constraints as dependencies with accountable people. Failed inspection or unsafe-weather hold blocks affected tasks until a human records clearance; agents cannot certify compliance or physical completion. Owners/admins record jurisdiction, accountable person, original PDF/PNG/JPEG permit and result documents, requests, failures and weather/site holds. Pending requests and open holds block the named tasks and their transitive successors through planner publication and legacy booking approval/move; an all-work requirement blocks the whole job. A human clearance appends a reason and original evidence (passed result or permit for inspection/permit clearance); a later hold reopens the gate without replacing history. Preview lists the blockers, and publication rechecks the current job version atomically. Agents can read and prepare schedule previews but cannot create or clear requirements. Raw documents, notes and constraint decisions remain office-only until DOC-007 supplies explicit sharing; existing approved client schedule access is unchanged. Uploading or clearing a document is not app verification of compliance or physical completion. **Acceptance evidence:** Require an inspection before drywall, record failure and a rain hold, attempt to publish dependent work, then attach passed inspection evidence and reschedule. The history retains every hold and release.
 
 - **DOC-001 — Versioned plans specifications and distribution.** Store plan sets, specifications and addenda with sheet/revision numbers, issue dates, supersession and distribution acknowledgements. Field users land on the latest approved revision while older marked-up versions remain available as history; pinned links identify exact sheets. **Acceptance evidence:** Upload two plan sets sharing sheet numbers, approve the second and notify its recipients. Open a pinned old-sheet link and the current drawing on a phone; each is clearly labelled and annotations retain their source revision.
 
@@ -340,8 +340,8 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 4 | 28 | 88 | 120 |
-| All | 18 | 28 | 88 | 134 |
+| Target and push further | 5 | 28 | 87 | 120 |
+| All | 19 | 28 | 87 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -385,7 +385,7 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | `SCH-003` | Cross-job capacity and trade confirmations | target | partial | `src/plinth/operations.ts`; `tests/plinth/domain.test.mjs` | Same-trade overlap refusal exists; availability calendars, capacity, travel and confirmation workflow are absent. |
 | `SCH-004` | Published schedule changes and acknowledgements | target | missing |  | No published schedule changes and acknowledgements workflow exists. |
 | `SCH-005` | Mobile daily work and look-ahead | target | partial | `src/ui/job.tsx`; `src/plinth/http.ts` | Per-job booked intervals display; role-specific today/look-ahead and progress records are absent. |
-| `SCH-006` | Inspection permit and weather constraints | target | missing |  | No inspection permit and weather constraints workflow exists. |
+| `SCH-006` | Inspection permit and weather constraints | target | done | `src/plinth/schedule-constraints.ts`; `src/plinth/schedule-constraint-model.ts`; `src/plinth/schedule-plan.ts`; `src/plinth/operations.ts`; `src/plinth/schedule-changes.ts`; `src/ui/schedule-constraints.tsx`; `src/ui/schedule-review.tsx`; `tests/plinth/schedule.test.mjs`; `tests/journeys/schedule-constraints.mjs` | |
 | `DOC-001` | Versioned plans specifications and distribution | target | missing |  | No versioned plans specifications and distribution workflow exists. |
 | `DOC-002` | Drawing recognition hyperlinks and comparison | target | missing |  | No drawing recognition hyperlinks and comparison workflow exists. |
 | `DOC-003` | RFI questions responses and resolution | target | missing |  | No rfi questions responses and resolution workflow exists. |

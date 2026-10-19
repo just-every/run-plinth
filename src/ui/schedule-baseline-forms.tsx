@@ -6,13 +6,14 @@ import { Field } from './shared'
 import { scheduleInstant } from './schedule-views'
 
 /** Schedule record forms share the workspace's status pattern and explicit button styles. */
-export function ScheduleEntryForm({ children, action, submit, disabled = false }: { children: ReactNode; action: (data: FormData) => Promise<unknown>; submit: string; disabled?: boolean }) {
+export function ScheduleEntryForm({ children, action, submit, disabled = false, reset = false }: { children: ReactNode; action: (data: FormData) => Promise<unknown>; submit: string; disabled?: boolean; reset?: boolean }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false)
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const data = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const data = new FormData(form)
     setBusy(true); setError(''); setSaved(false)
-    try { await action(data); setSaved(true) } catch (e) { setError(e instanceof Error ? e.message : 'Could not save the schedule record.') } finally { setBusy(false) }
+    try { await action(data); if (reset) form.reset(); setSaved(true) } catch (e) { setError(e instanceof Error ? e.message : 'Could not save the schedule record.') } finally { setBusy(false) }
   }
   return <form onSubmit={send}><fieldset disabled={busy || disabled}>{children}<button type="submit" className="primary">{busy ? 'Saving…' : submit}</button></fieldset>{error && <p role="alert" className="error">{error}</p>}{saved && <p role="status">Saved.</p>}</form>
 }
