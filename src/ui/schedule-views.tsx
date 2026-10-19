@@ -3,7 +3,7 @@ import type { Schedule } from '../plinth/model'
 import { Badge } from './shared'
 
 export const scheduleDate = (value: string | number) => new Date(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
-export const scheduleTime = (value: string) => new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'
+export const scheduleTime = (value: string) => new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(new Date(value).getUTCSeconds() || new Date(value).getUTCMilliseconds() ? {second: '2-digit' as const} : {}), timeZone: 'UTC' }) + ' UTC'
 export const scheduleInstant = (value: string | null) => value ? `${scheduleDate(value)}, ${scheduleTime(value)}` : 'No scheduled finish'
 
 export function TaskDetails({ task, tasks, critical }: { task: Schedule; tasks: Schedule[]; critical: boolean }) {

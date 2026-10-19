@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Schedule as Booking } from '../plinth/model'
 import { defaultCalendar, type SchedulePreview, type WorkingCalendar } from '../plinth/schedule-model'
+import { ScheduleTemplates, type TemplatePreviewInput } from './schedule-templates'
+import { ScheduleBaselines } from './schedule-baselines'
 import { CalendarSubscription } from './calendar'
 import { BookingChanges } from './booking-changes'
 import { Action, Badge, clientName, dateTime, money } from './shared'
@@ -20,12 +22,13 @@ export function Schedule(props: JobProps) {
   const [tasks, setTasks] = useState<TaskInput[]>(job.schedules)
   const [calendar, setCalendar] = useState<WorkingCalendar>(job.schedule_calendar ?? defaultCalendar)
   const [preview, setPreview] = useState<SchedulePreview>()
+  const [templateInput, setTemplateInput] = useState<TemplatePreviewInput>()
   const [dirty, setDirty] = useState(false)
   const [view, setView] = useState<'Gantt' | 'Calendar' | 'List'>('Gantt')
   const [picked, setPicked] = useState<string>()
   const [editor, setEditor] = useState<string | 'new'>()
   const generation = useRef(0)
-  useEffect(() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setDirty(false); setEditor(undefined) }, [job.id, job.version])
+  useEffect(() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setTemplateInput(undefined); setDirty(false); setEditor(undefined) }, [job.id, job.version])
   useEffect(() => { if (editor && window.innerWidth < 1240) document.getElementById('booking-panel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [editor])
   const shown = preview?.tasks ?? job.schedules
   const critical = preview?.critical_path ?? job.schedule_critical_path ?? []
@@ -36,12 +39,12 @@ export function Schedule(props: JobProps) {
   const stage = (task: TaskInput) => {
     generation.current++
     setTasks(current => current.some(t => t.id === task.id) ? current.map(t => t.id === task.id ? task : t) : [...current, task])
-    setPreview(undefined); setDirty(true); setEditor(undefined)
+    setPreview(undefined); setTemplateInput(undefined); setDirty(true); setEditor(undefined)
   }
   async function review() {
     const requested = generation.current
     const result = await mutate('/schedule/preview', { calendar, tasks })
-    if (generation.current === requested) setPreview(result.preview)
+    if (generation.current === requested) { setTemplateInput(undefined); setPreview(result.preview) }
   }
   return <div className="split">
     <div className="stack">
@@ -59,12 +62,14 @@ export function Schedule(props: JobProps) {
         <section className="card"><h3>Plan tasks and milestones</h3>
           <p>Assign responsible people, connect predecessors and review the effect on the client’s completion date. Working times and lag use UTC.</p>
           {dirty && !preview && <p role="status">Unreviewed changes are staged. The views above still show the published schedule.</p>}
-          <div className="button-row"><button type="button" className="secondary" onClick={() => setEditor('new')}>Add task or milestone</button><Action className="secondary" action={review}>Preview schedule</Action>{dirty && <button type="button" className="secondary" onClick={() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setDirty(false); setEditor(undefined) }}>Discard staged changes</button>}</div>
+          <div className="button-row"><button type="button" className="secondary" onClick={() => setEditor('new')}>Add task or milestone</button><Action className="secondary" action={review}>Preview schedule</Action>{dirty && <button type="button" className="secondary" onClick={() => { generation.current++; setTasks(job.schedules); setCalendar(job.schedule_calendar ?? defaultCalendar); setPreview(undefined); setTemplateInput(undefined); setDirty(false); setEditor(undefined) }}>Discard staged changes</button>}</div>
           {!!tasks.length && <ul className="rows" aria-label="Tasks in schedule plan">{tasks.map(task => <li className="row" key={task.id}><div className="row-main"><span><button type="button" className="link-button" onClick={() => setEditor(task.id)}>{task.description}</button></span><span>{task.owner ?? task.trade}{task.milestone && ' · Milestone'}{task.status === 'cancelled' && ' · Cancelled'}</span></div></li>)}</ul>}
         </section>
-        <CalendarEditor calendar={calendar} save={next => { generation.current++; setCalendar(next); setPreview(undefined); setDirty(true) }} />
-        {preview && <ScheduleReview preview={preview} publish={async () => { await mutate('/schedule/publish', { calendar, tasks, digest: preview.digest }) }} discard={() => setPreview(undefined)} />}
+        <CalendarEditor calendar={calendar} save={next => { generation.current++; setCalendar(next); setPreview(undefined); setTemplateInput(undefined); setDirty(true) }} />
+        {preview && <ScheduleReview preview={preview} requiresRevision={!!job.schedule_baselines?.length} publish={async revision => { await mutate(templateInput ? '/schedule-template/apply' : '/schedule/publish', { ...(templateInput ?? { calendar, tasks }), digest: preview.digest, ...revision }) }} discard={() => { setTemplateInput(undefined); setPreview(undefined) }} />}
+        <ScheduleTemplates job={job} mutate={mutate} onPreview={(proposal, input) => { generation.current++; setPreview(proposal); setTemplateInput(input); setDirty(false) }} />
       </>}
+      <ScheduleBaselines job={job} mutate={mutate} manager={manager} forecast={preview?.tasks} />
       <JobLog job={job} go={go} limit={4} />
       <CalendarSubscription mutate={mutate} />
     </div>

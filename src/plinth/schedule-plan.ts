@@ -1,3 +1,4 @@
+import { latestActual, taskActualDates } from './schedule-baseline-model'
 import { requireManager } from './auth'
 import { active, need, object, recordApproval, stamp, text, type Actor, type Input, type Job, type Schedule } from './model'
 import { scheduleTime } from './operations'
@@ -15,7 +16,6 @@ function normalize(job: Job, actor: Actor, input: Input): Schedule[] {
   need(/^[a-zA-Z0-9_-]+$/.test(id) && !seen.has(id), 'Task ids must be unique letters, digits, dashes or underscores'); seen.add(id)
   const old = job.schedules.find(s => s.id === id)
   const start = scheduleTime(raw, 'start')
-  need(Date.parse(start) % 60000 === 0, 'Task starts must use whole minutes')
   const milestone = raw.milestone === true
   const duration = raw.duration_minutes === undefined && old ? Math.round((Date.parse(old.end) - Date.parse(old.start)) / 60000) : integer(raw.duration_minutes, 'Duration')
   need(milestone ? duration === 0 : duration > 0, 'Milestones have zero duration; work tasks need positive duration')
@@ -60,8 +60,9 @@ export async function previewSchedule(job: Job, actor: Actor, input: Input, all:
    need(previous.status !== 'cancelled', 'Remove or replace a cancelled predecessor before publishing its dependent', 409, 'cancelled_predecessor')
    start = Math.max(start, addWork(Date.parse(previous.end), d.lag_minutes, calendar))
   }
-  task.start = new Date(nextWork(start, calendar)).toISOString()
-  task.end = new Date(task.milestone ? Date.parse(task.start) : addWork(Date.parse(task.start), task.duration_minutes!, calendar)).toISOString()
+  const actual = taskActualDates(job, task)
+  task.start = actual?.actual_start ?? new Date(nextWork(start, calendar)).toISOString()
+  task.end = actual?.actual_finish ?? new Date(task.milestone ? Date.parse(task.start) : addWork(Date.parse(task.start), task.duration_minutes!, calendar)).toISOString()
  }
  const completion = finish(tasks), latest = new Map<string, number>(), critical: string[] = []
  for (const task of [...sorted].reverse()) {
@@ -87,14 +88,15 @@ export async function publishSchedule(job: Job, actor: Actor, input: Input, all:
  const preview = await previewSchedule(job, actor, input, all)
  need(input.digest === preview.digest, 'Preview these exact dates before publishing', 409, 'schedule_review')
  need(!preview.conflicts.length, 'Resolve the reviewed trade conflicts before publishing', 409, 'schedule_conflict', { conflicts: preview.conflicts })
- const before = { calendar: job.schedule_calendar, tasks: structuredClone(job.schedules) }
+ const before = { calendar: job.schedule_calendar, tasks: structuredClone(job.schedules), actuals: structuredClone(job.schedule_published_actuals ?? []) }
  for (const task of preview.tasks) {
   const old = job.schedules.find(s => s.id === task.id)
   task.prepared_by = old?.prepared_by ?? stamp(actor)
   const semantic = (s: Schedule) => JSON.stringify({ ...s, prepared_by: undefined, revision: undefined, updated_at: undefined })
   if (!old || semantic(old) !== semantic(task)) { task.revision = old ? (old.revision ?? 0) + 1 : 0; task.updated_at = new Date().toISOString() }
  }
+ job.schedule_published_actuals = preview.tasks.flatMap(task => { const actual = latestActual(job, task.id); return actual ? [{ task_id: task.id, actual_start: actual.actual_start, ...(actual.actual_finish ? {actual_finish: actual.actual_finish} : {}) }] : [] })
  job.schedules = preview.tasks; job.schedule_calendar = preview.calendar; job.schedule_critical_path = preview.critical_path
- recordApproval(job, actor, 'schedule.publish', { id: job.id, prepared_by: stamp(actor) }, { before, after: { calendar: preview.calendar, tasks: preview.tasks }, completion_before: preview.completion_before, completion_after: preview.completion_after, critical_path: preview.critical_path })
+ recordApproval(job, actor, 'schedule.publish', { id: job.id, prepared_by: stamp(actor) }, { before, after: { calendar: preview.calendar, tasks: preview.tasks, actuals: job.schedule_published_actuals }, completion_before: preview.completion_before, completion_after: preview.completion_after, critical_path: preview.critical_path })
  return preview
 }
