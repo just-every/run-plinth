@@ -4,6 +4,7 @@ import { api, Field, Form } from './shared'
 import { JobWorkspace } from './job'
 import { Imports } from './imports'
 import { Customers } from './customers'
+import { Vendors } from './vendors'
 import { Jobs } from './jobs'
 import { CompanySetup } from './company'
 import type { CurrencyTotal } from '../plinth/currency-report'
@@ -31,6 +32,7 @@ export function Workspace() {
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
         {view === 'customers' && manager && <Customers />}
+        {view === 'vendors' && manager && <Vendors />}
         {view === 'imports' && <Imports onChange={refresh} />}
         {view === 'people' && <Page title="People & access" lead="Invite a client using the email on their job. Clients see only their jobs and approve their own change orders. Project managers can prepare job records."><section className="card narrow"><h2>Send an invitation</h2><Form submit="Send invitation" action={async f => { await api('/auth/invite', {email:f.get('email'),displayName:f.get('displayName'),role:f.get('role'),returnTo:'/app'}) }}><div className="fields"><Field name="displayName" label="Full name" /><Field name="email" type="email" label="Email" /><label>Access<select name="role"><option value="member">Client</option>{role === 'owner' && <option value="admin">Project manager</option>}</select></label></div></Form></section>{manager && <CompanySetup />}</Page>}
         {view === 'jobs' && (selected ? <JobWorkspace id={selected} role={role} onBack={() => go('jobs')} onChange={refresh} /> : <Jobs jobs={shown} totals={totals} all={jobs.length} query={query} manager={manager} create={create} onOpen={open} onCreated={refresh} />)}

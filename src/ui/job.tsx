@@ -9,6 +9,7 @@ import { DailyLogs } from './site'
 import { Orders, Billing } from './money'
 import { JobCustomer } from './job-customer'
 import { History } from './history'
+import { Subcontracts } from './job-subcontracts'
 
 export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Purchasing', 'Billing', 'Customer', 'History'] as const
 export type Section = typeof sections[number]
@@ -48,7 +49,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
-      {open === 'Purchasing' && <Orders {...props} />}
+      {open === 'Purchasing' && <><Orders {...props} /><Subcontracts {...props} /></>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'History' && <History {...props} onErased={onBack} />}
