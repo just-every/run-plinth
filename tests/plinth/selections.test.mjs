@@ -230,6 +230,14 @@ test('CLIENT-003 / AUTO-002 — exact overage and underage, immutable reviewed c
   assert.equal((await f.json('/auth/operator/status', { method: 'POST', cookie: f.owner, body: { operatorId: person.id, status: 'inactive' } })).status, 200)
   assert.equal((await act(`/continuity/${oldWorkflow.id}/notify`, notice)).status, 403)
   assert.equal(f.messages.length, sent + 1)
+  // The native role/assignment wins even when an internal person's email is the original client email.
+  await f.invite('unassigned-pm@example.com', 'Unassigned project manager', 'admin')
+  const internalJob = await createActiveJob(f, 'Internal identity is still assignment-scoped', 'unassigned-pm@example.com')
+  const internalPerson = await f.db.prepare("SELECT id FROM oa_operators WHERE email='unassigned-pm@example.com'").first()
+  const restricted = await f.json('/api/plinth/team/' + internalPerson.id, { method: 'PUT', cookie: f.owner, body: { expected_version: 0, role: 'project_manager', job_ids: [], po_limit_cents: 0 } })
+  assert.equal(restricted.status, 200)
+  const denied = await f.json(`/api/plinth/jobs/${internalJob.id}/continuity/${internalJob.continuity[0].id}/notify`, { method: 'POST', cookie: f.owner, body: { expected_version: internalJob.version, email: 'unassigned-pm@example.com', channel: 'email', confirm: true } })
+  assert.equal(denied.status, 403, 'An unassigned PM cannot receive a job notice by also matching its client email')
 
  } finally { await f.close() }
 })

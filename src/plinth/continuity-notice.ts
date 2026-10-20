@@ -6,17 +6,25 @@ import { jobOf, readClock, saveJob } from './store'
 import { checkWarrantySend, officeAuthority, recipientGuards } from './warranty-store'
 import type { WarrantyRecipient } from './warranty-model'
 
+/** Native office roles retain their assignment boundary even if an email also matches a client contact. */
+async function eligibleRecipient(db: D1Database, job: Job, email: string) {
+ const person = await db.prepare("SELECT id,role FROM oa_operators WHERE lower(email)=? AND status='active'").bind(email).first<{ id: string; role: string }>()
+ if (!person) return null
+ const office = await officeAuthority(db, job, person.id, true)
+ if (!office && person.role !== 'member') return null
+ const recipient: WarrantyRecipient = office ? { kind: 'office', email, operator_id: person.id } : { kind: 'client', email }
+ const guards = await recipientGuards(db, job, recipient)
+ return guards ? { person, guards } : null
+}
+
 /** Owner approval names the email channel and one current job recipient. Nothing sends on approval or resume. */
 export async function sendContinuityNotice(env: Bindings, previous: Job, actor: Actor, id: string, input: Input, clock: number) {
  requireOwner(actor)
  need(input.channel === 'email' && input.confirm === true, 'The owner must explicitly approve this email channel and recipient')
  const email = text(input.email, 'Recipient email', 254).toLowerCase()
- const person = await env.DB.prepare("SELECT id,role FROM oa_operators WHERE lower(email)=? AND status='active'").bind(email).first<{ id: string; role: string }>()
- need(person, 'Choose a currently active person assigned to this job', 403, 'recipient')
- const office = await officeAuthority(env.DB, previous, person.id, true)
- const recipient: WarrantyRecipient = office ? { kind: 'office', email, operator_id: person.id } : { kind: 'client', email }
- const guards = await recipientGuards(env.DB, previous, recipient)
- need(guards, 'Recipient no longer has access to this job', 403, 'recipient')
+ const eligible = await eligibleRecipient(env.DB, previous, email)
+ need(eligible, 'Choose a currently active person with access to this job', 403, 'recipient')
+ const { person, guards } = eligible
  const next = structuredClone(previous), row = find(next.continuity ?? [], id)
  need(!(row.notices ?? []).some(n => n.recipient_id === person.id), 'This event already has a reserved email for this recipient; inspect its outcome before contacting them separately', 409, 'notice_reserved')
  need((row.notices?.length ?? 0) < 100, 'Review the event notice history before adding more recipients')
@@ -24,10 +32,10 @@ export async function sendContinuityNotice(env: Bindings, previous: Job, actor: 
  ;(row.notices ??= []).push(attempt)
  await saveJob(env.DB, actor, previous, next, guards, clock)
  try {
-  const latest = await jobOf(env.DB, actor, next.id), currentGuards = await recipientGuards(env.DB, latest, recipient)
-  if (!currentGuards) { attempt.status = 'cancelled'; attempt.label = 'Access changed; nothing was sent' }
+  const latest = await jobOf(env.DB, actor, next.id), current = await eligibleRecipient(env.DB, latest, email)
+  if (!current || current.person.id !== person.id) { attempt.status = 'cancelled'; attempt.label = 'Access changed; nothing was sent' }
   else {
-   await checkWarrantySend(env.DB, latest, await readClock(env.DB), currentGuards, actor)
+   await checkWarrantySend(env.DB, latest, await readClock(env.DB), current.guards, actor)
    const sender = operatorMail(env)
    if (!sender || !env.MAIL_FROM) { attempt.status = 'unconfigured'; attempt.label = 'Mail is not configured; nothing was sent' }
    else {
