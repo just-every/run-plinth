@@ -50,6 +50,7 @@ export interface SovApplicationLine extends SovLine {
  stored_orders: SovStoredOrder[]
 }
 export interface SovApplication {
+ retainage?: import('./retainage-model').RetainageSnapshot
  format: 'plinth-sov-application-v1'
  purpose: string
  currency: 'USD'

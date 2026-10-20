@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -43,6 +43,30 @@ test('AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / IN
     r=await f.json(`/api/plinth/jobs/${job.id}/calendar`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,action:'rotate'}});assert.equal(r.status,200);const feedPath=r.value.urlPath
     const catalog=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'rate',name:'Archive wallboard rate',reason:'Reviewed vendor quote',value:{vendor:'Cascade Supply',effective_on:'2026-10-01',unit:'square feet',cost_cents:125,sell_cents:200,reference:'CS-1042'}}});assert.equal(catalog.status,201)
     const taxRate=await f.json('/api/plinth/pricing-rates',{method:'POST',cookie:f.owner,body:{effective_on:'2026-10-01',jurisdiction:'Synthetic archive jurisdiction',kind:'sales',percent:'7.5',reference:'Reviewed archive fixture rate schedule',human_reviewed:true}});assert.equal(taxRate.status,201)
+    // BILL-003: populate a separate priced job through the same native doors before archiving.
+    let billing=(await f.json('/api/plinth/jobs',{method:'POST',cookie:f.owner,body:{name:'Archive client retainage contract',client_email:'retainage-client@example.com',address:'412 Maple Street, Portland, OR 97205'}})).value.job
+    const bill=async(path,input)=>{const r=await f.json(`/api/plinth/jobs/${billing.id}${path}`,{method:'POST',cookie:f.owner,body:{expected_version:billing.version,...input}});assert.equal(r.status,200,JSON.stringify(r.value));billing=r.value.job;return r.value.record}
+    await bill('/quotes',{lines:[{id:'plumbing',description:'Plumbing rough-in and finish',cost_code:'22-100',phase:'Plumbing',category:'subcontract',quantity:'1',unit:'job',unit_cents:100000,cost_unit_cents:80000}]})
+    const pricingInput={basis:'sell',as_of:'2026-10-01',rules:[],tax:{rate_id:taxRate.value.rate.id,taxable_line_ids:['plumbing']}}
+    const priced=await f.json(`/api/plinth/jobs/${billing.id}/pricing/preview`,{method:'POST',cookie:f.owner,body:{expected_version:billing.version,...pricingInput}});assert.equal(priced.status,200)
+    await bill('/pricing/apply',{...pricingInput,digest:priced.value.preview.digest})
+    await bill(`/quotes/${billing.quotes.at(-1).id}/accept`,{method:'signed',evidence:'Archive signed external plumbing agreement',schedule_choice:{kind:'none',reason:'Plumbing dates planned separately'}})
+    await bill('/sov',{})
+    await bill('/retainage',{contract_reference:'Signed archive retainage section RT-104',rules:[{line_id:'quote:plumbing',work_bps:500,stored_bps:1000}],milestones:[{id:'substantial',name:'Substantial completion',completion_requirements:['Plumbing inspection'],waiver_requirements:[]}]})
+    const billingClaim=await bill('/claims',{description:'Archive rough-in draw',lines:[{line_id:'quote:plumbing',completed_cents:50000,stored_cents:0,evidence:'Plumbing rough-in inspection PI-104',order_ids:[]}]})
+    await bill(`/claims/${billingClaim.id}/approve`,{})
+    await bill(`/claims/${billingClaim.id}/issue`,{})
+    await bill('/retainage/release',{claim_id:billingClaim.id,milestone_id:'substantial',lines:[{line_id:'quote:plumbing',amount_cents:1000}],completion_references:[{requirement:'Plumbing inspection',reference:'Human reviewed signed inspection PI-104'}],waiver_references:[]})
+    assert.equal(billing.retainage_balance.held_cents,1500)
+    const archiveVendor=(await f.json('/api/plinth/vendors',{method:'POST',cookie:f.owner,body:{kind:'subcontractor',name:'Archive Plumbing LLC',trades:['Plumbing'],contacts:[]}})).value.vendor
+    assert.equal((await f.json(`/api/plinth/vendors/${archiveVendor.id}/qualifications`,{method:'POST',cookie:f.owner,body:{expected_version:archiveVendor.version,trade:'Plumbing',status:'qualified',evidence:'Reviewed plumbing qualification archive source'}})).status,200)
+    const archiveSub=await bill('/subcontracts',{vendor_id:archiveVendor.id,trade:'Plumbing',scope:'Archive plumbing installation',contact_ids:[],awarded_on:'2026-10-20',amount_cents:80000})
+    await bill(`/subcontracts/${archiveSub.id}/release`,{});await bill(`/subcontracts/${archiveSub.id}/lien`,{state:'OR'})
+    await bill(`/subcontracts/${archiveSub.id}/retainage`,{contract_reference:'Supplier archive retainage SR-104',rate_bps:1000,milestones:[{id:'rough',name:'Rough-in completion',completion_requirements:['Supplier rough-in inspection'],waiver_requirements:[]}]})
+    const archiveDraw=await bill(`/subcontracts/${archiveSub.id}/draws`,{through_date:'2026-10-20',amount_cents:40000})
+    await bill(`/subcontracts/${archiveSub.id}/retainage/release`,{draw_id:archiveDraw.id,milestone_id:'rough',lines:[{draw_id:archiveDraw.id,amount_cents:1000}],completion_references:[{requirement:'Supplier rough-in inspection',reference:'Signed supplier inspection SI-104'}],waiver_references:[]})
+    assert.equal(billing.subcontracts[0].retainage_balance.held_cents,3000)
+
     let warrantyJob=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     let warranty=await f.json(`/api/plinth/jobs/${job.id}/warranties`,{method:'POST',cookie:f.owner,body:{expected_version:warrantyJob.version,kind:'component',name:'Archive HVAC',starts_on:'2030-01-01',ends_on:'2035-12-31',terms:'Signed original HVAC warranty',signed_terms_reference:'Archive warranty W-104'}});assert.equal(warranty.status,200);warrantyJob=warranty.value.job
     warranty=await f.json(`/api/plinth/jobs/${job.id}/warranties`,{method:'POST',cookie:f.owner,body:{expected_version:warrantyJob.version,kind:'promise',component_id:warrantyJob.warranties.components[0].id,title:'Archive maintenance agreement',anchor_on:'2031-01-31',interval_unit:'year',interval_count:1,recipient_kind:'office',recipient_email:'builder@example.com',agreement_reference:'Owner recorded explicit reminder agreement'}});assert.equal(warranty.status,200);job=warranty.value.job
@@ -65,6 +89,8 @@ test('AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / IN
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
+    assert.ok(serialized.includes('Signed archive retainage section RT-104')&&serialized.includes('Human reviewed signed inspection PI-104'),'BILL-003 immutable terms, withholding snapshots and release evidence survive CLI recovery')
+    const recoveredBilling=JSON.parse(rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===billing.id).row.data);assert.deepEqual(recoveredBilling.retainage,billing.retainage);assert.deepEqual(recoveredBilling.subcontracts[0].retainage,billing.subcontracts[0].retainage,'BILL-003 independent supplier terms and release sources survive CLI recovery');assert.deepEqual(recoveredBilling.claims,billing.claims,'BILL-003 issued gross/withheld/net application identity survives unchanged')
     assert.ok(serialized.includes(taxRate.value.rate.id)&&serialized.includes('Reviewed archive fixture rate schedule'),'EST-003 reviewed jurisdiction source and dated rate revisions survive CLI recovery')
     assert.ok(serialized.includes(catalog.value.entry.id)&&serialized.includes('CS-1042'),'EST-002 catalog source identities and dated revisions survive CLI recovery')
     assert.ok(serialized.includes('Archive warranty W-104')&&serialized.includes('Archive maintenance agreement'),'CARE-003 terms, agreements and attribution survive the private CLI archive');assert.ok(!restored[0].tables.some(t=>t.name==='pl_warranty_scheduler'),'Transient scheduler cursor is excluded')

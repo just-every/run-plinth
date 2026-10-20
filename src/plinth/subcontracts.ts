@@ -4,7 +4,7 @@ import { currentQualification } from './vendor-model'
 import { getVendor, save } from './vendors'
 import type { Draw, LienSetup } from './lien-waiver-model'
 
-export interface Subcontract { id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released'; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
+export interface Subcontract { retainage?: import('./supplier-retainage-model').SupplierRetainageState; retainage_balance?: import('./supplier-retainage-model').SupplierRetainageBalance; id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released'; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
 /** A person awards a scope on a job to a company currently qualified for that trade, with dated award terms.
  * Client job responses never include awards; SUB-003 adds insurance and license holds before release. */
 export async function awardSubcontract(db: D1Database, job: Job, actor: Actor, input: Input): Promise<{ row: Subcontract; writes: D1PreparedStatement[] }> {

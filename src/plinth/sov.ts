@@ -1,4 +1,5 @@
 import { requireJobManager } from './auth'
+import { retainageSnapshot } from './retainage'
 import { active, cents, need, object, recordApproval, stamp, sum, text, usdOnly, type Actor, type Input, type Job, type Stamp, type Variation } from './model'
 import type { PricingSnapshot } from './pricing-model'
 import type { SovApplication, SovApplicationLine, SovClaim, SovJob, SovLine, SovRevision, SovSources, SovStoredOrder } from './sov-model'
@@ -141,7 +142,9 @@ function buildApplication(job: Job, input: Input, prepared_by: Stamp): SovApplic
  const total_cents = sum(lines.map(line => line.total_cents)), previous_cents = sum(lines.map(line => line.previous_cents)), scheduled_cents = sum(lines.map(line => line.scheduled_cents))
  need(previous_cents === (previous?.cumulative_cents ?? 0), 'Earlier approved pay app totals do not reconcile to coded history', 409, 'sov_legacy_history')
  need(total_cents > previous_cents && total_cents <= scheduled_cents, 'Application total must exceed earlier approved applications and remain within the contract', 409, 'claim_balance')
- return { format: 'plinth-sov-application-v1', purpose, currency: 'USD', job_id: job.id, job_name: job.name, prepared_by: structuredClone(prepared_by), sov_revision: structuredClone(revision), ...(previous ? { previous_claim_id: previous.id } : {}), lines, scheduled_cents, previous_cents, completed_cents: sum(lines.map(line => line.completed_cents)), stored_cents: sum(lines.map(line => line.stored_cents)), current_cents: total_cents - previous_cents, total_cents, completion_percent: percent(total_cents, scheduled_cents), balance_cents: scheduled_cents - total_cents }
+ const application: SovApplication = { format: 'plinth-sov-application-v1', purpose, currency: 'USD', job_id: job.id, job_name: job.name, prepared_by: structuredClone(prepared_by), sov_revision: structuredClone(revision), ...(previous ? { previous_claim_id: previous.id } : {}), lines, scheduled_cents, previous_cents, completed_cents: sum(lines.map(line => line.completed_cents)), stored_cents: sum(lines.map(line => line.stored_cents)), current_cents: total_cents - previous_cents, total_cents, completion_percent: percent(total_cents, scheduled_cents), balance_cents: scheduled_cents - total_cents }
+ const retainage = retainageSnapshot(job, application)
+ return {...application,...(retainage ? {retainage} : {})}
 }
 /** Drafting records human-supplied work evidence; receipts never assert installation. */
 export function prepareSovApplication(job: Job, actor: Actor, input: Input): SovApplication {
@@ -159,5 +162,9 @@ function csvCell(value: string | number): string {
 }
 export function sovCsv(application: SovApplication): string {
  const rows: (string | number)[][] = [[application.purpose], ['Job', application.job_name, 'Currency', application.currency, 'SOV revision', application.sov_revision.revision, 'Accepted quote', application.sov_revision.sources.quote.id, 'Quote revision', application.sov_revision.sources.quote.revision], ['Line id', 'Cost code', 'Description', 'Scheduled cents', 'Previous cents', 'Completed to date cents', 'Stored to date cents', 'Current application cents', 'Total to date cents', 'Completion percent', 'Balance cents', 'Evidence', 'Issued PO ids', 'Source kind', 'Source id', 'Source revision', 'Source line id'], ...application.lines.map(l => [l.id, l.cost_code, l.description, l.scheduled_cents, l.previous_cents, l.completed_cents, l.stored_cents, l.current_cents, l.total_cents, l.completion_percent, l.balance_cents, l.evidence, l.order_ids.join('; '), l.source.kind, l.source.id, l.source.revision, l.source.line_id ?? '']), ['', '', 'TOTAL', application.scheduled_cents, application.previous_cents, application.completed_cents, application.stored_cents, application.current_cents, application.total_cents, application.completion_percent, application.balance_cents]]
+ if (application.retainage) {
+  rows.push(['Client retainage line', 'Prior withheld cents', 'Current withheld cents', 'Cumulative withheld cents', 'Released cents', 'Held cents', 'Prior net cents', 'Current net cents', 'Cumulative net cents'])
+  for(const line of application.retainage.lines)rows.push([line.line_id,line.previous_withheld_cents,line.current_withheld_cents,line.cumulative_withheld_cents,line.cumulative_released_cents,line.held_cents,line.previous_net_cents,line.current_net_cents,line.cumulative_net_cents])
+ }
  return rows.map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
 }

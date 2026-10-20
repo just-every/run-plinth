@@ -1,5 +1,6 @@
 import { cents, DomainError, find, need, object, stamp, sum, text, type Actor, type Attachment, type Input, type Stamp } from './model'
 import type { Subcontract } from './subcontracts'
+import { supplierRetainageBalance } from './supplier-retainage-model'
 
 export const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'] as const
 export const FORMS = ['conditional_progress', 'unconditional_progress', 'conditional_final', 'unconditional_final'] as const
@@ -98,6 +99,7 @@ export function acceptWaiver(waiver: Waiver, input: Input, actor: Actor) {
 /** Payment needs an accepted conditional waiver from every party on the award, unless the owner recorded an exception. */
 export function recordPayment(sub: Subcontract, draw: Draw, input: Input, actor: Actor): SubPayment {
  need(!draw.payment, 'This draw is already paid', 409, 'immutable')
+ need(!(supplierRetainageBalance(sub)?.draws.find(row=>row.draw_id===draw.id)?.held_cents), 'Release this supplier draw’s retained value before recording its existing full-gross payment; net payment handoff is not available', 409, 'supplier_retainage_held')
  const missing = sub.lien!.parties.filter(p => !draw.waivers.some(w => w.party_id === p.id && w.kind === 'conditional' && w.status === 'accepted'))
  if (missing.length && !draw.exception) throw new DomainError('waiver_required', 'Accept a conditional waiver from every party, or record an owner exception, before payment', 409, { missing: missing.map(p => ({ party_id: p.id, party_name: p.name, tier: p.tier })) })
  const amount = cents(input.amount_cents); need(amount === draw.amount_cents, 'Record one payment of exactly the draw amount', 409, 'payment_amount')
