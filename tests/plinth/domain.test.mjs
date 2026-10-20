@@ -155,10 +155,10 @@ test('EST-007 — exact recorded acceptance freezes one coded original plan and 
   // A second acceptance uses an exact, reviewed reusable template in the same atomic job write.
   const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]}
   r=await api('/schedule-templates',{name:'Kitchen fit-out',calendar,tasks:[{id:'fitout',trade:'Carpentry',description:'Kitchen cabinetry installation',start:'2026-11-02T08:00:00Z',duration_minutes:60}]});assert.equal(r.status,201);const template=r.value.template
-  r=await api('/jobs',{name:'Cedar Lane cabinetry',client_email:'budget-client@example.com'});job=r.value.job;await act('/quotes',{lines:[line('Cabinetry','06-400',100000,150000)]});const q=job.quotes[0],input={template_id:template.id,start:'2026-11-09T08:00:00Z'}
+  r=await api('/jobs',{name:'Cedar Lane cabinetry',client_email:'budget-client@example.com',time_zone:'America/New_York'});job=r.value.job;await act('/quotes',{lines:[line('Cabinetry','06-400',100000,150000)]});const q=job.quotes[0],input={template_id:template.id,start:'2026-11-09T13:00:00Z'}
   r=await act('/quotes/'+q.id+'/plan-preview',input);assert.equal(r.status,200);const preview=r.value.preview
   assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:'stale'}}})).status,409)
   assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:preview.digest}}})).status,200)
-  assert.equal(job.schedules.length,1);assert.equal(job.budgets[0].schedule.application.template_id,template.id);assert.equal(job.budgets[0].schedule.application.template_version,template.version);assert.deepEqual(job.budgets[0].schedule.application.task_ids,job.schedules.map(t=>t.id))
+  assert.equal(job.schedules.length,1);assert.equal(job.schedules[0].start,'2026-11-09T13:00:00.000Z');assert.equal(job.time_zone,'America/New_York');assert.equal(job.budgets[0].schedule.application.template_id,template.id);assert.equal(job.budgets[0].schedule.application.template_version,template.version);assert.deepEqual(job.budgets[0].schedule.application.task_ids,job.schedules.map(t=>t.id))
  }finally{await f.close()}
 })

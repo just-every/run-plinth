@@ -3,7 +3,7 @@ import type { Job, Quote } from '../plinth/model'
 import type { ScheduleTemplate } from '../plinth/schedule-baseline-model'
 import type { JobProps } from './job'
 import { api, cents, Field, Form, money } from './shared'
-import { fromLocalInput, jobZone } from './schedule-views'
+import { fromLocalInput, jobZone, scheduleInstant } from './schedule-views'
 export function QuoteAcceptance({job,quote,mutate}:{job:Job;quote:Quote;mutate:JobProps['mutate']}) {
  const [templates,setTemplates]=useState<ScheduleTemplate[]>([]),[choice,setChoice]=useState(''),[preview,setPreview]=useState<any>(),[error,setError]=useState('')
  useEffect(()=>{api('/schedule-templates').then(r=>setTemplates(r.templates.filter((t:ScheduleTemplate)=>!t.archived))).catch(e=>setError(e.message))},[])
@@ -11,8 +11,8 @@ export function QuoteAcceptance({job,quote,mutate}:{job:Job;quote:Quote;mutate:J
  const build=(f:FormData)=>({template_id:choice,start:fromLocalInput(String(f.get('start')),jobZone(job))})
  return <section className="inline-form"><p>Record the client’s acceptance and how you received it. This records external evidence; it does not collect an electronic signature. Freeze the original budget and billing plan with an explicit schedule choice. Missing costs remain unknown and uncoded lines stay Unassigned.</p>{error&&<p role="alert">{error}</p>}
  <label>Acceptance schedule choice<select value={choice} onChange={e=>{setChoice(e.target.value);setPreview(undefined)}} required><option value="">Choose explicitly</option><option value="none">No tasks at acceptance</option>{templates.map(t=><option value={t.id} key={t.id}>{t.name} · v{t.version}</option>)}</select></label>
- {choice&&choice!=='none'&&<Form submit="Preview acceptance schedule" action={async f=>{const input=build(f);const r=await mutate('/quotes/'+quote.id+'/plan-preview',input);setPreview({input,digest:r.preview.digest,tasks:r.preview.tasks})}}><Field label={`Acceptance template start (${jobZone(job)})`} name="start" type="datetime-local"/></Form>}
- {preview&&<section><h4>Reviewed acceptance schedule</h4>{preview.tasks.map((t:any)=><p key={t.id}>{t.description} · {t.start} – {t.end}</p>)}</section>}
+ {choice&&choice!=='none'&&<Form reset={false} submit="Preview acceptance schedule" action={async f=>{const input=build(f);const r=await mutate('/quotes/'+quote.id+'/plan-preview',input);setPreview({input,digest:r.preview.digest,tasks:r.preview.tasks})}}><div onChange={()=>setPreview(undefined)}><Field label={`Acceptance template start (${jobZone(job)})`} name="start" type="datetime-local"/></div></Form>}
+ {preview&&<section><h4>Reviewed acceptance schedule</h4>{preview.tasks.map((t:any)=><p key={t.id}>{t.description} · {scheduleInstant(t.start,jobZone(job))} – {scheduleInstant(t.end,jobZone(job))}</p>)}</section>}
  <Form submit="Record client acceptance" action={async f=>{if(!choice)throw new Error('Choose the acceptance schedule.');if(choice!=='none'&&!preview)throw new Error('Preview the chosen schedule first.');return mutate('/quotes/'+quote.id+'/accept',{method:f.get('method'),evidence:f.get('evidence'),schedule_choice:choice==='none'?{kind:'none',reason:f.get('no_tasks_reason')}:{kind:'template',input:{...preview.input,digest:preview.digest}},budget:{allowances:codes.map(code=>({cost_code:code,amount_cents:cents(f.get('allowance:'+code))})),commitment_plan:codes.map(code=>({cost_code:code,amount_cents:cents(f.get('commitment:'+code)),description:f.get('plan:'+code)}))}})}}>
  <label>Acceptance method<select name="method"><option value="email">Email</option><option value="signed">Signed agreement recorded externally</option><option value="phone">Phone</option><option value="in person">In person</option></select></label><Field label="Client acceptance reference" name="evidence"/>
  {choice==='none'&&<Field label="No-tasks reason" name="no_tasks_reason"/>}
