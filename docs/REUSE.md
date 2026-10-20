@@ -25,3 +25,5 @@ The stepladder mark (public/brand/mark.svg, with hand-tuned 16 and 32 px favicon
 ## Demo runtime adoption
 
 The current vendored Base modules are copied together, byte-for-byte, from `rer-v0.2.30` (`d434ea67989fe10b6ddff01daba8bb350975e54a`); `base-copies.json` records their paths and hashes. This replaces the module entries of the legacy composition source lock. Applied migrations retain their original bytes and provenance. Demo samples are Plinth domain records; [DEMO.md](../DEMO.md) describes their lifecycle and outbound policy.
+
+PDF rendering for EST-004 uses [Mozilla PDF.js](https://github.com/mozilla/pdf.js), distributed as `pdfjs-dist` under Apache-2.0. Its worker renders retained job PDF originals locally in the installed browser; measured quantities and commercial approvals remain Plinth records.

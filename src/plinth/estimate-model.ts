@@ -16,6 +16,7 @@ export interface EstimateLineFields {
  included?: boolean
 }
 export interface EstimateQuoteFields {
+ takeoff_source?: import('./takeoff-model').TakeoffSource & {conversions?:Record<string,unknown>;catalog?:unknown;assembly_snapshots?:unknown[]}
  pricing?: import('./pricing-model').PricingSnapshot
  selling_adjusted?: boolean
  cost_catalog?: import('./catalog-model').CatalogSource

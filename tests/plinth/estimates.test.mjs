@@ -260,3 +260,63 @@ test('EST-005 — supplier captures form reviewed room boards and estimate draft
   assert.equal(reloaded.products[0].revisions.length,2);assert.ok(reloaded.approvals.some(a=>a.kind==='product.review'&&a.subject_id===tapV2.id))
  } finally {await f.close()}
 })
+
+test('EST-004 — calibrated multi-sheet PDF lengths areas counts and deducted openings price reviewed assemblies; drawing revisions flag review and preserve sold scope', async()=>{
+ const {takeoffPlan}=await import('../fixtures/takeoff-plan.mjs'),f=await createFixture()
+ try{
+  const client=await f.invite('takeoff-client@example.com'),foreign=await f.invite('takeoff-other@example.com'),agent=await f.agent(),pdf=takeoffPlan()
+  let result=await f.json('/api/plinth/jobs',{method:'POST',cookie:f.owner,body:{name:'Calibrated kitchen and laundry remodel',client_email:'takeoff-client@example.com',address:'148 Maple Street, Burlington, VT 05401'}});assert.equal(result.status,201);let job=result.value.job
+  const post=async(path,body={},credentials={cookie:f.owner})=>{const r=await f.json(`/api/plinth/jobs/${job.id}`+path,{method:'POST',...credentials,body:{expected_version:job.version,...body}});if(r.value.job)job=r.value.job;return r}
+  const catalog=async(kind,name,value)=>{const r=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind,name,reason:'Estimator reviewed drawings and supplier labor/material rates',value}});assert.equal(r.status,201);return r.value.entry}
+  const dimensions={walls:'1',floors:'1',fixtures:'1'},units={walls:'ft',floors:'sq ft',fixtures:'each'},costs={walls:100,floors:200,fixtures:1000},sells={walls:200,floors:400,fixtures:2000},assemblies={}
+  for(const key of Object.keys(dimensions)){const rate=await catalog('rate',key+' rate',{vendor:'Estimator reviewed rate',effective_on:'2026-01-01',unit:units[key],cost_cents:costs[key],sell_cents:sells[key],reference:'Supplier and production schedule R-1048'});assemblies[key]=await catalog('assembly',key+' assembly',{unit:units[key],parts:[{id:key,rate_id:rate.id,description:key+' from calibrated drawings',cost_code:key==='walls'?'06-100':key==='floors'?'09-600':'22-400',phase:'Remodel',category:'material',units_per_dimension:'1',productivity:'1',waste_percent:key==='floors'?'10':'0'}]})}
+  const template=await catalog('template','Measured kitchen and laundry',{kind:'remodel',dimensions,items:Object.keys(dimensions).map(key=>({id:key,assembly_id:assemblies[key].id,dimension:key}))})
+  const upload={name:'A1 Kitchen',page:1,width:400,height:400,document:{name:'kitchen-and-laundry.pdf',mime:'application/pdf',base64:pdf.toString('base64')}}
+  assert.equal((await post('/takeoff',upload,{cookie:client})).status,403)
+  assert.equal((await post('/takeoff',{...upload,document:{...upload.document,base64:Buffer.from('<script>unsafe</script>').toString('base64')}})).status,400)
+  assert.equal((await post('/takeoff',upload)).status,200);let sheet=job.takeoff[0],revision=sheet.revisions[0]
+  const filePath=`/api/plinth/jobs/${job.id}/takeoff-files/${revision.document.id}`
+  assert.deepEqual(await (await f.request(filePath,{cookie:f.owner})).arrayBuffer(),Uint8Array.from(pdf).buffer)
+  assert.equal((await f.request(filePath,{cookie:client})).status,403);assert.equal((await f.request(filePath,{cookie:foreign})).status,404)
+  assert.equal((await post(`/takeoff/${sheet.id}/calibrate`,{revision_id:revision.id,points:[{x:50,y:350},{x:250,y:350}],length:'20',unit:'ft'})).status,200);const calibration=job.takeoff[0].calibrations[0]
+  const measure=async(sheetId,rev,calibrationId,kind,points,name,dimension,deduct_from)=>{const r=await post(`/takeoff/${sheetId}/measure`,{revision_id:rev,calibration_id:calibrationId,kind,points,name,dimension,annotation:'Measured on exact drawing revision; openings and scale reviewed',...(deduct_from?{deduct_from}:{})});assert.equal(r.status,200);return r.value.record}
+  const wall=await measure(sheet.id,revision.id,calibration.id,'length',[{x:50,y:250},{x:250,y:250}],'Kitchen walls','walls')
+  const floor=await measure(sheet.id,revision.id,calibration.id,'area',[{x:50,y:250},{x:250,y:250},{x:250,y:350},{x:50,y:350}],'Kitchen floor','floors')
+  await measure(sheet.id,revision.id,calibration.id,'area',[{x:50,y:250},{x:90,y:250},{x:90,y:300},{x:50,y:300}],'Stair opening','floors',floor.id)
+  const before=job.version
+  assert.equal((await post(`/takeoff/${sheet.id}/measure`,{revision_id:revision.id,calibration_id:calibration.id,kind:'area',points:[{x:0,y:0},{x:400,y:0},{x:400,y:400},{x:0,y:400}],name:'Outside opening',dimension:'floors',annotation:'Refused opening outside its parent',deduct_from:floor.id})).status,400);assert.equal(job.version,before)
+  assert.equal((await post(`/takeoff/${sheet.id}/measure`,{revision_id:revision.id,calibration_id:calibration.id,kind:'area',points:[{x:50,y:250},{x:90,y:250},{x:90,y:300},{x:50,y:300}],name:'Duplicate stair opening',dimension:'floors',annotation:'Refused duplicate deduction',deduct_from:floor.id})).status,400)
+  const fixtures=await measure(sheet.id,revision.id,undefined,'count',[{x:80,y:280},{x:170,y:280}],'Plumbing fixtures','fixtures')
+  assert.equal((await post('/takeoff',{...upload,name:'A2 Laundry',page:2})).status,200);const laundry=job.takeoff[1],laundryRevision=laundry.revisions[0]
+  assert.equal((await post(`/takeoff/${laundry.id}/calibrate`,{revision_id:laundryRevision.id,points:[{x:50,y:350},{x:150,y:350}],length:'10',unit:'ft'})).status,200);const laundryCalibration=job.takeoff[1].calibrations[0]
+  const laundryFloor=await measure(laundry.id,laundryRevision.id,laundryCalibration.id,'area',[{x:50,y:250},{x:150,y:250},{x:150,y:350},{x:50,y:350}],'Laundry floor','floors')
+  const input={template_id:template.id,as_of:'2026-10-20',measurement_ids:[wall.id,floor.id,fixtures.id,laundryFloor.id]}
+  result=await post('/takeoff-estimate/preview',input);assert.equal(result.status,200);let preview=result.value.preview
+  assert.deepEqual(preview.source.dimensions,{walls:'20.000000',floors:'280.000000',fixtures:'2.000000'})
+  assert.equal(preview.source.measurements.find(m=>m.id===floor.id).gross_quantity,'200.000000');assert.equal(preview.source.measurements.find(m=>m.id===floor.id).net_quantity,'180.000000')
+  assert.equal(preview.catalog.proposal.total_cents,131_200,'20 feet × $2 + (180 + 100) square feet × 110% × $4 + 2 fixtures × $20')
+  assert.equal((await post('/takeoff-estimate/apply',{...input,digest:preview.digest},{token:agent})).status,403)
+  assert.equal((await post('/takeoff-estimate/apply',{...input,digest:'unreviewed'})).status,409)
+  assert.equal((await post('/takeoff-estimate/apply',{...input,digest:preview.digest})).status,200)
+  let quote=structuredClone(job.quotes.at(-1));assert.equal(quote.takeoff_source.measurements[0].drawing.document.checksum,revision.document.checksum);assert.equal(quote.takeoff_source.assembly_snapshots.find(a=>a.id===assemblies.floors.id).revision.value.parts[0].waste_percent,'10')
+  const replacement={...upload,document:{...upload.document,base64:takeoffPlan(true).toString('base64')}}
+  assert.equal((await post(`/takeoff/${sheet.id}/revise`,replacement)).status,200);const revised=job.takeoff[0].revisions[1]
+  assert.equal((await post('/takeoff-estimate/preview',input)).status,409,'A new drawing does not silently reuse prior calibration/measurements')
+  assert.equal((await post(`/takeoff/${sheet.id}/measure`,{revision_id:revised.id,calibration_id:calibration.id,kind:'length',points:[{x:50,y:250},{x:290,y:250}],name:'Old calibration attempt',dimension:'walls',annotation:'Must be refused'})).status,400)
+  assert.equal((await post(`/takeoff/${sheet.id}/calibrate`,{revision_id:revised.id,points:[{x:50,y:350},{x:250,y:350}],length:'20',unit:'ft'})).status,200);const calibration2=job.takeoff[0].calibrations.at(-1)
+  const wall2=await measure(sheet.id,revised.id,calibration2.id,'length',[{x:50,y:250},{x:290,y:250}],'Revised kitchen walls','walls'),floor2=await measure(sheet.id,revised.id,calibration2.id,'area',[{x:50,y:250},{x:290,y:250},{x:290,y:350},{x:50,y:350}],'Revised kitchen floor','floors'),fixtures2=await measure(sheet.id,revised.id,undefined,'count',[{x:80,y:280},{x:170,y:280}],'Reconfirmed plumbing fixtures','fixtures')
+  await measure(sheet.id,revised.id,calibration2.id,'area',[{x:50,y:250},{x:90,y:250},{x:90,y:300},{x:50,y:300}],'Reconfirmed stair opening','floors',floor2.id)
+  const revisedInput={...input,measurement_ids:[wall2.id,floor2.id,fixtures2.id,laundryFloor.id]};result=await post('/takeoff-estimate/preview',revisedInput);assert.equal(result.status,200);preview=result.value.preview;assert.equal(preview.catalog.total_delta_cents,18_400);assert.deepEqual(preview.source.dimensions,{walls:'24.000000',floors:'320.000000',fixtures:'2.000000'});assert.deepEqual(preview.source.dimension_changes.find(c=>c.dimension==='floors'),{dimension:'floors',before:'280.000000',after:'320.000000',unit:'sq ft'})
+  assert.equal((await post('/takeoff-estimate/apply',{...revisedInput,digest:preview.digest})).status,200)
+  assert.deepEqual(job.quotes.find(q=>q.id===quote.id),{...quote,status:'superseded'})
+  quote=job.quotes.at(-1);assert.equal((await post(`/quotes/${quote.id}/accept`,{method:'email',evidence:'Client accepted revised measured scope and exact quote',schedule_choice:{kind:'none',reason:'Schedule prepared separately'}})).status,200)
+  const accepted=structuredClone(job.quotes.at(-1)),budget=structuredClone(job.budgets)
+  assert.equal((await post(`/takeoff/${sheet.id}/revise`,upload)).status,200);const third=job.takeoff[0].revisions.at(-1)
+  assert.equal((await post(`/takeoff/${sheet.id}/calibrate`,{revision_id:third.id,points:[{x:50,y:350},{x:250,y:350}],length:'20',unit:'ft'})).status,200);const calibration3=job.takeoff[0].calibrations.at(-1)
+  const wall3=await measure(sheet.id,third.id,calibration3.id,'length',[{x:50,y:250},{x:250,y:250}],'Sold-job change walls','walls'),floor3=await measure(sheet.id,third.id,calibration3.id,'area',[{x:50,y:250},{x:250,y:250},{x:250,y:350},{x:50,y:350}],'Sold-job change floor','floors'),fixtures3=await measure(sheet.id,third.id,undefined,'count',[{x:80,y:280},{x:170,y:280}],'Sold-job fixtures','fixtures')
+  const soldInput={...input,measurement_ids:[wall3.id,floor3.id,fixtures3.id,laundryFloor.id]};result=await post('/takeoff-estimate/preview',soldInput);assert.equal(result.status,200);assert.equal(result.value.preview.catalog.sold,true)
+  assert.equal((await post('/takeoff-estimate/apply',{...soldInput,digest:result.value.preview.digest})).status,409)
+  assert.deepEqual(job.quotes.at(-1),accepted);assert.deepEqual(job.budgets,budget);assert.equal(job.takeoff[0].revisions.length,3)
+  const safe=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:client})).value.job;assert.equal(safe.takeoff,undefined);assert.ok(!JSON.stringify(safe).includes('takeoff_source'))
+ }finally{await f.close()}
+})

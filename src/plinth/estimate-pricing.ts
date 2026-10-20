@@ -60,7 +60,7 @@ export async function previewPricing(db: D1Database, job: Job, actor: Actor, inp
  // Legacy imported lines had no ids. Their stable position supplies preview custody.
  base_lines.forEach((line, index) => { line.id ??= `legacy-${index + 1}` })
  const { calculated, pricing } = await reviewedPricing(db, input, base_lines, current)
- const proposal = { lines: calculated.lines, total_cents: calculated.total_cents, cost_total_cents: current.cost_total_cents, alternate_selections: current.alternate_selections, inclusions: current.inclusions, exclusions: current.exclusions, notes: current.notes, ...(current.cost_catalog ? { cost_catalog: current.cost_catalog } : {}), pricing }
+ const proposal = { lines: calculated.lines, total_cents: calculated.total_cents, cost_total_cents: current.cost_total_cents, alternate_selections: current.alternate_selections, inclusions: current.inclusions, exclusions: current.exclusions, notes: current.notes, ...(current.cost_catalog ? { cost_catalog: current.cost_catalog } : {}), ...(current.takeoff_source ? { takeoff_source:current.takeoff_source } : {}), pricing }
  return { proposal, previous_total_cents: current.total_cents, total_delta_cents: calculated.total_cents - current.total_cents, sold: job.status !== 'quoting', digest: await digest([job.id, job.version, proposal]) }
 }
 export async function applyPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
@@ -72,6 +72,7 @@ export async function applyPricing(db: D1Database, job: Job, actor: Actor, input
  const quote = prepareQuote(job, actor, { ...preview.proposal, lines: preview.proposal.pricing.base_lines }) as Quote & { pricing: PricingSnapshot }
  quote.lines = preview.proposal.lines; quote.total_cents = preview.proposal.total_cents; quote.selling_adjusted = true
  if (preview.proposal.cost_catalog) quote.cost_catalog = preview.proposal.cost_catalog
+ if (preview.proposal.takeoff_source) quote.takeoff_source=preview.proposal.takeoff_source
  quote.pricing = { ...preview.proposal.pricing, approved_by: stamp(actor) }
  recordApproval(job, actor, 'estimate.pricing', quote, { quote_id: quote.id, revision: quote.revision, pricing: quote.pricing, lines: quote.lines, total_cents: quote.total_cents, cost_total_cents: quote.cost_total_cents })
  return quote

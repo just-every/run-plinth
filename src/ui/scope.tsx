@@ -1,3 +1,4 @@
+import { Takeoff } from './takeoff'
 import { Products, ProductSource } from './products'
 import { AllowanceChangeSummary } from './allowance-changes'
 import { QuoteAcceptance, BudgetComparison } from './quote-acceptance'
@@ -13,7 +14,7 @@ export function Quotes({job,manager,mutate}: JobProps) {
   const accepted = job.quotes.some(q => q.status === 'accepted')
   return <div className="split"><section className="card"><div className="card-head"><h2>Quote revisions</h2><span className="muted">{job.quotes.length} {job.quotes.length === 1 ? 'revision' : 'revisions'}</span></div>
     {job.import_evidence && <p className="notice">Imported source acceptance is retained. Review and explicitly accept the native quote before work begins.</p>}
-    {manager && <><EstimateComparison quotes={job.quotes} currency={job.currency} /><EstimateCatalog job={job} mutate={mutate} /><EstimatePricing job={job} mutate={mutate} /></>}
+    {manager && <><Takeoff job={job} mutate={mutate}/><EstimateComparison quotes={job.quotes} currency={job.currency} /><EstimateCatalog job={job} mutate={mutate} /><EstimatePricing job={job} mutate={mutate} /></>}
     {job.quotes.length === 0 && <p className="empty">No quote prepared yet.</p>}
     {[...job.quotes].reverse().map(q => <article className="record" key={q.id}><div className="record-head"><h3>Quote {q.revision}</h3><Badge>{q.status}</Badge></div>
       <table className="lines estimate-lines"><thead><tr><th scope="col">Scope</th><th scope="col">Qty × unit</th><th scope="col">Amount</th></tr></thead><tbody>{q.lines.map((l,i) => <tr key={i}><td>{l.description}{l.cost_code && <p className="muted">{l.cost_code} · {l.phase} · {l.category}</p>}{l.alternate_group && <p>{l.alternate_group}: {l.alternate_option} · {l.included === false ? 'Not selected' : 'Included'}</p>}{manager && l.cost_unit_cents !== undefined && <p className="muted">Cost: {money(l.cost_unit_cents, job.currency)} per {l.rate_unit ?? l.unit} · line {money(l.cost_total_cents, job.currency)}</p>}</td><td>{l.quantity}{l.unit ? ` ${l.unit}` : ''}{(!q.selling_adjusted || manager) && <>{q.selling_adjusted ? ' · Base rate ' : ' × '}{money(l.unit_cents, job.currency)}{l.rate_unit && <> / {l.rate_unit}</>}</>}{l.conversion && <p className="muted">Conversion {l.conversion.numerator} ÷ {l.conversion.denominator}</p>}</td><td>{money(l.total_cents, job.currency)}</td></tr>)}</tbody><tfoot><tr><th scope="row" colSpan={2}>Total selling price</th><td>{money(q.total_cents, job.currency)}</td></tr></tfoot></table>

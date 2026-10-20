@@ -20,7 +20,7 @@ export function costCodeReport(job: Job, actor: Actor, quoteId: string) {
  return {
   format: 'plinth-estimate-cost-codes-v1', currency: currencyOf(job), job_id: job.id, job_name: job.name, quote_id: quote.id, revision: quote.revision, status: quote.status,
   rounding: quote.pricing ? 'Base measurements round half-up once per line. Scoped pricing stages round half-up, then allocate cents proportionally by largest remainder in source-line order; final line totals include reviewed tax.' : 'Exact quantity × conversion numerator ÷ conversion denominator × integer rate cents; round half-up once per line, then sum included lines.',
-  ...(quote.pricing ? { pricing: quote.pricing } : {}),
+  ...(quote.pricing ? { pricing: quote.pricing } : {}), ...(quote.takeoff_source?{takeoff_source:quote.takeoff_source}:{}),
   alternate_selections: quote.alternate_selections ?? {}, inclusions: quote.inclusions ?? [], exclusions: quote.exclusions ?? [],
   lines: quote.lines.map(line => ({ ...line, included: included(line) })),
   cost_codes: [...grouped.values()].map(group => ({ cost_code: group.cost_code, phase: group.phase, category: group.category, line_count: group.lines.length, cost_total_cents: cost(group.lines), total_cents: sum(group.lines.map(line => line.total_cents)) })),
@@ -38,6 +38,6 @@ export function costCodeCsv(report: CostCodeReport): string {
 /** Apply to both job quotes and approval snapshots at the authorized client boundary. */
 export function projectEstimateCosts<T>(value: T): T {
  if (Array.isArray(value)) return value.map(projectEstimateCosts) as T
- if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('cost_') && !['phase', 'category', 'pricing', 'pricing_direction'].includes(key) && !key.toLowerCase().includes('margin')).map(([key, child]) => [key, projectEstimateCosts(key === 'product_source' && child && typeof child==='object' ? Object.fromEntries(Object.entries(child).filter(([field])=>field!=='evidence')) : key === 'lines' && Array.isArray(child) ? child.filter(line => !line || typeof line !== 'object' || line.included !== false) : child)])) as T
+ if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('cost_') && !['phase', 'category', 'pricing', 'pricing_direction', 'takeoff_source'].includes(key) && !key.toLowerCase().includes('margin')).map(([key, child]) => [key, projectEstimateCosts(key === 'product_source' && child && typeof child==='object' ? Object.fromEntries(Object.entries(child).filter(([field])=>field!=='evidence')) : key === 'lines' && Array.isArray(child) ? child.filter(line => !line || typeof line !== 'object' || line.included !== false) : child)])) as T
  return value
 }

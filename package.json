@@ -50,6 +50,7 @@
     "esbuild": "0.28.1",
     "ical.js": "2.2.1",
     "miniflare": "5.20260907.0-alpha",
+    "pdfjs-dist": "6.4.299",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "wrangler": "4.129.1"
