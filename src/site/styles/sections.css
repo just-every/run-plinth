@@ -387,3 +387,8 @@
   .kv > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .kv dt { color: var(--muted); font-size: 14px; }
 }
+/* Under 360 a long event line wraps between its parts (the date stays whole), and the case chip drops under its title. */
+@media (max-width: 359px) {
+  .events .seg .segs, .events .ox-text { white-space: normal; }
+  .case-head { flex-wrap: wrap; gap: 12px 18px; }
+}

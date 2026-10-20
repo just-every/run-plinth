@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { Avatar, Copy, Done, Icon, Picture, Section, Segs, Tick } from '../parts'
 
 const events: [string, ReactNode, ReactNode][] = [
-  ['ox', <b className="ox-text">General liability expires Sat Oct 31</b>, 'start is Mon Nov 2'],
+  ['ox', <b className="ox-text">General liability expires Sat&nbsp;Oct&nbsp;31</b>, 'start is Mon Nov 2'],
   ['blue', 'Hold placed', 'Mon Oct 26, 8:00 am'],
   ['blue', 'Renewal requested by email and text', 'Mon Oct 26, 8:01 am'],
   ['blue', 'New certificate uploaded', <Segs>{['Wed Oct 28, 2:14 pm', 'to Oct 31, 2027']}</Segs>],
