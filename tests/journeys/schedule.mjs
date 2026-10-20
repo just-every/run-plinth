@@ -1,4 +1,4 @@
-// SCH-001 browser journey against an actual rer dev installation with native owner sign-in.
+// SCH-001 / EST-007 browser journey against an actual rer dev installation with native owner sign-in.
 // PLINTH_URL and PLINTH_STATE point to that installation and a private Playwright storage state.
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
@@ -19,6 +19,8 @@ try {
  await page.getByLabel('Quote total (including sales tax if applicable)').fill('480000.00')
  await page.getByRole('button', { name: 'Prepare quote revision', exact: true }).click()
  await page.getByLabel('Client acceptance reference').fill('Signed agreement returned by Morgan and Taylor Chen, 19 October 2026')
+ await page.getByRole('combobox',{name:/^Acceptance schedule choice/}).selectOption('none')
+ await page.getByLabel('No-tasks reason',{exact:true}).fill('Plan construction dates after the estimate is accepted')
  await page.getByRole('button', { name: 'Record client acceptance', exact: true }).click()
  await page.getByRole('navigation', { name: 'Job sections', exact: true }).getByRole('button', { name: 'Schedule', exact: true }).click()
  await page.getByText('Working calendar · UTC', { exact: true }).click()

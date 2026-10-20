@@ -1,4 +1,4 @@
-// EST-001: native measured-estimate preparation and revision review on the installed workspace.
+// EST-001 / EST-007: native measured-estimate preparation and revision review on the installed workspace.
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
@@ -86,8 +86,10 @@ try {
  assert.deepEqual(job.quotes[0], { ...first, status: 'superseded' })
  const second = structuredClone(job.quotes[1])
  await page.getByLabel('Client acceptance reference', { exact: true }).fill('Client signed the measured revision and selected Tile finish')
+ await page.getByRole('combobox',{name:/^Acceptance schedule choice/}).selectOption('none')
+ await page.getByLabel('No-tasks reason',{exact:true}).fill('Plan construction dates after the estimate is accepted')
  await page.getByRole('button', { name: 'Record client acceptance', exact: true }).click()
- await expect(page.getByText('Accepted by email:', { exact: false })).toBeVisible()
+ await expect.poll(async()=>((await (await context.request.get(base+'/api/plinth/jobs/'+job.id)).json()).job.quotes.at(-1).status)).toBe('accepted')
  await page.reload()
  await expect(page.getByRole('heading', { name: 'Quote 2', exact: true })).toBeVisible()
  await expect(page.getByRole('button', { name: 'Prepare measured estimate revision', exact: true })).toHaveCount(0)
