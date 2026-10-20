@@ -68,7 +68,7 @@ test('CLIENT-002 — room allowances, exact client signatures, immutable replace
  } finally { await f.close() }
 })
 
-test('CLIENT-003 — exact overage and underage, immutable reviewed client changes, incremental replacements and one-time budget, PO and next-draw effects', async () => {
+test('CLIENT-003 / AUTO-002 — exact overage and underage, immutable reviewed client changes, incremental replacements and one-time budget, PO and next-draw effects', async () => {
  const f = await createFixture()
  try {
   const client = await f.invite('allowance@example.com', 'Sam Client'), foreign = await f.invite('unrelated@example.com'), agent = await f.agent()
@@ -176,5 +176,60 @@ test('CLIENT-003 — exact overage and underage, immutable reviewed client chang
   const unplannedInput={...input({selection_id:unplanned.id,revision_id:unplannedRevision.id},20_000,10_000),lines:[line('allowance','Unassigned',20_000,10_000)]}
   const version=job.version;assert.equal((await act('/allowance-changes/preview',unplannedInput)).value.error,'allowance_baseline');assert.equal(job.version,version)
   assert.equal(f.messages.length, sent); assert.equal(job.schedules.length, 0, 'Recorded date impacts do not manufacture schedule approval')
+  // AUTO-002: commit one real downstream step, abandon the caller, reload and resume.
+  const workflow = job.continuity.find(w => w.source.id === finalChangeId), workflowId = workflow.id
+  assert.equal(workflow.budget_id, job.budgets.at(-1).id)
+  assert.equal((await act(`/continuity/${workflowId}/resume`, {}, client)).status, 403)
+  assert.equal((await act(`/continuity/${workflowId}/resume`, {}, foreign)).status, 404)
+  assert.equal((await act(`/continuity/${workflowId}/resume`, {}, undefined, agent)).status, 200)
+  job = (await api(`/jobs/${job.id}`)).value.job
+  const interrupted = structuredClone(job.continuity.find(w => w.id === workflowId))
+  assert.equal(interrupted.stage, 'purchasing'); assert.equal(interrupted.schedule.calendar_day_impact, 5)
+  assert.equal(interrupted.schedule.selection_revision_id, finalChoice.revision_id)
+  assert.deepEqual(interrupted.schedule.tasks, []); assert.equal(interrupted.purchasing, undefined)
+  const versionBeforeResume = job.version
+  const resumed = await Promise.all([1, 2].map(() => api(`/jobs/${job.id}/continuity/${workflowId}/resume`, { expected_version: versionBeforeResume })))
+  assert.deepEqual(resumed.map(r => r.status).sort(), [200, 409])
+  job = (await api(`/jobs/${job.id}`)).value.job
+  const prepared = job.continuity.find(w => w.id === workflowId), po = job.orders.find(o => o.id === prepared.purchasing.order_id)
+  assert.equal(prepared.stage, 'billing'); assert.equal(po.status, 'draft'); assert.equal(po.amount_cents, 255_550)
+  assert.equal(po.source.selection_id, finalChoice.selection_id); assert.equal(po.source.revision_id, finalChoice.revision_id)
+  assert.equal((await act(`/continuity/${workflowId}/resume`)).status, 200)
+  const complete = structuredClone(job.continuity.find(w => w.id === workflowId))
+  assert.equal(complete.stage, 'complete'); assert.deepEqual(complete.schedule, interrupted.schedule)
+  assert.equal(complete.billing.adjustment_cents, -11_000); assert.deepEqual(complete.billing.budget, job.budgets.at(-1))
+  for (let replay = 0; replay < 2; replay++) assert.equal((await act(`/continuity/${workflowId}/resume`)).status, 200)
+  assert.deepEqual(job.continuity.find(w => w.id === workflowId), complete)
+  assert.equal(job.orders.filter(o => o.source?.revision_id === finalChoice.revision_id).length, 1)
+  assert.equal(job.budgets.filter(b => b.source.id === finalChangeId).length, 1)
+  // An earlier event adopts its existing issued PO; it never duplicates or changes it.
+  const oldWorkflow = job.continuity.find(w => w.source.id === tileChangeId), issuedOrder = structuredClone(job.orders.find(o => o.id === order.id))
+  for (let step = 0; step < 3; step++) assert.equal((await act(`/continuity/${oldWorkflow.id}/resume`)).status, 200)
+  assert.equal(job.continuity.find(w => w.id === oldWorkflow.id).purchasing.order_id, order.id)
+  assert.deepEqual(job.orders.find(o => o.id === order.id), issuedOrder)
+  r = await act('/claims', draw(110_000, 60_000)); assert.equal(r.status, 200, JSON.stringify(r.value))
+  assert.equal(r.value.record.status, 'draft'); assert.equal(r.value.record.reconciliation.contract_cents, 353_550)
+  assert.deepEqual(job.continuity.find(w => w.id === workflowId).billing.claim_ids, [r.value.record.id])
+  assert.deepEqual(job.claims.find(c => c.id === firstClaimId), firstClaim)
+  assert.equal(f.messages.length, sent, 'Continuation never sends a notice without an owner-approved channel')
+  const notice = { email: 'allowance@example.com', channel: 'email', confirm: true }
+  assert.equal((await act(`/continuity/${workflowId}/notify`, notice, undefined, agent)).status, 403)
+  assert.equal((await act(`/continuity/${workflowId}/notify`, notice, client)).status, 403)
+  assert.equal((await act(`/continuity/${workflowId}/notify`, { ...notice, confirm: false })).status, 400)
+  assert.equal((await act(`/continuity/${workflowId}/notify`, { ...notice, channel: 'sms' })).status, 400)
+  assert.equal((await act(`/continuity/${workflowId}/notify`, { ...notice, email: 'unrelated@example.com' })).status, 403)
+  assert.equal((await act(`/continuity/${workflowId}/notify`, notice)).status, 200)
+  const outcome = job.continuity.find(w => w.id === workflowId).notices[0]
+  assert.equal(outcome.status, 'accepted'); assert.equal(outcome.channel, 'email'); assert.equal(outcome.approved_by.role, 'owner')
+  assert.equal(f.messages.length, sent + 1); assert.deepEqual(f.messages.at(-1).to, ['allowance@example.com'])
+  assert.ok(!f.messages.at(-1).text.includes('private-vendor')); assert.ok(!f.messages.at(-1).text.includes('353550'))
+  assert.equal((await act(`/continuity/${workflowId}/notify`, notice)).status, 409); assert.equal(f.messages.length, sent + 1)
+  const noPrivate = (await api(`/jobs/${job.id}`, undefined, client)).value.job
+  assert.equal(noPrivate.continuity, undefined)
+  const person = await f.db.prepare("SELECT id FROM oa_operators WHERE email='allowance@example.com'").first()
+  assert.equal((await f.json('/auth/operator/status', { method: 'POST', cookie: f.owner, body: { operatorId: person.id, status: 'inactive' } })).status, 200)
+  assert.equal((await act(`/continuity/${oldWorkflow.id}/notify`, notice)).status, 403)
+  assert.equal(f.messages.length, sent + 1)
+
  } finally { await f.close() }
 })

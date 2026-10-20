@@ -126,7 +126,7 @@ test('INT-006 — calendar subscription scopes approved work, moves/cancels stab
  } finally { await f.close() }
 })
 
-test('EST-007 — exact recorded acceptance freezes one coded original plan and revised budgets drive the next native draw',async()=>{
+test('EST-007 / AUTO-002 — exact recorded acceptance freezes one coded original plan and revised budgets drive the next native draw',async()=>{
  const f=await createFixture()
  try{
   const client=await f.invite('budget-client@example.com'),agent=await f.agent()
@@ -151,6 +151,11 @@ test('EST-007 — exact recorded acceptance freezes one coded original plan and 
   assert.equal(job.budgets.length,2);assert.deepEqual(job.budgets[0],original);assert.equal(job.budgets[1].contract_cents,160000);assert.deepEqual(job.budgets[1].codes.at(-1),{cost_code:'Unassigned',revenue_cents:10000,cost_cents:null,allowance_cents:0,commitment_plan_cents:0});assert.equal(job.budgets[1].billing_lines.at(-1).id,'variation:'+variation.id)
   assert.equal((await act('/variations/'+variation.id+'/approve',{},client)).status,409)
   r=await act('/claims',{description:'Next cumulative draw on revised contract',cumulative_cents:80000});assert.equal(r.value.record.reconciliation.contract_cents,160000);assert.equal(r.value.record.reconciliation.current_cents,50000);assert.equal(r.value.record.reconciliation.remaining_cents,80000);assert.equal(r.value.record.reconciliation.budget_revision,2);assert.deepEqual(job.claims[0],issued)
+  const generic=job.continuity.find(w=>w.source.id===variation.id)
+  for(let step=0;step<3;step++)assert.equal((await act('/continuity/'+generic.id+'/resume')).status,200)
+  const prepared=job.continuity.find(w=>w.id===generic.id)
+  assert.equal(prepared.schedule.calendar_day_impact,null);assert.equal(prepared.purchasing.order_id,undefined);assert.equal(prepared.purchasing.lines[0].scheduled_cents,10000);assert.equal(prepared.billing.adjustment_cents,10000);assert.equal(job.orders.length,0)
+  assert.equal(job.claims.filter(c=>c.status!=='draft').length,1,'Continuity cannot approve financial work')
   r=await api('/pricing-rates',{jurisdiction:'Reviewed test exemption',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'Reviewed cost-code budget test rate',human_reviewed:true});const rate=r.value.rate
   const codedChange={description:'Two-code revised tile and fixture package',direction:'charge',basis:'sell',as_of:'2026-10-20',rules:[],tax:{rate_id:rate.id,taxable_line_ids:['tile-change','fixture-change']},lines:[line('tile-change','09-300',3000,5000),line('fixture-change','22-400',1000,2000)]}
   r=await act('/variation-pricing/preview',codedChange);assert.equal(r.status,200);await act('/variation-pricing/apply',{...codedChange,digest:r.value.preview.digest});const coded=job.variations.at(-1)
@@ -165,6 +170,7 @@ test('EST-007 — exact recorded acceptance freezes one coded original plan and 
   r=await act('/quotes/'+q.id+'/plan-preview',input);assert.equal(r.status,200);const preview=r.value.preview
   assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:'stale'}}})).status,409)
   assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:preview.digest}}})).status,200)
+  assert.equal(job.continuity.length,1);assert.equal(job.continuity[0].source.id,q.id);assert.equal(job.continuity[0].budget_id,job.budgets[0].id)
   assert.equal(job.schedules.length,1);assert.equal(job.schedules[0].start,'2026-11-09T13:00:00.000Z');assert.equal(job.time_zone,'America/New_York');assert.equal(job.budgets[0].schedule.application.template_id,template.id);assert.equal(job.budgets[0].schedule.application.template_version,template.version);assert.deepEqual(job.budgets[0].schedule.application.task_ids,job.schedules.map(t=>t.id))
  }finally{await f.close()}
 })
