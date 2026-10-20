@@ -21,7 +21,8 @@ export function allowanceComparison(job: Job, selectionId: string, revisionId: s
  const { selection, revision, option } = selected(job, selectionId, revisionId)
  need(selection.revisions.at(-1) === revision, 'Review the latest recorded selection revision', 409, 'selection_revision')
  const original = selection.revisions[0]!, plan = job.budgets?.[0]?.allowances.find(a => a.cost_code === original.cost_code)
- if (plan) {
+ need(plan,'An allowance change needs its original accepted cost-code allowance allocation',409,'allowance_baseline')
+ {
   need(revision.cost_code === original.cost_code && revision.allowance_cents === original.allowance_cents, 'A replacement cannot rewrite the original cost code or allowance allocation', 409, 'allowance_baseline')
   const allocated = sum((job.selections ?? []).filter(s => s.revisions[0]?.cost_code === original.cost_code).map(s => s.revisions[0]!.allowance_cents))
   need(allocated === plan.amount_cents, 'Selection allowances for this cost code must reconcile to the accepted budget allocation', 409, 'allowance_baseline')
@@ -48,8 +49,3 @@ export function assertAllowanceChange(job: Job, variation: Variation) {
  need(source.options.some(o => JSON.stringify(o) === JSON.stringify(change.selection_snapshot.option)), 'The accepted option differs from the presented terms', 409, 'selection_terms')
 }
 
-/** Cost codes are office metadata; signed client prices and reviewed date impacts are public. */
-export function clientAllowanceChange(change: AllowanceChange) {
- const { cost_code, ...visible } = change
- return visible
-}

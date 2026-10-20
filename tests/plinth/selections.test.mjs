@@ -169,6 +169,12 @@ test('CLIENT-003 — exact overage and underage, immutable reviewed client chang
   const visibleChange = visible.variations.find(v => v.id === finalChangeId)
   assert.equal(visibleChange.allowance_change.selection_revision_id, finalChoice.revision_id); assert.equal(visibleChange.allowance_change.impacts.schedule_days, 5)
   for (const privateValue of ['cost_unit_cents', 'cost_total_cents', 'pricing', 'private-vendor@example.com', 'commitment_plan_cents', 'cost_code']) assert.ok(!JSON.stringify(visible).includes(privateValue), `Client projection excludes ${privateValue}`)
+  const missingPlan={...terms('Faucet',120_000),cost_code:'Unassigned'}
+  r=await act('/selections',missingPlan);const unplanned=r.value.record,unplannedRevision=unplanned.revisions[0]
+  await act(`/selections/${unplanned.id}/present`,{revision_id:unplannedRevision.id})
+  await act(`/selections/${unplanned.id}/sign`,{revision_id:unplannedRevision.id,option_id:unplannedRevision.options[0].id,statement:'Recorded client choice with no original allocation',confirm:true},client)
+  const unplannedInput={...input({selection_id:unplanned.id,revision_id:unplannedRevision.id},20_000,10_000),lines:[line('allowance','Unassigned',20_000,10_000)]}
+  const version=job.version;assert.equal((await act('/allowance-changes/preview',unplannedInput)).value.error,'allowance_baseline');assert.equal(job.version,version)
   assert.equal(f.messages.length, sent); assert.equal(job.schedules.length, 0, 'Recorded date impacts do not manufacture schedule approval')
  } finally { await f.close() }
 })
