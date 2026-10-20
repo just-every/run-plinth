@@ -1,0 +1,14 @@
+/* 12ui Billing continuation: preserve the installed shell and use only the new invoice panels. */
+.invoice-workspace { margin-bottom: 24px; }
+.invoice-table-scroll { max-width: 100%; overflow-x: auto; }
+.invoice-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.invoice-table th,.invoice-table td { padding: 12px 8px; border-bottom: 1px solid #d0e1eb; text-align: left; vertical-align: top; }
+.invoice-table thead { background: #f5f8fa; }
+.invoice-table td:nth-child(n+4) { white-space: nowrap; }
+.invoice-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.invoice-breakdown > section { border-radius: 6px; padding: 16px; background: #e5f5ec; }
+.invoice-breakdown > section + section { background: #e9f2fc; }
+.invoice-breakdown h4 { margin: 0 0 12px; }
+.invoice-breakdown p { margin: 10px 0; }
+.invoice-workspace details > summary { cursor: pointer; overflow-wrap: anywhere; }
+@media(max-width:700px) { .invoice-breakdown { grid-template-columns:1fr; } .invoice-workspace { min-width:0; } }

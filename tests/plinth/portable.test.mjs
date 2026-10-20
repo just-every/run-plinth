@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -66,6 +66,13 @@ test('BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / C
     const archiveDraw=await bill(`/subcontracts/${archiveSub.id}/draws`,{through_date:'2026-10-20',amount_cents:40000})
     await bill(`/subcontracts/${archiveSub.id}/retainage/release`,{draw_id:archiveDraw.id,milestone_id:'rough',lines:[{draw_id:archiveDraw.id,amount_cents:1000}],completion_references:[{requirement:'Supplier rough-in inspection',reference:'Signed supplier inspection SI-104'}],waiver_references:[]})
     assert.equal(billing.subcontracts[0].retainage_balance.held_cents,3000)
+    const archiveDeposit=await bill('/invoices',{kind:'deposit',description:'Archive original contract deposit',recipient_email:'retainage-client@example.com',due_on:'2026-11-01',terms:'Due within 14 days',amount_cents:10000})
+    await bill(`/invoices/${archiveDeposit.id}/issue`,{})
+    await bill(`/invoices/${archiveDeposit.id}/receipt`,{amount_cents:10000,received_on:'2026-10-21',reference:'Archive bank statement receipt BS-104',method:'bank',confirm:true})
+    const archiveInvoice=await bill('/invoices',{kind:'milestone',description:'Archive issued rough-in invoice',recipient_email:'retainage-client@example.com',due_on:'2026-11-15',terms:'Progress application approved by builder',source_application_id:billingClaim.id})
+    await bill(`/invoices/${archiveInvoice.id}/issue`,{});await bill(`/invoices/${archiveInvoice.id}/apply-deposit`,{deposit_invoice_id:archiveDeposit.id,amount_cents:4000})
+    assert.equal(billing.invoice_deposit_liability_cents,6000)
+
 
     let warrantyJob=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     let warranty=await f.json(`/api/plinth/jobs/${job.id}/warranties`,{method:'POST',cookie:f.owner,body:{expected_version:warrantyJob.version,kind:'component',name:'Archive HVAC',starts_on:'2030-01-01',ends_on:'2035-12-31',terms:'Signed original HVAC warranty',signed_terms_reference:'Archive warranty W-104'}});assert.equal(warranty.status,200);warrantyJob=warranty.value.job
@@ -90,7 +97,7 @@ test('BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / C
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
     assert.ok(serialized.includes('Signed archive retainage section RT-104')&&serialized.includes('Human reviewed signed inspection PI-104'),'BILL-003 immutable terms, withholding snapshots and release evidence survive CLI recovery')
-    const recoveredBilling=JSON.parse(rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===billing.id).row.data);assert.deepEqual(recoveredBilling.retainage,billing.retainage);assert.deepEqual(recoveredBilling.subcontracts[0].retainage,billing.subcontracts[0].retainage,'BILL-003 independent supplier terms and release sources survive CLI recovery');assert.deepEqual(recoveredBilling.claims,billing.claims,'BILL-003 issued gross/withheld/net application identity survives unchanged')
+    const recoveredBilling=JSON.parse(rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===billing.id).row.data);assert.deepEqual(recoveredBilling.retainage,billing.retainage);assert.deepEqual(recoveredBilling.subcontracts[0].retainage,billing.subcontracts[0].retainage,'BILL-003 independent supplier terms and release sources survive CLI recovery');assert.deepEqual(recoveredBilling.invoices.map(i=>i.issued),billing.invoices.map(i=>i.issued),'BILL-002 original invoice numbers, pricing/tax and commercial snapshots survive recovery');assert.deepEqual(recoveredBilling.invoices.map(i=>[i.receipts,i.deposit_applications]),billing.invoices.map(i=>[i.receipts,i.deposit_applications]),'BILL-002 recorded receipt and unearned deposit allocations survive recovery');assert.equal(rows(restored).find(item=>item.table==='pl_invoice_sequence').row.next_number,Math.max(...billing.invoices.map(i=>Number(i.number.split('-').at(-1))))+1,'BILL-002 the next invoice sequence survives private CLI recovery');assert.deepEqual(recoveredBilling.claims,billing.claims,'BILL-003 issued gross/withheld/net application identity survives unchanged')
     assert.ok(serialized.includes(taxRate.value.rate.id)&&serialized.includes('Reviewed archive fixture rate schedule'),'EST-003 reviewed jurisdiction source and dated rate revisions survive CLI recovery')
     assert.ok(serialized.includes(catalog.value.entry.id)&&serialized.includes('CS-1042'),'EST-002 catalog source identities and dated revisions survive CLI recovery')
     assert.ok(serialized.includes('Archive warranty W-104')&&serialized.includes('Archive maintenance agreement'),'CARE-003 terms, agreements and attribution survive the private CLI archive');assert.ok(!restored[0].tables.some(t=>t.name==='pl_warranty_scheduler'),'Transient scheduler cursor is excluded')
