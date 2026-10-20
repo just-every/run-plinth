@@ -1,3 +1,5 @@
+import { warrantyAction } from './warranties'
+import { dispatchWarrantyReminders } from './warranty-reminders'
 import { prepareSov, sovCsv } from './sov'
 import { applicationDocument } from './sov-document'
 import { previewVariationPricing, preparePricedVariation } from './variation-pricing'
@@ -12,7 +14,7 @@ import { constraintAction, constraintFile } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireJobManager, requireManager, requireOwner } from './auth'
 import { teamResponse } from './team'
-import { emptyJob, DomainError, need, object, type Actor, type Input, type Job } from './model'
+import { emptyJob, DomainError, need, object, recordApproval, type Actor, type Input, type Job } from './model'
 import { insertJob, jobOf, jobs, readClock, saveJob, transaction } from './store'
 import { acceptQuote, approveVariation, prepareQuote, prepareVariation } from './quotes'
 import { approveSchedule, issueOrder, prepareOrder, prepareSchedule, receiveOrder } from './operations'
@@ -42,7 +44,7 @@ async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await d
 function display(job:Job,actor:Actor) {
  if(actor.role!=='member')return {...job,selections:selectionProjection(job,false)}
  const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,sov:undefined,reconciliation}})
- const safe=projectEstimateCosts({...job,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
+ const safe=projectEstimateCosts({...job,warranties:undefined,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
  return {...safe,selections:selectionProjection(job,true),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:job.approvals.find(source=>source.id===a.id)!.snapshot}:a)}
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
@@ -88,6 +90,9 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  }
  need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireJobManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
  need(input.expected_version===previous.version,'Job changed. Reload before applying this action.',409,'stale_version')
+ if(parts.length===4&&parts[2]==='warranty-reminders'&&parts[3]==='run'){
+  requireJobManager(actor);const report=await dispatchWarrantyReminders(env,{jobId:previous.id,actor});return json({job:display((await named(env.DB,[await jobOf(env.DB,actor,previous.id)]))[0]!,actor),report,role:role(actor)})
+ }
  if(parts.length===4&&parts[2]==='variation-pricing'&&parts[3]==='preview')return json({preview:await previewVariationPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='pricing'&&parts[3]==='preview')return json({preview:await previewPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})
@@ -96,7 +101,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
+ if(category==='warranties'&&(parts.length===3||parts.length===5)){record=await warrantyAction(env.DB,job,actor,input,id,action);if(id&&['review','close'].includes(action!)){const item=job.warranties!.cases.find(c=>c.id===id)!;recordApproval(job,actor,'warranty.'+action,{id,prepared_by:item.recorded_by,revision:item.reviews.length},record)}}
+ else if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
  else if(category==='variation-pricing'&&id==='apply'&&parts.length===4)record=await preparePricedVariation(env.DB,job,actor,input)
  else if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)
  else if(category==='selections'&&parts.length===5){if(action==='order'){requireJobManager(actor,true);record=prepareOrder(job,actor,selectionOrderInput(job,id!,String(input.revision_id),input))}else record=selectionAction(job,actor,input,id,action)}
