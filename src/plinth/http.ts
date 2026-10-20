@@ -1,3 +1,4 @@
+import { previewAllowanceChange, applyAllowanceChange } from './allowance-changes'
 import { freezeOriginalBudget, reviseBudget } from './budget'
 import { warrantyAction } from './warranties'
 import { dispatchWarrantyReminders } from './warranty-reminders'
@@ -95,6 +96,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   requireJobManager(actor);const report=await dispatchWarrantyReminders(env,{jobId:previous.id,actor});return json({job:display((await named(env.DB,[await jobOf(env.DB,actor,previous.id)]))[0]!,actor),report,role:role(actor)})
  }
  if(parts.length===5&&parts[2]==='quotes'&&parts[4]==='plan-preview'){requireJobManager(actor);need(previous.status==='quoting'&&previous.quotes.at(-1)?.id===parts[3],'Preview the current draft quote',409,'revision');const candidate=structuredClone(previous);candidate.status='active';return json({preview:await previewScheduleTemplate(candidate,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))})}
+ if(parts.length===4&&parts[2]==='allowance-changes'&&parts[3]==='preview')return json({preview:await previewAllowanceChange(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='variation-pricing'&&parts[3]==='preview')return json({preview:await previewVariationPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='pricing'&&parts[3]==='preview')return json({preview:await previewPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})
@@ -104,6 +106,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
  if(category==='warranties'&&(parts.length===3||parts.length===5)){record=await warrantyAction(env.DB,job,actor,input,id,action);if(id&&['review','close'].includes(action!)){const item=job.warranties!.cases.find(c=>c.id===id)!;recordApproval(job,actor,'warranty.'+action,{id,prepared_by:item.recorded_by,revision:item.reviews.length},record)}}
+ else if(category==='allowance-changes'&&id==='apply'&&parts.length===4)record=await applyAllowanceChange(env.DB,job,actor,input)
  else if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
  else if(category==='variation-pricing'&&id==='apply'&&parts.length===4)record=await preparePricedVariation(env.DB,job,actor,input)
  else if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)

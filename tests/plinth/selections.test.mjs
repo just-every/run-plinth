@@ -67,3 +67,108 @@ test('CLIENT-002 — room allowances, exact client signatures, immutable replace
   assert.equal((await api(`/jobs/${job.id}`, { cookie: foreign })).status, 404)
  } finally { await f.close() }
 })
+
+test('CLIENT-003 — exact overage and underage, immutable reviewed client changes, incremental replacements and one-time budget, PO and next-draw effects', async () => {
+ const f = await createFixture()
+ try {
+  const client = await f.invite('allowance@example.com', 'Sam Client'), foreign = await f.invite('unrelated@example.com'), agent = await f.agent()
+  const sent = f.messages.length
+  const api = (path, body, cookie = f.owner, token) => f.json('/api/plinth' + path, { cookie, token, ...(body === undefined ? {} : { method: 'POST', body }) })
+  let r = await api('/jobs', { name: 'Tile and faucet allowances', client_email: 'allowance@example.com' }); assert.equal(r.status, 201); let job = r.value.job
+  const act = async (path, body = {}, cookie = f.owner, token) => { const result = await api(`/jobs/${job.id}${path}`, { expected_version: job.version, ...body }, cookie, token); if (result.status === 200 && result.value.job) job = (await api(`/jobs/${job.id}`)).value.job; return result }
+  const line = (id, code, sell, cost) => ({ id, description: id, cost_code: code, phase: 'Finishes', category: 'material', quantity: '1', unit: 'each', unit_cents: sell, cost_unit_cents: cost })
+  assert.equal((await act('/quotes', { lines: [line('tile', '09-300', 200_000, 150_000), line('faucet', '22-400', 100_000, 60_000)] })).status, 200)
+  r = await api('/pricing-rates', { jurisdiction: 'Synthetic allowance tax jurisdiction', kind: 'sales', percent: '10', effective_on: '2026-01-01', reference: 'Reviewed synthetic rate for public HTTP journey', human_reviewed: true }); assert.equal(r.status, 201); const rate = r.value.rate
+  const quotePricing = { basis: 'sell', as_of: '2026-10-20', rules: [], tax: { rate_id: rate.id, taxable_line_ids: ['tile'], exemption_reference: 'Reviewed faucet scope exemption' } }
+  r = await act('/pricing/preview', quotePricing); assert.equal(r.status, 200)
+  assert.equal((await act('/pricing/apply', { ...quotePricing, digest: r.value.preview.digest })).status, 200)
+  const quote = job.quotes.at(-1)
+  assert.equal((await act(`/quotes/${quote.id}/accept`, { method: 'email', evidence: 'Client acceptance recorded from dated email', schedule_choice: { kind: 'none', reason: 'Procurement dates require separate review' }, budget: { allowances: [{ cost_code: '09-300', amount_cents: 200_000 }, { cost_code: '22-400', amount_cents: 100_000 }], commitment_plan: [{ cost_code: '09-300', amount_cents: 150_000, description: 'Tile procurement plan' }, { cost_code: '22-400', amount_cents: 60_000, description: 'Faucet procurement plan' }] } })).status, 200)
+  const originalBudget = structuredClone(job.budgets[0]), accepted = structuredClone(job.quotes.find(q => q.status === 'accepted'))
+  assert.equal(originalBudget.contract_cents, 320_000)
+  if (!job.sov?.length) assert.equal((await act('/sov')).status, 200)
+  const originalSov = structuredClone(job.sov[0])
+  const draw = (tile, faucet) => ({ description: 'Reviewed installed work and allowance reconciliation', lines: job.sov.at(-1).lines.map(l => ({ line_id: l.id, completed_cents: l.source.kind === 'variation' ? l.scheduled_cents : l.source.line_id === 'tile' ? tile : faucet, stored_cents: 0, evidence: 'Superintendent reviewed installed quantities and recorded client changes' })) })
+  r = await act('/claims', draw(50_000, 20_000)); assert.equal(r.status, 200); const firstClaimId = r.value.record.id
+  assert.equal((await act(`/claims/${firstClaimId}/approve`)).status, 200); assert.equal((await act(`/claims/${firstClaimId}/issue`)).status, 200)
+  const firstClaim = structuredClone(job.claims.find(c => c.id === firstClaimId))
+  const terms = (category, price) => ({ room: 'Kitchen', category, allowance_cents: category === 'Tile' ? 200_000 : 100_000, cost_code: category === 'Tile' ? '09-300' : '22-400', decision_on: '2026-11-04', lead_days: 21, options: [{ name: category === 'Tile' ? 'Handmade tile' : 'Brushed faucet', specifications: 'Exact finish, size and quantity reviewed with client', supplier: category === 'Tile' ? 'Tile Workshop' : 'Fixture Supply', price_cents: price }] })
+  async function choose(category, price, selectionId) {
+   r = await act(selectionId ? `/selections/${selectionId}/revise` : '/selections', terms(category, price)); assert.equal(r.status, 200); const s = r.value.record, revision = s.revisions.at(-1)
+   assert.equal((await act(`/selections/${s.id}/present`, { revision_id: revision.id })).status, 200)
+   assert.equal((await act(`/selections/${s.id}/sign`, { revision_id: revision.id, option_id: revision.options[0].id, statement: `I accept the exact ${category} at ${price} cents`, confirm: true }, client)).status, 200)
+   return { selection_id: s.id, revision_id: revision.id }
+  }
+  const tile = await choose('Tile', 266_550), faucet = await choose('Faucet', 78_000)
+  const input = (choice, base, cost, rules = []) => ({ ...choice, schedule_days: choice.selection_id === tile.selection_id ? 5 : 0, impact_reference: 'Manager reviewed supplier lead time, exact tax-inclusive price and date impact', impacts_reviewed: true, basis: 'sell', as_of: '2026-10-20', lines: [line('allowance', choice.selection_id === tile.selection_id ? '09-300' : '22-400', base, cost)], rules, tax: { rate_id: rate.id, taxable_line_ids: ['allowance'] } })
+  const tileInput = input(tile, 50_000, 30_000, [{ scope: 'project', overhead_percent: '10', method: 'markup', percent: '10', discount_percent: '0' }]), faucetInput = input(faucet, 20_000, 15_000)
+  tileInput.lines=[line('allowance','09-300',40_000,20_000),{...line('freight','09-300',10_000,10_000),description:'Selection freight',unit:'shipment'}];tileInput.tax.taxable_line_ids=['allowance','freight']
+  assert.equal(job.budgets.length, 1); assert.equal(job.variations.length, 0); assert.equal(job.orders.length, 0, 'Recording choices changes no contract, budget or PO')
+  for (const auth of [{ cookie: client }, { cookie: foreign }]) assert.ok([403, 404].includes((await act('/allowance-changes/preview', tileInput, auth.cookie)).status))
+  for (const invalid of [{ ...tileInput, impacts_reviewed: false }, { ...tileInput, schedule_days: 1.5 }, { ...tileInput, impact_reference: '' }, { ...tileInput, lines: [line('allowance', '09-300', 49_999, 30_000)] }, { ...tileInput, lines: [line('allowance', '22-400', 50_000, 30_000)] }]) assert.equal((await act('/allowance-changes/preview', invalid)).status, 400)
+  r = await act('/allowance-changes/preview', tileInput, undefined, agent); assert.equal(r.status, 200); let preview = r.value.preview
+  assert.equal(preview.proposal.amount_cents, 66_550); assert.equal(preview.proposal.allowance_change.economic_delta_cents, 66_550); assert.equal(preview.proposal.pricing.tax.tax_cents, 6050);assert.equal(preview.proposal.pricing.base_lines.find(l=>l.id==='freight').total_cents,10_000)
+  assert.equal((await act('/allowance-changes/apply', { ...tileInput, digest: preview.digest }, undefined, agent)).status, 403)
+  assert.equal((await act('/allowance-changes/apply', { ...tileInput, digest: 'unreviewed' })).status, 409)
+  assert.equal((await act('/allowance-changes/apply', { ...tileInput, schedule_days: 6, digest: preview.digest })).status, 409)
+  assert.equal((await act('/allowance-changes/apply', { ...tileInput, digest: preview.digest })).status, 200); const tileChangeId = job.variations.at(-1).id
+  assert.equal(job.budgets.length, 1); assert.equal(job.orders.length, 0)
+  assert.equal((await act('/allowance-changes/apply', { ...tileInput, digest: preview.digest })).status, 409, 'Repeated preparation cannot add a second adjustment')
+  for (const auth of [{ cookie: f.owner }, { cookie: undefined, token: agent }, { cookie: foreign }]) assert.ok([403, 404].includes((await act(`/variations/${tileChangeId}/approve`, {}, auth.cookie, auth.token)).status))
+  const approvalVersion = job.version
+  const deliveries = await Promise.all([1, 2].map(() => api(`/jobs/${job.id}/variations/${tileChangeId}/approve`, { expected_version: approvalVersion }, client)))
+  assert.deepEqual(deliveries.map(d => d.status).sort(), [200, 409]); job = (await api(`/jobs/${job.id}`)).value.job
+  const signedTileChange = structuredClone(job.variations.find(v => v.id === tileChangeId))
+  assert.equal(job.budgets.length, 2); assert.equal(job.budgets.at(-1).contract_cents, 386_550)
+  const approval = job.approvals.find(a => a.kind === 'variation' && a.subject_id === tileChangeId)
+  assert.deepEqual(approval.snapshot.allowance_change, signedTileChange.allowance_change); assert.deepEqual(approval.snapshot.pricing, signedTileChange.pricing)
+  r = await act('/allowance-changes/preview', faucetInput); assert.equal(r.status, 200); preview = r.value.preview
+  assert.equal(preview.proposal.amount_cents, -22_000); assert.equal(preview.proposal.pricing_direction, 'credit')
+  assert.equal((await act('/allowance-changes/apply', { ...faucetInput, digest: preview.digest })).status, 200); const faucetChangeId = job.variations.at(-1).id
+  assert.equal((await act(`/variations/${faucetChangeId}/approve`, {}, client)).status, 200)
+  assert.equal(job.budgets.at(-1).contract_cents, 364_550)
+  assert.deepEqual(job.budgets.at(-1).codes.map(c => [c.cost_code, c.revenue_cents, c.cost_cents, c.allowance_cents, c.commitment_plan_cents]), [['09-300', 286_550, 180_000, 200_000, 150_000], ['22-400', 78_000, 45_000, 100_000, 60_000]])
+  assert.equal(job.orders.length, 0, 'Client approval cannot commit or send a vendor order')
+  assert.equal((await act(`/selections/${tile.selection_id}/order`, { revision_id: tile.revision_id }, client)).status, 403)
+  assert.equal((await act(`/selections/${tile.selection_id}/order`, { revision_id: tile.revision_id, vendor_email: 'private-vendor@example.com' })).status, 200); const order = structuredClone(job.orders.at(-1))
+  assert.equal(order.status, 'draft'); assert.equal(order.amount_cents, 266_550); assert.equal(order.lines[0].cost_code, '09-300'); assert.equal(order.delivery, undefined)
+  assert.equal((await act(`/orders/${order.id}/issue`, {}, undefined, agent)).status, 403); assert.equal((await act(`/orders/${order.id}/issue`, {}, client)).status, 403)
+  assert.equal((await act(`/orders/${order.id}/issue`)).status, 200)
+  assert.equal(f.messages.length, sent, 'No allowance, approval or PO issue sends a supplier message')
+  const recordedTile = structuredClone(job.selections.find(s => s.id === tile.selection_id).revisions[0])
+  const replacement = await choose('Tile', 277_550, tile.selection_id), replacementInput = input(replacement, 10_000, 5000)
+  r = await act('/allowance-changes/preview', replacementInput); assert.equal(r.status, 200); preview = r.value.preview
+  assert.equal(preview.proposal.amount_cents, 11_000); assert.equal(preview.proposal.allowance_change.prior_variation_id, tileChangeId)
+  assert.equal((await act('/allowance-changes/apply', { ...replacementInput, digest: preview.digest })).status, 200); const obsolete = job.variations.at(-1).id
+  const finalChoice = await choose('Tile', 255_550, tile.selection_id)
+  assert.equal((await act(`/variations/${obsolete}/approve`, {}, client)).status, 409, 'A newer selection invalidates an older pending variation')
+  const finalInput = input(finalChoice, 10_000, 5000)
+  r = await act('/allowance-changes/preview', finalInput); assert.equal(r.status, 200); preview = r.value.preview
+  assert.equal(preview.proposal.allowance_change.economic_delta_cents, 55_550); assert.equal(preview.proposal.amount_cents, -11_000, 'Replacement applies only the difference from approved economics')
+  assert.equal((await act('/allowance-changes/apply', { ...finalInput, digest: preview.digest })).status, 200); const finalChangeId = job.variations.at(-1).id
+  assert.equal((await act(`/variations/${finalChangeId}/approve`, {}, client)).status, 200)
+  assert.equal((await act(`/variations/${finalChangeId}/approve`, {}, client)).status, 409)
+  assert.equal(job.budgets.length, 4); assert.equal(job.budgets.at(-1).contract_cents, 353_550)
+  assert.deepEqual(job.budgets[0], originalBudget); assert.deepEqual(job.quotes.find(q => q.status === 'accepted'), accepted)
+  assert.deepEqual(job.variations.find(v => v.id === tileChangeId), signedTileChange)
+  assert.deepEqual(job.selections.find(s => s.id === tile.selection_id).revisions[0], recordedTile)
+  assert.equal(job.orders.length, 1); assert.equal(job.orders[0].amount_cents, 266_550, 'A replacement cannot rewrite the earlier vendor commitment')
+  const assignments = Object.fromEntries(job.variations.filter(v => v.status === 'approved').map(v => ['variation:' + v.id, v.allowance_change.cost_code]))
+  assert.equal((await act('/sov', { code_assignments: assignments })).status, 200)
+  assert.deepEqual(job.sov[0], originalSov)
+  r = await act('/claims', draw(100_000, 50_000)); assert.equal(r.status, 200); const next = r.value.record
+  assert.equal(next.reconciliation.contract_cents, 353_550); assert.equal(next.reconciliation.variation_cents, 33_550); assert.equal(next.reconciliation.previous_cents, 70_000)
+  assert.equal(next.reconciliation.current_cents, 113_550); assert.equal(next.reconciliation.cumulative_cents, 183_550)
+  assert.equal(next.sov.sov_revision.sources.variations.length, 3)
+  assert.deepEqual(next.sov.sov_revision.sources.variations.find(v => v.id === tileChangeId).pricing, signedTileChange.pricing)
+  assert.equal((await act(`/claims/${next.id}/approve`)).status, 200); assert.equal((await act(`/claims/${next.id}/issue`)).status, 200)
+  assert.deepEqual(job.claims.find(c => c.id === firstClaimId), firstClaim, 'Next draw preserves the earlier issued billing record')
+  const exported = (await api(`/jobs/${job.id}/claims/${next.id}/application.json`)).value.application
+  assert.equal(exported.scheduled_cents, 353_550); assert.equal(exported.previous_cents + exported.current_cents, exported.total_cents)
+  const visible = (await api(`/jobs/${job.id}`, undefined, client)).value.job
+  const visibleChange = visible.variations.find(v => v.id === finalChangeId)
+  assert.equal(visibleChange.allowance_change.selection_revision_id, finalChoice.revision_id); assert.equal(visibleChange.allowance_change.impacts.schedule_days, 5)
+  for (const privateValue of ['cost_unit_cents', 'cost_total_cents', 'pricing', 'private-vendor@example.com', 'commitment_plan_cents', 'cost_code']) assert.ok(!JSON.stringify(visible).includes(privateValue), `Client projection excludes ${privateValue}`)
+  assert.equal(f.messages.length, sent); assert.equal(job.schedules.length, 0, 'Recorded date impacts do not manufacture schedule approval')
+ } finally { await f.close() }
+})
