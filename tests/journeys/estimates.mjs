@@ -24,7 +24,7 @@ try {
  let { job } = await post('/jobs', { name: 'Measured multi-trade kitchen remodel ' + Date.now(), client_email: email, address: '2480 Maple Street, Burlington, VT 05401' })
  await page.goto(`${base}/app?job=${job.id}&tab=Quote`)
  await page.getByText('Build a measured estimate', { exact: true }).click()
- const input = (label, index) => page.getByLabel(`${label} ${index}`, { exact: true })
+ const input = (label, index) => page.getByRole('region',{name:`Estimate line ${index}`,exact:true}).getByLabel(`${label} ${index}`, { exact: true })
  const specs = [
   { description: 'Framing crew', code: '06-100', phase: 'Structure', category: 'labor', quantity: '2.5', unit: 'hour', rateUnit: 'hour', numerator: '1', denominator: '1', cost: '20.01', sell: '30.01' },
   { description: 'Trim measured in inches', code: '06-200', phase: 'Finishes', category: 'material', quantity: '18.125', unit: 'inch', rateUnit: 'foot', numerator: '1', denominator: '12', cost: '8.01', sell: '12.01' },
