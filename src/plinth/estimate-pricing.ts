@@ -1,6 +1,6 @@
 import { requireJobManager, requireManager } from './auth'
 import { date } from './catalog-input'
-import { need, object, usdOnly, recordApproval, stamp, text, type Actor, type Input, type Job, type Quote } from './model'
+import { need, object, usdOnly, recordApproval, stamp, text, type Actor, type Input, type Line, type Job, type Quote } from './model'
 import { calculatePricing, pricingPercent, pricingRules, type PricingRate, type PricingRateRevision, type PricingSnapshot } from './pricing-model'
 import { prepareQuote } from './quotes'
 import { readClock, transaction } from './store'
@@ -32,17 +32,10 @@ export async function pricingResponse(request: Request, db: D1Database, actor: A
  await transaction(db, actor, null, writes, clock)
  return Response.json({ rate }, { status: previous ? 200 : 201, headers })
 }
-async function digest(value: unknown) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2, '0')).join('') }
-export async function previewPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
- requireJobManager(actor, true); usdOnly(job)
- const current = job.quotes.at(-1); need(current, 'Prepare an estimate before pricing', 409, 'quote_required')
- need(input.quote_id === undefined || input.quote_id === current.id, 'Price the current quote revision', 409, 'revision')
- need(input.basis === undefined || input.basis === 'sell' || input.basis === 'cost', 'Choose sell or cost pricing basis')
+/** One reviewed calculator for estimates and the priced change sources of BILL-001. */
+export async function reviewedPricing(db: D1Database, input: Input, base_lines: Line[], source: {id:string;revision:number}) {
  const basis = input.basis === 'cost' ? 'cost' as const : 'sell' as const
- const existing = (current as Quote & { pricing?: PricingSnapshot }).pricing
- const base_lines = structuredClone(existing?.base_lines ?? current.lines)
- // Legacy imported lines had no ids. Their stable position supplies preview custody.
- base_lines.forEach((line, index) => { line.id ??= `legacy-${index + 1}` })
+ need(input.basis === undefined || input.basis === 'cost' || input.basis === 'sell', 'Choose sell or cost pricing basis')
  const included = base_lines.filter(line => line.included !== false), rules = pricingRules(input.rules ?? [], included), tax = object(input.tax)
  need(tax.provider === undefined || tax.provider === 'manual', 'Tax provider calculation is unavailable; no provider-verified tax can be claimed', 503, 'tax_provider_unavailable')
  const as_of = date(input.as_of), rate = await pricingRate(db, text(tax.rate_id, 'Reviewed tax rate id', 100))
@@ -53,7 +46,20 @@ export async function previewPricing(db: D1Database, job: Job, actor: Actor, inp
  need(taxable_line_ids.length === tax.taxable_line_ids.length, 'Taxable line ids must be unique')
  const exemption_reference = text(tax.exemption_reference, 'Exemption evidence reference', 2000, taxable_line_ids.length === included.length)
  const calculated = calculatePricing(base_lines, basis, rules, revision.percent, taxable_line_ids)
- const pricing: PricingSnapshot = { basis, base_quote_id: current.id, base_quote_revision: current.revision, base_lines, rules, stages: calculated.stages, tax: { rate_id: rate.id, rate_version: revision.version, rate_record_version: rate.version, rate: revision, as_of, provider: 'manual', verification: 'human reviewed', taxable_line_ids, exemption_reference, taxable_cents: calculated.taxable_cents, exempt_cents: calculated.exempt_cents, tax_cents: calculated.tax_cents }, subtotal_cents: calculated.subtotal_cents, total_cents: calculated.total_cents }
+ const pricing: PricingSnapshot = { basis, base_quote_id: source.id, base_quote_revision: source.revision, base_lines, rules, stages: calculated.stages, tax: { rate_id: rate.id, rate_version: revision.version, rate_record_version: rate.version, rate: revision, as_of, provider: 'manual', verification: 'human reviewed', taxable_line_ids, exemption_reference, taxable_cents: calculated.taxable_cents, exempt_cents: calculated.exempt_cents, tax_cents: calculated.tax_cents }, subtotal_cents: calculated.subtotal_cents, total_cents: calculated.total_cents }
+ return { calculated, pricing }
+}
+
+async function digest(value: unknown) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2, '0')).join('') }
+export async function previewPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
+ requireJobManager(actor, true); usdOnly(job)
+ const current = job.quotes.at(-1); need(current, 'Prepare an estimate before pricing', 409, 'quote_required')
+ need(input.quote_id === undefined || input.quote_id === current.id, 'Price the current quote revision', 409, 'revision')
+ const existing = (current as Quote & { pricing?: PricingSnapshot }).pricing
+ const base_lines = structuredClone(existing?.base_lines ?? current.lines)
+ // Legacy imported lines had no ids. Their stable position supplies preview custody.
+ base_lines.forEach((line, index) => { line.id ??= `legacy-${index + 1}` })
+ const { calculated, pricing } = await reviewedPricing(db, input, base_lines, current)
  const proposal = { lines: calculated.lines, total_cents: calculated.total_cents, cost_total_cents: current.cost_total_cents, alternate_selections: current.alternate_selections, inclusions: current.inclusions, exclusions: current.exclusions, notes: current.notes, ...(current.cost_catalog ? { cost_catalog: current.cost_catalog } : {}), pricing }
  return { proposal, previous_total_cents: current.total_cents, total_delta_cents: calculated.total_cents - current.total_cents, sold: job.status !== 'quoting', digest: await digest([job.id, job.version, proposal]) }
 }

@@ -33,7 +33,7 @@ export async function saveValues(db:D1Database,actor:Actor,scope:ReportRecordSco
 export async function reportNativeGate(db:D1Database,job:Job,actor:Actor,category:string,id?:string,action?:string) {
  if(actor.role==='agent'||actor.role==='member'&&!(category==='variations'&&action==='approve'))return
  const jobStages=category==='quotes'&&action==='accept'?['active','construction']:category==='schedule'&&id==='publish'||category==='schedule-template'&&id==='apply'||category==='schedules'&&(action==='approve'||!id)?['construction']:[]
- const financialStage=category==='quotes'&&action==='accept'?'accepted':category==='orders'&&action==='issue'?'issued':category==='claims'&&action==='approve'?'approved':category==='claims'&&action==='export'?'exported':category==='variations'&&action==='approve'?'approved':category==='subcontracts'&&action==='release'?'released':null
+ const financialStage=category==='quotes'&&action==='accept'?'accepted':category==='orders'&&action==='issue'?'issued':category==='claims'&&action==='approve'?'approved':category==='claims'&&(action==='export'||action==='issue')?'exported':category==='variations'&&action==='approve'?'approved':category==='subcontracts'&&action==='release'?'released':null
  if(!jobStages.length&&!financialStage)return
  const config=await fieldConfig(db)
  const check=(scope:ReportRecordScope,stage:string,values:Parameters<typeof requireFieldsAtStage>[3])=>{try{requireFieldsAtStage(config.fields,scope,stage,values)}catch(error){if((actor.role==='member'||actor.role==='project_manager'&&scope==='financial')&&error instanceof DomainError&&error.code==='required_fields')throw new DomainError('required_fields','The office must complete required information before this decision.',409);throw error}}

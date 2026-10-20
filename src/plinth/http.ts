@@ -1,3 +1,6 @@
+import { prepareSov, sovCsv } from './sov'
+import { applicationDocument } from './sov-document'
+import { previewVariationPricing, preparePricedVariation } from './variation-pricing'
 import { reportsResponse } from './reports'
 import { reportNativeGate } from './report-store'
 import { selectionAction, selectionOrderInput, selectionProjection } from './selections'
@@ -32,13 +35,14 @@ import { rulesResponse, today } from './compliance'
 import { lienAction, packetResponse, releaseFile, templatesResponse } from './lien-waivers'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
+const findSovClaim=(job:Job,id:string)=>job.claims.find(c=>c.id===id)?.sov
 const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 /** Each job with its client's name from People & access, once they are invited. */
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor) {
  if(actor.role!=='member')return {...job,selections:selectionProjection(job,false)}
- const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,reconciliation}})
- const safe=projectEstimateCosts({...job,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
+ const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,sov:undefined,reconciliation}})
+ const safe=projectEstimateCosts({...job,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
  return {...safe,selections:selectionProjection(job,true),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:job.approvals.find(source=>source.id===a.id)!.snapshot}:a)}
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
@@ -65,6 +69,11 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   if(parts[4]==='cost-codes.json')return json(report)
   return new Response(costCodeCsv(report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename=estimate-${report.revision}-cost-codes.csv`}})
  }
+ if(parts.length===5&&parts[2]==='claims'&&['application.json','application.csv','application.html'].includes(parts[4])&&method==='GET'){
+  requireJobManager(actor);const claim=previous.claims.find(c=>c.id===parts[3]);need(claim?.status==='exported'&&claim.export?.sov,'Issue this SOV application before downloading it',409,'application_unissued');const app=claim.export.sov
+  if(parts[4]==='application.json')return json({application:app,issued_by:claim.exported_by,approved_by:claim.approved_by,lien_waivers:claim.export.lien_waivers})
+  const html=parts[4]==='application.html';return new Response(html?applicationDocument(app,claim):sovCsv(app),{headers:{...headers,'content-type':html?'text/html; charset=utf-8':'text/csv; charset=utf-8',...(html?{'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"}:{'content-disposition':'attachment; filename=plinth-sov-application.csv'})}})
+ }
  if(parts.length===5&&parts[2]==='claims'&&parts[4]==='packet'&&method==='GET')return packetResponse(env.DB,previous,actor,parts[3]!)
  if(parts[2]==='orders'&&(parts.length===4||parts.length===5&&parts[4]==='document')&&method==='GET')return orderResponse(previous,actor,parts[3]!,parts.length===5)
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
@@ -79,6 +88,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  }
  need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireJobManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
  need(input.expected_version===previous.version,'Job changed. Reload before applying this action.',409,'stale_version')
+ if(parts.length===4&&parts[2]==='variation-pricing'&&parts[3]==='preview')return json({preview:await previewVariationPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='pricing'&&parts[3]==='preview')return json({preview:await previewPricing(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='estimate-template'&&parts[3]==='preview')return json({preview:await catalogPreview(env.DB,previous,actor,input)})
  if(parts.length===4&&parts[2]==='schedule-template'&&parts[3]==='preview')return json({preview:await previewScheduleTemplate(previous,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB))})
@@ -86,7 +96,9 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)
+ if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
+ else if(category==='variation-pricing'&&id==='apply'&&parts.length===4)record=await preparePricedVariation(env.DB,job,actor,input)
+ else if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)
  else if(category==='selections'&&parts.length===5){if(action==='order'){requireJobManager(actor,true);record=prepareOrder(job,actor,selectionOrderInput(job,id!,String(input.revision_id),input))}else record=selectionAction(job,actor,input,id,action)}
  else if(category==='pricing'&&id==='apply'&&parts.length===4)record=await applyPricing(env.DB,job,actor,input)
  else if(category==='estimate-template'&&id==='apply'&&parts.length===4)record=await applyCatalog(env.DB,job,actor,input)
@@ -96,9 +108,10 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  else if(category==='subcontracts'&&parts.length>=5&&['lien','draws'].includes(action!)){const result=await lienAction(env.DB,job,actor,parts.slice(3),input);record=result.record;writes=result.writes}
  else if(parts.length===3&&['schedule-baseline','schedule-actuals'].includes(category))record=await scheduleBaselineAction(job,actor,input,category==='schedule-baseline'?'baseline':'actuals',await jobs(env.DB))
  else if(parts.length===3){switch(category){case 'customer':record=await linkCustomer(env.DB,job,actor,input);break;case 'subcontracts':{const awarded=await awardSubcontract(env.DB,job,actor,input);record=awarded.row;writes=awarded.writes;break}case 'quotes':record=prepareQuote(job,actor,input);break;case 'schedules':record=prepareSchedule(job,actor,input,await jobs(env.DB));break;case 'diary':{const prepared=await prepareDiary(env.DB,job,actor,input);record=prepared.row;writes=prepared.writes;break}case 'variations':record=prepareVariation(job,actor,input);break;case 'orders':record=prepareOrder(job,actor,input);break;case 'claims':record=prepareClaim(job,actor,input);break;default:throw new DomainError('not_found','Unknown action',404)}}
- else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'orders/acknowledge':case 'orders/promise':case 'orders/ship':case 'orders/return':case 'orders/cancel':case 'orders/amend':case 'orders/approve-amendment':record=orderAction(job,actor,id!,action!,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
+ else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':record=acceptQuote(job,actor,id,input);break;case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'orders/acknowledge':case 'orders/promise':case 'orders/ship':case 'orders/return':case 'orders/cancel':case 'orders/amend':case 'orders/approve-amendment':record=orderAction(job,actor,id!,action!,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/issue':need(findSovClaim(job,id),'Only SOV applications use issue',409,'sov_required');record=exportClaim(job,actor,id,await today(env.DB));break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
  await saveJob(env.DB,actor,previous,job,writes,clock)
  if(actor.role==='member'&&category==='selections')record=selectionProjection(job,true).find(s=>s.id===id)
+ if(actor.role==='member')record=projectEstimateCosts(record)
  return json({job:display((await named(env.DB,[job]))[0]!,actor),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
 }
 /** Each direct API request authenticates independently of document-route guards. */
