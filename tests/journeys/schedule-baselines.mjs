@@ -17,7 +17,7 @@ try {
  const active = async(name) => {
   let {job} = await post('/jobs',{name,client_email:email,address:'2480 Maple Street, Burlington, VT 05401'})
   let result = await post(`/jobs/${job.id}/quotes`,{expected_version:job.version,lines:[{description:'Fixed-price whole-home remodel',quantity:1,unit_cents:48_000_000}]});job=result.job
-  result = await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',evidence:'Signed remodel agreement returned by the household'});return result.job
+  result = await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Signed remodel agreement returned by the household'});return result.job
  }
  const stamp=Date.now(), source=await active('SCH-002 template source '+stamp)
  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]}

@@ -56,7 +56,7 @@ test('EST-001 — exact coded multi-trade costs/sell, selected alternates, immut
   assert.equal(first.lines.find(row => row.id === 'oak').included, true)
   const totals = quote => quote.lines.filter(row => row.included).reduce((total, row) => ({ sell: total.sell + rounded(row, row.unit_cents), cost: total.cost + rounded(row, row.cost_unit_cents) }), { sell: 0, cost: 0 })
   assert.equal(first.total_cents, totals(first).sell); assert.equal(first.cost_total_cents, totals(first).cost)
-  assert.equal((await post(`/quotes/${first.id}/accept`, { method: 'signed', evidence: 'Agent cannot record this decision' }, { token: agent })).status, 403)
+  assert.equal((await post(`/quotes/${first.id}/accept`, { method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Agent cannot record this decision' }, { token: agent })).status, 403)
   assert.equal((await f.json(root, { cookie: client })).value.job.quotes.length, 0, 'Draft estimate stays private')
 
   const revisedBody = { ...body, lines: first.lines.map(row => row.id === 'labor' ? { ...row, quantity: '3.75', phase: 'Framing revised' } : row), alternate_selections: { Finish: 'Tile' }, inclusions: [...body.inclusions, 'Additional framing bay'], exclusions: ['Existing electrical repairs'] }
@@ -71,7 +71,7 @@ test('EST-001 — exact coded multi-trade costs/sell, selected alternates, immut
   assert.equal(second.total_cents, totals(second).sell); assert.equal(second.cost_total_cents, totals(second).cost)
   assert.deepEqual(second.inclusions, revisedBody.inclusions); assert.deepEqual(second.exclusions, revisedBody.exclusions)
   assert.equal((await post('/quotes', { ...body, expected_version: job.version - 1 })).status, 409)
-  assert.equal((await post(`/quotes/${first.id}/accept`, { method: 'email', evidence: 'Old revision' })).status, 409)
+  assert.equal((await post(`/quotes/${first.id}/accept`, { method: 'email',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Old revision' })).status, 409)
 
   for (const quote of [first, second]) {
    const path = `${root}/quotes/${quote.id}/cost-codes`
@@ -103,7 +103,7 @@ test('EST-001 — exact coded multi-trade costs/sell, selected alternates, immut
    assert.equal(Number(records.find(row => row.row_type === 'estimate_total').total_cents), report.total_cents)
    assert.equal(Number(records.find(row => row.row_type === 'estimate_total').cost_total_cents), report.cost_total_cents)
   }
-  response = await post(`/quotes/${second.id}/accept`, { method: 'signed', evidence: 'Client signed the measured scope and Tile selection' }); assert.equal(response.status, 200); job = response.value.job
+  response = await post(`/quotes/${second.id}/accept`, { method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Client signed the measured scope and Tile selection' }); assert.equal(response.status, 200); job = response.value.job
   const snapshot = job.approvals.find(row => row.kind === 'quote').snapshot
   assert.deepEqual(snapshot.lines, second.lines); assert.deepEqual(snapshot.inclusions, second.inclusions); assert.deepEqual(snapshot.exclusions, second.exclusions); assert.deepEqual(snapshot.alternate_selections, second.alternate_selections)
   assert.equal(snapshot.cost_total_cents, second.cost_total_cents)
@@ -161,7 +161,7 @@ test('EST-002 — dated vendor catalogs, waste/productivity assemblies and dimen
   let second=await preview(b,secondInput);r=await apply(b,second,secondInput);assert.equal(r.status,200);b=r.value.job
   assert.equal(b.quotes[0].lines[0].cost_total_cents,34444,'250.5 × 1.1 × 125 rounds once half-up')
   assert.equal(b.quotes[0].lines[1].cost_total_cents,37575,'Labor divides by exact production without rounding hours')
-  const soldQuote=structuredClone(a.quotes[0]);r=await post(`/api/plinth/jobs/${a.id}/quotes/${soldQuote.id}/accept`,{expected_version:a.version,method:'email',evidence:'Chen accepted exact wall scope and price'});assert.equal(r.status,200);a=r.value.job
+  const soldQuote=structuredClone(a.quotes[0]);r=await post(`/api/plinth/jobs/${a.id}/quotes/${soldQuote.id}/accept`,{expected_version:a.version,method:'email',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Chen accepted exact wall scope and price'});assert.equal(r.status,200);a=r.value.job
   const accepted=structuredClone(a.quotes[0]),acceptedApproval=structuredClone(a.approvals.find(row=>row.kind==='quote'))
   const stale=await preview(b,secondInput)
   r=await post('/api/plinth/estimate-catalog/'+material.id,{expected_version:1,name:material.name,reason:'Supplier price revision CS-1051',value:{...material.revisions[0].value,effective_on:'2026-10-15',cost_cents:150,sell_cents:240}});assert.equal(r.status,200);assert.equal(r.value.entry.revisions.length,2)

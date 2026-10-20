@@ -52,7 +52,7 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       assert.equal(Buffer.from(originals.value.originals[0].original.base64, 'base64').toString('utf8'), csv)
     })
     await t.test('undo preserves a quote explicitly accepted in the native job and removes unchanged imported peers', async () => {
-      const accepted = await f.json(`/api/plinth/jobs/${edited.id}/quotes/${edited.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: edited.version, method: 'email', evidence: 'Owner reviewed the original client acceptance email before adoption.' } })
+      const accepted = await f.json(`/api/plinth/jobs/${edited.id}/quotes/${edited.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: edited.version, method: 'email',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Owner reviewed the original client acceptance email before adoption.' } })
       assert.equal(accepted.status, 200)
       edited = accepted.value.job
       const undo = await call(`/${journal.id}/undo`)

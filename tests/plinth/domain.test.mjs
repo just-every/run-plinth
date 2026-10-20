@@ -125,3 +125,40 @@ test('INT-006 — calendar subscription scopes approved work, moves/cancels stab
   assert.equal((await f.request(path)).status,404)
  } finally { await f.close() }
 })
+
+test('EST-007 — exact recorded acceptance freezes one coded original plan and revised budgets drive the next native draw',async()=>{
+ const f=await createFixture()
+ try{
+  const client=await f.invite('budget-client@example.com'),agent=await f.agent()
+  const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{...(body===undefined?{}:{method:'POST',body}),cookie,token})
+  let r=await api('/jobs',{name:'Maple Street kitchen and porch',client_email:'budget-client@example.com'});let job=r.value.job
+  const act=async(path,body={},cookie=f.owner,token)=>{const r=await api('/jobs/'+job.id+path,{expected_version:job.version,...body},cookie,token);if(r.value.job&&cookie===f.owner&&!token)job=r.value.job;return r}
+  const line=(id,code,cost,sell)=>({id,cost_code:code,description:id,quantity:'1',unit:'each',phase:'Remodel',category:'material',cost_unit_cents:cost,unit_cents:sell})
+  await act('/quotes',{lines:[line('Tile supply','09-300',60000,100000),line('Plumbing fixtures','22-400',25000,50000)]})
+  const quote=job.quotes[0],accept={method:'email',evidence:'Client email agreeing exact dated scope and price',schedule_choice:{kind:'none',reason:'Schedule dates reviewed after permit approval'},budget:{allowances:[{cost_code:'09-300',amount_cents:50000}],commitment_plan:[{cost_code:'09-300',amount_cents:60000,description:'Tile procurement after client choice'}]}}
+  assert.equal((await act('/quotes/'+quote.id+'/accept',{...accept,schedule_choice:undefined})).status,400)
+  assert.equal((await act('/quotes/'+quote.id+'/accept',accept,undefined,agent)).status,403)
+  assert.equal((await act('/quotes/'+quote.id+'/accept',accept)).status,200)
+  const original=structuredClone(job.budgets[0]);assert.equal(original.source.id,quote.id);assert.equal(original.source.revision,quote.revision);assert.equal(original.contract_cents,150000);assert.equal(original.schedule.kind,'none');assert.equal(original.schedule.reason,accept.schedule_choice.reason)
+  assert.deepEqual(original.codes,[{cost_code:'09-300',revenue_cents:100000,cost_cents:60000,allowance_cents:50000,commitment_plan_cents:60000},{cost_code:'22-400',revenue_cents:50000,cost_cents:25000,allowance_cents:0,commitment_plan_cents:0}]);assert.equal(original.billing_lines.reduce((s,l)=>s+l.scheduled_cents,0),150000)
+  assert.equal((await act('/quotes/'+quote.id+'/accept',accept)).status,409)
+  let all=(await api('/jobs')).value.jobs;assert.equal(all.filter(j=>j.id===job.id).length,1);assert.equal(job.budgets.length,1)
+  r=await act('/claims',{description:'Original first draw',cumulative_cents:30000});const first=r.value.record
+  assert.equal(first.reconciliation.budget_revision,1);await act('/claims/'+first.id+'/approve');await act('/claims/'+first.id+'/export');const issued=structuredClone(job.claims[0])
+  r=await act('/variations',{description:'Client approved revised porch scope',amount_cents:10000});const variation=r.value.record
+  assert.equal(job.budgets.length,1,'An unapproved change cannot affect economics')
+  assert.equal((await act('/variations/'+variation.id+'/approve',{},client)).status,200);job=(await api('/jobs/'+job.id)).value.job
+  assert.equal(job.budgets.length,2);assert.deepEqual(job.budgets[0],original);assert.equal(job.budgets[1].contract_cents,160000);assert.equal(job.budgets[1].billing_lines.at(-1).id,'variation:'+variation.id)
+  assert.equal((await act('/variations/'+variation.id+'/approve',{},client)).status,409)
+  r=await act('/claims',{description:'Next cumulative draw on revised contract',cumulative_cents:80000});assert.equal(r.value.record.reconciliation.contract_cents,160000);assert.equal(r.value.record.reconciliation.current_cents,50000);assert.equal(r.value.record.reconciliation.remaining_cents,80000);assert.equal(r.value.record.reconciliation.budget_revision,2);assert.deepEqual(job.claims[0],issued)
+  for(const path of ['/jobs/'+job.id,'/jobs']){const shown=(await api(path,undefined,client)).value;assert.ok(!JSON.stringify(shown).includes('budgets'));assert.ok(!JSON.stringify(shown).includes('cost_cents'))}
+  // A second acceptance uses an exact, reviewed reusable template in the same atomic job write.
+  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]}
+  r=await api('/schedule-templates',{name:'Kitchen fit-out',calendar,tasks:[{id:'fitout',trade:'Carpentry',description:'Kitchen cabinetry installation',start:'2026-11-02T08:00:00Z',duration_minutes:60}]});assert.equal(r.status,201);const template=r.value.template
+  r=await api('/jobs',{name:'Cedar Lane cabinetry',client_email:'budget-client@example.com'});job=r.value.job;await act('/quotes',{lines:[line('Cabinetry','06-400',100000,150000)]});const q=job.quotes[0],input={template_id:template.id,start:'2026-11-09T08:00:00Z'}
+  r=await act('/quotes/'+q.id+'/plan-preview',input);assert.equal(r.status,200);const preview=r.value.preview
+  assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:'stale'}}})).status,409)
+  assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:preview.digest}}})).status,200)
+  assert.equal(job.schedules.length,1);assert.equal(job.budgets[0].schedule.application.template_id,template.id);assert.equal(job.budgets[0].schedule.application.template_version,template.version);assert.deepEqual(job.budgets[0].schedule.application.task_ids,job.schedules.map(t=>t.id))
+ }finally{await f.close()}
+})

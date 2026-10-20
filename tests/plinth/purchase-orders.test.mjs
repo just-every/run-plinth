@@ -11,7 +11,7 @@ test('SUB-005 — itemized cost-coded vendor PO from the budget: acknowledgment,
   const act = async (path, body = {}, credentials) => { const result = await api(`/jobs/${job.id}${path}`, { expected_version: job.version, ...body }, credentials); if (result.status === 200) job = result.value.job; return result }
   const quoteLine = (id, cost_code, cost, sell) => ({ id, description: `${cost_code} scope`, cost_code, phase: 'Finishes', category: 'material', quantity: 1, unit: 'each', rate_unit: 'each', cost_unit_cents: cost, unit_cents: sell })
   r = await act('/quotes', { lines: [quoteLine('cab', '12-350', 600_000, 900_000), quoteLine('elec', '26-100', 200_000, 300_000)] }); assert.equal(r.status, 200, JSON.stringify(r.value))
-  r = await act(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed', evidence: 'Signed proposal' }); assert.equal(r.status, 200)
+  r = await act(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Signed proposal' }); assert.equal(r.status, 200)
 
   // An itemized, cost-coded PO prepared against the accepted budget.
   const lines = [{ id: 'base', description: 'Base cabinets', cost_code: '12-350', quantity: '10', unit: 'each', unit_cents: 30_000 }, { id: 'pulls', description: 'Cabinet pulls', cost_code: '12-350', quantity: '40', unit: 'each', unit_cents: 1_250 }]

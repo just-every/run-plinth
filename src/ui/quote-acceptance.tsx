@@ -1,0 +1,27 @@
+import { useEffect, useState } from 'react'
+import type { Job, Quote } from '../plinth/model'
+import type { ScheduleTemplate } from '../plinth/schedule-baseline-model'
+import type { JobProps } from './job'
+import { api, cents, Field, Form, money } from './shared'
+import { fromLocalInput, jobZone } from './schedule-views'
+export function QuoteAcceptance({job,quote,mutate}:{job:Job;quote:Quote;mutate:JobProps['mutate']}) {
+ const [templates,setTemplates]=useState<ScheduleTemplate[]>([]),[choice,setChoice]=useState(''),[preview,setPreview]=useState<any>(),[error,setError]=useState('')
+ useEffect(()=>{api('/schedule-templates').then(r=>setTemplates(r.templates.filter((t:ScheduleTemplate)=>!t.archived))).catch(e=>setError(e.message))},[])
+ const codes=[...new Set(quote.lines.filter(l=>l.included!==false).map(l=>l.cost_code??'Unassigned'))]
+ const build=(f:FormData)=>({template_id:choice,start:fromLocalInput(String(f.get('start')),jobZone(job))})
+ return <section className="inline-form"><p>Record the client’s acceptance and how you received it. This records external evidence; it does not collect an electronic signature. Freeze the original budget and billing plan with an explicit schedule choice. Missing costs remain unknown and uncoded lines stay Unassigned.</p>{error&&<p role="alert">{error}</p>}
+ <label>Acceptance schedule choice<select value={choice} onChange={e=>{setChoice(e.target.value);setPreview(undefined)}} required><option value="">Choose explicitly</option><option value="none">No tasks at acceptance</option>{templates.map(t=><option value={t.id} key={t.id}>{t.name} · v{t.version}</option>)}</select></label>
+ {choice&&choice!=='none'&&<Form submit="Preview acceptance schedule" action={async f=>{const input=build(f);const r=await mutate('/quotes/'+quote.id+'/plan-preview',input);setPreview({input,digest:r.preview.digest,tasks:r.preview.tasks})}}><Field label={`Acceptance template start (${jobZone(job)})`} name="start" type="datetime-local"/></Form>}
+ {preview&&<section><h4>Reviewed acceptance schedule</h4>{preview.tasks.map((t:any)=><p key={t.id}>{t.description} · {t.start} – {t.end}</p>)}</section>}
+ <Form submit="Record client acceptance" action={async f=>{if(!choice)throw new Error('Choose the acceptance schedule.');if(choice!=='none'&&!preview)throw new Error('Preview the chosen schedule first.');return mutate('/quotes/'+quote.id+'/accept',{method:f.get('method'),evidence:f.get('evidence'),schedule_choice:choice==='none'?{kind:'none',reason:f.get('no_tasks_reason')}:{kind:'template',input:{...preview.input,digest:preview.digest}},budget:{allowances:codes.map(code=>({cost_code:code,amount_cents:cents(f.get('allowance:'+code))})),commitment_plan:codes.map(code=>({cost_code:code,amount_cents:cents(f.get('commitment:'+code)),description:f.get('plan:'+code)}))}})}}>
+ <label>Acceptance method<select name="method"><option value="email">Email</option><option value="signed">Signed agreement recorded externally</option><option value="phone">Phone</option><option value="in person">In person</option></select></label><Field label="Client acceptance reference" name="evidence"/>
+ {choice==='none'&&<Field label="No-tasks reason" name="no_tasks_reason"/>}
+ {codes.map(code=><section key={code}><h4>{code}</h4><Field label={`Original allowance: ${code}`} name={'allowance:'+code} defaultValue="0.00" inputMode="decimal"/><Field label={`Planned commitments: ${code}`} name={'commitment:'+code} defaultValue="0.00" inputMode="decimal"/><Field label={`Commitment plan reference: ${code}`} name={'plan:'+code} defaultValue="No vendor commitment planned at acceptance"/></section>)}
+ </Form></section>
+}
+export function BudgetComparison({job}:{job:Job}) {
+ const original=job.budgets?.[0],current=job.budgets?.at(-1);if(!original||!current)return null
+ return <section className="card"><h2>Original and revised budget</h2><p>Revision {current.revision} · original contract {money(original.contract_cents,job.currency)} · revised contract {money(current.contract_cents,job.currency)}. Planned commitments are a plan, not issued orders.</p><p>{original.schedule.kind==='none'?`No tasks at acceptance: ${original.schedule.reason}`:`Acceptance template: ${original.schedule.application.template_name} · version ${original.schedule.application.template_version}`}</p>
+ {current.codes.map(code=>{const old=original.codes.find(c=>c.cost_code===code.cost_code);const cost=(value:number|null|undefined)=>value==null?'Unknown':money(value,job.currency);return <section className="record" key={code.cost_code}><h3>{code.cost_code}</h3><dl className="reconciliation"><div><dt>Original / revised revenue</dt><dd>{money(old?.revenue_cents??0,job.currency)} / {money(code.revenue_cents,job.currency)}</dd></div><div><dt>Original / revised cost budget</dt><dd>{cost(old?.cost_cents)} / {cost(code.cost_cents)}</dd></div><div><dt>Original allowance</dt><dd>{money(code.allowance_cents,job.currency)}</dd></div><div><dt>Planned commitments</dt><dd>{money(code.commitment_plan_cents,job.currency)}</dd></div></dl></section>})}
+ <details><summary>Frozen billing baseline and revised selling lines</summary>{current.billing_lines.map(l=><p key={l.id}>{l.cost_code} · {l.description} · {money(l.scheduled_cents,job.currency)}</p>)}</details></section>
+}

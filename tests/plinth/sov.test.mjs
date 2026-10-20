@@ -17,7 +17,7 @@ test('BILL-001 — coded USD draws retain reviewed tax, reconcile stored materia
   assert.equal((await act('/pricing/apply',{...pricing,digest:r.value.preview.digest})).status,200)
   const quote=job.quotes.at(-1)
   assert.equal(quote.total_cents,320_000)
-  assert.equal((await act(`/quotes/${quote.id}/accept`,{method:'signed',evidence:'Client signed exact scope and reviewed tax'})).status,200)
+  assert.equal((await act(`/quotes/${quote.id}/accept`,{method:'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Client signed exact scope and reviewed tax'})).status,200)
   const pricedChange={description:'Client-approved porch handrail upgrade',direction:'charge',basis:'sell',as_of:'2026-10-20',lines:[line('handrail','Porch handrail upgrade','06-100',5000,10_000)],rules:[],tax:{rate_id:rate.id,taxable_line_ids:['handrail']}}
   r=await act('/variation-pricing/preview',pricedChange);assert.equal(r.status,200);const preview=r.value.preview
   assert.equal((await act('/variation-pricing/apply',{...pricedChange,digest:'stale'})).status,409)

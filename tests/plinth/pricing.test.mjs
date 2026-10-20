@@ -68,7 +68,7 @@ test('EST-003 — human-reviewed scoped pricing reconciles final lines, preserve
   const csv = await f.request(`${root}/quotes/${priced.id}/cost-codes.csv`, { cookie: f.owner }); assert.equal(csv.status, 200); assert.ok((await csv.text()).includes('"62033"'))
   assert.equal((await post('/pricing/apply', { ...input, digest: preview.digest })).status, 409, 'A changed job revision also invalidates the preview')
   const repeat = await post('/pricing/preview', input); assert.equal(repeat.status, 200); assert.equal(repeat.value.preview.proposal.total_cents, priced.total_cents, 'Repeat pricing starts from original base lines')
-  result = await post(`/quotes/${priced.id}/accept`, { method: 'signed', evidence: 'Client signed scoped pricing and reviewed tax terms' }); assert.equal(result.status, 200); job = result.value.job
+  result = await post(`/quotes/${priced.id}/accept`, { method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Client signed scoped pricing and reviewed tax terms' }); assert.equal(result.status, 200); job = result.value.job
   const signed = structuredClone(job.quotes.at(-1)), signedApproval = job.approvals.find(row => row.kind === 'quote').snapshot
   assert.deepEqual(signedApproval.pricing, signed.pricing)
   result = await f.json(rates + '/' + rate.id, { method: 'POST', cookie: f.owner, body: { ...rateBody, percent: '8', expected_version: rate.version } }); assert.equal(result.status, 200)

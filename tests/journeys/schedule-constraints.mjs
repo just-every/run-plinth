@@ -13,7 +13,7 @@ try {
  const suffix=Date.now(),pdf=Buffer.from('%PDF-1.7\nOriginal city inspection and safe-site clearance evidence\n%%EOF')
  let {job}=await post('/jobs',{name:'Alvarez whole-home remodel — inspection and weather clearance '+suffix,client_email:'client@dev.localhost',address:'2480 Maple Street, Burlington, VT 05401'})
  let r=await post(`/jobs/${job.id}/quotes`,{expected_version:job.version,lines:[{description:'Agreed remodel construction works',quantity:1,unit_cents:48_000_000}]});job=r.job
- r=await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',evidence:'Signed household remodel agreement'});job=r.job
+ r=await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Signed household remodel agreement'});job=r.job
  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]}
  let tasks=[{id:crypto.randomUUID(),trade:'Drywall crew '+suffix,owner:'Alex Rivera, superintendent',description:'Drywall after city rough inspection',start:'2026-11-02T08:00:00Z',duration_minutes:120}]
  r=await post(`/jobs/${job.id}/schedule/preview`,{expected_version:job.version,calendar,tasks});r=await post(`/jobs/${job.id}/schedule/publish`,{expected_version:job.version,calendar,tasks:r.preview.tasks,digest:r.preview.digest});job=r.job

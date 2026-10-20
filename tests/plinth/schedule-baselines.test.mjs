@@ -30,7 +30,7 @@ test('SCH-002 — sold-job templates, immutable human baselines, evidenced actua
   const application = { template_id: template.id, start: '2026-11-09T08:00:00Z' }
   assert.equal((await post('/schedule-template/preview', application)).status, 409, 'Quote acceptance precedes template application')
   r = await post('/quotes', { lines: [{ description: 'Remodel works', quantity: 1, unit_cents: 48_000_000 }] }); assert.equal(r.status, 200); job = r.value.job
-  r = await post(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed', evidence: 'Client signed the remodel contract' }); assert.equal(r.status, 200); job = r.value.job
+  r = await post(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Client signed the remodel contract' }); assert.equal(r.status, 200); job = r.value.job
   r = await post('/schedule-template/preview', application, { token: agent }); assert.equal(r.status, 200); let preview = r.value.preview
   assert.equal(preview.tasks.find(task => task.description === 'framing').start, '2026-11-09T08:00:00.000Z')
   assert.equal(preview.completion_after, '2026-11-10T09:00:00.000Z')

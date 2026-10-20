@@ -16,7 +16,7 @@ test('CRM-001 — shared household contacts and properties commission jobs with 
   const make=async(name,property)=>{
    let r=await post('/jobs',{name,client_email:'morgan@example.com',address:'',customer_id:customer.id,property_id:property,client_contact_ids:['morgan','alex']});assert.equal(r.status,201);let job=r.value.job
    r=await post(`/jobs/${job.id}/quotes`,{expected_version:job.version,lines:[{description:'Remodel scope',quantity:1,unit_cents:48_000_000}]});assert.equal(r.status,200);job=r.value.job
-   r=await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',evidence:'Client signed current scope and USD price'});assert.equal(r.status,200);return r.value.job
+   r=await post(`/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Client signed current scope and USD price'});assert.equal(r.status,200);return r.value.job
   }
   let first=await make('Maple remodel','maple'),second=await make('Oak addition','oak')
   assert.equal(first.address,data.properties[0].address);assert.equal(second.address,data.properties[1].address)

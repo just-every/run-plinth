@@ -1,3 +1,4 @@
+import { QuoteAcceptance, BudgetComparison } from './quote-acceptance'
 import { PricingBreakdown } from './pricing-snapshot'
 import { EstimatePricing } from './estimate-pricing'
 import { EstimateCatalog } from './estimate-catalog'
@@ -20,9 +21,9 @@ export function Quotes({job,manager,mutate}: JobProps) {
       <EstimateTerms quote={q} />
       {manager && <p><a href={`/api/plinth/jobs/${job.id}/quotes/${q.id}/cost-codes.json`} download>Export cost-code JSON · quote {q.revision}</a> · <a href={`/api/plinth/jobs/${job.id}/quotes/${q.id}/cost-codes.csv`} download>Export cost-code CSV · quote {q.revision}</a></p>}
       {q.notes && <p className="muted">{q.notes}</p>}
-      {q.acceptance && <p className="notice">Accepted by {q.acceptance.method}: {q.acceptance.evidence}<br />Recorded by {q.acceptance.recorded_by.name} · {dateTime(q.acceptance.recorded_by.at)}</p>}
-      {manager && !accepted && q.status === 'draft' && q.id === job.quotes.at(-1)?.id && <div className="inline-form"><Form submit="Record client acceptance" action={async f => mutate('/quotes/'+q.id+'/accept',{method:f.get('method'),evidence:f.get('evidence')})}><div className="fields"><label>Acceptance method<select name="method"><option value="email">Email</option><option value="signed">Signed agreement</option><option value="phone">Phone</option><option value="in person">In person</option></select></label><Field label="Client acceptance reference" name="evidence" placeholder="Client email of October 15 agreeing scope and price" /></div></Form></div>}
-    </article>)}</section>
+      {q.acceptance && <p className="notice">Acceptance recorded from {q.acceptance.method}: {q.acceptance.evidence}<br />Recorded by {q.acceptance.recorded_by.name} · {dateTime(q.acceptance.recorded_by.at)}</p>}
+      {manager && !accepted && q.status === 'draft' && q.id === job.quotes.at(-1)?.id && <QuoteAcceptance job={job} quote={q} mutate={mutate} />}
+    </article>)}{manager && <BudgetComparison job={job}/>}</section>
     {manager && !accepted && <aside className="card side"><h2>Prepare a quote</h2><p className="card-lead">Create an immutable revision. Record acceptance only when you have the client’s agreement.</p><Form submit="Prepare quote revision" action={async f => mutate('/quotes',{lines:[{description:f.get('description'),quantity:1,unit_cents:cents(f.get('amount'))}],notes:f.get('notes') || undefined})}><Field label="Scope of work" name="description" /><Field label="Quote total (including sales tax if applicable)" name="amount" inputMode="decimal" placeholder="48000.00" /><label>Terms and inclusions<textarea name="notes" rows={4} /></label></Form><EstimateEditor key={job.quotes.at(-1)?.id ?? 'new'} quote={job.quotes.at(-1)} mutate={mutate} /></aside>}</div>
 }
 

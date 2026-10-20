@@ -39,7 +39,7 @@ test('US-001 — USD company setup, US address and phone, exact US/metric measur
   assert.equal(metric.total_cents, 18019, '2 m² = 21.5278... sq ft x $8.37 = $180.1878..., half-up once')
   assert.equal(trim.total_cents, 3125, '30 in = 2.5 ft x $12.50')
   assert.equal(west.quotes[0].total_cents, 10463 + 18019 + 3125)
-  r = await f.json(`/api/plinth/jobs/${west.id}/quotes/${west.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: west.version, method: 'signed', evidence: 'Signed quote returned by the client' } }); assert.equal(r.status, 200); west = r.value.job
+  r = await f.json(`/api/plinth/jobs/${west.id}/quotes/${west.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: west.version, method: 'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Signed quote returned by the client' } }); assert.equal(r.status, 200); west = r.value.job
 
   // Working hours are local in each job's zone, so a two-day task keeps 08:00-17:00 across each DST change.
   const calendar = { weekdays: [1, 2, 3, 4, 5], start_hour: 8, end_hour: 17, holidays: [] }
