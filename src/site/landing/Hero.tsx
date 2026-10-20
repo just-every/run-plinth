@@ -26,7 +26,7 @@ export function Hero() {
         alt="Front elevation of the Alvarez bungalow in Linden Hills taking a second story: the new framing in pale olive, two carpenters at work, a tree at left and dimension lines at right." />
       <nav className="site-bar" aria-label="Site">
         <Lockup />
-        <span className="site-links"><a href="/docs">Docs</a><a href={SOURCE}>Source</a></span>
+        <span className="site-links"><a href="/docs">Docs</a><a href="/contract">Contract</a><a href={SOURCE}>Source</a></span>
       </nav>
       <div className="hero-copy">
         <h1>Handover day, right on time.</h1>

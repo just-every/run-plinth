@@ -80,4 +80,8 @@ html { -webkit-text-size-adjust: 100%; scroll-padding-top: 24px; }
   .foot-brand p, .site-foot nav { font-size: 16px; }
   .site-foot nav { gap: 24px; }
 }
+@media (max-width: 360px) {
+  .site-links { gap: 14px; font-size: 15px; }
+  .site-foot nav { gap: 14px; font-size: 15px; }
+}
 @media (prefers-reduced-motion: reduce) { .btn-run { transition: none; } }

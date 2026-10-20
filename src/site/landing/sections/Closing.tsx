@@ -21,6 +21,6 @@ export function Closing() {
 export function Footer() {
   return <footer className="site-foot">
     <div className="foot-brand"><Lockup /><p>Free, open source construction management</p></div>
-    <nav aria-label="Footer"><a href="/docs">Docs</a><a href={SOURCE}>Source</a><a href={`${SOURCE}/blob/main/LICENSE`}>MIT licensed</a></nav>
+    <nav aria-label="Footer"><a href="/docs">Docs</a><a href="/contract">Contract</a><a href={SOURCE}>Source</a><a href={`${SOURCE}/blob/main/LICENSE`}>MIT licensed</a></nav>
   </footer>
 }
