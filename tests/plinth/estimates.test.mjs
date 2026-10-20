@@ -195,3 +195,68 @@ test('EST-002 — dated vendor catalogs, waste/productivity assemblies and dimen
   const visible=JSON.stringify((await f.json(`/api/plinth/jobs/${a.id}`,{cookie:client})).value.job);assert.ok(!visible.includes('cost_catalog')&&!visible.includes('cost_total_cents'))
  } finally {await f.close()}
 })
+
+test('EST-005 — supplier captures form reviewed room boards and estimate drafts; refreshed prices require review and signed alternatives retain original sources', async()=>{
+ const f=await createFixture()
+ try {
+  const client=await f.invite('product-client@example.com'),foreign=await f.invite('other-product-client@example.com'),agent=await f.agent()
+  const root='/api/plinth';let r=await f.json(root+'/jobs',{method:'POST',cookie:f.owner,body:{name:'Mason kitchen and bath — supplier specification boards',client_email:'product-client@example.com',address:'4518 Alder Avenue, Portland, OR 97211'}});assert.equal(r.status,201);let job=r.value.job
+  const post=async(path,body={},credentials={cookie:f.owner})=>{const result=await f.json(root+`/jobs/${job.id}`+path,{method:'POST',...credentials,body:{expected_version:job.version,...body}});if(result.status===200)job=(await f.json(root+`/jobs/${job.id}`,{cookie:f.owner})).value.job;return result}
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
+  const captured_on=new Date(Date.now()-86400000).toISOString().slice(0,10),valid_until=new Date(Date.now()+86400000*30).toISOString().slice(0,10)
+  const faucet={name:'Brushed nickel single-handle faucet',sku:'FAU-108-BN',supplier:'Cascade Plumbing Supply',source_url:'https://supplier.example.com/products/FAU-108-BN',dimensions:'8 inch reach, 15 inch height, single-hole mount',cost_quote_cents:28_450,lead_days:14,captured_on,valid_until,discontinued:false,evidence:'Dated supplier quote CSP-1048 and supplier product sheet, transcribed by estimator',image:{name:'faucet-original.png',mime:'image/png',base64:png}}
+  assert.equal((await post('/products',faucet,{cookie:client})).status,403)
+  assert.equal((await post('/products',{...faucet,source_url:'javascript:alert(1)'})).status,400)
+  assert.equal((await post('/products',{...faucet,image:{...faucet.image,base64:Buffer.from('<html>bad upload</html>').toString('base64')}})).status,400)
+  assert.equal((await post('/products',{...faucet,valid_until:'2020-01-01'})).status,400)
+  r=await post('/products',faucet,{token:agent});assert.equal(r.status,200);const tap=job.products[0],tapV1=structuredClone(tap.revisions[0])
+  assert.equal((await post(`/products/${tap.id}/estimate`,{revision_id:tapV1.id,cost_code:'22-400',unit_cents:35_000})).status,409)
+  assert.equal((await post(`/products/${tap.id}/review`,{revision_id:tapV1.id,confirm:true},{token:agent})).status,403)
+  assert.equal((await post(`/products/${tap.id}/review`,{revision_id:tapV1.id,confirm:true})).status,200)
+  assert.equal((await post(`/products/${tap.id}/review`,{revision_id:tapV1.id,confirm:true})).status,409)
+  r=await post(`/products/${tap.id}/estimate`,{revision_id:tapV1.id,cost_code:'22-400',unit_cents:35_000});assert.equal(r.status,200)
+  assert.equal(job.quotes[0].lines[0].product_source.cost_quote_cents,28_450)
+  assert.equal(job.quotes[0].lines[0].cost_total_cents,28_450);assert.equal(job.quotes[0].total_cents,35_000)
+  const finishBody={...faucet,name:'Rift oak cabinet finish sample',sku:'CAB-OAK-12',supplier:'Columbia Cabinetry',source_url:'https://supplier.example.com/finishes/rift-oak',dimensions:'12 × 12 inch sample, clear matte finish',cost_quote_cents:4_000,lead_days:28,evidence:'Cabinet finish quote CC-57 and sample photograph'}
+  assert.equal((await post('/products',finishBody)).status,200);const finish=job.products[1],finishV1=finish.revisions[0]
+  assert.equal((await post(`/products/${finish.id}/review`,{revision_id:finishV1.id,confirm:true})).status,200)
+  assert.equal((await post(`/products/${finish.id}/estimate`,{revision_id:finishV1.id,cost_code:'06-400',unit_cents:5_000})).status,200)
+  assert.equal(job.quotes.at(-1).lines.length,2);const estimate=structuredClone(job.quotes.at(-1));assert.equal(estimate.total_cents,40_000)
+  const quote=job.quotes.at(-1)
+  assert.equal((await post(`/quotes/${quote.id}/accept`,{method:'email',evidence:'Client accepted kitchen scope and finish quote',schedule_choice:{kind:'none',reason:'Installation dates will be planned after product decisions'}})).status,200)
+  assert.equal((await post('/products',{...faucet,name:'Chrome kitchen faucet alternative',sku:'FAU-220-CH',source_url:'https://supplier.example.com/products/FAU-220-CH',cost_quote_cents:22_000})).status,200);const alternative=job.products[2],alternativeV1=alternative.revisions[0]
+  assert.equal((await post(`/products/${alternative.id}/review`,{revision_id:alternativeV1.id,confirm:true})).status,200)
+  const option=(p,v,price)=>({name:v.name,specifications:v.dimensions,supplier:v.supplier,price_cents:price,product_id:p.id,product_revision_id:v.id})
+  const board={room:'Kitchen',category:'Kitchen faucet alternatives',allowance_cents:40_000,cost_code:'22-400',decision_on:valid_until,lead_days:28,options:[option(tap,tapV1,35_000),option(alternative,alternativeV1,27_500)]}
+  assert.equal((await post('/selections',board)).status,200);let selection=job.selections[0],boardV1=selection.revisions[0]
+  assert.equal((await post(`/selections/${selection.id}/present`,{revision_id:boardV1.id})).status,200)
+  r=await post(`/selections/${selection.id}/sign`,{revision_id:boardV1.id,option_id:boardV1.options[0].id,statement:'I approve the exact brushed nickel faucet specification and selling price',confirm:true},{cookie:client});assert.equal(r.status,200)
+  const signed=structuredClone(job.selections[0].revisions[0]);assert.equal(signed.signature.option.product_source.source_url,faucet.source_url)
+  let clientJob=(await f.json(root+`/jobs/${job.id}`,{cookie:client})).value.job
+  assert.equal(clientJob.products,undefined);assert.ok(!JSON.stringify(clientJob).includes('cost_quote_cents'));assert.equal(clientJob.selections[0].revisions[0].options[0].product_source.sku,faucet.sku)
+  const imagePath=root+`/jobs/${job.id}/product-images/${tapV1.image.id}`
+  assert.deepEqual(await (await f.request(imagePath,{cookie:client})).arrayBuffer(),Uint8Array.from(Buffer.from(png,'base64')).buffer)
+  assert.equal((await f.request(imagePath,{cookie:foreign})).status,404)
+  const captureRefresh={...faucet,cost_quote_cents:31_900,valid_until:captured_on,discontinued:true};delete captureRefresh.image
+  assert.equal((await post(`/products/${tap.id}/revise`,captureRefresh)).status,200);const tapV2=job.products[0].revisions[1]
+  assert.equal(tapV2.image.id,tapV1.image.id,'Image custody retained on price-only refresh')
+  assert.equal((await post('/selections',{...board,options:[option(tap,tapV2,38_000)]})).status,409,'Refreshed supplier values cannot enter a new board without exact human review')
+  assert.equal((await post(`/products/${tap.id}/review`,{revision_id:tapV2.id,confirm:true})).status,200)
+  assert.ok(job.selections[0].revisions[0].options[0].product_notices.some(n=>n.includes('Newer')))
+  assert.ok(job.selections[0].revisions[0].options[0].product_notices.some(n=>n.includes('discontinued')))
+  assert.deepEqual(job.quotes.find(q=>q.id===estimate.id),{...estimate,status:'accepted',acceptance:job.quotes.find(q=>q.id===estimate.id).acceptance},'Supplier refresh never reprices accepted estimate')
+  assert.deepEqual(job.selections[0].revisions[0].signature,signed.signature,'Existing decision and supplier evidence are immutable')
+  assert.equal((await post(`/selections/${selection.id}/revise`,{...board,options:[option(tap,tapV2,38_000),option(alternative,alternativeV1,27_500)]})).status,200)
+  selection=job.selections[0];const replacement=selection.revisions[1]
+  assert.ok(replacement.options[0].product_notices.some(n=>n.includes('stale')));assert.ok(replacement.options[0].product_notices.some(n=>n==='Discontinued'))
+  assert.equal((await post(`/selections/${selection.id}/present`,{revision_id:replacement.id})).status,200)
+  assert.equal((await post(`/selections/${selection.id}/sign`,{revision_id:replacement.id,option_id:replacement.options[1].id,statement:'I select the reviewed chrome faucet alternative with its original source specification',confirm:true},{cookie:client})).status,200)
+  assert.equal((await post(`/selections/${selection.id}/order`,{revision_id:replacement.id})).status,200)
+  assert.equal(job.orders.at(-1).supplier,'Cascade Plumbing Supply');assert.equal(job.orders.at(-1).amount_cents,27_500)
+  assert.equal(job.selections[0].revisions[1].signature.option.product_source.id,alternativeV1.id)
+  assert.equal(job.selections[0].revisions[0].signature.option.product_source.id,tapV1.id)
+  assert.equal((await f.json(root+`/jobs/${job.id}`,{cookie:foreign})).status,404)
+  const reloaded=(await f.json(root+`/jobs/${job.id}`,{cookie:f.owner})).value.job
+  assert.equal(reloaded.products[0].revisions.length,2);assert.ok(reloaded.approvals.some(a=>a.kind==='product.review'&&a.subject_id===tapV2.id))
+ } finally {await f.close()}
+})

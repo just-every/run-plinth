@@ -21,7 +21,7 @@ export function EstimateEditor({ quote, mutate }: { quote?: Quote; mutate: JobPr
    const lines = rows.map((row, index) => {
     const get = (name: string) => f.get(`line-${index}-${name}`)
     const cost = get('cost')
-    return { id: row.key, description: get('description'), quantity: get('quantity'), unit: get('unit'), rate_unit: get('rate-unit'), cost_code: get('code'), phase: get('phase'), category: get('category'), unit_cents: cents(get('sell')), ...(cost ? { cost_unit_cents: cents(cost) } : {}), conversion: { numerator: get('numerator'), denominator: get('denominator') }, alternate_group: get('group'), alternate_option: get('option') }
+    return { id: row.key, description: get('description'), quantity: get('quantity'), unit: get('unit'), rate_unit: get('rate-unit'), cost_code: get('code'), phase: get('phase'), category: get('category'), unit_cents: cents(get('sell')), ...(row.source?.product_source?{product_source:row.source.product_source}:{}), ...(cost ? { cost_unit_cents: cents(cost) } : {}), conversion: { numerator: get('numerator'), denominator: get('denominator') }, alternate_group: get('group'), alternate_option: get('option') }
    })
    const alternate_selections = Object.fromEntries([...groups.keys()].flatMap((group, index) => { const selected = f.get(`alternate-${index}`); return selected ? [[group, selected]] : [] }))
    await mutate('/quotes', { lines, alternate_selections, inclusions: terms(f.get('inclusions')), exclusions: terms(f.get('exclusions')), notes: f.get('estimate-notes') || undefined })

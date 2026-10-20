@@ -1,3 +1,5 @@
+import { publicProductSources } from './product-source'
+import { productAction, productImage } from './products'
 import { previewAllowanceChange, applyAllowanceChange } from './allowance-changes'
 import { freezeOriginalBudget, reviseBudget } from './budget'
 import { warrantyAction } from './warranties'
@@ -46,8 +48,8 @@ async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await d
 function display(job:Job,actor:Actor) {
  if(actor.role!=='member')return {...job,selections:selectionProjection(job,false)}
  const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,sov:undefined,reconciliation}})
- const safe=projectEstimateCosts({...job,budgets:undefined,warranties:undefined,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
- return {...safe,selections:selectionProjection(job,true),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:job.approvals.find(source=>source.id===a.id)!.snapshot}:a)}
+ const safe=projectEstimateCosts({...job,products:undefined,budgets:undefined,warranties:undefined,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
+ return {...safe,selections:publicProductSources(selectionProjection(job,true)),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:publicProductSources(job.approvals.find(source=>source.id===a.id)!.snapshot)}:a)}
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
 async function handle(request:Request,original:Bindings):Promise<Response>{const env=runtimeBindings(original),actor=await authorize(request,env),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
@@ -82,6 +84,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[2]==='orders'&&(parts.length===4||parts.length===5&&parts[4]==='document')&&method==='GET')return orderResponse(previous,actor,parts[3]!,parts.length===5)
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
+ if(parts.length===4&&parts[2]==='product-images'&&method==='GET')return productImage(env.DB,previous,actor,parts[3]!)
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
  if(parts[2]==='diary'&&parts[4]==='attachments'&&parts.length===6&&method==='GET')return serveAttachment(env.DB,previous,actor,parts[3],parts[5])
  if(parts.length===2&&method==='DELETE'){
@@ -105,7 +108,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='warranties'&&(parts.length===3||parts.length===5)){record=await warrantyAction(env.DB,job,actor,input,id,action);if(id&&['review','close'].includes(action!)){const item=job.warranties!.cases.find(c=>c.id===id)!;recordApproval(job,actor,'warranty.'+action,{id,prepared_by:item.recorded_by,revision:item.reviews.length},record)}}
+ if(category==='products'&&(parts.length===3||parts.length===5)){const result=await productAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='warranties'&&(parts.length===3||parts.length===5)){record=await warrantyAction(env.DB,job,actor,input,id,action);if(id&&['review','close'].includes(action!)){const item=job.warranties!.cases.find(c=>c.id===id)!;recordApproval(job,actor,'warranty.'+action,{id,prepared_by:item.recorded_by,revision:item.reviews.length},record)}}
  else if(category==='allowance-changes'&&id==='apply'&&parts.length===4)record=await applyAllowanceChange(env.DB,job,actor,input)
  else if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
  else if(category==='variation-pricing'&&id==='apply'&&parts.length===4)record=await preparePricedVariation(env.DB,job,actor,input)

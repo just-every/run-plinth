@@ -1,6 +1,6 @@
 import type { Line, Quote } from './model'
 
-const scopeKeys = ['description', 'quantity', 'unit_cents', 'cost_unit_cents', 'cost_code', 'phase', 'category', 'unit', 'rate_unit', 'conversion', 'alternate_group', 'alternate_option', 'included', 'total_cents', 'cost_total_cents'] as const
+const scopeKeys = ['description', 'quantity', 'unit_cents', 'cost_unit_cents', 'cost_code', 'phase', 'category', 'unit', 'rate_unit', 'conversion', 'alternate_group', 'alternate_option', 'included', 'total_cents', 'cost_total_cents', 'product_source'] as const
 const identity = (line: Line, index: number) => line.id ?? `legacy-line-${index}`
 const cost = (quote: Quote) => {
  const selected = quote.lines.filter(line => line.included !== false)

@@ -1,6 +1,7 @@
 /** Optional additions keep archived and imported quantity/price quotes readable. */
 export type EstimateCategory = 'labor' | 'material' | 'equipment' | 'subcontract' | 'other'
 export interface EstimateLineFields {
+ product_source?: import('./product-model').ProductSource
  id?: string
  cost_code?: string
  phase?: string

@@ -1,3 +1,4 @@
+import { productSource } from './product-source'
 import { cents, need, object, sum, text, type Input, type Line } from './model'
 import { standardConversion } from './us-conventions'
 import { decimal, lineCents, measurement } from './estimate-math'
@@ -9,7 +10,7 @@ export function scopeTerms(value: unknown, name: string): string[] {
  need(Array.isArray(value) && value.length <= 100, `${name} must contain at most 100 entries`)
  return value.map(entry => text(entry, name, 1000))
 }
-export function estimateLines(input: Input) {
+export function estimateLines(input: Input, job?: import('./model').Job) {
  need(Array.isArray(input.lines) && input.lines.length > 0 && input.lines.length <= 100, 'Provide 1–100 quote lines')
  const lines: Line[] = input.lines.map(value => {
   const row = object(value), quantity = measurement(row.quantity), unit_cents = cents(row.unit_cents, 'unit_cents')
@@ -34,6 +35,7 @@ export function estimateLines(input: Input) {
    need(!!group === !!option, 'An alternate needs both a group and option')
    if (group) { line.alternate_group = group; line.alternate_option = option }
   }
+  if(row.product_id!==undefined||row.product_source!==undefined){need(job,'Product sources require their job');const source=row.product_source===undefined?row:object(row.product_source);line.product_source=productSource(job,source.product_id,source.product_revision_id??source.id)}
   line.total_cents = lineCents(quantity, unit_cents, line.conversion)
   if (line.cost_unit_cents !== undefined) line.cost_total_cents = lineCents(quantity, line.cost_unit_cents, line.conversion)
   return line

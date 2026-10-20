@@ -1,7 +1,7 @@
 import { cents, find, need, object, stamp, text, type Actor, type Input, type Job, type Stamp } from './model'
 import { day, fulfillment } from './purchase-order-model'
 
-export interface SelectionOption { id: string; name: string; specifications: string; supplier: string; price_cents: number }
+export interface SelectionOption { id: string; name: string; specifications: string; supplier: string; price_cents: number; product_notices?: string[]; product_source?: import('./product-model').ProductSource }
 export interface SelectionRevision { id: string; revision: number; room: string; category: string; allowance_cents: number; cost_code: string; decision_on: string; lead_days: number; options: SelectionOption[]; procurement?: ReturnType<typeof selectionTracker>; status: 'draft' | 'presented' | 'signed'; prepared_by: Stamp; presented_by?: Stamp; signature?: { option: SelectionOption; by: Stamp; statement: string } }
 export interface Selection { id: string; revisions: SelectionRevision[]; comments: { id: string; revision_id: string; text: string; by: Stamp }[] }
 

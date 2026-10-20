@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -31,6 +31,8 @@ test('CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI arch
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
     let r=await f.json(`/api/plinth/jobs/${job.id}/diary`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,date:'2026-10-15',note:'Framing inspected; ready for electrical rough-in.',attachments:[{name:'framing.png',mime:'image/png',base64:png}]}})
     assert.equal(r.status,200); job=r.value.job
+    r=await f.json(`/api/plinth/jobs/${job.id}/products`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,name:'Archive faucet specification',sku:'AF-108',supplier:'Archive Plumbing Supply',source_url:'https://supplier.example.com/faucets/AF-108',dimensions:'8 inch reach, single-hole mount',cost_quote_cents:28450,lead_days:14,captured_on:'2026-10-01',valid_until:'2027-01-01',discontinued:false,evidence:'Archive supplier quote AP-1048',image:{name:'faucet.png',mime:'image/png',base64:png}}});assert.equal(r.status,200);job=r.value.job
+    const supplierProduct=job.products[0];r=await f.json(`/api/plinth/jobs/${job.id}/products/${supplierProduct.id}/review`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,revision_id:supplierProduct.revisions[0].id,confirm:true}});assert.equal(r.status,200);job=r.value.job
     const csv=await readFile(new URL('../fixtures/import-accepted-jobs.csv',import.meta.url),'utf8')
     const preview=await f.json('/api/plinth/imports/preview',{method:'POST',cookie:f.owner,body:{csv}});assert.equal(preview.status,200)
     r=await f.json('/api/plinth/imports/commit',{method:'POST',cookie:f.owner,body:{csv,fingerprint:preview.value.fingerprint}});assert.equal(r.status,200)
@@ -60,6 +62,7 @@ test('CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI arch
     assert.ok(serialized.includes(taxRate.value.rate.id)&&serialized.includes('Reviewed archive fixture rate schedule'),'EST-003 reviewed jurisdiction source and dated rate revisions survive CLI recovery')
     assert.ok(serialized.includes(catalog.value.entry.id)&&serialized.includes('CS-1042'),'EST-002 catalog source identities and dated revisions survive CLI recovery')
     assert.ok(serialized.includes('Archive warranty W-104')&&serialized.includes('Archive maintenance agreement'),'CARE-003 terms, agreements and attribution survive the private CLI archive');assert.ok(!restored[0].tables.some(t=>t.name==='pl_warranty_scheduler'),'Transient scheduler cursor is excluded')
+    assert.ok(serialized.includes('Archive supplier quote AP-1048')&&serialized.includes(supplierProduct.revisions[0].image.checksum),'EST-005 original supplier images, source identities and reviewed capture snapshots survive private CLI recovery')
     assert.ok(serialized.includes('Chen household archive'));assert.ok(serialized.includes('archive-client'));
     assert.ok(serialized.includes('Ashgrove kitchen')); assert.ok(serialized.includes(png)); assert.ok(serialized.includes('accepted-jobs.csv'))
     assert.ok(!serialized.includes(feedPath.split('/').at(-1).replace('.ics','')))

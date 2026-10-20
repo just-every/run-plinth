@@ -1,17 +1,21 @@
+import { productSource, productStatus } from './product-source'
+import { object } from './model'
 import { requireJobManager } from './auth'
 import { active, find, need, recordApproval, stamp, text, usdOnly, type Actor, type Input, type Job } from './model'
 import { clientSelections, selected, selectionRevision, selectionTracker } from './selection-model'
+
+function revisionWithProducts(job:Job,input:Input,actor:Actor,revision:number){const result=selectionRevision(input,actor,revision);for(const [i,option] of result.options.entries()){const raw=object((input.options as unknown[])[i]);if(raw.product_id!==undefined)option.product_source=productSource(job,raw.product_id,raw.product_revision_id);else if(raw.product_source!==undefined){const source=object(raw.product_source);option.product_source=productSource(job,source.product_id,source.id)}}return result}
 
 /** CLIENT-002: only current assigned clients decide; office preparation never fabricates a client decision. */
 export function selectionAction(job: Job, actor: Actor, input: Input, id?: string, action?: string) {
  active(job); usdOnly(job)
  if (!id) {
   requireJobManager(actor, true)
-  const row = { id: crypto.randomUUID(), revisions: [selectionRevision(input, actor, 1)], comments: [] }
+  const row = { id: crypto.randomUUID(), revisions: [revisionWithProducts(job, input, actor, 1)], comments: [] }
   ;(job.selections ??= []).push(row); return row
  }
  const row = find(job.selections ?? [], id), current = row.revisions.at(-1)!
- if (action === 'revise') { requireJobManager(actor, true); row.revisions.push(selectionRevision(input, actor, current.revision + 1)); return row }
+ if (action === 'revise') { requireJobManager(actor, true); row.revisions.push(revisionWithProducts(job, input, actor, current.revision + 1)); return row }
  const revision = find(row.revisions, text(input.revision_id, 'revision_id', 100))
  if (action === 'comment') {
   need(actor.role !== 'agent', 'A person must post a comment', 403, 'human_required')
@@ -38,5 +42,5 @@ export function selectionOrderInput(job: Job, selectionId: string, revisionId: s
  return { supplier: option.supplier, description: `${revision.room}: ${revision.category} — ${option.name}. ${option.specifications}`, source: { kind: 'selection', selection_id: selectionId, revision_id: revisionId }, lines: [{ description: option.name, cost_code: revision.cost_code, quantity: '1', unit: 'selection', unit_cents: option.price_cents }], ...(input.vendor_email ? { vendor_email: input.vendor_email } : {}), ...(input.promised_on ? { promised_on: input.promised_on } : {}) }
 }
 export function selectionProjection(job: Job, client: boolean) {
- return (client ? clientSelections(job) : job.selections ?? []).map(s => ({ ...s, revisions: s.revisions.map(r => ({ ...r, procurement: selectionTracker(job, s.id, r.id) })) }))
+ return (client ? clientSelections(job) : job.selections ?? []).map(s => ({ ...s, revisions: s.revisions.map(r => ({ ...r, ...(!client?{options:r.options.map(o=>({...o,...(o.product_source?{product_notices:productStatus(job,o.product_source)}:{})}))}:{}), procurement: selectionTracker(job, s.id, r.id) })) }))
 }

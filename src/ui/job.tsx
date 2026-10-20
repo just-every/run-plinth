@@ -1,3 +1,4 @@
+import { Products } from './products'
 import { Warranties } from './warranties'
 import { Selections } from './selections'
 import { useEffect, useState } from 'react'
@@ -52,7 +53,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Selections' && <Selections {...props} />}
-      {open === 'Purchasing' && <><Orders {...props} /><Subcontracts {...props} /></>}
+      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} /><Subcontracts {...props} /></>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'Warranty' && manager && <Warranties {...props} />}
