@@ -233,3 +233,24 @@ test('CLIENT-003 / AUTO-002 — exact overage and underage, immutable reviewed c
 
  } finally { await f.close() }
 })
+
+
+test('AUTO-002 — refused, unknown, development and unconfigured notice outcomes remain durable and cannot replay a provider effect', async () => {
+ for (const outcome of ['refused', 'unknown', 'development', 'unconfigured']) {
+  const f = await createFixture({ mailProvider: outcome === 'unconfigured' ? null : outcome === 'development' ? 'development' : 'resend', mailResponse: () => Response.json({ message: 'Network-edge outcome' }, { status: outcome === 'refused' ? 422 : 500 }) })
+  try {
+   let job = await createActiveJob(f, 'Pine Street approved sale')
+   const id = job.continuity[0].id, path = `/api/plinth/jobs/${job.id}/continuity/${id}/notify`
+   const input = { email: 'builder@example.com', channel: 'email', confirm: true }
+   let r = await f.json(path, { method: 'POST', cookie: f.owner, body: { expected_version: job.version, ...input } })
+   assert.equal(r.status, 200, JSON.stringify(r.value)); job = r.value.job
+   assert.equal(job.continuity[0].notices[0].status, outcome)
+   const attempts = f.messages.length
+   assert.equal(attempts, ['refused', 'unknown'].includes(outcome) ? 1 : 0)
+   r = await f.json(path, { method: 'POST', cookie: f.owner, body: { expected_version: job.version, ...input } })
+   assert.equal(r.status, 409); assert.equal(f.messages.length, attempts)
+   const reloaded = await f.json(`/api/plinth/jobs/${job.id}`, { cookie: f.owner })
+   assert.deepEqual(reloaded.value.job.continuity[0].notices, job.continuity[0].notices)
+  } finally { await f.close() }
+ }
+})
