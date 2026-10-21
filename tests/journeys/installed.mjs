@@ -3,10 +3,9 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { homedir, userInfo } from 'node:os'
 import { resolve, join } from 'node:path'
 import { createServer } from 'node:net'
-import { chromium } from '@playwright/test'
 
 const name = process.argv[2]
 assert.ok(['punch','handover','bids','todos'].includes(name), 'Choose punch, handover, bids or todos')
@@ -36,18 +35,10 @@ try {
  const client = new URL(ownerOpen), fragment = new URLSearchParams(client.hash.slice(1))
  assert.ok(fragment.has('rer-dev'), 'The synthetic installation supplies its own native local dev entrance')
  fragment.set('as','client');fragment.set('next','/auth/dev/enter?as=client&returnTo=/app');client.hash=fragment.toString()
- const env = {...process.env,PLINTH_URL:base,PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
- const browser = await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
- try {
-  const context = await browser.newContext(), page = await context.newPage()
-  await page.goto(ownerOpen);await page.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'));await page.goto(base+'/app')
-  if(new URL(page.url()).pathname==='/setup') {
-   await page.getByLabel('Your name',{exact:true}).fill('Morgan Mason, builder')
-   await page.getByRole('checkbox',{name:'I confirm this owner account is ready to use.'}).check()
-   await page.getByRole('button',{name:'Finish setup',exact:true}).click();await page.waitForURL('**/app')
-  }
-  await context.close()
- } finally { await browser.close() }
+ const env = {...process.env,HOME:userInfo().homedir,PLINTH_URL:base,PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
+ const bootstrap=spawn(process.execPath,['tests/journeys/installed-signin.mjs'],{env,stdio:'inherit'})
+ const ready=await new Promise((resolve,reject)=>{bootstrap.once('error',reject);bootstrap.once('exit',code=>resolve(code))})
+ assert.equal(ready,0,'The native setup browser uses the real HOME and completes')
  console.log('Fresh synthetic installation ready; private sign-in links withheld')
  const journey = spawn(process.execPath,[`tests/journeys/${name}.mjs`],{env,stdio:'inherit'})
  const result = await new Promise((resolve,reject)=>{journey.once('error',reject);journey.once('exit',code=>resolve(code))})
