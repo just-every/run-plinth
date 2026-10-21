@@ -37,6 +37,6 @@ export function sitePages({ styles = [], contract }: Partial<SiteContext> = {}):
       ...docs.map(doc => ({ path: doc.path, html: documentHtml({ title: doc.path === '/docs' ? 'Plinth guides' : `${doc.title} · Plinth`, description: doc.description, styles, body: createElement(DocsPage, { doc }), script: COPY_SCRIPT }) })),
       { path: '/404', html: basePage(siteNotFoundHtml(site, data, contract)) },
     ],
-    assets: ['site', 'fonts', 'brand', 'favicon.ico', 'apple-touch-icon.png'],
+    assets: ['site', 'fonts', 'brand', 'rer-theme.css', 'favicon.ico', 'apple-touch-icon.png'],
   }
 }

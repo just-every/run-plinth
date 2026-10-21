@@ -1,7 +1,8 @@
 /* The run site's frame on Base's shared pages (/run, /contract, not found).
-   Every token comes from public/brand/tokens.css. */
+   Every token comes from public/fonts/fonts.css and public/rer-theme.css
+   (Base's --rer-* tokens and the faces). */
 @import url('/fonts/fonts.css');
-@import url('/brand/tokens.css');
+@import url('/rer-theme.css');
 
 
 /* Base's Run, contract and not-found pages in the same look: the drafting grid

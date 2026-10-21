@@ -1,23 +1,102 @@
-/* inter-latin-opsz-normal (the run site and the installed app: headings, body and every screen) */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url(/fonts/inter/inter-latin-opsz-normal.woff2) format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}
-/* Metric-matched fallback so the page does not shift while Inter loads. */
-@font-face { font-family: 'Inter Fallback'; src: local('Arial'); size-adjust: 107%; ascent-override: 90%; descent-override: 22%; line-gap-override: 0%; }
+/* Plinth's look beyond its theme. /rer-theme.css holds only what Base's
+   theme grammar allows (the --rer-* tokens and the faces; the installer
+   reads it), so everything else every document wears is here: the page
+   font, Plinth's own tokens and Base's sign-in pages in Plinth's look. Base
+   links this file before the theme in the root document, /setup and sign-in
+   (src/base/font-head.ts), the Lobby and the Run pages (the edition
+   identity's fonts) and the hosted demo's gate; the run site imports both
+   (public/site/theme.css) and the development sign-in and hand-off pages
+   link this one too (src/server.dev.ts). */
 
-/* jetbrains-mono-latin-wght-normal (the terminal line) */
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 800;
-  src: url(/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2) format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}
+/* The page font, form controls included. */
 :root { font-family: 'Inter', 'Inter Fallback', Arial, sans-serif; }
 button, input, select, textarea { font-family: inherit; }
+
+/* Plinth's tokens, defined once. The run site, the installed app, its Lobby,
+   setup and sign-in all read them; public/rer-theme.css gives Base's --rer-*
+   theme tokens their literal values.
+   The look (design desk, 18 Oct 2026): an architect's elevation in chalk-line
+   deep blue ink on crisp white with a pale cyan drafting grid, near-black
+   headings, oxblood only for the primary action, the handover and the one late
+   item, pale olive for new work, mint for confirmed, green for done. */
+:root {
+  --ink: #061320;
+  --text: #1d2a38;
+  --body: #3c4a5a;
+  --muted: #566475;
+  --soft: #6b7887;
+  --blue: #0a5482;
+  --bar: #155f98;
+  --blue-tint: #e4eff6;
+  --hair: #b0d0e0;
+  --line: #cfe2eb;
+  --line-soft: #e3eef3;
+  --grid: rgba(176, 208, 224, .34);
+  --paper: #ffffff;
+  --sea: #eef6f6;
+  --olive: #d8d8b8;
+  --olive-bar: #bdb57c;
+  --olive-ink: #77722f;
+  --ox: #801030;
+  --ox-hover: #96193d;
+  --ox-deep: #3a0a18;
+  --ox-tint: #f8e7ec;
+  --green: #23955a;
+  --green-ink: #15703f;
+  --green-tint: #e4f3e9;
+  --amber: #f0a93a;
+  --amber-ink: #9a5a06;
+  --ghost: #dbe3e9;
+  --teal: #096a86;
+  --mint: #9fd5bf;
+  --terminal: #0b1824;
+  --terminal-text: #e6eef4;
+
+  --font: 'Inter', 'Inter Fallback', Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 1px 2px rgba(6, 19, 32, .04), 0 16px 36px -22px rgba(10, 84, 130, .32);
+  --shadow-float: 0 2px 4px rgba(6, 19, 32, .05), 0 28px 56px -26px rgba(10, 84, 130, .42);
+  --wrap: 1296px;
+  --gutter: clamp(16px, 5.4vw, 96px);
+  --grid-paper: linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 96px 96px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 96px 96px;
+
+  /* Base's shared pages (/run, /contract, not found) read these beside the
+     theme's --rer-* tokens. */
+  --rer-font-mono: var(--mono);
+  --rer-button-radius: 6px;
+  --rer-code-background: var(--terminal);
+  --rer-code-text: var(--terminal-text);
+  --rer-wordmark-weight: 800;
+  --rer-wordmark-tracking: -.035em;
+}
+
+/* Seed styling for Base's unchanged, server-rendered authentication pages
+   (sign in, confirm, account): the Lobby's family, on the drafting grid above
+   the chalk-line elevation, with hairline fields and the oxblood action. */
+html.rer-themed body { position:relative; isolation:isolate; min-height:100vh; min-height:100dvh; box-sizing:border-box; padding-bottom:220px; background:var(--grid-paper), var(--paper); color:var(--ink); font-family:var(--font); font-size:16px; }
+html.rer-themed body::after { content:""; position:absolute; z-index:-1; left:0; right:0; bottom:0; height:200px; background:url('/site/band-1536.webp') center 88%/cover no-repeat; -webkit-mask-image:linear-gradient(to bottom, transparent, #000 30%); mask-image:linear-gradient(to bottom, transparent, #000 30%); pointer-events:none; }
+html.rer-themed main:has(>.brand) { position:relative; width:100%; max-width:560px; padding:40px 44px 40px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper); box-shadow:var(--shadow-float); }
+html.rer-themed .brand { justify-content:center; font-size:34px; font-weight:800; letter-spacing:-.045em; line-height:1; margin:0 0 36px; color:var(--ink); }
+html.rer-themed .brand::before { width:34px; height:38px; }
+html.rer-themed main:has(>.brand) h1 { font-size:38px; line-height:1.1; font-weight:800; letter-spacing:-.045em; text-align:center; margin-bottom:28px; }
+html.rer-themed main:has(>.brand) label { font-size:14px; font-weight:600; color:var(--text); }
+html.rer-themed main:has(>.brand) input { min-height:46px; border:1px solid var(--rer-border); border-radius:var(--radius); background:var(--paper); color:var(--ink); }
+html.rer-themed main:has(>.brand) input:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent); }
+html.rer-themed main:has(>.brand) input[type=checkbox] { min-height:20px; accent-color:var(--ox); }
+html.rer-themed main:has(>.brand) button, html.rer-themed main:has(>.brand) .action { min-height:50px; border-radius:var(--radius); font-size:17px; font-weight:650; }
+html.rer-themed main:has(>.brand) .notice { border-color:var(--line); border-left:3px solid var(--teal); background:var(--sea); color:var(--text); }
+/* One class, not html.rer-themed: the sign-in pages link this file after
+   their own hashed style, so Base's equally specific ring on a secondary link
+   (.secondary-link a:focus-visible) still wins, as it did when the theme
+   carried this rule ahead of that style. */
+.rer-themed :focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+@media(max-width:600px) {
+  html.rer-themed body { padding-bottom:170px; }
+  html.rer-themed body::after { height:160px; }
+  html.rer-themed main:has(>.brand) { padding:32px 20px 28px; }
+  html.rer-themed main:has(>.brand) h1 { font-size:30px; margin-bottom:24px; }
+  html.rer-themed .brand { font-size:29px; margin-bottom:28px; }
+  html.rer-themed .brand::before { width:29px; height:32px; }
+}

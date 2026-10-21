@@ -1,7 +1,57 @@
-@import url('/fonts/fonts.css');
-@import url('/brand/tokens.css');
-@import url('/brand/auth.css');
+/* Plinth's theme for Base: the --rer-* tokens and the faces that the
+   installer, sign-in, its confirmation, /setup, the development hand-off
+   page, the Lobby and Base's Run, contract and not-found pages read. The
+   installer reads this file with Base's theme grammar (only :root --rer-*
+   tokens with literal values, and @font-face rules) and checks its colour
+   pairs, so Plinth's own tokens and Base's sign-in pages in its look are in
+   public/fonts/fonts.css, linked before it. Each value here is the literal
+   of one of those tokens (--font, --paper, --ink, --muted, --blue, --ox,
+   --green, --green-ink, --olive-bar, --olive-ink): change both together. */
+:root {
+  --rer-font-body: 'Inter', 'Inter Fallback', Arial, sans-serif;
+  --rer-font-heading: 'Inter', 'Inter Fallback', Arial, sans-serif;
+  --rer-page: #ffffff;
+  --rer-surface: #ffffff;
+  --rer-text: #061320;
+  --rer-muted: #566475;
+  --rer-border: #7f95a6;
+  --rer-focus: #0a5482;
+  --rer-link: #0a5482;
+  --rer-accent: #801030;
+  --rer-accent-text: #ffffff;
+  --rer-radius: 10px;
+  --rer-logo: url('/brand/mark.svg');
+  /* Base's /contract statuses. A done segment's count is ink on the green,
+     as Base prints partial's: white on that green is 3.8:1, under 4.5:1. */
+  --rer-done: #23955a;
+  --rer-done-ink: #15703f;
+  --rer-on-done: #061320;
+  --rer-partial: #bdb57c;
+  --rer-partial-ink: #77722f;
+  --rer-missing: #8aa2b3;
+  --rer-missing-ink: #4d6475;
+}
 
-/* The installed app's theme: the Lobby, Finish setup, Base's sign-in and
-   account pages and the workspace. Every value is a token from
-   public/brand/tokens.css; Base's --rer-* names are mapped there too. */
+/* Self-hosted variable faces (public/fonts/README.md); the grammar names
+   their format woff2. */
+/* inter-latin-opsz-normal (the run site and the installed app: headings, body and every screen) */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(/fonts/inter/inter-latin-opsz-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+/* Metric-matched fallback so the page does not shift while Inter loads. */
+@font-face { font-family: 'Inter Fallback'; src: local('Arial'); size-adjust: 107%; ascent-override: 90%; descent-override: 22%; line-gap-override: 0%; }
+
+/* jetbrains-mono-latin-wght-normal (the terminal line) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url(/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2) format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
