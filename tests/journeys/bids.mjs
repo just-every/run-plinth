@@ -40,7 +40,7 @@ try{
  }
  const url=base+`/app?job=${job.id}&tab=Bids`;await page.goto(url)
  const panel=page.getByRole('heading',{name:'Bid requests and responses',exact:true}).locator('..')
- const formFor=(p,label)=>p.locator('form').filter({has:p.getByRole('button',{name:label,exact:true})})
+ const formFor=(p,label)=>p.getByRole('button',{name:label,exact:true}).locator('xpath=ancestor::form')
  let form=formFor(page,'Prepare bid package')
  await form.getByLabel('Bid package title',{exact:true}).fill(title);await form.getByLabel('Qualified trade',{exact:true}).fill('Framing');await form.getByLabel('Package scope',{exact:true}).fill('Whole-home framing and structural carpentry')
  await form.getByLabel('Package pricing',{exact:true}).selectOption('priced')

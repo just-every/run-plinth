@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { createServer } from 'node:net'
 import { chromium } from '@playwright/test'
@@ -11,7 +11,9 @@ import { chromium } from '@playwright/test'
 const name = process.argv[2]
 assert.ok(['punch','handover','bids','todos'].includes(name), 'Choose punch, handover, bids or todos')
 assert.ok(!existsSync('.dev.vars') && !existsSync('.wrangler/state'), 'Use a fresh disposable checkout; this runner never resets an existing installation')
-const screenshots = await mkdtemp(join(tmpdir(), `plinth-${name}-screens-`))
+const screenshotRoot = join(homedir(), '.cache', 'plinth-journeys')
+await mkdir(screenshotRoot, {recursive:true})
+const screenshots = await mkdtemp(join(screenshotRoot, `plinth-${name}-screens-`))
 const socket = createServer(); await new Promise((resolve,reject) => { socket.once('error',reject);socket.listen(0,'127.0.0.1',resolve) })
 const port = socket.address().port; await new Promise(resolve => socket.close(resolve))
 const rer = resolve('node_modules/@runeditrun/rer/global/rer.mjs')
