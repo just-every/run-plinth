@@ -335,13 +335,13 @@ No separate owner-approved desk-built CLAIMS.md was supplied for Plinth as of 17
 
 ## Status
 
-Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa69` (21 October 2026).
+Judged from the code and tests at commit `f4e220392e4e8691722a5521a011a21fac271876` (22 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 27 | 26 | 67 | 120 |
-| All | 41 | 26 | 67 | 134 |
+| Target and push further | 28 | 26 | 66 | 120 |
+| All | 42 | 26 | 66 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -378,7 +378,7 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | `EST-007` | Signed estimate becomes budget and billing plan | target | done | `src/plinth/budget.ts`; `src/plinth/budget-model.ts`; `src/plinth/claims.ts`; `src/ui/quote-acceptance.tsx`; `tests/plinth/domain.test.mjs` | |
 | `EST-008` | Room design and client visualization handoff | target | missing |  | No room design and client visualization handoff workflow exists. |
 | `BID-001` | Bid requests and subcontractor responses | target | partial | `tests/plinth/subcontractors.test.mjs` — “BID-001 — three qualified contacts receive scoped revised plans, two private priced responses and one decline; current grants gate every door” proves three qualified scoped invitations, addendum acknowledgments, two priced responses/one decline, original bytes and response isolation; `tests/journeys/bids.mjs` — “BID-001 PASS” proves estimator and three private bid inbox journeys at 1440/390 | Pre-award bid access awaits ct approval against ROLE-003’s awarded-scope-only rule. Default ADOPTED: only an explicitly invited active contact in its own currently released, qualified company scope can read, download or respond; owner/admin issue invitations, assigned PMs read. No automatic outbound notices. BID-002 and ROLE-003 inherit any approved pre-award grant boundary. |
-| `BID-002` | Comparable scope and award decisions | target | missing |  | No comparable scope and award decisions workflow exists. |
+| `BID-002` | Comparable scope and award decisions | target | done | `tests/plinth/purchase-orders.test.mjs` — “BID-002 — source-backed bid leveling retains original units/exclusions, human normalization, one commitment and cost delta with explicit cancellation/replacement” proves exact originals, per-code quantity/unit/allowance/tax/exclusion/alternate/duration interpretations, missing-scope flags, retained reviews, one source-keyed approved commitment and cost adjustment, replay refusal, explicit replacement/cancellation and current office-only authority; `tests/journeys/bid-comparison.mjs` — “BID-002 PASS” proves side-by-side original comparisons, reviewed normalization, exact-source downloads, original-price award, effective cost delta and restored cost after explicit cancellation at 1440/390 | |
 | `BID-003` | Bid follow-up and procurement lead times | target | missing |  | No bid follow-up and procurement lead times workflow exists. |
 | `SCH-001` | Gantt tasks dependencies and milestones | target | done | `src/plinth/schedule-plan.ts`; `src/plinth/schedule-calendar.ts`; `src/plinth/schedule-model.ts`; `src/ui/schedule.tsx`; `src/ui/schedule-editor.tsx`; `src/ui/schedule-views.tsx`; `tests/plinth/schedule.test.mjs`; `tests/journeys/schedule.mjs` | |
 | `SCH-002` | Schedule baselines templates and variance | target | done | `src/plinth/schedule-baselines.ts`; `src/plinth/schedule-baseline-model.ts`; `src/plinth/schedule-plan.ts`; `src/ui/schedule-templates.tsx`; `src/ui/schedule-baselines.tsx`; `src/ui/schedule-baseline-forms.tsx`; `tests/plinth/schedule-baselines.test.mjs`; `tests/journeys/schedule-baselines.mjs` | |
