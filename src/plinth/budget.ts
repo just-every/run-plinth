@@ -22,6 +22,8 @@ export function freezeOriginalBudget(job: Job, actor: Actor, input: Input) {
 }
 /** Each approved change appends once; original costs, allocations and source lines never move. */
 export function reviseBudget(job:Job,actor:Actor,v:Variation) {
+ // A zero-price date decision records authority without revising economic or billing sources.
+ if(v.amount_cents===0)return
  const before=job.budgets?.at(-1);if(!before)return
  need(!job.budgets!.some(b=>b.source.kind==='variation'&&b.source.id===v.id),'The approved change is already budgeted',409,'budget_exists')
  const next=structuredClone(before),sign=v.amount_cents<0?-1:1

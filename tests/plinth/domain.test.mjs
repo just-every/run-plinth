@@ -199,6 +199,8 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   assert.equal((await act('/rfis',question,undefined,agent)).status,403)
   let r=await inboxAct('',question);assert.equal(r.status,200);const rfi=r.value.rfi,id=rfi.id;assert.equal(rfi.by.name,'Field Lead');assert.equal(rfi.sheet.document.checksum,sheet.revisions[0].document.checksum)
   assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:['rfi-trade@example.com'],reason:'Affected framing trade must review the exact revised detail'})).status,200)
+  const secondScope=await createReleasedScope(f,job,'rfi-other@example.com','Framing');job=secondScope.job
+  assert.equal((await act('/rfi-access',{email:'rfi-other@example.com',role:'trade',sheet_ids:[],subcontract_id:secondScope.scope.id})).status,200)
   const sourceResponse=await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:designer});assert.equal(sourceResponse.status,200);assert.deepEqual(Buffer.from(await sourceResponse.arrayBuffer()),drawing)
   assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:other})).status,404)
   const detail=Buffer.from('%PDF-1.4\nsynthetic-plinth-2 revised structural detail\n%%EOF'),response={text:'Move the duct opening; install the engineer-reviewed revised detail',cost_impact_cents:15000,date_impact_days:2,attachments:[{name:'revised-detail.pdf',mime:'application/pdf',base64:detail.toString('base64')}]}
@@ -209,6 +211,9 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:1,date_impact_days:2})).value.error,'rfi_review')
   assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:15000,date_impact_days:2})).status,200)
   assert.equal(job.variations.length,count+1);const change=job.variations.at(-1);assert.equal(change.status,'draft');assert.equal(change.amount_cents,15000);assert.deepEqual(job.schedules,before);assert.equal(job.orders.length,0);assert.equal(f.messages.length,messages,'Publication is in-app distribution, not claimed email')
+  assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:['rfi-trade@example.com','rfi-other@example.com'],reason:'Prepare an additional recipient for the next explicit distribution'})).status,200)
+  assert.equal((await api('/rfi-inbox',undefined,other)).value.jobs[0].rfis[0].responses.length,0,'Changing routing does not distribute an older exact response to a new recipient')
+  assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:['rfi-trade@example.com'],reason:'Retain the original distribution for this exact response'})).status,200)
   const tradeRfi=(await api('/rfi-inbox',undefined,trade)).value.jobs[0].rfis[0];assert.equal(tradeRfi.responses[0].text,response.text);assert.equal(tradeRfi.responses[0].cost_impact_cents,undefined);assert.equal(tradeRfi.responses[0].change_pending,true)
   const download=await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${answer.attachments[0].id}`,{cookie:trade});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),detail)
   assert.equal((await act(`/schedules/${task.id}/move`,{start:'2026-11-06T11:00:00Z',end:'2026-11-06T13:00:00Z'})).value.error,'schedule_hold')
@@ -229,7 +234,7 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   const latestChange=job.variations.at(-1);assert.equal((await act(`/variations/${latestChange.id}/approve`,{},client)).status,200)
   assert.equal((await inboxAct(`/${id}/respond`,{...response,text:'Date-only coordination revision',cost_impact_cents:19000,date_impact_days:3},designer)).status,200)
   const dateOnly=job.rfis[0].responses.at(-1);assert.equal((await act(`/rfis/${id}/publish`,{response_id:dateOnly.id,confirm:true,cost_impact_cents:19000,date_impact_days:3})).status,200)
-  const zeroChange=job.variations.at(-1);assert.equal(zeroChange.amount_cents,0);assert.equal((await act(`/variations/${zeroChange.id}/approve`,{},client)).status,200,'A date-only response still needs explicit native client approval')
+  const dateBudgets=structuredClone(job.budgets);const zeroChange=job.variations.at(-1);assert.equal(zeroChange.amount_cents,0);assert.equal((await act(`/variations/${zeroChange.id}/approve`,{},client)).status,200,'A date-only response still needs explicit native client approval');assert.deepEqual(job.budgets,dateBudgets,'Date-only approval preserves every economic and billing source')
   assert.equal((await act('/rfi-access',{email:'rfi-trade@example.com',revoke:true})).status,200)
   assert.deepEqual((await api('/rfi-inbox',undefined,trade)).value.jobs,[]);assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${job.rfis[0].responses[0].attachments[0].id}`,{cookie:trade})).status,404)
   const visible=(await api(`/jobs/${job.id}`,undefined,client)).value.job;assert.equal(visible.rfis,undefined);assert.equal(visible.rfi_access,undefined)

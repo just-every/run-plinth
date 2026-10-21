@@ -1,5 +1,5 @@
 import type {Attachment,Stamp} from './model'
 export interface RfiGrant {subcontract_id?:string; email:string;role:'field'|'designer'|'trade';sheet_ids:string[];by:Stamp;revoked_by?:Stamp}
-export interface RfiResponse {id:string;revision:number;text:string;attachments:Attachment[];cost_impact_cents:number;date_impact_days:number;by:Stamp;published_by?:Stamp;variation_id?:string;acknowledgments:{email:string;by:Stamp}[]}
+export interface RfiResponse {recipient_emails?:string[]; id:string;revision:number;text:string;attachments:Attachment[];cost_impact_cents:number;date_impact_days:number;by:Stamp;published_by?:Stamp;variation_id?:string;acknowledgments:{email:string;by:Stamp}[]}
 export interface Rfi {id:string;number:number;title:string;question:string;sheet?:{sheet_id:string;revision_id:string;name:string;revision:number;page:number;document:Attachment};cost_code?:string;task_ids:string[];assignee_email:string;due_on:string;recipient_emails:string[];attachments:Attachment[];by:Stamp;responses:RfiResponse[];history:{kind:'raised'|'routed'|'published'|'resolved'|'reopened';reason:string;by:Stamp}[];resolved?:{reason:string;by:Stamp}}
 export interface RfiChange {rfi_id:string;response_id:string;proposed_total_cents:number;prior_total_cents:number;date_impact_days:number;task_ids:string[];response_text:string}
