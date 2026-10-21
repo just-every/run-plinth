@@ -1,3 +1,4 @@
+import { handoverDocument } from '../fixtures/handover-document.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture } from './helpers.mjs'
@@ -162,9 +163,9 @@ test('CARE-001 — exact client-safe handover keeps assigned punch exceptions, s
   const png={name:'synthetic-plinth-1.png',mime:'image/png',base64:Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]).toString('base64')}
   const issue=(await act('/punch/issues',{title:'Adjust basin trim',description:'Unresolved minor trim adjustment',due_on:'2026-11-10',location:'Kitchen basin',photo:png,annotation:{x:0.3,y:0.4,note:'Trim gap'}})).value.record
   assert.equal((await act(`/punch/issues/${issue.id}/assign`,{subcontract_id:scope.id,email:'handover-plumber@example.com'})).status,200)
-  const pdf=Buffer.from('%PDF-1.4\nsynthetic-plinth-1 original document\n%%EOF'),file={name:'synthetic-plinth-1.pdf',mime:'application/pdf',base64:pdf.toString('base64')}
+  const file={name:'synthetic-plinth-1.pdf',mime:'application/pdf'}
   const kinds=['as-built','selection','manual','inspection','punch','warranty','final-cost','waiver'],documents=[]
-  for(const kind of kinds){const r=await act('/handover/documents',{title:'Reviewed '+kind,kind,tags:['handover'],reference:'Exact '+kind+' original revision 1',file});assert.equal(r.status,200,JSON.stringify(r.value));documents.push(r.value.record)}
+  for(const kind of kinds){const r=await act('/handover/documents',{title:'Reviewed '+kind,kind,tags:['handover'],reference:'Exact '+kind+' original revision 1',file:{...file,base64:handoverDocument(kind,1).toString('base64')}});assert.equal(r.status,200,JSON.stringify(r.value));documents.push(r.value.record)}
   const input={title:'Cedar Street final handover',documents:documents.map(d=>({document_id:d.id,revision_id:d.revisions[0].id}))}
   assert.equal((await act('/handover/packages',input)).status,409,'Unreleased punch exception cannot disappear from client handover')
   assert.equal((await act(`/punch/issues/${issue.id}/release`,{confirm:true})).status,200)
@@ -184,11 +185,11 @@ test('CARE-001 — exact client-safe handover keeps assigned punch exceptions, s
   const accepted=structuredClone(job.handover.packages[0]);assert.notEqual(accepted.completion.by.id,accepted.acceptance.by.id)
   const release={claim_id:claim.id,milestone_id:'final',lines:[{line_id:'quote:finish',amount_cents:5000}],completion_references:[{requirement:'Completion certificate',reference:pkg.id}],waiver_references:[{requirement:'Final waiver',reference:'Reviewed final waiver'}]}
   assert.equal((await act('/retainage/release',release)).status,409,'Client acceptance never bypasses the earned-value final release rule')
-  assert.equal((await act('/handover/documents/'+documents[0].id,{reference:'Later as-built revision 2',file:{...file,base64:Buffer.from('%PDF-1.4\nsynthetic-plinth-2\n%%EOF').toString('base64')}})).status,200)
+  assert.equal((await act('/handover/documents/'+documents[0].id,{reference:'Later as-built revision 2',file:{...file,base64:handoverDocument('as-built',2).toString('base64')}})).status,200)
   assert.deepEqual(job.handover.packages[0],accepted,'Later document upload preserves accepted package revisions and decisions')
   const visible=(await api(`/jobs/${job.id}/handover?q=original`,undefined,client)).value
   assert.equal(visible.packages.length,1);assert.deepEqual(visible.documents,[]);assert.equal(visible.packages[0].documents[0].source.revision,1)
-  for(const document of visible.packages[0].documents){const r=await f.request(`/api/plinth/jobs/${job.id}/handover/files/${document.source.file.id}`,{cookie:client});assert.equal(r.status,200);assert.deepEqual(Buffer.from(await r.arrayBuffer()),pdf)}
+  for(const document of visible.packages[0].documents){const r=await f.request(`/api/plinth/jobs/${job.id}/handover/files/${document.source.file.id}`,{cookie:client});assert.equal(r.status,200);assert.deepEqual(Buffer.from(await r.arrayBuffer()),handoverDocument(document.kind,1))}
   assert.equal((await api(`/jobs/${job.id}/handover`,undefined,foreign)).status,404)
   assert.equal((await api(`/jobs/${job.id}/handover`,undefined,trade)).status,404)
   const final=(await act('/claims',{description:'Final human-reviewed earned completion',lines:[{line_id:'quote:finish',completed_cents:100000,stored_cents:0,evidence:'Signed final completion certificate',order_ids:[]}]})).value.record

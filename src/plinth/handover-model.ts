@@ -9,8 +9,8 @@ export interface HandoverPackage {
  id: string; revision: number; title: string; digest: string; by: Stamp
  documents: { id: string; title: string; kind: HandoverKind; tags: string[]; source: HandoverRevision }[]
  exceptions: HandoverException[]; punch_results: { id: string; number: number; title: string; status: string; attempts: number }[]
- selection_references: { id: string; room: string; category: string; revision: number; specification: unknown }[]
- warranty_references: { id: string; snapshot: unknown }[]
+ selection_references: { id: string; room: string; category: string; revision: number; specification: { name: string; specifications: string; price_cents: number } }[]
+ warranty_references: { id: string; snapshot: { name: string; starts_on: string; ends_on: string; terms: string; signed_terms_reference: string } }[]
  completion?: { statement: string; by: Stamp }
  acceptance?: { statement: string; exception_ids: string[]; by: Stamp }
 }
