@@ -9,7 +9,7 @@ try{
  const owner=await browser.newContext(),client=await browser.newContext(),page=await owner.newPage(),cp=await client.newPage()
  for(const [p,open] of [[page,process.env.PLINTH_OWNER_OPEN],[cp,process.env.PLINTH_CLIENT_OPEN]]){await p.goto(open);await p.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))}
  const post=async(path,body)=>{const r=await owner.request.post(base+'/api/plinth'+path,{headers:{origin:base},data:body});assert.ok(r.ok(),`${path}: ${await r.text()}`);return r.json()}
- let {job}=await post('/jobs',{name:'Mason kitchen and bath — final handover '+Date.now(),client_email:'client@dev.localhost',address:'4518 Alder Avenue, Portland, OR 97211'})
+ let {job}=await post('/jobs',{name:'Mason kitchen and bath — final handover',client_email:'client@dev.localhost',address:'4518 Alder Avenue, Portland, OR 97211'})
  const read=async()=>job=(await (await owner.request.get(base+`/api/plinth/jobs/${job.id}`)).json()).job
  const act=async(path,body={})=>{const r=await post(`/jobs/${job.id}${path}`,{expected_version:job.version,...body});await read();return r.record}
  await act('/quotes',{lines:[{id:'finish',description:'Kitchen and bath finishes',cost_code:'06-100',phase:'Finish',category:'labor',quantity:'1',unit:'job',unit_cents:48000000,cost_unit_cents:35000000}]})
@@ -30,7 +30,7 @@ try{
  await page.goto(base+`/app?job=${job.id}&tab=Handover`);await page.setViewportSize({width:390,height:1000});await page.getByText('Add a handover document',{exact:true}).click()
  const upload=page.locator('form').filter({has:page.getByRole('button',{name:'Add original document',exact:true})})
  await upload.getByLabel('Document title',{exact:true}).fill(titles.manual);await upload.getByLabel('Category',{exact:true}).selectOption('manual');await upload.getByLabel('Document tags (comma separated)',{exact:true}).fill('kitchen, maintenance');await upload.getByLabel('Exact document revision reference',{exact:true}).fill('Manufacturer manual FM-104 · revision 1');await upload.getByLabel('Original document (PDF, PNG or JPEG)',{exact:true}).setInputFiles({name:'synthetic-plinth-8.pdf',mimeType:'application/pdf',buffer:pdf})
- const capture=async(p,name)=>{for(const width of [1440,390]){await p.setViewportSize({width,height:1000});await p.waitForTimeout(100);assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width);await p.screenshot({path:`${shots}/CARE-001-${name}-${width}.png`,fullPage:true,animations:'disabled'})}}
+ const capture=async(p,name)=>{for(const width of [1440,390]){await p.setViewportSize({width,height:1000});await p.evaluate(()=>scrollTo(0,0));await p.waitForTimeout(100);assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width);await p.screenshot({path:`${shots}/CARE-001-${name}-${width}.png`,fullPage:true,animations:'disabled'})}}
  await capture(page,'document-upload');await upload.getByRole('button',{name:'Add original document',exact:true}).click();await expect(page.getByRole('heading',{name:titles.manual,exact:true})).toBeVisible();await read();docs.push(job.handover.documents.at(-1))
  await page.getByText('Prepare an exact handover package',{exact:true}).click();const prepare=page.locator('form').filter({has:page.getByRole('button',{name:'Prepare handover package',exact:true})})
  await prepare.getByLabel('Package title',{exact:true}).fill('Mason residence — reviewed final handover')
