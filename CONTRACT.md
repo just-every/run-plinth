@@ -340,8 +340,8 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 27 | 24 | 69 | 120 |
-| All | 41 | 24 | 69 | 134 |
+| Target and push further | 27 | 25 | 68 | 120 |
+| All | 41 | 25 | 68 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -377,7 +377,7 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | `EST-006` | Branded electronic proposals and contracts | target | partial | `src/plinth/quotes.ts`; `src/ui/scope.tsx` | Manager-recorded acceptance exists; proposal delivery, signer workflow and client electronic contract execution are absent. |
 | `EST-007` | Signed estimate becomes budget and billing plan | target | done | `src/plinth/budget.ts`; `src/plinth/budget-model.ts`; `src/plinth/claims.ts`; `src/ui/quote-acceptance.tsx`; `tests/plinth/domain.test.mjs` | |
 | `EST-008` | Room design and client visualization handoff | target | missing |  | No room design and client visualization handoff workflow exists. |
-| `BID-001` | Bid requests and subcontractor responses | target | missing |  | No bid requests and subcontractor responses workflow exists. |
+| `BID-001` | Bid requests and subcontractor responses | target | partial | `tests/plinth/subcontractors.test.mjs` — “BID-001 — three qualified contacts receive scoped revised plans, two private priced responses and one decline; current grants gate every door” proves three qualified scoped invitations, addendum acknowledgments, two priced responses/one decline, original bytes and response isolation; `tests/journeys/bids.mjs` — “BID-001 PASS” proves estimator and three private bid inbox journeys at 1440/390 | Pre-award bid access awaits ct approval against ROLE-003’s awarded-scope-only rule. Default ADOPTED: only an explicitly invited active contact in its own currently released, qualified company scope can read, download or respond; owner/admin issue invitations, assigned PMs read. No automatic outbound notices. BID-002 and ROLE-003 inherit any approved pre-award grant boundary. |
 | `BID-002` | Comparable scope and award decisions | target | missing |  | No comparable scope and award decisions workflow exists. |
 | `BID-003` | Bid follow-up and procurement lead times | target | missing |  | No bid follow-up and procurement lead times workflow exists. |
 | `SCH-001` | Gantt tasks dependencies and milestones | target | done | `src/plinth/schedule-plan.ts`; `src/plinth/schedule-calendar.ts`; `src/plinth/schedule-model.ts`; `src/ui/schedule.tsx`; `src/ui/schedule-editor.tsx`; `src/ui/schedule-views.tsx`; `tests/plinth/schedule.test.mjs`; `tests/journeys/schedule.mjs` | |

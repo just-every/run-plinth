@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { api, initials } from './shared'
 import { Icon, type IconName } from './icons'
 
-export type View = 'jobs' | 'imports' | 'people' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch'
+export type View = 'jobs' | 'imports' | 'people' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids'
 export type Me = { displayName: string; email: string; role: string }
 const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', client: 'Client', member: 'Client' }
 
@@ -16,6 +16,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
     <div className="rail-top"><a className="lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span data-rer-name>Plinth</span></a><button className="icon-button rail-close" aria-label="Close menu" onClick={onClose}><Icon name="close" /></button></div>
     <ul className="rail-nav">
       {item('jobs', 'folder', 'Jobs', jobs.length)}
+      {role === 'client' && item('bids','folder','Bid inbox')}
       {role === 'client' && item('punch','folder','Punch inbox')}
       {role === 'client' && item('rfis','folder','RFI inbox')}
       {role === 'client' && item('trade','calendar','Trade inbox')}

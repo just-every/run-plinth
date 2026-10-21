@@ -228,3 +228,84 @@ test('SUB-004 — conditional waiver for a sub draw, exact signed release, recor
   assert.ok(!JSON.stringify(r.value).includes('Northern Wire') && !JSON.stringify(r.value).includes('lien_waivers'), 'Clients never see sub draws or waivers')
  } finally { await f.close() }
 })
+
+test('BID-001 — three qualified contacts receive scoped revised plans, two private priced responses and one decline; current grants gate every door', async () => {
+ const f=await createFixture()
+ try{
+  const cookies=await Promise.all([1,2,3,4].map(n=>f.invite(`synthetic-plinth-${n}@example.com`,`Synthetic bidder ${n}`))),agent=await f.agent()
+  const api=(path,body,cookie=f.owner)=>f.json('/api/plinth'+path,{method:body===undefined?'GET':'POST',cookie,body})
+  let result=await api('/jobs',{name:'synthetic-plinth-1',client_email:'synthetic-plinth-4@example.com',address:'Synthetic bid site'}),job=result.value.job
+  const jobAct=async(path,body)=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body});assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job;return r.value.record}
+  const codes=['06-100','06-200','06-300']
+  await jobAct('/quotes',{lines:codes.map((code,n)=>({id:`synthetic-plinth-${n+1}`,description:`Synthetic scope ${n+1}`,quantity:'1',unit:'job',unit_cents:100000,cost_code:code,phase:'Structure',category:'labor'}))})
+  await jobAct(`/quotes/${job.quotes[0].id}/accept`,{method:'signed',evidence:'Synthetic client accepted the exact estimate',schedule_choice:{kind:'none',reason:'Bid preparation first'}})
+  const vendors=[],scopes=[]
+  for(let n=0;n<3;n++){
+   let r=await api('/vendors',{kind:'subcontractor',name:`synthetic-plinth-${n+1}`,trades:['Framing'],contacts:[{id:`synthetic-plinth-${n+1}`,name:`Synthetic bidder ${n+1}`,email:`synthetic-plinth-${n+1}@example.com`}]});assert.equal(r.status,201);let vendor=r.value.vendor
+   r=await api(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Framing',status:'qualified',evidence:'Synthetic human-reviewed qualification'});assert.equal(r.status,200);vendors.push(r.value.vendor)
+   const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:`Synthetic released scope ${n+1}`,contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`,{})
+  }
+  const original=Buffer.from('%PDF-1.7\nsynthetic-plinth-1 plan\n%%EOF'),revised=Buffer.from('%PDF-1.7\nsynthetic-plinth-2 revised plan\n%%EOF'),file=(name,bytes)=>({name,base64:bytes.toString('base64')})
+  let source=(await api(`/bids/${job.id}`)).value.source
+  const act=async(path,body={},cookie=f.owner)=>{const r=await api(`/bids/${job.id}${path}`,{expected_version:source.version,...body},cookie);if(r.value.source)source=r.value.source;return r}
+  const initial={title:'Synthetic framing package',trade:'Framing',scope:'Private estimator package description',mode:'priced',lines:codes.map((cost_code,n)=>({cost_code,description:`Invited scope ${n+1}`,budget_cents:100000+n})),note:'Initial plans',due_on:'2099-12-31',plans:[file('synthetic-plinth-1.pdf',original)]}
+  assert.equal((await api(`/bids/${job.id}`,{expected_version:source.version,...initial},cookies[0])).status,404)
+  assert.equal((await f.json(`/api/plinth/bids/${job.id}`,{method:'POST',token:agent,body:{expected_version:source.version,...initial}})).status,403)
+  result=await act('',initial);assert.equal(result.status,201,JSON.stringify(result.value));const id=result.value.record_id,revision=source.bids[0].revisions[0].id
+  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[0],cost_codes:[codes[0]],confirm:true})).status,409,'Draft package cannot be invited')
+  assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:false})).status,400)
+  assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:true})).status,200)
+  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[1],cost_codes:[codes[0]],confirm:true})).status,409,'A rival released scope cannot grant access')
+  for(let n=0;n<3;n++)assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[n].id,contact_id:`synthetic-plinth-${n+1}`,subcontract_id:scopes[n],cost_codes:[codes[n]],confirm:true})).status,200)
+  assert.equal((await api(`/jobs/${job.id}`,undefined,cookies[0])).status,404,'Invitation never grants general job access')
+  assert.equal((await api(`/bids/${job.id}`,undefined,cookies[3])).status,404,'Uninvited job client cannot read bids')
+  assert.equal((await api(`/jobs/${job.id}`,undefined,cookies[3])).value.job.bids,undefined,'General client projection strips private bid state')
+  assert.equal((await f.request(`/api/plinth/bids/${job.id}`)).status,401)
+  const oldVersion=source.version
+  assert.equal((await act(`/${id}/acknowledge`,{revision_id:revision},cookies[0])).status,200)
+  assert.equal((await api(`/bids/${job.id}/${id}/question`,{expected_version:oldVersion,revision_id:revision,text:'stale'},cookies[0])).status,409)
+  const past=`${new Date().getUTCFullYear()-1}-12-31`
+  assert.equal((await act(`/${id}/addendum`,{revision_id:revision,confirm:true,note:'Revised detail A',due_on:past,plans:[file('synthetic-plinth-2.pdf',revised)]})).status,200)
+  const current=source.bids[0].revisions.at(-1).id
+  assert.equal((await act(`/${id}/respond`,{revision_id:revision,items:[]},cookies[0])).status,409,'Superseded revision cannot receive prices')
+  assert.equal((await act(`/${id}/respond`,{revision_id:current,items:[]},cookies[0])).status,409,'Reading is not acknowledgment')
+  assert.equal((await act(`/${id}/question`,{revision_id:current,text:'Synthetic private question 1'},cookies[0])).status,200)
+  let ownerSource=(await api(`/bids/${job.id}`)).value.source,invitation=ownerSource.bids[0].invitations[0]
+  assert.equal((await act(`/${id}/answer`,{invitation_id:invitation.id,question_id:invitation.questions[0].id,text:'Synthetic private answer 1'})).status,200)
+  for(let n=0;n<2;n++){
+   assert.equal((await act(`/${id}/acknowledge`,{revision_id:current},cookies[n])).status,200)
+   assert.equal((await act(`/${id}/respond`,{revision_id:current,items:[{cost_code:codes[(n+1)%3],description:'Rival scope',amount_cents:50000}]},cookies[n])).status,400)
+   result=await act(`/${id}/respond`,{revision_id:current,items:[{cost_code:codes[n],description:`Synthetic private price ${n+1}`,amount_cents:123400+n}],exclusions:`Synthetic exclusion ${n+1}`,attachments:[file(`synthetic-plinth-${n+3}.pdf`,original)]},cookies[n]);assert.equal(result.status,200,JSON.stringify(result.value))
+   assert.equal((await act(`/${id}/respond`,{revision_id:current,items:[]},cookies[n])).status,409,'Submitted original is immutable')
+  }
+  assert.equal((await act(`/${id}/acknowledge`,{revision_id:current},cookies[2])).status,200)
+  assert.equal((await act(`/${id}/decline`,{revision_id:current,reason:'Synthetic unavailable crew'},cookies[2])).status,200)
+  ownerSource=(await api(`/bids/${job.id}`)).value.source
+  const bid=ownerSource.bids[0];assert.deepEqual(bid.invitations.map(i=>i.status),['Received','Received','Declined']);assert.ok(bid.invitations.every(i=>i.late&&i.acknowledgments.some(a=>a.revision_id===current)))
+  assert.equal(bid.revisions.length,2);assert.equal(bid.invitations[0].responses[0].total_cents,123400)
+  const ownFile=bid.invitations[0].responses[0].attachments[0].id,rivalFile=bid.invitations[1].responses[0].attachments[0].id,planFile=bid.revisions[1].plans[0].id
+  for(let n=0;n<3;n++){
+   const projected=(await api(`/bids/${job.id}`,undefined,cookies[n])).value.source.bids[0]
+   assert.equal(projected.invitations.length,1);assert.equal(projected.invitations[0].email,`synthetic-plinth-${n+1}@example.com`);assert.deepEqual(projected.lines.map(l=>l.cost_code),[codes[n]])
+   const serialized=JSON.stringify(projected);assert.ok(!serialized.includes(`synthetic-plinth-${(n+1)%3+1}@example.com`));if(n!==0)assert.ok(!serialized.includes('Synthetic private question 1')&&!serialized.includes('Synthetic private answer 1'))
+   const download=await f.request(`/api/plinth/bids/${job.id}/files/${planFile}`,{cookie:cookies[n]});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),revised)
+  }
+  assert.equal((await f.request(`/api/plinth/bids/${job.id}/files/${rivalFile}`,{cookie:cookies[0]})).status,404)
+  assert.equal((await f.request(`/api/plinth/bids/${job.id}/files/${ownFile}`,{cookie:cookies[0]})).status,200)
+  assert.equal((await api(`/jobs/${job.id}/bids`)).status,200,'Job route authenticates independently')
+  assert.equal((await api(`/jobs/${job.id}/bids`,undefined,cookies[3])).status,404)
+  const messages=f.messages.length
+  result=await act('',{...initial,title:'Synthetic unpriced package',mode:'unpriced'});assert.equal(result.status,201);assert.ok(source.bids.at(-1).lines.every(l=>l.budget_cents===undefined));assert.equal(f.messages.length,messages,'Bids never send automatic notices')
+  result=await api(`/vendors/${vendors[0].id}/qualifications`,{expected_version:vendors[0].version,trade:'Framing',status:'rejected',evidence:'Synthetic qualification withdrawn'});assert.equal(result.status,200)
+  for(const path of [`/bids/${job.id}`,`/bids/${job.id}/files/${ownFile}`,`/bids/${job.id}/files/${planFile}`])assert.equal((await api(path,undefined,cookies[0])).status,404,'Qualification withdrawal removes every portal door')
+  assert.equal((await act(`/${id}/question`,{revision_id:current,text:'No longer qualified'},cookies[0])).status,404)
+  const v=vendors[1]
+  result=await api(`/vendors/${v.id}`,{expected_version:v.version,contacts:[{...v.contacts[0],email:'synthetic-plinth-5@example.com'}]});assert.equal(result.status,200)
+  assert.equal((await api(`/bids/${job.id}`,undefined,cookies[1])).status,404,'A changed directory contact immediately loses the grant')
+  assert.equal((await act(`/${id}/revoke`,{invitation_id:bid.invitations[2].id})).status,200)
+  assert.equal((await api(`/bids/${job.id}`,undefined,cookies[2])).status,404,'Explicit revocation removes access')
+  const people=(await f.json('/auth/operators',{cookie:f.owner})).value,person=people.find(p=>p.email==='synthetic-plinth-3@example.com')
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
+  assert.equal((await api('/bids',undefined,cookies[2])).status,401,'An inactive member cannot reach the portal at all')
+ }finally{await f.close()}
+})
