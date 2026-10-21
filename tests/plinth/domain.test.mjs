@@ -1,6 +1,7 @@
+import { takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createActiveJob, createFixture } from './helpers.mjs'
+import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
 // Six public business flows share one real Worker to keep local resource use small.
 test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const f=await createFixture();try{
@@ -172,5 +173,65 @@ test('EST-007 / AUTO-002 — exact recorded acceptance freezes one coded origina
   assert.equal((await act('/quotes/'+q.id+'/accept',{...accept,budget:{},schedule_choice:{kind:'template',input:{...input,digest:preview.digest}}})).status,200)
   assert.equal(job.continuity.length,1);assert.equal(job.continuity[0].source.id,q.id);assert.equal(job.continuity[0].budget_id,job.budgets[0].id)
   assert.equal(job.schedules.length,1);assert.equal(job.schedules[0].start,'2026-11-09T13:00:00.000Z');assert.equal(job.time_zone,'America/New_York');assert.equal(job.budgets[0].schedule.application.template_id,template.id);assert.equal(job.budgets[0].schedule.application.template_version,template.version);assert.deepEqual(job.budgets[0].schedule.application.task_ids,job.schedules.map(t=>t.id))
+ }finally{await f.close()}
+})
+
+test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trade distribution and acknowledgment, client-change work hold and revocation',async()=>{
+ const f=await createFixture()
+ try{
+  const field=await f.invite('field@example.com','Field Lead'),designer=await f.invite('designer@example.com','Design Reviewer'),trade=await f.invite('rfi-trade@example.com','Affected Trade'),other=await f.invite('rfi-other@example.com'),client=await f.invite('client@example.com','Client Reviewer'),agent=await f.agent()
+  const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{cookie,token,...(body?{method:'POST',body}:{})})
+  let job=(await api('/jobs',{name:'RFI kitchen clash',client_email:'client@example.com'})).value.job
+  const read=async()=>{job=(await api(`/jobs/${job.id}`)).value.job;return job}
+  const act=async(path,body={},cookie=f.owner,token)=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body},cookie,token);await read();return r}
+  const inboxAct=async(path,body={},cookie=field)=>{const r=await api(`/rfi-inbox/${job.id}/rfis${path}`,{expected_version:job.version,...body},cookie);await read();return r}
+  assert.equal((await act('/quotes',{lines:[{id:'framing',description:'Kitchen framing',cost_code:'06-100',phase:'Structure',category:'labor',quantity:'1',unit:'job',unit_cents:100000,cost_unit_cents:80000}]})).status,200)
+  assert.equal((await act(`/quotes/${job.quotes[0].id}/accept`,{method:'email',evidence:'Recorded client acceptance',schedule_choice:{kind:'none',reason:'Field dimensions pending'}})).status,200)
+  const drawing=takeoffPlan(),original={name:'kitchen-sheet.pdf',mime:'application/pdf',base64:drawing.toString('base64')}
+  assert.equal((await act('/takeoff',{name:'A1 Kitchen',page:1,width:400,height:400,document:original})).status,200);const sheet=job.takeoff[0]
+  assert.equal((await act('/schedules',{trade:'Framing',description:'Frame affected wall',start:'2026-11-06T08:00:00Z',end:'2026-11-06T10:00:00Z'})).status,200);const task=job.schedules[0]
+  const scopeSetup=await createReleasedScope(f,job,'rfi-trade@example.com','Framing');job=scopeSetup.job
+  for(const [email,role,sheet_ids] of [['field@example.com','field',[sheet.id]],['designer@example.com','designer',[]],['rfi-trade@example.com','trade',[]]])assert.equal((await act('/rfi-access',{email,role,sheet_ids,...(role==='trade'?{subcontract_id:scopeSetup.scope.id}:{})})).status,200)
+  assert.deepEqual((await api('/rfi-inbox',undefined,other)).value.jobs,[]);assert.equal((await api(`/jobs/${job.id}`,undefined,field)).status,404)
+  const source=(await api('/rfi-inbox',undefined,field)).value.jobs[0];assert.equal(source.sheets[0].revisions[0].id,sheet.revisions[0].id);assert.deepEqual(source.cost_codes,['06-100']);assert.equal(source.quotes,undefined)
+  const question={title:'Beam and duct clash',question:'Resolve the beam/duct conflict at grid C3',sheet:{sheet_id:sheet.id,revision_id:sheet.revisions[0].id},cost_code:'06-100',task_ids:[task.id],assignee_email:'designer@example.com',due_on:'2026-11-04',attachments:[original]}
+  assert.equal((await inboxAct('',question,designer)).status,403)
+  assert.equal((await act('/rfis',question,undefined,agent)).status,403)
+  let r=await inboxAct('',question);assert.equal(r.status,200);const rfi=r.value.rfi,id=rfi.id;assert.equal(rfi.by.name,'Field Lead');assert.equal(rfi.sheet.document.checksum,sheet.revisions[0].document.checksum)
+  assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:['rfi-trade@example.com'],reason:'Affected framing trade must review the exact revised detail'})).status,200)
+  const sourceResponse=await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:designer});assert.equal(sourceResponse.status,200);assert.deepEqual(Buffer.from(await sourceResponse.arrayBuffer()),drawing)
+  assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:other})).status,404)
+  const detail=Buffer.from('%PDF-1.4\nsynthetic-plinth-2 revised structural detail\n%%EOF'),response={text:'Move the duct opening; install the engineer-reviewed revised detail',cost_impact_cents:15000,date_impact_days:2,attachments:[{name:'revised-detail.pdf',mime:'application/pdf',base64:detail.toString('base64')}]}
+  assert.equal((await inboxAct(`/${id}/respond`,response,trade)).status,403)
+  r=await inboxAct(`/${id}/respond`,response,designer);assert.equal(r.status,200);let answer=job.rfis[0].responses[0]
+  assert.equal((await api('/rfi-inbox',undefined,trade)).value.jobs[0].rfis[0].responses.length,0,'Unreviewed design responses are not distributed')
+  const count=job.variations.length,before=structuredClone(job.schedules),messages=f.messages.length
+  assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:1,date_impact_days:2})).value.error,'rfi_review')
+  assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:15000,date_impact_days:2})).status,200)
+  assert.equal(job.variations.length,count+1);const change=job.variations.at(-1);assert.equal(change.status,'draft');assert.equal(change.amount_cents,15000);assert.deepEqual(job.schedules,before);assert.equal(job.orders.length,0);assert.equal(f.messages.length,messages,'Publication is in-app distribution, not claimed email')
+  const tradeRfi=(await api('/rfi-inbox',undefined,trade)).value.jobs[0].rfis[0];assert.equal(tradeRfi.responses[0].text,response.text);assert.equal(tradeRfi.responses[0].cost_impact_cents,undefined);assert.equal(tradeRfi.responses[0].change_pending,true)
+  const download=await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${answer.attachments[0].id}`,{cookie:trade});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),detail)
+  assert.equal((await act(`/schedules/${task.id}/move`,{start:'2026-11-06T11:00:00Z',end:'2026-11-06T13:00:00Z'})).value.error,'schedule_hold')
+  assert.equal((await act(`/rfis/${id}/resolve`,{reason:'Too early'})).value.error,'rfi_change_pending')
+  assert.equal((await act(`/variations/${change.id}/approve`)).status,403)
+  assert.equal((await inboxAct(`/${id}/acknowledge`,{response_id:answer.id},trade)).status,200);assert.equal((await inboxAct(`/${id}/acknowledge`,{response_id:answer.id},trade)).status,409)
+  assert.equal((await act(`/variations/${change.id}/approve`,{},client)).status,200);assert.deepEqual(job.schedules,before,'Client change approval never publishes dates automatically')
+  assert.equal((await act(`/rfis/${id}/resolve`,{reason:'Client approved extra work; trade acknowledged exact detail'})).status,200);assert.equal(job.rfis[0].resolved.by.name,'Builder')
+  assert.equal((await act(`/schedules/${task.id}/move`,{start:'2026-11-06T11:00:00Z',end:'2026-11-06T13:00:00Z'})).status,200)
+  assert.equal((await act(`/rfis/${id}/reopen`,{reason:'Further coordination required'})).status,200)
+  r=await inboxAct(`/${id}/respond`,{...response,text:'Second revised detail',cost_impact_cents:18000},designer);assert.equal(r.status,200);answer=job.rfis[0].responses.at(-1)
+  assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:18000,date_impact_days:2})).status,200);assert.equal(job.variations.at(-1).amount_cents,3000,'A revision changes only the increment from the last approved RFI price')
+  const supersededChange=job.variations.at(-1)
+  r=await inboxAct(`/${id}/respond`,{...response,text:'Third exact design response',cost_impact_cents:19000},designer);assert.equal(r.status,200);const latest=job.rfis[0].responses.at(-1)
+  assert.equal((await act(`/rfis/${id}/publish`,{response_id:latest.id,confirm:true,cost_impact_cents:19000,date_impact_days:2})).status,200)
+  assert.equal((await act(`/variations/${supersededChange.id}/approve`,{},client)).value.error,'rfi_stale')
+  assert.equal(job.rfis[0].responses[0].text,response.text);assert.equal(job.rfis[0].responses[0].acknowledgments[0].by.name,'Affected Trade')
+  const latestChange=job.variations.at(-1);assert.equal((await act(`/variations/${latestChange.id}/approve`,{},client)).status,200)
+  assert.equal((await inboxAct(`/${id}/respond`,{...response,text:'Date-only coordination revision',cost_impact_cents:19000,date_impact_days:3},designer)).status,200)
+  const dateOnly=job.rfis[0].responses.at(-1);assert.equal((await act(`/rfis/${id}/publish`,{response_id:dateOnly.id,confirm:true,cost_impact_cents:19000,date_impact_days:3})).status,200)
+  const zeroChange=job.variations.at(-1);assert.equal(zeroChange.amount_cents,0);assert.equal((await act(`/variations/${zeroChange.id}/approve`,{},client)).status,200,'A date-only response still needs explicit native client approval')
+  assert.equal((await act('/rfi-access',{email:'rfi-trade@example.com',revoke:true})).status,200)
+  assert.deepEqual((await api('/rfi-inbox',undefined,trade)).value.jobs,[]);assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${job.rfis[0].responses[0].attachments[0].id}`,{cookie:trade})).status,404)
+  const visible=(await api(`/jobs/${job.id}`,undefined,client)).value.job;assert.equal(visible.rfis,undefined);assert.equal(visible.rfi_access,undefined)
  }finally{await f.close()}
 })

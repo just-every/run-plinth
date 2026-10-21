@@ -1,3 +1,5 @@
+import { rfiAction, rfiAccess, rfiFile } from './rfis'
+import { rfiInboxResponse } from './rfi-inbox'
 import { travelFields } from './schedule-travel'
 import { tradePortalResponse, inviteTrade } from './trade-confirmations'
 import { resourceResponse, resources, resourceConflicts, scopedConflicts, requireResources } from './schedule-resources'
@@ -28,7 +30,7 @@ import { pricingResponse, previewPricing, applyPricing } from './estimate-pricin
 import { catalogResponse } from './estimate-catalog'
 import { catalogPreview, applyCatalog } from './catalog-quote'
 import { costCodeReport, costCodeCsv, projectEstimateCosts } from './estimate-report'
-import { constraintAction, constraintFile } from './schedule-constraints'
+import { constraintAction, constraintFile, requireScheduleClearance } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireJobManager, requireManager, requireOwner } from './auth'
 import { teamResponse } from './team'
@@ -63,7 +65,7 @@ async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await d
 function display(job:Job,actor:Actor) {
  if(actor.role!=='member')return {...job,invoices:invoiceProjection(job,actor),invoice_deposit_liability_cents:depositLiability(job),subcontracts:job.subcontracts?.map(sub=>({...sub,retainage_balance:supplierRetainageBalance(sub)})),retainage_balance:currentRetainageBalance(job),selections:selectionProjection(job,false)}
  const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,sov:undefined,reconciliation}})
- const safe=projectEstimateCosts({...job,remittances:undefined,invoices:invoiceProjection(job,actor),invoice_deposit_liability_cents:depositLiability(job),retainage:undefined,retainage_balance:undefined,continuity:undefined,takeoff:undefined,trade_invitations:undefined,products:undefined,budgets:undefined,warranties:undefined,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
+ const safe=projectEstimateCosts({...job,remittances:undefined,invoices:invoiceProjection(job,actor),invoice_deposit_liability_cents:depositLiability(job),retainage:undefined,retainage_balance:undefined,continuity:undefined,takeoff:undefined,rfis:undefined,rfi_access:undefined,trade_invitations:undefined,products:undefined,budgets:undefined,warranties:undefined,sov:undefined,selections:undefined,subcontracts:undefined,schedule_constraints:undefined,schedule_actuals:job.schedule_published_actuals??[],quotes:job.quotes.filter(q=>q.status==='accepted'),schedules:job.schedules.filter(s=>s.status!=='draft'),diary:job.diary.filter(d=>d.status==='published'),orders:[],claims,approvals:job.approvals.filter(a=>['quote','variation','schedule','schedule.move','schedule.cancel','schedule.publish','schedule.baseline','schedule.revision','schedule.template','diary','selection.sign'].includes(a.kind)).map(a=>{if(!['schedule.publish','schedule.revision'].includes(a.kind))return a;const snapshot=structuredClone(a.snapshot) as {before?:{tasks?:Job['schedules']}};if(snapshot.before?.tasks)snapshot.before.tasks=snapshot.before.tasks.filter(s=>s.status!=='draft');return {...a,snapshot}})})
  return JSON.parse(JSON.stringify({...safe,selections:publicProductSources(selectionProjection(job,true)),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:publicProductSources(job.approvals.find(source=>source.id===a.id)!.snapshot)}:a)},(key,value)=>['resources','trade_invitations'].includes(key)?undefined:value))
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
@@ -78,6 +80,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
  const pricing=await pricingResponse(request,env.DB,actor,parts,body);if(pricing)return pricing
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
+ const rfiInbox=await rfiInboxResponse(request,env,actor,parts,body);if(rfiInbox)return rfiInbox
  const tradePortal=await tradePortalResponse(request,env,actor,parts,body);if(tradePortal)return tradePortal
  const resource=await resourceResponse(request,env.DB,actor,parts,body);if(resource)return resource
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
@@ -112,6 +115,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===4&&parts[2]==='takeoff-files'&&method==='GET')return takeoffFile(env.DB,previous,actor,parts[3]!)
+ if(parts.length===4&&parts[2]==='rfi-files'&&method==='GET')return rfiFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='decision-files'&&method==='GET')return selectionDecisionFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='product-images'&&method==='GET')return productImage(env.DB,previous,actor,parts[3]!)
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
@@ -140,8 +144,10 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='schedules'&&parts.length===5&&action==='invite')record=await inviteTrade(env.DB,job,actor,input,id!)
- else if(category==='schedules'&&parts.length===5&&action==='resources'){requireJobManager(actor);const row=job.schedules.find(t=>t.id===id);need(row,'Task not found',404,'not_found');Object.assign(row,allocations(input,row),travelFields(input,row));checkConflicts(await jobs(env.DB),job,row);row.revision=(row.revision??0)+1;row.updated_at=new Date().toISOString();recordApproval(job,actor,'schedule.resources',row,row);record=row}
+ if(category==='rfi-access'&&parts.length===3)record=await rfiAccess(env.DB,job,actor,input)
+ else if(category==='rfis'&&(parts.length===3||parts.length===5)){const result=await rfiAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='schedules'&&parts.length===5&&action==='invite')record=await inviteTrade(env.DB,job,actor,input,id!)
+ else if(category==='schedules'&&parts.length===5&&action==='resources'){requireJobManager(actor);const row=job.schedules.find(t=>t.id===id);need(row,'Task not found',404,'not_found');Object.assign(row,allocations(input,row),travelFields(input,row));checkConflicts(await jobs(env.DB),job,row);requireScheduleClearance(job,[row]);row.revision=(row.revision??0)+1;row.updated_at=new Date().toISOString();recordApproval(job,actor,'schedule.resources',row,row);record=row}
  else if(category==='continuity'&&parts.length===5&&action==='resume')record=resumeContinuity(job,actor,id!)
  else if(category==='takeoff'&&(parts.length===3||parts.length===5)){const result=await takeoffAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='takeoff-estimate'&&id==='apply'&&parts.length===4)record=await applyTakeoff(env.DB,job,actor,input)

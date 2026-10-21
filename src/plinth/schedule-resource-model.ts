@@ -2,7 +2,7 @@ import { need, object, text, type Input, type Schedule, type Stamp } from './mod
 export interface Allocation { resource_id:string; units:number }
 export interface ResourceWindow { start:string; end:string; reason:string }
 export interface ScheduleResource { id:string; version:number; name:string; kind:'crew'|'equipment'; capacity:number; available:ResourceWindow[]; leave:ResourceWindow[]; history:{by:Stamp; reason:string; capacity:number; available:ResourceWindow[]; leave:ResourceWindow[]}[] }
-export interface TradeInvitation {id:string; task_id:string; email:string; invited_by:Stamp; snapshot:string; start:string; end:string; responses:{kind:'confirm'|'alternative'; start:string; end:string; reason:string; by:Stamp}[]}
+export interface TradeInvitation {subcontract_id:string; id:string; task_id:string; email:string; invited_by:Stamp; snapshot:string; start:string; end:string; responses:{kind:'confirm'|'alternative'; start:string; end:string; reason:string; by:Stamp}[]}
 export function allocations(input:Input,old?:Schedule):{resources?:Allocation[]}{
  if(input.resources===undefined)return old?.resources?{resources:structuredClone(old.resources)}:{}
  need(Array.isArray(input.resources)&&input.resources.length<=30,'Allocate up to 30 crews or equipment resources')

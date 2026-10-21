@@ -1,3 +1,4 @@
+import { RfiInbox } from './rfis'
 import { TradeInbox } from './trade-inbox'
 import { Reports } from './reports'
 import { useEffect, useRef, useState } from 'react'
@@ -34,6 +35,7 @@ export function Workspace() {
       <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
+        {view === 'rfis' && <RfiInbox/>}
         {view === 'trade' && <TradeInbox/>}
         {view === 'customers' && manager && <Customers />}
         {view === 'vendors' && manager && <Vendors />}

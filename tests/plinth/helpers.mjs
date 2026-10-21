@@ -32,3 +32,11 @@ export async function createFixture({persistTo,ownerCookie,mailResponse,mailProv
  } catch(error) { await mf.dispose();throw error }
 }
 export async function createActiveJob(f,name='Kitchen renovation',client_email='client@example.com',total=1_000_000){let r=await f.json('/api/plinth/jobs',{method:'POST',cookie:f.owner,body:{name,client_email,address:'22 Example Street'}});assert.equal(r.status,201);let job=r.value.job;r=await f.json(`/api/plinth/jobs/${job.id}/quotes`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,lines:[{description:'Agreed renovation works including GST',quantity:1,unit_cents:total}]}});assert.equal(r.status,200);job=r.value.job;r=await f.json(`/api/plinth/jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,method:'signed',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'},evidence:'Signed quote returned by the client'}});assert.equal(r.status,200);return r.value.job}
+/** Create a qualified company and release its actual contact-bound scope through public business doors. */
+export async function createReleasedScope(f,job,email,trade){
+ const api=(path,body)=>f.json('/api/plinth'+path,{method:'POST',cookie:f.owner,body})
+ let r=await api('/vendors',{kind:'subcontractor',name:'Synthetic '+trade+' company',trades:[trade],contacts:[{id:'scope-contact',name:'Assigned trade contact',email}]});assert.equal(r.status,201);const vendor=r.value.vendor
+ r=await api(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade,status:'qualified',evidence:'Human reviewed synthetic qualification'});assert.equal(r.status,200)
+ r=await api(`/jobs/${job.id}/subcontracts`,{expected_version:job.version,vendor_id:vendor.id,trade,scope:'Assigned '+trade+' work',contact_ids:['scope-contact'],awarded_on:'2026-10-21'});assert.equal(r.status,200);job=r.value.job;const scope=r.value.record
+ r=await api(`/jobs/${job.id}/subcontracts/${scope.id}/release`,{expected_version:job.version});assert.equal(r.status,200);return {job:r.value.job,scope:r.value.record,vendor}
+}

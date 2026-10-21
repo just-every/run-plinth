@@ -1,3 +1,4 @@
+import { RfiWorkspace } from './rfis'
 import { Products } from './products'
 import { Warranties } from './warranties'
 import { Selections } from './selections'
@@ -14,7 +15,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -44,7 +45,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
         <li><Icon name="money" />{job.status === 'active' ? <>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
         <li><Icon name="mail" />Client {job.client_email}</li>
       </ul>
-      <nav className="tabs" aria-label="Job sections">{sections.filter(s => !['Customer','Warranty'].includes(s) || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
+      <nav className="tabs" aria-label="Job sections">{sections.filter(s => !['Customer','Warranty','RFIs'].includes(s) || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
     <div className="job-body">
       {open !== 'Schedule' && <DecisionStrip job={job} manager={manager} go={setSection} />}
@@ -56,6 +57,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} /><Subcontracts {...props} /></>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
+      {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
       {open === 'Warranty' && manager && <Warranties {...props} />}
       {open === 'History' && <History {...props} onErased={onBack} />}
     </div>

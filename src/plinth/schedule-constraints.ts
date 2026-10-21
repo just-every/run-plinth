@@ -1,3 +1,4 @@
+import { rfiWorkHolds } from './rfis'
 import { requireJobManager } from './auth'
 import { digest, fromBase64 } from './attachments'
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Attachment, type Input, type Job, type Schedule } from './model'
@@ -17,6 +18,7 @@ export function scheduleBlockers(job: Job, tasks: Schedule[]): ScheduleBlocker[]
   }
   for (const task of tasks.filter(t => t.status !== 'cancelled' && (!constraint.task_ids.length || affected.has(t.id)))) result.push({ constraint_id: constraint.id, title: constraint.title, task_id: task.id, task: task.description, status, accountable: constraint.accountable })
  }
+ for(const hold of rfiWorkHolds(job)){const affected=new Set(hold.task_ids);let changed=true;while(changed){changed=false;for(const task of tasks)if(!affected.has(task.id)&&task.predecessors?.some(p=>affected.has(p.id))){affected.add(task.id);changed=true}}for(const task of tasks.filter(t=>t.status!=='cancelled'&&affected.has(t.id)))result.push({constraint_id:hold.rfi.id,title:`RFI ${hold.rfi.number}: client change decision pending`,task_id:task.id,task:task.description,status:'client_change_pending',accountable:'Assigned client'})}
  return result
 }
 export function requireScheduleClearance(job: Job, tasks: Schedule[]) {

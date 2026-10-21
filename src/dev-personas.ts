@@ -6,5 +6,8 @@ export function devPersonas(): DevPersona[] {
  return [
   { as: 'admin', role: 'admin', displayName: 'Dev admin' },
   { as: 'client', role: 'member', displayName: 'Ana Alvarez' },
+  { as: 'field', role: 'member', displayName: 'Dev field lead' },
+  { as: 'designer', role: 'member', displayName: 'Dev designer' },
+  { as: 'trade', role: 'member', displayName: 'Dev trade contact' },
  ]
 }

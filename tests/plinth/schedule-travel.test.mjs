@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createActiveJob, createFixture } from './helpers.mjs'
+import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
 
 const date = time => `2026-11-06T${time}Z`
 
@@ -94,7 +94,8 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   r=await act(east,'/schedules',booking('Electrical','08','10',[{resource_id:lift.id,units:1}]));assert.equal(r.status,409);assert.equal(r.value.details.conflicts[0].reason,'capacity');assert.deepEqual(r.value.details.conflicts.map(c=>c.job_name).sort(),[north.name,south.name].sort());assert.equal((await reload(east)).schedules.length,0)
   assert.equal((await act(east,'/schedules',booking('Electrical','10','11',[{resource_id:crew.id,units:1}]))).status,409,'Crew travel gap is honored across trades and jobs')
   assert.equal((await act(north,`/schedules/${nt}/invite`,{email:'trade@example.com'},client)).status,403)
-  r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com'});assert.equal(r.status,200);south=r.value.job;let invitation=r.value.record
+  let scopeSetup=await createReleasedScope(f,south,'trade@example.com','Roof');south=scopeSetup.job;const scopeId=scopeSetup.scope.id
+  r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com',subcontract_id:scopeId});assert.equal(r.status,200);south=r.value.job;let invitation=r.value.record
   let inbox=(await api('/trade-confirmations',undefined,trade)).value.invitations;assert.equal(inbox.length,1);assert.equal(inbox[0].at_risk,true);assert.equal(inbox[0].job_name,south.name)
   assert.ok(!JSON.stringify(inbox).includes(north.name));assert.equal(inbox[0].quotes,undefined);assert.equal((await api(`/jobs/${south.id}`,undefined,trade)).status,404,'A trade invitation grants no client portal access')
   assert.deepEqual((await api('/trade-confirmations',undefined,outsider)).value.invitations,[])
@@ -102,7 +103,7 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   r=await api(`/trade-confirmations/${invitation.id}/alternative`,{expected_version:south.version,start:t('13'),end:t('14'),reason:'Crew available after maintenance'},trade);assert.equal(r.status,200);south=await reload(south);assert.equal(south.schedules[0].start,t('08').replace('Z','.000Z'));assert.equal(south.trade_invitations[0].responses[0].kind,'alternative')
   r=await act(south,`/schedules/${st}/move`,{start:t('13'),end:t('14')});assert.equal(r.status,200);south=r.value.job
   assert.equal((await api(`/trade-confirmations/${invitation.id}/confirm`,{expected_version:south.version,confirm:true,reason:'Old invitation'},trade)).value.error,'invitation_stale')
-  r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com'});assert.equal(r.status,200);south=r.value.job;invitation=r.value.record
+  r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com',subcontract_id:scopeId});assert.equal(r.status,200);south=r.value.job;invitation=r.value.record
   r=await api(`/resources/${lift.id}`,{...lift,expected_version:lift.version,reason:'Unexpected maintenance',leave:[...lift.leave,win('13','14','Safety hold')]});assert.equal(r.status,200);lift=r.value.resource
   assert.equal((await api(`/trade-confirmations/${invitation.id}/confirm`,{expected_version:south.version,confirm:true,reason:'I can attend'},trade)).value.error,'resource_conflict','Live availability is rechecked at confirmation')
   r=await api(`/resources/${lift.id}`,{...lift,expected_version:lift.version,reason:'Maintenance completed with staff clearance',leave:lift.leave.slice(0,1)});assert.equal(r.status,200);lift=r.value.resource;assert.equal(lift.history.length,3)
@@ -113,6 +114,19 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   const calendar={weekdays:[1,2,3,4,5],start_hour:0,end_hour:24,holidays:[]},task={id:'capacity-planner',trade:'Drywall',description:'Planner resource',start:t('08'),duration_minutes:60,resources:[{resource_id:lift.id,units:2}]}
   r=await act(east,'/schedule/preview',{calendar,tasks:[task]});assert.equal(r.status,200)
   assert.equal((await act(east,'/schedule/publish',{calendar,tasks:[task],digest:r.value.preview.digest})).value.error,'resource_conflict','Planner publication shares the capacity gate')
+  r=await api('/schedule-templates',{name:'Resource allocation template',calendar,tasks:[{...task,start:t('18'),resources:[{resource_id:lift.id,units:2}]}]});assert.equal(r.status,201);const template=r.value.template
+  assert.deepEqual(template.tasks[0].resources,[{resource_id:lift.id,units:2}])
+  const plan={template_id:template.id,start:t('08')}
+  r=await act(east,'/schedule-template/preview',plan);assert.equal(r.status,200);assert.ok(r.value.preview.conflicts.some(c=>c.reason==='capacity'))
+  assert.equal((await act(east,'/schedule-template/apply',{...plan,digest:r.value.preview.digest})).value.error,'resource_conflict')
+  plan.start=t('18');r=await act(east,'/schedule-template/preview',plan);assert.equal(r.status,200);assert.deepEqual(r.value.preview.conflicts,[])
+  r=await act(east,'/schedule-template/apply',{...plan,digest:r.value.preview.digest});assert.equal(r.status,200);east=r.value.job;assert.deepEqual(east.schedules[0].resources,[{resource_id:lift.id,units:2}])
+  let draftJob=await createActiveJob(f,'Draft resource check')
+  r=await act(draftJob,'/schedules',booking('Agent draft','17','18',[{resource_id:crew.id,units:2}]),undefined,agent);assert.equal(r.status,200);draftJob=r.value.job
+  assert.equal((await act(draftJob,`/schedules/${r.value.record.id}/approve`)).value.error,'resource_conflict','Agent drafts cannot bypass the human capacity check')
+  const currentVendor=(await api(`/vendors/${scopeSetup.vendor.id}`)).value.vendor
+  assert.equal((await api(`/vendors/${currentVendor.id}`,{expected_version:currentVendor.version,contacts:[]})).status,200)
+  assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[],'Removing the awarded company contact revokes inbox access on the next request')
   const fourth=await createActiveJob(f,'Atomic A'),fifth=await createActiveJob(f,'Atomic B')
   const race=await Promise.all([act(fourth,'/schedules',booking('Trade A','17','18',[{resource_id:crew.id,units:1}])),act(fifth,'/schedules',booking('Trade B','17','18',[{resource_id:crew.id,units:1}]))]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409])
  }finally{await f.close()}
