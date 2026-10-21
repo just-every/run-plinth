@@ -335,7 +335,7 @@ No separate owner-approved desk-built CLAIMS.md was supplied for Plinth as of 17
 
 ## Status
 
-Judged from the code and tests at commit `f4e220392e4e8691722a5521a011a21fac271876` (22 October 2026).
+Judged from the code and tests at commit `941f4ba16084b885c7ffe57a440d5f0a3ab7932d` (22 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
