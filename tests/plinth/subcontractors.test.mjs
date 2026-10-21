@@ -307,5 +307,6 @@ test('BID-001 — three qualified contacts receive scoped revised plans, two pri
   const people=(await f.json('/auth/operators',{cookie:f.owner})).value,person=people.find(p=>p.email==='synthetic-plinth-3@example.com')
   assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
   assert.equal((await api('/bids',undefined,cookies[2])).status,401,'An inactive member cannot reach the portal at all')
+  for(const path of [`/api/plinth/jobs/${job.id}`,'/api/plinth/jobs']){const visible=await f.json(path,{token:agent});assert.equal(visible.status,200);assert.equal((visible.value.job??visible.value.jobs.find(j=>j.id===job.id)).bids,undefined,'Generic agent job doors do not expose private bids')}
  }finally{await f.close()}
 })
