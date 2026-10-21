@@ -2,6 +2,7 @@ import { DailyWork } from './daily-work'
 import { LinkedTodos } from './linked-todos'
 import { Todos } from './todos'
 import { Bids } from './bids'
+import { BidComparisons } from './bid-comparison'
 import { Handover } from './handover'
 import { PunchWorkspace } from './punch'
 import { RfiWorkspace } from './rfis'
@@ -66,7 +67,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
       {open === 'Warranty' && manager && <Warranties {...props} />}
       {open === 'Punch' && <PunchWorkspace {...props}/>}
-      {open === 'Bids' && manager && <Bids {...props}/>}
+      {open === 'Bids' && manager && <><Bids {...props}/><BidComparisons {...props}/></>}
       {open === 'Today' && manager && <DailyWork {...props}/>}
       {open === 'To-dos' && <Todos job={job}/>}
       {open === 'Handover' && <Handover {...props}/>}

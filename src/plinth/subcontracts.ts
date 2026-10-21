@@ -4,7 +4,7 @@ import { currentQualification } from './vendor-model'
 import { getVendor, save } from './vendors'
 import type { Draw, LienSetup } from './lien-waiver-model'
 
-export interface Subcontract { retainage?: import('./supplier-retainage-model').SupplierRetainageState; retainage_balance?: import('./supplier-retainage-model').SupplierRetainageBalance; id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released'; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
+export interface Subcontract { retainage?: import('./supplier-retainage-model').SupplierRetainageState; retainage_balance?: import('./supplier-retainage-model').SupplierRetainageBalance; id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released' | 'cancelled'; bid_comparison_award_id?: string; bid_cancellation?: { reason: string; by: Stamp; award_id: string }; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
 /** A person awards a scope on a job to a company currently qualified for that trade, with dated award terms.
  * Client job responses never include awards; SUB-003 adds insurance and license holds before release. */
 export async function awardSubcontract(db: D1Database, job: Job, actor: Actor, input: Input): Promise<{ row: Subcontract; writes: D1PreparedStatement[] }> {
@@ -27,7 +27,7 @@ export async function awardSubcontract(db: D1Database, job: Job, actor: Actor, i
 /** Release lets the awarded company start; it re-checks compliance now and is refused while any hold remains. */
 export async function releaseSubcontract(db: D1Database, job: Job, actor: Actor, id: string): Promise<Subcontract> {
  need(actor.role === 'owner' || actor.role === 'admin', 'Only an owner or administrator releases a subcontract scope', 403, 'forbidden')
- const row = find(job.subcontracts ?? [], id); need(row.status !== 'released', 'This scope is already released', 409, 'immutable')
+ const row = find(job.subcontracts ?? [], id); need(row.status !== 'released', 'This scope is already released', 409, 'immutable'); need(row.status !== 'cancelled', 'A cancelled scope cannot be released; use its explicit replacement commitment', 409, 'immutable')
  const check = evaluate(await getVendor(db, row.vendor_id), row.trade, await rules(db), await today(db))
  if (check.holds.length) throw new DomainError('compliance_hold', 'Required insurance or license evidence is missing, expired or not verified', 409, check)
  row.compliance = check; row.status = 'released'; row.released_by = stamp(actor)

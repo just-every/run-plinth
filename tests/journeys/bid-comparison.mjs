@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict'
+import {mkdir} from 'node:fs/promises'
+import {chromium,expect} from '@playwright/test'
+import {handoverDocument} from '../fixtures/handover-document.mjs'
+
+const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
+assert.ok(base&&shots&&process.env.PLINTH_OWNER_OPEN&&process.env.PLINTH_CLIENT_OPEN,'Private installed-app owner/client sign-ins and screenshot destination required')
+const open=new URL(process.env.PLINTH_OWNER_OPEN),fragment=new URLSearchParams(open.hash.slice(1))
+assert.ok(open.origin===new URL(base).origin&&['localhost','127.0.0.1','[::1]'].includes(open.hostname)&&fragment.has('rer-dev'),'Use this synthetic installation’s native local dev entrance')
+const devOpen=email=>{const u=new URL(open),h=new URLSearchParams(fragment);h.set('as',email);h.set('next',`/auth/dev/enter?as=${encodeURIComponent(email)}&returnTo=/app`);u.hash=h.toString();return u.href}
+const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+await mkdir(shots,{recursive:true})
+try{
+ const contexts=await Promise.all(Array.from({length:4},()=>browser.newContext())),pages=await Promise.all(contexts.map(c=>c.newPage())),[owner,client,...trades]=contexts,[page,cp]=pages,stamp=Date.now(),identities=[]
+ const signIn=async(n,url)=>{await pages[n].goto(url);await pages[n].waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'));const response=await contexts[n].request.get(base+'/auth/session');assert.ok(response.ok());identities[n]=(await response.json()).operator}
+ await signIn(0,process.env.PLINTH_OWNER_OPEN);await signIn(1,process.env.PLINTH_CLIENT_OPEN)
+ for(let n=0;n<2;n++){const email=`synthetic-plinth-${stamp+n+1}@dev.localhost`,r=await owner.request.post(base+'/auth/invite',{headers:{origin:base},data:{email,displayName:n?'Alex Chen':'Sam Rivera',role:'member',returnTo:'/app'}});assert.equal(r.status(),202);await signIn(n+2,devOpen(email))}
+ const capture=async(p,name,check)=>{for(const width of [1440,390]){await p.setViewportSize({width,height:1000});await p.evaluate(()=>scrollTo(0,0));await check();assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width);await p.screenshot({path:`${shots}/BID-002-${name}-${width}.png`,fullPage:true,animations:'disabled'})}}
+ const request=async(context,path,body)=>{const r=body===undefined?await context.request.get(base+'/api/plinth'+path):await context.request.post(base+'/api/plinth'+path,{headers:{origin:base},data:body});assert.ok(r.ok(),path+' '+await r.text());return r.json()}
+ let {job}=await request(owner,'/jobs',{name:'Mason residence — framing procurement',client_email:identities[1].email,address:'4518 Alder Avenue, Portland, OR 97211'})
+ const jobAct=async(path,body={})=>{const r=await request(owner,`/jobs/${job.id}${path}`,{expected_version:job.version,...body});job=r.job;return r.record}
+ const codes=['06-100','06-200'],companies=['Cascade Framing','Rivera Carpentry']
+ await jobAct('/quotes',{lines:codes.map((cost_code,n)=>({id:`synthetic-plinth-${n+1}`,description:n?'Blocking':'Wall framing',cost_code,phase:'Structure',category:'labor',quantity:'1',unit:'job',cost_unit_cents:n?20000:100000,unit_cents:n?40000:200000}))})
+ await jobAct(`/quotes/${job.quotes[0].id}/accept`,{method:'signed',evidence:'Client accepted exact estimate',schedule_choice:{kind:'none',reason:'Complete procurement review first'}})
+ const frozen=structuredClone(job.budgets),vendors=[],scopes=[]
+ for(let n=0;n<2;n++){
+  const vendor=(await request(owner,'/vendors',{kind:'subcontractor',name:companies[n],trades:['Framing'],contacts:[{id:`synthetic-plinth-${n+1}`,name:identities[n+2].displayName,email:identities[n+2].email}]})).vendor;vendors.push(vendor)
+  await request(owner,`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Framing',status:'qualified',evidence:'Reviewed references and trade qualification'})
+  const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:'Previously released contact scope',contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`)
+ }
+ let bidSource=(await request(owner,`/bids/${job.id}`)).source
+ const bidAct=async(path,body,context=owner)=>{const r=await request(context,`/bids/${job.id}${path}`,{expected_version:bidSource.version,...body});bidSource=r.source;return r}
+ const originals=[handoverDocument('100 SF framing $1200; 5 days; paint excluded; primer alternate $100',2),handoverDocument('10 panels $1300; tax $65; allowance $50; 3 days; crane excluded',3)]
+ const file=(name,bytes)=>({name,base64:bytes.toString('base64')})
+ const prepared=await bidAct('',{title:'Mason framing and blocking',trade:'Framing',scope:'Wall framing and blocking',mode:'unpriced',lines:codes.map((cost_code,n)=>({cost_code,description:n?'Blocking':'Wall framing'})),note:'Issued plan for pricing',due_on:'2099-12-31',plans:[file('framing-plan.pdf',handoverDocument('Mason framing and blocking plan'))]})
+ const packageId=prepared.record_id,revision=bidSource.bids[0].revisions[0].id
+ await bidAct(`/${packageId}/publish`,{revision_id:revision,confirm:true})
+ for(let n=0;n<2;n++){
+  await bidAct(`/${packageId}/invite`,{vendor_id:vendors[n].id,contact_id:`synthetic-plinth-${n+1}`,subcontract_id:scopes[n],cost_codes:[codes[0]],confirm:true})
+  await bidAct(`/${packageId}/acknowledge`,{revision_id:revision},trades[n]);await bidAct(`/${packageId}/respond`,{revision_id:revision,items:[{cost_code:codes[0],description:n?'10 panel wall framing':'100 square feet wall framing',amount_cents:n?130000:120000}],exclusions:n?'Crane excluded':'Painting excluded',attachments:[file(n?'rivera-panel-quote.pdf':'cascade-area-quote.pdf',originals[n])]},trades[n])
+ }
+ const sourceBids=(await request(owner,`/bids/${job.id}`)).source.bids[0],responses=sourceBids.invitations.map(i=>structuredClone(i.responses[0]))
+ const url=base+`/app?job=${job.id}&tab=Bids`;await page.goto(url)
+ const panel=page.getByRole('heading',{name:'Bid comparisons and awards',exact:true}).locator('..'),formFor=(scope,button)=>scope.getByRole('button',{name:button,exact:true}).locator('xpath=ancestor::form')
+ await panel.locator('summary').filter({hasText:/^Prepare a comparison of current responses$/}).click();let form=formFor(panel,'Prepare bid comparison');await form.getByLabel('Current bid package',{exact:true}).selectOption(packageId);await form.getByLabel('Comparison title',{exact:true}).fill('Mason framing — scope and cost review');await form.getByRole('button',{name:'Prepare bid comparison',exact:true}).click()
+ const comparison=panel.locator('article[data-bid-comparison]').filter({has:page.getByRole('heading',{name:'Mason framing — scope and cost review',exact:true})}),candidate=n=>comparison.locator('[data-bid-candidate]').filter({has:page.getByRole('heading',{name:companies[n],exact:true})})
+ await capture(page,'originals-and-missing-scope',async()=>{await expect(comparison.getByText('Missing original price line: 06-200',{exact:true})).toHaveCount(2);await expect(candidate(0).getByText('Original exclusions: Painting excluded',{exact:true})).toBeVisible();await expect(candidate(1).getByText('Original exclusions: Crane excluded',{exact:true})).toBeVisible()})
+ for(let n=0;n<2;n++){
+  const card=candidate(n);await card.locator('summary').filter({hasText:new RegExp('^Review and normalize '+companies[n]+'$')}).click();form=formFor(card,'Record reviewed normalization')
+  for(let k=0;k<2;k++){
+   const code=codes[k];if(!k){await form.getByLabel(`Quoted quantity ${code}`,{exact:true}).fill(n?'10':'100');await form.getByLabel(`Quoted unit ${code}`,{exact:true}).fill(n?'panel':'square foot');await form.getByLabel(`Quoted allowance ${code} (USD)`,{exact:true}).fill(n?'50.00':'0.00');await form.getByLabel(`Quoted tax ${code} (USD)`,{exact:true}).fill(n?'65.00':'0.00')}
+   await form.getByLabel(`Scope assessment ${code}`,{exact:true}).selectOption(k?'missing':'included');await form.getByLabel(`Original interpretation ${code}`,{exact:true}).fill(k?'Blocking is not priced in the original':'Quoted dimensions and exclusions checked against original page 1');await form.getByLabel(`Original source evidence ${code}`,{exact:true}).selectOption('file:'+responses[n].attachments[0].id);await form.getByLabel(`Original page or section ${code}`,{exact:true}).fill('Page 1, quotation scope');await form.getByLabel(`Normalized total ${code} (USD)`,{exact:true}).fill(k?'200.00':n?'1450.00':'1350.00');await form.getByLabel(`Normalization rationale ${code}`,{exact:true}).fill(k?'Estimator allowance for missing blocking':'Comparable installation allowance; original bid remains unchanged')
+  }
+  await form.getByLabel('Quoted duration (calendar days)',{exact:true}).fill(n?'3':'5');await form.getByRole('button',{name:'Add quoted alternate',exact:true}).click();await form.getByLabel('Quoted alternate 1',{exact:true}).fill(n?'Weatherproof panels':'Primer coat');await form.getByLabel('Alternate price 1 (USD)',{exact:true}).fill(n?'120.00':'100.00');await form.getByLabel('Alternate source note 1',{exact:true}).fill('Reviewed original quote; not in base commitment');await form.getByLabel('Review evidence and normalization basis',{exact:true}).fill('Reviewed original unit basis, scope gaps and exclusions; comparison only');await form.getByRole('checkbox').check();await form.getByRole('button',{name:'Record reviewed normalization',exact:true}).click();await expect(card.getByRole('heading',{name:n?'Reviewed normalization $1,650.00':'Reviewed normalization $1,550.00',exact:true})).toBeVisible()
+ }
+ await capture(page,'reviewed-unit-comparison',async()=>{await expect(candidate(0).getByText('06-100 · Quoted 100 square foot · included',{exact:true})).toBeVisible();await expect(candidate(1).getByText('06-100 · Quoted 10 panel · included',{exact:true})).toBeVisible();await expect(candidate(1).getByText('Allowance $50.00 · Tax $65.00',{exact:true})).toBeVisible();await expect(candidate(0).getByText('Quoted duration: 5 calendar days',{exact:true})).toBeVisible();await expect(candidate(1).getByText('Quoted duration: 3 calendar days',{exact:true})).toBeVisible()})
+ const fillAward=async(n,replacement=false)=>{
+  const card=candidate(n);await card.locator('summary').filter({hasText:new RegExp('^'+(replacement?'Replace active award with':'Award original bid from')+' '+companies[n]+'$')}).click();const form=formFor(card,replacement?'Approve replacement award':'Approve original bid award');await form.getByLabel('Award date',{exact:true}).fill('2026-10-22');await form.getByLabel('Award decision and scope reasoning',{exact:true}).fill('Award the original framing scope; blocking remains separately budgeted');await form.getByLabel('Award terms and source reference',{exact:true}).fill('Exact original quote, page 1');await form.getByLabel('Budget allocation replaced 06-100 (USD)',{exact:true}).fill('800.00');if(replacement)await form.getByLabel('Replacement and cancellation reason',{exact:true}).fill('Reviewed replacement before any work release or orders');for(const checkbox of await form.getByRole('checkbox').all())await checkbox.check();await form.getByRole('button',{name:replacement?'Approve replacement award':'Approve original bid award',exact:true}).click()
+ }
+ await fillAward(0)
+ await capture(page,'approved-commitment-and-cost-delta',async()=>{await expect(comparison.getByRole('heading',{name:'Approved bid award · $1,200.00',exact:true})).toBeVisible();await expect(panel.getByText('06-100 · Previous $1,000.00 · Delta $400.00 · Current $1,400.00',{exact:true})).toBeVisible();await expect(candidate(0).getByText('Original bid $1,200.00',{exact:false})).toBeVisible()})
+ let source=(await request(owner,`/bid-comparisons/${job.id}`)).source;assert.equal(source.awards.length,1);assert.equal(source.cost_budget.adjustments.length,1);assert.equal(source.commitments.length,1)
+ const chosen=source.comparisons[0].candidates[0],review=source.comparisons[0].reviews.find(r=>r.candidate_id===chosen.id)
+ const replay=await owner.request.post(base+`/api/plinth/bid-comparisons/${job.id}/${source.comparisons[0].id}/award`,{headers:{origin:base},data:{expected_version:source.version,candidate_id:chosen.id,review_id:review.id,amount_cents:120000,confirm:true,acknowledge_missing_scope:true}});assert.equal(replay.status(),409)
+ await fillAward(1,true)
+ await capture(page,'explicit-replacement',async()=>{await expect(comparison.getByRole('heading',{name:'Cancelled bid award · $1,200.00',exact:true})).toBeVisible();await expect(comparison.getByRole('heading',{name:'Approved bid award · $1,300.00',exact:true})).toBeVisible();await expect(panel.getByText('06-100 · Source cost $1,000.00 · Current internal cost $1,500.00',{exact:true})).toBeVisible()})
+ source=(await request(owner,`/bid-comparisons/${job.id}`)).source;assert.equal(source.commitments.filter(c=>c.status!=='cancelled').length,1);assert.equal(source.cost_budget.adjustments.length,3)
+ await comparison.locator('summary').filter({hasText:/^Cancel this unreleased commitment$/}).click();form=formFor(comparison,'Cancel exact bid award');await form.getByLabel('Cancellation reason',{exact:true}).fill('Owner cancelled before release');await form.getByRole('checkbox').check();await form.getByRole('button',{name:'Cancel exact bid award',exact:true}).click()
+ await capture(page,'cancelled-and-cost-restored',async()=>{await expect(comparison.getByRole('heading',{name:'Cancelled bid award · $1,300.00',exact:true})).toBeVisible();await expect(panel.getByText('06-100 · Source cost $1,000.00 · Current internal cost $1,000.00',{exact:true})).toBeVisible()})
+ const current=(await request(owner,`/jobs/${job.id}`)).job;assert.deepEqual(current.budgets,frozen);assert.deepEqual(current.bids[0].invitations.map(i=>i.responses[0]),responses)
+ for(let n=0;n<2;n++){const original=await owner.request.get(base+`/api/plinth/bids/${job.id}/files/${responses[n].attachments[0].id}`);assert.ok(original.ok());assert.deepEqual(await original.body(),originals[n]);assert.equal((await trades[n].request.get(base+`/api/plinth/bid-comparisons/${job.id}`)).status(),403)}
+ assert.equal((await client.request.get(base+`/api/plinth/bid-comparisons/${job.id}`)).status(),403);const external=(await request(client,`/jobs/${job.id}`)).job;for(const key of ['bid_comparisons','bid_cost_adjustments','bid_comparison_awards'])assert.equal(external[key],undefined)
+ await cp.goto(base+`/app?job=${job.id}&tab=Quote`);await expect(cp.getByRole('heading',{name:job.name,exact:true})).toBeVisible();await capture(cp,'client-financial-comparison-absent',async()=>{await expect(cp.getByRole('heading',{name:'Bid comparisons and awards',exact:true})).toHaveCount(0);await expect(cp.getByRole('button',{name:'Bids',exact:true})).toHaveCount(0)})
+ console.log('BID-002 PASS: original unit/exclusion comparison, reviewed normalization and exact evidence, original-price commitment, cost allocation/delta, explicit replacement/cancellation, no double commitment or external financial exposure; 1440/390')
+ for(const context of contexts)await context.close()
+}finally{await browser.close()}
