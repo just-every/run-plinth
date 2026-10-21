@@ -1,7 +1,8 @@
+import type { TravelFields } from './schedule-travel'
 import type { Job, Schedule, Stamp } from './model'
 import type { WorkingCalendar } from './schedule-model'
 
-export type TemplateTask = Pick<Schedule, 'id' | 'trade' | 'description' | 'owner' | 'start' | 'duration_minutes' | 'milestone' | 'predecessors'>
+export type TemplateTask = TravelFields & Pick<Schedule, 'id' | 'trade' | 'description' | 'owner' | 'start' | 'duration_minutes' | 'milestone' | 'predecessors'>
 export interface TemplateRevision {
  revision: number; name: string; reason: string; calendar: WorkingCalendar; tasks: TemplateTask[]
  archived: boolean; approved_by: Stamp

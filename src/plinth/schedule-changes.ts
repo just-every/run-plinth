@@ -1,3 +1,4 @@
+import { travelFields } from './schedule-travel'
 import { requireScheduleClearance } from './schedule-constraints'
 import { requireJobManager } from './auth'
 import { find, need, recordApproval, type Actor, type Input, type Job } from './model'
@@ -11,6 +12,9 @@ export function changeSchedule(job: Job, actor: Actor, id: string, input: Input,
   need(row.status === 'booked', 'Only a booked trade can be moved or cancelled', 409, 'schedule_state')
   const before = structuredClone(row)
   if (action === 'move') {
+    const travel = travelFields(input, row)
+    delete (row as typeof row & { travel_minutes?: number }).travel_minutes
+    Object.assign(row, travel)
     row.start = scheduleTime(input, 'start')
     row.end = scheduleTime(input, 'end')
     need(row.end > row.start, 'Schedule must end after it starts')

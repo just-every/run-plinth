@@ -1,3 +1,4 @@
+import { tradeConflicts, travelFields } from './schedule-travel'
 import { scheduleBlockers, requireScheduleClearance } from './schedule-constraints'
 import { latestActual, taskActualDates } from './schedule-baseline-model'
 import { requireJobManager } from './auth'
@@ -28,7 +29,7 @@ function normalize(job: Job, actor: Actor, input: Input): Schedule[] {
    need(!predecessors.some(d => d.id === predecessor), 'A predecessor may appear only once')
    predecessors.push({ id: predecessor, lag_minutes: integer(dependency.lag_minutes, 'Lag') })
   }
-  return { id, trade: text(raw.trade, 'Trade', 200), description: text(raw.description, 'Task', 1000), owner: text(raw.owner ?? old?.owner ?? raw.trade, 'Responsible owner', 200), start, end: old?.end ?? start, duration_minutes: duration, milestone, predecessors, status: raw.status === 'cancelled' ? 'cancelled' as const : 'booked' as const, prepared_by: old?.prepared_by ?? stamp(actor), revision: old?.revision ?? 0, ...(old?.updated_at ? { updated_at: old.updated_at } : {}) }
+  return { ...travelFields(raw, old), id, trade: text(raw.trade, 'Trade', 200), description: text(raw.description, 'Task', 1000), owner: text(raw.owner ?? old?.owner ?? raw.trade, 'Responsible owner', 200), start, end: old?.end ?? start, duration_minutes: duration, milestone, predecessors, status: raw.status === 'cancelled' ? 'cancelled' as const : 'booked' as const, prepared_by: old?.prepared_by ?? stamp(actor), revision: old?.revision ?? 0, ...(old?.updated_at ? { updated_at: old.updated_at } : {}) }
  })
  need(job.schedules.every(s => seen.has(s.id)), 'Keep every existing task; cancel a task explicitly instead of deleting its history')
  for (const task of tasks) {
@@ -75,9 +76,7 @@ export async function previewSchedule(job: Job, actor: Actor, input: Input, all:
  }
  const conflicts: SchedulePreview['conflicts'] = []
  const candidate = { ...job, schedules: tasks }
- for (const task of tasks.filter(s => s.status === 'booked' && !s.milestone)) for (const other of [...all.filter(j => j.id !== job.id), candidate]) for (const s of other.schedules) {
-  if (s.status === 'booked' && !s.milestone && !(other.id === job.id && s.id === task.id) && s.trade.toLowerCase() === task.trade.toLowerCase() && s.start < task.end && s.end > task.start) conflicts.push({ job_id: other.id, job_name: other.name, schedule_id: s.id, trade: s.trade, start: s.start, end: s.end })
- }
+ for (const task of tasks.filter(s => s.status === 'booked' && !s.milestone)) conflicts.push(...tradeConflicts([...all.filter(j => j.id !== job.id), candidate], candidate, task))
  const changes = tasks.flatMap(task => { const old = job.schedules.find(s => s.id === task.id); return !old || JSON.stringify({ ...old, updated_at: undefined }) !== JSON.stringify({ ...task, updated_at: undefined }) ? [{ id: task.id, description: task.description, before: old ? state(old) : null, after: state(task) }] : [] })
  // Bind publication to the exact semantic proposal; preparer timestamps do not affect dates or review.
  const canonical = { calendar, tasks: tasks.map(({ prepared_by, revision, updated_at, ...task }) => task), version: job.version }

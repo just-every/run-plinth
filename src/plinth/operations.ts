@@ -1,20 +1,21 @@
+import { tradeConflicts, travelFields } from './schedule-travel'
 import { requireScheduleClearance } from './schedule-constraints'
 import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Order, type Schedule } from './model'
 import { requireJobManager } from './auth'
 import { day, fulfillment, lineQuantities, poLines, poSource } from './purchase-order-model'
 export const scheduleTime=(input:Input,key:string)=>{const value=text(input[key],key,60);need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value)),`${key} requires a date, time and timezone`);return new Date(value).toISOString()}
 /** Glove dispatch conflicts: the same trade may not be committed twice in overlapping slots. */
-export function checkConflicts(all:Job[],job:Job,row:Schedule){const conflicts=all.flatMap(j=>j.schedules.filter(s=>!(j.id===job.id&&s.id===row.id)&&s.status==='booked'&&!s.milestone&&!row.milestone&&s.trade.toLowerCase()===row.trade.toLowerCase()&&s.start<row.end&&s.end>row.start).map(s=>({job_id:j.id,job_name:j.name,schedule_id:s.id,trade:s.trade,start:s.start,end:s.end})));need(!conflicts.length,'This trade is already scheduled during this time',409,'schedule_conflict',{conflicts})}
+export function checkConflicts(all:Job[],job:Job,row:Schedule){const conflicts=tradeConflicts(all,job,row);need(!conflicts.length,'This trade has an overlapping booking or insufficient travel time between sites',409,'schedule_conflict',{conflicts})}
 export function prepareSchedule(job:Job,actor:Actor,input:Input,all:Job[]) {
  requireJobManager(actor,true);active(job)
  need(!job.schedule_calendar,'Use the schedule planner to review this job’s tasks before publication',409,'schedule_review')
 
- const row:Schedule={id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
+ const row:Schedule={...travelFields(input),id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
  need(row.end>row.start,'Schedule must end after it starts');job.schedules.push(row)
  if(actor.role!=='agent')approveSchedule(job,actor,row.id,all)
  return row
 }
-export function approveSchedule(job:Job,actor:Actor,id:string,all:Job[]){requireJobManager(actor);need(!job.schedule_calendar,'Review this booking in the schedule planner',409,'schedule_review');const row=find(job.schedules,id);need(row.status==='draft','Schedule already booked',409,'immutable');checkConflicts(all,job,row);requireScheduleClearance(job,[{...row,status:'booked'}]);recordApproval(job,actor,'schedule',row,{trade:row.trade,start:row.start,end:row.end,description:row.description});row.status='booked';return row}
+export function approveSchedule(job:Job,actor:Actor,id:string,all:Job[]){requireJobManager(actor);need(!job.schedule_calendar,'Review this booking in the schedule planner',409,'schedule_review');const row=find(job.schedules,id);need(row.status==='draft','Schedule already booked',409,'immutable');checkConflicts(all,job,row);requireScheduleClearance(job,[{...row,status:'booked'}]);recordApproval(job,actor,'schedule',row,{trade:row.trade,start:row.start,end:row.end,description:row.description,...travelFields(row as unknown as Input)});row.status='booked';return row}
 /** Purse orders: commitment is issued once; receipts consume only the outstanding commitment. */
 /** SUB-005: an itemized PO carries cost-coded lines and its award or budget source; its amount is the sum of its lines. */
 export function prepareOrder(job:Job,actor:Actor,input:Input){requireJobManager(actor,true);active(job);const lines=input.lines===undefined?undefined:poLines(input.lines),source=lines?poSource(job,input,lines):undefined;need(!lines||input.amount_cents===undefined,'An itemized PO takes its amount from its lines');const award=source?.kind==='award'?job.subcontracts!.find(s=>s.id===source.subcontract_id)!:undefined;const email=text(input.vendor_email,'vendor email',254,true).toLowerCase();need(!email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),'Provide a valid vendor email');const row:Order={id:crypto.randomUUID(),supplier:award?award.vendor_name:text(input.supplier,'supplier',200),description:text(input.description,'description',2000),amount_cents:lines?sum(lines.map(l=>l.total_cents)):cents(input.amount_cents),status:'draft',receipts:[],prepared_by:stamp(actor),...(lines?{lines,source}:{}),...(email?{vendor_email:email}:{}),...(input.promised_on===undefined?{}:{promised_on:day(input.promised_on,'promised date')})};need(row.amount_cents>0,'Order amount must be positive');job.orders.push(row);return row}
