@@ -1,3 +1,4 @@
+import { selectionDecision, selectionDecisionFile } from './selection-decisions'
 import { enqueueContinuity, resumeContinuity, linkContinuityClaim } from './continuity'
 import { sendContinuityNotice } from './continuity-notice'
 import { takeoffAction, takeoffFile } from './takeoff-documents'
@@ -103,6 +104,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===4&&parts[2]==='takeoff-files'&&method==='GET')return takeoffFile(env.DB,previous,actor,parts[3]!)
+ if(parts.length===4&&parts[2]==='decision-files'&&method==='GET')return selectionDecisionFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='product-images'&&method==='GET')return productImage(env.DB,previous,actor,parts[3]!)
  if(parts.length===2&&method==='GET')return json({job:display((await named(env.DB,[previous]))[0]!,actor),role:role(actor)})
  if(parts[2]==='diary'&&parts[4]==='attachments'&&parts.length===6&&method==='GET')return serveAttachment(env.DB,previous,actor,parts[3],parts[5])
@@ -143,6 +145,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  else if(category==='sov'&&parts.length===3)record=prepareSov(job,actor,input)
  else if(category==='variation-pricing'&&id==='apply'&&parts.length===4)record=await preparePricedVariation(env.DB,job,actor,input)
  else if(category==='selections'&&parts.length===3)record=selectionAction(job,actor,input)
+ else if(category==='selections'&&parts.length===5&&['substitute','reminder','dispute','withdraw'].includes(action!)){const result=await selectionDecision(env.DB,job,actor,input,id!,action!);record=result.record;writes=result.writes}
  else if(category==='selections'&&parts.length===5){if(action==='order'){requireJobManager(actor,true);record=prepareOrder(job,actor,selectionOrderInput(job,id!,String(input.revision_id),input))}else record=selectionAction(job,actor,input,id,action)}
  else if(category==='pricing'&&id==='apply'&&parts.length===4)record=await applyPricing(env.DB,job,actor,input)
  else if(category==='estimate-template'&&id==='apply'&&parts.length===4)record=await applyCatalog(env.DB,job,actor,input)

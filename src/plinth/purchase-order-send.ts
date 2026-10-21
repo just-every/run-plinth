@@ -1,3 +1,4 @@
+import { selected } from './selection-model'
 import { operatorMail } from '../mail.server.mjs'
 import type { Bindings } from '../auth.server'
 import { requireJobManager } from './auth'
@@ -23,6 +24,7 @@ export async function sendOrder(env: Bindings, previous: Job, actor: Actor, id: 
  const current = find(previous.orders, id), delivery = current.delivery as PoDelivery | undefined
  need(current.status === 'issued' && delivery, 'Issue the PO before sending it', 409, 'order_state')
  need(current.vendor_email, 'Add the vendor email to the PO before sending it', 409, 'vendor_email')
+ if(current.source?.kind==='selection')selected(previous,current.source.selection_id,current.source.revision_id)
  const revision = revisionOf(current), sender = operatorMail(env), from = env.MAIL_FROM
  need(sender && from, `${UNCONFIGURED}; download the PO and send it yourself`, 409, 'mail_unconfigured')
  need(!(delivery.status === 'accepted' && delivery.revision === revision), 'This revision was already accepted by the mail provider', 409, 'already_sent')

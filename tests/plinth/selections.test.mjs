@@ -262,3 +262,52 @@ test('AUTO-002 — refused, unknown, development and unconfigured notice outcome
   } finally { await f.close() }
  }
 })
+
+test('CLIENT-005 — overdue requests never accept; disputed substitutions require fresh exact builder/client decisions before any PO', async () => {
+ const f=await createFixture()
+ try {
+  const client=await f.invite('client@example.com','Decision Client'),foreign=await f.invite('foreign@example.com'),agent=await f.agent()
+  let job=await createActiveJob(f),r
+  const read=async(cookie=f.owner)=>(await f.json(`/api/plinth/jobs/${job.id}`,{cookie})).value.job
+  const act=async(path,input={},cookie=f.owner,token)=>{const result=await f.json(`/api/plinth/jobs/${job.id}${path}`,{method:'POST',cookie,token,body:{expected_version:job.version,...input}});job=await read();return result}
+  const terms={room:'Kitchen',category:'Faucet',allowance_cents:30000,cost_code:'22-400',decision_on:'2020-01-01',lead_days:21,options:[{name:'Original brass faucet',supplier:'Synthetic supply',specifications:'Single hole, 8 inch reach',price_cents:30000}]}
+  r=await act('/selections',terms);const id=r.value.record.id,current=()=>job.selections[0].revisions.at(-1),path=action=>`/selections/${id}/${action}`
+  assert.equal((await act(path('present'),{revision_id:current().id})).status,200)
+  const original=structuredClone(current()),beforeMessages=f.messages.length
+  const pdf=Buffer.from('%PDF-1.4\nsynthetic-plinth-1\n%%EOF'),file={name:'supplier-notice.pdf',mime:'application/pdf',base64:pdf.toString('base64')}
+  r=await act(path('reminder'),{revision_id:current().id,reason:'Deadline passed; request an explicit decision',attachments:[file]});assert.equal(r.status,200);assert.equal(current().status,'presented');assert.equal(current().signature,undefined);assert.equal(f.messages.length,beforeMessages,'A reminder is an honestly labelled record, never a claimed send')
+  const attachment=r.value.record.decisions.at(-1).attachments[0]
+  for(const cookie of [f.owner,client]){const response=await f.request(`/api/plinth/jobs/${job.id}/decision-files/${attachment.id}`,{cookie});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),pdf)}
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/decision-files/${attachment.id}`,{cookie:foreign})).status,404)
+  assert.equal((await act(path('order'),{revision_id:current().id})).value.error,'selection_unsigned')
+  const substitution={...terms,options:[{...terms.options[0],name:'Chrome substitute',price_cents:28000,specifications:'Single hole, 7 inch reach'}],revision_id:current().id,option_id:current().options[0].id,unavailable_reason:'Supplier discontinued the brass finish',previous_available_on:'2026-11-01',available_on:'2026-11-08',specification_comparison:'Chrome instead of brass; reach reduced by one inch',date_impact_days:7}
+  for(const [cookie,token] of [[client,undefined],[undefined,agent],[foreign,undefined]])assert.ok([403,404].includes((await act(path('substitute'),substitution,cookie,token)).status))
+  r=await act(path('substitute'),substitution);assert.equal(r.status,200);assert.deepEqual(job.selections[0].revisions[0],original)
+  const draft=structuredClone(current());assert.equal(draft.status,'draft');assert.equal(draft.substitution.previous_option.price_cents,30000)
+  assert.equal((await read(client)).selections[0].revisions.length,1,'A draft comparison is private')
+  assert.equal((await act(path('present'),{revision_id:current().id})).value.error,'substitution_review')
+  assert.equal((await act(path('present'),{revision_id:current().id,confirm_substitution:true})).status,200)
+  assert.equal((await read(client)).selections[0].revisions.at(-1).substitution.specification_comparison,substitution.specification_comparison)
+  const sign=()=>({revision_id:current().id,option_id:current().options[0].id,statement:'I approve this exact revised specification and price',confirm:true})
+  assert.equal((await act(path('dispute'),{revision_id:current().id,reason:'I need the original reach',attachments:[file]},f.owner)).status,403)
+  r=await act(path('dispute'),{revision_id:current().id,reason:'I need the original reach',attachments:[file]},client);assert.equal(r.status,200);assert.equal(r.value.record.decisions.at(-1).by.name,'Decision Client')
+  assert.equal((await act(path('sign'),sign(),client)).value.error,'selection_held');assert.equal(job.orders.length,0)
+  const disputed=structuredClone(current())
+  r=await act(path('substitute'),{...substitution,revision_id:current().id,option_id:current().options[0].id,options:[{...terms.options[0],name:'Revised chrome faucet',price_cents:29000}],specification_comparison:'Same original reach, chrome finish'});assert.equal(r.status,200)
+  assert.equal((await act(path('present'),{revision_id:current().id,confirm_substitution:true})).status,200)
+  assert.equal((await act(path('sign'),sign(),f.owner)).status,403)
+  assert.equal((await act(path('sign'),sign(),client)).status,200);assert.deepEqual(job.selections[0].revisions[1],disputed)
+  let signed=structuredClone(current())
+  r=await act(path('order'),{revision_id:current().id,vendor_email:'vendor@example.com'});assert.equal(r.status,200);const order=r.value.record
+  assert.equal(order.status,'draft');assert.equal(order.amount_cents,29000);assert.equal((await act(`/orders/${order.id}/issue`)).status,200)
+  signed=structuredClone(current())
+  assert.equal((await act(path('dispute'),{revision_id:current().id,reason:'Stop further action pending site review'},client)).status,200)
+  assert.equal((await act(`/orders/${order.id}/send`)).value.error,'selection_held','A dispute fences even an approved but unsent PO')
+  assert.equal(f.messages.length,beforeMessages);assert.deepEqual(current(),signed,'A dispute never erases or changes an earlier signature')
+  assert.equal(job.orders.length,1);assert.equal(job.variations.length,0);assert.equal(job.quotes[0].total_cents,1000000)
+  r=await act('/selections',{...terms,category:'Withdrawal'});const other=r.value.record,rev=other.revisions[0]
+  assert.equal((await act(`/selections/${other.id}/present`,{revision_id:rev.id})).status,200)
+  assert.equal((await act(`/selections/${other.id}/withdraw`,{revision_id:rev.id,reason:'Scope removed by builder'})).status,200)
+  assert.equal((await act(`/selections/${other.id}/sign`,{revision_id:rev.id,option_id:rev.options[0].id,statement:'Too late',confirm:true},client)).value.error,'selection_held')
+ } finally {await f.close()}
+})
