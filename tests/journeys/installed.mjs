@@ -11,7 +11,7 @@ import { chromium } from '@playwright/test'
 const name = process.argv[2]
 assert.ok(['punch','handover','bids','todos'].includes(name), 'Choose punch, handover, bids or todos')
 assert.ok(!existsSync('.dev.vars') && !existsSync('.wrangler/state'), 'Use a fresh disposable checkout; this runner never resets an existing installation')
-const screenshotRoot = join(homedir(), '.cache', 'plinth-journeys')
+const screenshotRoot = process.env.PLINTH_SCREENSHOTS_ROOT ?? join(homedir(), '.cache', 'plinth-journeys')
 await mkdir(screenshotRoot, {recursive:true})
 const screenshots = await mkdtemp(join(screenshotRoot, `plinth-${name}-screens-`))
 const socket = createServer(); await new Promise((resolve,reject) => { socket.once('error',reject);socket.listen(0,'127.0.0.1',resolve) })
