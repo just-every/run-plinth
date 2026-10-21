@@ -14,7 +14,7 @@ export function PunchFormEditor({ forms, mutate }: { forms: PunchForm[]; mutate:
  </Form><p>Saved revisions remain available. Observations keep the exact questions and answers captured with them.</p></details>
 }
 export function PunchAnswerFields({ form }: { form?: PunchForm }) {
- return <>{form?.fields.map(field => <label key={form.id + field.id}>{field.label}{field.type === 'text' ? <textarea name={'answer:' + field.id} required={field.required} maxLength={4000}/> : <select name={'answer:' + field.id} required={field.required}><option value="">Choose an answer</option>{field.type === 'boolean' ? <><option value="true">Yes</option><option value="false">No</option></> : field.options?.map(v => <option key={v}>{v}</option>)}</select>}</label>)}</>
+ return <>{form?.fields.map(field => <label key={form.id + field.id}>{field.label}{field.type === 'text' ? <textarea name={'answer:' + field.id} required={field.required} maxLength={4000}/> : <select aria-label={field.label} name={'answer:' + field.id} required={field.required}><option value="">Choose an answer</option>{field.type === 'boolean' ? <><option value="true">Yes</option><option value="false">No</option></> : field.options?.map(v => <option key={v}>{v}</option>)}</select>}</label>)}</>
 }
 export function readPunchAnswers(form: PunchForm | undefined, data: FormData): PunchAnswers {
  return Object.fromEntries((form?.fields ?? []).flatMap(field => { const value = data.get('answer:' + field.id); return value === null || value === '' ? [] : [[field.id, field.type === 'boolean' ? value === 'true' : String(value)]] }))
