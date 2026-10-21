@@ -1,3 +1,4 @@
+import { PunchWorkspace } from './punch'
 import { RfiWorkspace } from './rfis'
 import { Products } from './products'
 import { Warranties } from './warranties'
@@ -15,7 +16,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -59,6 +60,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
       {open === 'Warranty' && manager && <Warranties {...props} />}
+      {open === 'Punch' && <PunchWorkspace {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}
     </div>
   </div>

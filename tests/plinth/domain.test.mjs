@@ -240,3 +240,78 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   const visible=(await api(`/jobs/${job.id}`,undefined,client)).value.job;assert.equal(visible.rfis,undefined);assert.equal(visible.rfi_access,undefined)
  }finally{await f.close()}
 })
+
+test('FIELD-004 — photo observations retain form revisions, qualified trade repairs and exact manager decisions with released client closeout',async()=>{
+ const f=await createFixture()
+ try{
+  const trade=await f.invite('punch-trade@example.com','Assigned Trade'),other=await f.invite('punch-other@example.com','Other Trade'),client=await f.invite('punch-client@example.com','Closeout Client'),pm=await f.invite('punch-pm@example.com','Job Inspector','admin'),agent=await f.agent()
+  let job=await createActiveJob(f,'synthetic-plinth-40','punch-client@example.com')
+  const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{cookie,token,...(body?{method:'POST',body}:{})})
+  const read=async()=>{job=(await api(`/jobs/${job.id}`)).value.job}
+  const act=async(path,body={},cookie=f.owner,token)=>{const r=await api(`/jobs/${job.id}/punch${path}`,{expected_version:job.version,...body},cookie,token);await read();return r}
+  let setup=await createReleasedScope(f,job,'punch-trade@example.com','Tile');job=setup.job
+  const assignedScope=setup.scope,assignedVendor=setup.vendor
+  setup=await createReleasedScope(f,job,'punch-other@example.com','Tile');job=setup.job
+  const team=(await api('/team')).value.team.find(p=>p.email==='punch-pm@example.com')
+  assert.equal((await f.json('/api/plinth/team/'+team.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[job.id],po_limit_cents:0}})).status,200)
+  const outside=await createActiveJob(f,'synthetic-plinth-41','punch-client@example.com')
+  assert.equal((await api(`/jobs/${outside.id}/punch`,undefined,pm)).status,404)
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/punch`)).status,401)
+  assert.equal((await api(`/jobs/${job.id}/punch`,undefined,undefined,agent)).status,403)
+  assert.equal((await api(`/jobs/${job.id}`,undefined,trade)).status,404,'A narrow punch assignment never grants the client job')
+  const photo={name:'synthetic-plinth-42.png',mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='}
+  let r=await act('/forms',{name:'Wet room inspection',fields:[{id:'dry',label:'Substrate dry',type:'boolean',required:true},{id:'finding',label:'Inspection finding',type:'text',required:true},{id:'finish',label:'Finish',type:'choice',required:true,options:['Tile','Stone']}]},pm)
+  assert.equal(r.status,200,JSON.stringify(r.value));const form=r.value.record
+  await f.request(`/api/plinth/jobs/${job.id}/takeoff`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,name:'A2 Bath',page:1,width:400,height:400,document:{name:'synthetic-plinth-43.pdf',mime:'application/pdf',base64:takeoffPlan().toString('base64')}}});await read();const sheet=job.takeoff[0]
+  const observation={title:'Shower grout gap',description:'Inspect the open grout joint at shower niche',kind:'quality',severity:'high',due_on:'2026-11-04',location:'Upper bath, niche west edge',photo,annotation:{x:.25,y:.75,note:'Open joint at niche corner'},form_id:form.id,answers:{dry:false,finding:'Joint remains open',finish:'Tile'},sheet:{sheet_id:sheet.id,revision_id:sheet.revisions[0].id}}
+  assert.equal((await act('/issues',{...observation,answers:{dry:'false',finding:'Invalid',finish:'Tile'}})).status,400)
+  assert.equal((await act('/issues',{...observation,annotation:{x:2,y:.5,note:'Outside photo'}})).status,400)
+  r=await act('/issues',observation,pm);assert.equal(r.status,200,JSON.stringify(r.value));const issue=r.value.record,id=issue.id
+  assert.deepEqual(issue.answers,observation.answers);assert.equal(issue.sheet.revision_id,sheet.revisions[0].id)
+  const original=await f.request(`/api/plinth/jobs/${job.id}/punch/files/${issue.photo.id}`,{cookie:f.owner});assert.deepEqual(Buffer.from(await original.arrayBuffer()),Buffer.from(photo.base64,'base64'))
+  const hidden=await api(`/jobs/${job.id}`,undefined,client);assert.deepEqual(hidden.value.job.punch.issues,[])
+  assert.deepEqual((await api(`/jobs/${job.id}/punch`,undefined,client)).value.issues,[])
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/punch/files/${issue.photo.id}`,{cookie:client})).status,404)
+  assert.equal((await act(`/issues/${id}/assign`,{subcontract_id:assignedScope.id,email:'punch-trade@example.com'},pm)).status,403,'Owner/admin grants the trade assignment')
+  assert.equal((await act(`/issues/${id}/assign`,{subcontract_id:assignedScope.id,email:'punch-other@example.com'})).status,409,'A contact from another company cannot be granted this scope')
+  r=await act(`/issues/${id}/assign`,{subcontract_id:assignedScope.id,email:'punch-trade@example.com'});assert.equal(r.status,200)
+  r=await act('/issues',{...observation,title:'Unresolved niche sealant',description:'Awaiting sealant return',annotation:{x:.5,y:.5,note:'Unresolved sealant'},answers:{dry:false,finding:'Awaiting sealant',finish:'Tile'}});assert.equal(r.status,200);const exception=r.value.record
+  assert.equal((await act(`/issues/${exception.id}/assign`,{subcontract_id:assignedScope.id,email:'punch-trade@example.com'})).status,200)
+  assert.equal((await act(`/issues/${exception.id}/release`,{confirm:true})).status,200)
+  const openClient=(await api(`/jobs/${job.id}/punch`,undefined,client)).value;assert.deepEqual(openClient.issues.map(i=>i.id),[exception.id]);assert.equal(openClient.issues[0].status,'open')
+  assert.equal((await act(`/issues/${exception.id}/assign`,{subcontract_id:assignedScope.id,email:'punch-trade@example.com'})).status,200,'Released open exceptions can be reassigned with history retained')
+  const inbox=await api('/punch',undefined,trade);assert.equal(inbox.value.jobs.length,1);assert.equal(inbox.value.jobs[0].issues[0].id,id);for(const key of ['quotes','client_email','orders','subcontracts','approvals'])assert.equal(inbox.value.jobs[0][key],undefined)
+  assert.deepEqual((await api('/punch',undefined,other)).value.jobs,[])
+  assert.equal((await f.request(`/api/plinth/punch/${job.id}/files/${issue.photo.id}`,{cookie:other})).status,404)
+  const repair=async(note,cookie=trade,body={})=>{const r=await api(`/punch/${job.id}/issues/${id}/submit`,{expected_version:job.version,note,attachments:[photo],...body},cookie);await read();return r}
+  assert.equal((await repair('Unauthorized repair',other)).status,404)
+  assert.equal((await act(`/issues/${id}/review`,{decision:'accepted',note:'No submission',evidence:'No original',qualified_review:true,attempt_id:'synthetic-plinth-44'})).status,409)
+  r=await repair('First repair: fill joint');assert.equal(r.status,200);const first=structuredClone(r.value.record.attempts[0])
+  assert.equal((await repair('Cannot overwrite pending attempt')).status,409)
+  assert.equal((await act(`/issues/${id}/review`,{attempt_id:first.id,decision:'rejected',note:'Still a void behind grout',evidence:'Site inspection 2026-11-02',qualified_review:false},pm)).status,400)
+  r=await act(`/issues/${id}/review`,{attempt_id:first.id,decision:'rejected',note:'Still a void behind grout',evidence:'Site inspection 2026-11-02',qualified_review:true,attachments:[photo]},pm);assert.equal(r.status,200)
+  assert.equal((await act(`/issues/${id}/review`,{attempt_id:first.id,decision:'accepted',note:'Overwrite',evidence:'Overwrite',qualified_review:true},pm)).status,409)
+  const rejected=structuredClone(job.punch.issues[0].attempts[0])
+  r=await act('/forms/'+form.id,{name:'Wet room inspection',fields:[{id:'new',label:'New revision question',type:'text',required:true}]});assert.equal(r.status,200);assert.equal(r.value.record.revision,2);assert.deepEqual(job.punch.issues[0].form,form)
+  r=await repair('Second repair: remove loose grout, pack and finish');assert.equal(r.status,200);const second=r.value.record.attempts[1]
+  const exported=await f.request(`/api/plinth/jobs/${job.id}/punch/export.json?status=open&q=grout%20gap`,{cookie:f.owner});assert.equal(exported.status,200);const artifact=await exported.json();assert.equal(artifact.issues.length,1);assert.deepEqual(artifact.issues[0].answers,observation.answers);assert.equal(artifact.issues[0].attempts.length,2);assert.deepEqual(artifact.issues[0].attempts[0],rejected)
+  assert.equal((await api(`/jobs/${job.id}/punch?status=open&q=Unrelated`)).value.issues.length,0)
+  const csv=await f.request(`/api/plinth/jobs/${job.id}/punch/export.csv?status=open`,{cookie:f.owner});assert.equal(csv.status,200);assert.match(await csv.text(),/Second repair/)
+  assert.equal((await act(`/issues/${id}/review`,{attempt_id:first.id,decision:'accepted',note:'Wrong attempt',evidence:'Site visit',qualified_review:true},pm)).status,409)
+  r=await act(`/issues/${id}/review`,{attempt_id:second.id,decision:'accepted',note:'Joint is filled and finish inspected',evidence:'Site inspection and original photo 2026-11-03',qualified_review:true,attachments:[photo]},pm);assert.equal(r.status,200)
+  assert.equal(job.punch.issues[0].status,'accepted');assert.deepEqual(job.punch.issues[0].attempts[0],rejected);assert.deepEqual((await api(`/jobs/${job.id}/punch`,undefined,client)).value.issues.map(i=>i.id),[exception.id])
+  assert.equal((await api(`/jobs/${job.id}/punch?status=open`)).value.issues.length,1)
+  assert.equal((await act(`/issues/${id}/release`,{confirm:true},pm)).status,403)
+  r=await act(`/issues/${id}/release`,{confirm:true});assert.equal(r.status,200)
+  const released=(await api(`/jobs/${job.id}/punch`,undefined,client)).value;assert.equal(released.issues.length,2);assert.equal(released.issues[0].attempts.length,2);assert.equal(released.issues[0].assignment,undefined);assert.deepEqual(released.issues[0].assignments,[]);assert.deepEqual(released.forms,[]);assert.ok(!JSON.stringify(released).includes('punch-trade@example.com'))
+  const clientJob=(await api(`/jobs/${job.id}`,undefined,client)).value.job;assert.equal(clientJob.punch.issues[0].id,id);assert.equal(clientJob.punch.issues[0].assignment,undefined)
+  const closedPhoto=await f.request(`/api/plinth/jobs/${job.id}/punch/files/${issue.photo.id}`,{cookie:client});assert.equal(closedPhoto.status,200)
+  assert.equal((await repair('Cannot overwrite accepted repair')).status,409)
+  assert.equal((await act(`/issues/${id}/release`,{confirm:true})).status,409)
+  const currentVendor=(await api('/vendors/'+assignedVendor.id)).value.vendor
+  r=await api(`/vendors/${assignedVendor.id}/qualifications`,{expected_version:currentVendor.version,trade:'Tile',status:'rejected',evidence:'Qualification withdrawn after inspection'});assert.equal(r.status,200)
+  assert.deepEqual((await api('/punch',undefined,trade)).value.jobs,[])
+  assert.equal((await f.request(`/api/plinth/punch/${job.id}/files/${issue.photo.id}`,{cookie:trade})).status,404,'Qualification withdrawal removes file access on the next request')
+  const final=job.punch.issues[0];assert.deepEqual(final.attempts[0],rejected);assert.equal(final.attempts[1].review.decision,'accepted');assert.equal(job.approvals.filter(a=>a.kind==='punch.inspect').length,2)
+ }finally{await f.close()}
+})
