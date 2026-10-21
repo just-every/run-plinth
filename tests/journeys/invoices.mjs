@@ -3,11 +3,17 @@ import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
 const base=process.env.PLINTH_URL,ownerState=process.env.PLINTH_STATE,clientState=process.env.PLINTH_CLIENT_STATE,shots=process.env.PLINTH_SCREENSHOTS
-assert.ok(base&&ownerState&&clientState&&shots,'Provide private owner/client states, installation URL and screenshot directory')
+const ownerOpen=process.env.PLINTH_OWNER_OPEN,clientOpen=process.env.PLINTH_CLIENT_OPEN
+assert.ok(base&&shots&&((ownerOpen&&clientOpen)||(ownerState&&clientState)),'Provide native dev sign-in links or private test states, installation URL and screenshot directory')
 await mkdir(shots,{recursive:true})
 const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
 try {
- const owner=await browser.newContext({storageState:ownerState}),client=await browser.newContext({storageState:clientState}),page=await owner.newPage(),clientPage=await client.newPage()
+ const owner=await browser.newContext(ownerOpen?{}:{storageState:ownerState}),client=await browser.newContext(clientOpen?{}:{storageState:clientState}),page=await owner.newPage(),clientPage=await client.newPage()
+ // Local development personas sign in through the native door in fresh contexts. No session export or profile copy.
+ for(const [entry,url] of [[page,ownerOpen],[clientPage,clientOpen]])if(url){
+  await entry.goto(url);await entry.waitForURL(u=>!u.hash&&u.pathname!=='/__dev/key',{timeout:30000});await entry.goto(base+'/app')
+  if(new URL(entry.url()).pathname==='/setup'){await entry.getByLabel('Your name',{exact:true}).fill('Local builder');await entry.getByRole('checkbox').check();await entry.getByRole('button',{name:'Finish setup',exact:true}).click();await entry.waitForURL(u=>u.pathname!=='/setup')}
+ }
  const req=async(path,body,context=owner)=>{const r=await context.request.fetch(base+'/api/plinth'+path,{method:body===undefined?'GET':'POST',headers:{origin:base,'content-type':'application/json'},...(body===undefined?{}:{data:body})});const value=await r.json();assert.ok(r.ok(),`${path}: ${r.status()} ${JSON.stringify(value)}`);return value}
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1100});await clientPage.setViewportSize({width,height:1100})
@@ -55,7 +61,14 @@ try {
   receivables=await req(`/jobs/${job.id}/receivables?as_of=2026-12-21`);assert.equal(receivables.unapplied_cents,0);assert.equal(receivables.aging['31-60'],6700000)
   await page.reload();await page.getByRole('heading',{name:'Invoices and deposits',exact:true}).waitFor();await page.locator('#invoice-'+milestone.invoice.id+' > summary').click();await expect(page.locator('#invoice-'+milestone.invoice.id).getByText(/Return recorded by staff/)).toBeVisible();await page.locator('#invoice-'+milestone.invoice.id).scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-returned-${width}.png`,animations:'disabled'})
   const directReceipt=job.invoices.find(i=>i.id===milestone.invoice.id).receipts.find(r=>r.reference==='Bank statement BS-105-'+job.id)
+  await act(`/invoices/${milestone.invoice.id}/return-receipt`,{receipt_id:directReceipt.id,amount_cents:750000,returned_on:'2026-10-25',reference:'Partial single-invoice check BS-108A-'+job.id,reason:'Private partial bank return correspondence',confirm:true})
+  assert.equal(job.invoices.find(i=>i.id===milestone.invoice.id).balance.due_cents,7450000)
+  await page.reload();await page.getByRole('heading',{name:'Invoices and deposits',exact:true}).waitFor();await page.locator('#invoice-'+milestone.invoice.id+' > summary').click()
+  await expect(page.locator('#invoice-'+milestone.invoice.id).getByText('Partial single-invoice check BS-108A-'+job.id,{exact:false})).toBeVisible()
+  await page.locator('#invoice-'+milestone.invoice.id).scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-partial-return-${width}.png`,animations:'disabled'})
   await act(`/invoices/${milestone.invoice.id}/return-receipt`,{receipt_id:directReceipt.id,returned_on:'2026-10-25',reference:'Returned single-invoice check BS-108-'+job.id,reason:'Private single-invoice bank return correspondence',confirm:true})
+  await act(`/invoices/${deposit.invoice.id}/return-receipt`,{receipt_id:depositReturnId,amount_cents:900000,returned_on:'2026-10-25',reference:'Partial unapplied deposit BS-109A-'+job.id,reason:'Private partial deposit return evidence',confirm:true})
+  assert.equal(job.invoice_deposit_liability_cents,1500000)
   await act(`/invoices/${deposit.invoice.id}/return-receipt`,{receipt_id:depositReturnId,returned_on:'2026-10-25',reference:'Returned unapplied deposit BS-109-'+job.id,reason:'Private deposit bank return correspondence',confirm:true})
   assert.equal(job.invoice_deposit_liability_cents,0);assert.equal(job.invoices.find(i=>i.id===milestone.invoice.id).balance.due_cents,8700000)
   assert.deepEqual(job.invoices.find(i=>i.id===milestone.invoice.id).issued,original)
@@ -69,8 +82,8 @@ try {
   await clientPage.goto(base+`/app?job=${job.id}&tab=Billing`);const clientInvoice=clientPage.locator('#invoice-'+milestone.invoice.id);await clientInvoice.locator('summary').first().click();await clientInvoice.getByLabel('Invoice acknowledgment statement',{exact:true}).fill('I acknowledge the exact framing invoice; payment is recorded separately');await clientInvoice.getByRole('checkbox').check();await clientInvoice.getByRole('button',{name:'Acknowledge this invoice',exact:true}).click();await expect(clientInvoice.getByText(/Client acknowledged by/)).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}/receivables`)).status(),403);assert.equal(await clientPage.getByText('Office-only remittance source statement',{exact:false}).count(),0);await shot(clientPage,'client',clientInvoice.locator('summary').first());assert.equal(await clientPage.getByText('Private single-invoice bank return correspondence',{exact:false}).count(),0);await read();assert.equal(job.invoices.find(i=>i.id===milestone.invoice.id).balance.due_cents,8700000)
   const document=await client.newPage();await document.setViewportSize({width,height:1100});await document.goto(base+`/api/plinth/jobs/${job.id}/invoices/${milestone.invoice.id}/document.html`);await document.getByRole('heading',{name:'Invoice '+original.number,exact:true}).waitFor();assert.equal(await document.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'BILL-002 original invoice fits the phone page');await document.screenshot({path:`${shots}/BILL-002-original-${width}.png`,animations:'disabled'});await document.close()
  }
- const site=process.env.PLINTH_SITE;assert.ok(site);await page.goto(site+'/contract');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByText('BILL-002',{exact:true}).first().scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-002-contract-${width}.png`,animations:'disabled'})}
- await page.goto(site+'/docs/agent-commands');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByRole('heading',{name:'Deposits and milestone invoices (BILL-002)',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-002-commands-${width}.png`,animations:'disabled'})}
+ const site=process.env.PLINTH_SITE;assert.ok(site);await page.goto(site+'/contract');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByText('BILL-006',{exact:true}).first().scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-contract-${width}.png`,animations:'disabled'})}
+ await page.goto(site+'/docs/agent-commands');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByRole('heading',{name:'Recorded remittances and current receivables (BILL-006, partial)',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-commands-${width}.png`,animations:'disabled'})}
  console.log('BILL-006 recorded allocation, direct/deposit receipt returns, history and aging passed at 1440/390; BILL-002 native owner/client Billing journey passed at 1440/390: issue, suppressed mail, recorded bank receipts, partial deposit allocation, liability, net balance, acknowledgment and immutable invoice')
  await owner.close();await client.close()
 } finally {await browser.close()}
