@@ -100,6 +100,20 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
    need(!(job.remittances ?? []).some(r => r.reference.toLowerCase() === reference.toLowerCase()) && !invoiceRows(job).some(i => i.receipts.some(r => r.reference.toLowerCase() === reference.toLowerCase())), 'This external receipt reference is already recorded on this job', 409, 'invoice_duplicate')
    const receipt: InvoiceReceipt = { id: crypto.randomUUID(), amount_cents, received_on: date(input.received_on, 'received_on'), reference, method: input.method, recorded_by: stamp(actor), label: 'Recorded by staff; Plinth did not move or independently verify funds' as const }
    row.receipts.push(receipt); recordApproval(job, actor, 'invoice.receipt', row, receipt)
+  } else if (action === 'return-receipt') {
+   need(input.confirm === true, 'Confirm the external bank/check return; Plinth does not move or independently verify funds')
+   need(input.amount_cents === undefined, 'A receipt return reverses the full original amount; partial returns need a separate reviewed adjustment')
+   const receipt = find(row.receipts, text(input.receipt_id, 'receipt_id', 100))
+   need(!receipt.remittance_id, 'Return a remittance through its remittance return door so all allocations reconcile together', 409, 'remittance_history')
+   need(receipt.amount_cents > 0 && !receipt.reversal_of && !row.receipts.some(r => r.reversal_of === receipt.id), 'Choose an original receipt that has not already been returned', 409, 'receipt_returned')
+   const returned_on = date(input.returned_on, 'returned_on')
+   need(returned_on >= receipt.received_on, 'Return date cannot precede the original receipt')
+   // Allocated liability must stay funded; this action never rewrites a draw's deposit applications.
+   need(row.kind !== 'deposit' || receipt.amount_cents <= depositAvailable(job, row), 'This return would consume deposit funds already applied to a milestone; review allocation reversals first', 409, 'deposit_allocated')
+   const reason = text(input.reason, 'Return reason', 2000)
+   const reversal: InvoiceReceipt = { id: crypto.randomUUID(), amount_cents: -receipt.amount_cents, received_on: returned_on, reference: text(input.reference, 'Return evidence reference', 500), method: receipt.method, recorded_by: stamp(actor), reversal_of: receipt.id, label: 'Return recorded by staff; receipt reversed, no funds moved or independently verified' }
+   row.receipts.push(reversal)
+   recordApproval(job, actor, 'invoice.receipt_return', row, { invoice_number: row.number, receipt, reversal, reason })
   } else if (action === 'apply-deposit') {
    need(row.kind === 'milestone', 'Apply deposits only to milestone invoices', 409, 'invoice_state')
    const deposit = find(invoiceRows(job), text(input.deposit_invoice_id, 'deposit_invoice_id', 100)), amount_cents = cents(input.amount_cents)
