@@ -38,7 +38,8 @@ try {
   await act(`/invoices/${deposit.invoice.id}/receipt`,{amount_cents:2400000,received_on:'2026-10-22',reference:'Second deposit bank posting BS-104B-'+job.id,method:'bank',confirm:true})
   const depositReturnId=job.invoices.find(i=>i.id===deposit.invoice.id).receipts.at(-1).id
   assert.equal(job.invoice_deposit_liability_cents,4800000)
-  await deposit.record.locator('summary').first().click()
+  // The second receipt was posted through HTTP; reload before the next version-bound UI mutation.
+  await page.reload();await page.getByRole('heading',{name:'Invoices and deposits',exact:true}).waitFor()
   const milestone=await prepare('milestone','Fixed framing milestone'),original=structuredClone(milestone.invoice.issued)
   await milestone.record.locator('summary').filter({hasText:'Apply a recorded deposit'}).click()
   const apply=milestone.record.getByRole('button',{name:'Apply deposit to invoice',exact:true}).locator('..');await apply.getByLabel('Deposit amount to apply (USD)',{exact:true}).fill('24000');await apply.getByRole('button',{name:'Apply deposit to invoice',exact:true}).click();await milestone.record.getByText(/^Applied .* from INV-/).waitFor();await read()
