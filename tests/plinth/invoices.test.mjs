@@ -100,6 +100,7 @@ test('BILL-006 — one recorded bank remittance pays multiple milestones, retain
   await unchanged('/remittances',{...input,received_on:'2026-02-30'},400)
   await unchanged('/remittances',{...input,allocations:[input.allocations[0],input.allocations[0]]},400)
   await unchanged('/remittances',{...input,allocations:[{invoice_id:ids[0],amount_cents:11400001}]},409)
+  await unchanged('/remittances',{...input,allocations:[{invoice_id:ids[0],amount_cents:1},{invoice_id:ids[1],amount_cents:11400001}]},409)
   await unchanged('/remittances',{...input,allocations:[{invoice_id:deposit.id,amount_cents:1}]},409)
   await unchanged('/remittances',{...input,allocations:[{invoice_id:draft.id,amount_cents:1}]},409)
   await unchanged('/remittances',{...input,allocations:[{invoice_id:crypto.randomUUID(),amount_cents:1}]},404)
