@@ -136,3 +136,65 @@ test('BILL-003 / BILL-001 — coded USD draws retain reviewed tax, reconcile sto
   const denied=await api(`/jobs/${legacy.id}/sov`,{expected_version:legacy.version});assert.equal(denied.status,409);assert.equal(denied.value.error,'sov_pricing_required','Unreviewed historic tax never gains invented provenance')
  } finally {await f.close()}
 })
+
+test('CARE-001 — exact client-safe handover keeps assigned punch exceptions, separate decisions and contract retainage rules', async()=>{
+ const f=await createFixture()
+ try {
+  const client=await f.invite('handover-client@example.com','Handover client'),foreign=await f.invite('handover-foreign@example.com'),agent=await f.agent()
+  const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{...(body===undefined?{}:{method:'POST',body}),cookie,token})
+  let job=(await api('/jobs',{name:'Cedar Street kitchen handover',client_email:'handover-client@example.com',address:'143 Cedar Street, Portland, OR 97205'})).value.job
+  const refresh=async()=>job=(await api(`/jobs/${job.id}`)).value.job
+  const act=async(path,body={},cookie=f.owner,token)=>{const r=await api(`/jobs/${job.id}`+path,{expected_version:job.version,...body},cookie,token);await refresh();return r}
+  assert.equal((await act('/quotes',{lines:[{id:'finish',description:'Kitchen finish works',cost_code:'06-100',phase:'Finish',category:'labor',quantity:'1',unit:'job',unit_cents:100000,cost_unit_cents:70000}]})).status,200)
+  const rate=(await api('/pricing-rates',{jurisdiction:'Synthetic handover jurisdiction',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'Human-reviewed signed contract exemption',human_reviewed:true})).value.rate
+  const pricing={basis:'sell',as_of:'2026-10-21',rules:[],tax:{rate_id:rate.id,taxable_line_ids:['finish']}},preview=await act('/pricing/preview',pricing)
+  assert.equal((await act('/pricing/apply',{...pricing,digest:preview.value.preview.digest})).status,200)
+  assert.equal((await act(`/quotes/${job.quotes.at(-1).id}/accept`,{method:'signed',evidence:'Client signed exact kitchen scope',schedule_choice:{kind:'none',reason:'Closeout schedule recorded separately'}})).status,200)
+  assert.equal((await act('/sov',{})).status,200)
+  assert.equal((await act('/retainage',{contract_reference:'Signed kitchen retainage rule',rules:[{line_id:'quote:finish',work_bps:1000,stored_bps:0}],milestones:[{id:'final',name:'Final release',final:true,completion_requirements:['Completion certificate'],waiver_requirements:['Final waiver']}]})).status,200)
+  const claim=(await act('/claims',{description:'Half completed finish works',lines:[{line_id:'quote:finish',completed_cents:50000,stored_cents:0,evidence:'Reviewed partial completion',order_ids:[]}]})).value.record
+  assert.equal((await act(`/claims/${claim.id}/approve`)).status,200)
+  const trade=await f.invite('handover-plumber@example.com','Plumbing closeout contact')
+  const vendor=(await api('/vendors',{kind:'subcontractor',name:'Synthetic handover plumbing',trades:['Plumbing'],contacts:[{id:'plumber',name:'Plumbing contact',email:'handover-plumber@example.com'}]})).value.vendor
+  assert.equal((await api(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Plumbing',status:'qualified',evidence:'Reviewed qualification'})).status,200)
+  const scope=(await act('/subcontracts',{vendor_id:vendor.id,trade:'Plumbing',scope:'Kitchen plumbing and closeout',contact_ids:['plumber'],awarded_on:'2026-10-21'})).value.record
+  assert.equal((await act(`/subcontracts/${scope.id}/release`)).status,200)
+  const png={name:'synthetic-plinth-1.png',mime:'image/png',base64:Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]).toString('base64')}
+  const issue=(await act('/punch/issues',{title:'Adjust basin trim',description:'Unresolved minor trim adjustment',due_on:'2026-11-10',location:'Kitchen basin',photo:png,annotation:{x:0.3,y:0.4,note:'Trim gap'}})).value.record
+  assert.equal((await act(`/punch/issues/${issue.id}/assign`,{subcontract_id:scope.id,email:'handover-plumber@example.com'})).status,200)
+  const pdf=Buffer.from('%PDF-1.4\nsynthetic-plinth-1 original document\n%%EOF'),file={name:'synthetic-plinth-1.pdf',mime:'application/pdf',base64:pdf.toString('base64')}
+  const kinds=['as-built','selection','manual','inspection','punch','warranty','final-cost','waiver'],documents=[]
+  for(const kind of kinds){const r=await act('/handover/documents',{title:'Reviewed '+kind,kind,tags:['handover'],reference:'Exact '+kind+' original revision 1',file});assert.equal(r.status,200,JSON.stringify(r.value));documents.push(r.value.record)}
+  const input={title:'Cedar Street final handover',documents:documents.map(d=>({document_id:d.id,revision_id:d.revisions[0].id}))}
+  assert.equal((await act('/handover/packages',input)).status,409,'Unreleased punch exception cannot disappear from client handover')
+  assert.equal((await act(`/punch/issues/${issue.id}/release`,{confirm:true})).status,200)
+  assert.equal((await act('/warranties',{kind:'component',name:'Kitchen faucet',starts_on:'2026-10-21',ends_on:'2027-10-21',signed_terms_reference:'Signed warranty exact original',terms:'One year manufacturer terms'})).status,200)
+  const prepared=await act('/handover/packages',input);assert.equal(prepared.status,200,JSON.stringify(prepared.value));const pkg=structuredClone(prepared.value.record)
+  assert.equal(pkg.exceptions.length,1);assert.equal(pkg.exceptions[0].id,issue.id);assert.equal(pkg.warranty_references[0].snapshot.terms,'One year manufacturer terms')
+  assert.equal((await api(`/jobs/${job.id}/handover`,undefined,client)).value.packages.length,0,'Draft package stays office-only')
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/handover/files/${documents[0].revisions[0].file.id}`,{cookie:client})).status,404)
+  for(const credentials of [{cookie:client},{cookie:undefined,token:agent}])assert.equal((await act('/handover/packages',input,credentials.cookie,credentials.token)).status,403)
+  assert.equal((await act(`/handover/packages/${pkg.id}/complete`,{digest:pkg.digest,confirm:true,statement:'Builder complete with basin trim exception',client_safe:false})).status,400)
+  assert.equal((await act(`/handover/packages/${pkg.id}/complete`,{digest:pkg.digest,confirm:true,statement:'Builder complete with basin trim exception',client_safe:true})).status,200)
+  assert.equal((await act(`/handover/packages/${pkg.id}/accept`,{digest:pkg.digest,confirm:true,statement:'Owner cannot accept for client',exception_ids:[issue.id]})).status,403)
+  assert.equal((await act(`/handover/packages/${pkg.id}/accept`,{digest:pkg.digest,confirm:true,statement:'Client accepts listed exception',exception_ids:[]},client)).status,409)
+  assert.equal((await act(`/handover/packages/${pkg.id}/accept`,{digest:'stale',confirm:true,statement:'Client accepts listed exception',exception_ids:[issue.id]},client)).status,409)
+  assert.equal((await act(`/handover/packages/${pkg.id}/accept`,{digest:pkg.digest,confirm:true,statement:'Client accepts with basin trim still assigned',exception_ids:[issue.id]},client)).status,200)
+  assert.equal(job.punch.issues[0].status,'open');assert.equal(job.punch.issues[0].assignment.subcontract_id,scope.id);assert.equal(job.retainage.releases.length,0)
+  const accepted=structuredClone(job.handover.packages[0]);assert.notEqual(accepted.completion.by.id,accepted.acceptance.by.id)
+  const release={claim_id:claim.id,milestone_id:'final',lines:[{line_id:'quote:finish',amount_cents:5000}],completion_references:[{requirement:'Completion certificate',reference:pkg.id}],waiver_references:[{requirement:'Final waiver',reference:'Reviewed final waiver'}]}
+  assert.equal((await act('/retainage/release',release)).status,409,'Client acceptance never bypasses the earned-value final release rule')
+  assert.equal((await act('/handover/documents/'+documents[0].id,{reference:'Later as-built revision 2',file:{...file,base64:Buffer.from('%PDF-1.4\nsynthetic-plinth-2\n%%EOF').toString('base64')}})).status,200)
+  assert.deepEqual(job.handover.packages[0],accepted,'Later document upload preserves accepted package revisions and decisions')
+  const visible=(await api(`/jobs/${job.id}/handover?q=original`,undefined,client)).value
+  assert.equal(visible.packages.length,1);assert.deepEqual(visible.documents,[]);assert.equal(visible.packages[0].documents[0].source.revision,1)
+  for(const document of visible.packages[0].documents){const r=await f.request(`/api/plinth/jobs/${job.id}/handover/files/${document.source.file.id}`,{cookie:client});assert.equal(r.status,200);assert.deepEqual(Buffer.from(await r.arrayBuffer()),pdf)}
+  assert.equal((await api(`/jobs/${job.id}/handover`,undefined,foreign)).status,404)
+  assert.equal((await api(`/jobs/${job.id}/handover`,undefined,trade)).status,404)
+  const final=(await act('/claims',{description:'Final human-reviewed earned completion',lines:[{line_id:'quote:finish',completed_cents:100000,stored_cents:0,evidence:'Signed final completion certificate',order_ids:[]}]})).value.record
+  assert.equal((await act(`/claims/${final.id}/approve`)).status,200)
+  assert.equal((await act('/retainage/release',{...release,claim_id:final.id,lines:[{line_id:'quote:finish',amount_cents:10000}],waiver_references:[]})).status,409)
+  assert.equal((await act('/retainage/release',{...release,claim_id:final.id,lines:[{line_id:'quote:finish',amount_cents:10000}]})).status,200)
+  assert.equal(job.retainage_balance.held_cents,0);assert.deepEqual(job.handover.packages[0],accepted)
+ } finally {await f.close()}
+})

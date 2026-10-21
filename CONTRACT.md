@@ -340,8 +340,8 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 26 | 24 | 70 | 120 |
-| All | 40 | 24 | 70 | 134 |
+| Target and push further | 27 | 24 | 69 | 120 |
+| All | 41 | 24 | 69 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -449,7 +449,7 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | `AUTO-004` | Receipts and collection closure | target | missing |  | No receipts and collection closure workflow exists. |
 | `NOTIFY-001` | Per-person notification channels and preferences | target | missing |  | Only native sign-in and invitation email is sent; per-person per-event channel choices, required notices and grant checks before delivery are absent. |
 | `NOTIFY-002` | Native mobile push and deep links | target | missing |  | No native apps, APNs/FCM device registration, push delivery or deep links exist. |
-| `CARE-001` | Handover closeout and final acceptance | target | missing |  | No handover closeout and final acceptance workflow exists. |
+| `CARE-001` | Handover closeout and final acceptance | target | done | `tests/plinth/sov.test.mjs` — “CARE-001 — exact client-safe handover keeps assigned punch exceptions, separate decisions and contract retainage rules” proves assigned unresolved exceptions, separate builder/client decisions, immutable original revisions and final earned-value/waiver release gates; `tests/journeys/handover.mjs` — “CARE-001 PASS” proves client-safe packages, phone document access, search and every exact original revision at 1440/390 | |
 | `CARE-002` | Warranty requests service visits and follow-up | target | missing |  | No warranty requests service visits and follow-up workflow exists. |
 | `CARE-003` | Warranty periods maintenance and recurring promises | target | done | `src/plinth/warranty-model.ts`; `src/plinth/warranties.ts`; `src/plinth/warranty-schedule.ts`; `src/plinth/warranty-store.ts`; `src/plinth/warranty-reminders.ts`; `src/plinth/warranty-cron.ts`; `src/ui/warranties.tsx`; `tests/plinth/warranties.test.mjs`; `tests/plinth/portable.test.mjs` |  |
 | `CARE-004` | Client satisfaction surveys and review requests | target | missing |  | No closeout surveys, low-score follow-up or review requests exist. |
