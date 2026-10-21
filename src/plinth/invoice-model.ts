@@ -24,7 +24,8 @@ export interface InvoiceSnapshot {
 }
 export interface InvoiceReceipt {
  id: string; amount_cents: number; received_on: string; reference: string; method: 'bank' | 'check'
- recorded_by: Stamp; label: 'Recorded by staff; Plinth did not move or independently verify funds'
+ remittance_id?: string; reversal_of?: string
+ recorded_by: Stamp; label: 'Recorded by staff; Plinth did not move or independently verify funds' | 'Return recorded by staff; allocation reversed, no funds moved or independently verified'
 }
 export interface InvoiceDepositApplication { id: string; deposit_invoice_id: string; amount_cents: number; recorded_by: Stamp }
 export interface InvoiceDelivery {

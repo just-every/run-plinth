@@ -97,7 +97,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
    need(amount_cents > 0 && amount_cents <= invoiceBalance(job, row).due_cents, 'Receipt must be positive and cannot exceed the invoice balance', 409, 'invoice_balance')
    const recorded = sum(invoiceRows(job).flatMap(i => i.receipts.map(r => r.amount_cents)))
    need(sum([recorded, amount_cents]) <= (job.budgets?.at(-1)?.contract_cents ?? 0), 'Total recorded receipts would exceed the current approved contract; review unapplied deposits before recording more', 409, 'invoice_balance')
-   need(!invoiceRows(job).some(i => i.receipts.some(r => r.reference.toLowerCase() === reference.toLowerCase())), 'This external receipt reference is already recorded on this job', 409, 'invoice_duplicate')
+   need(!(job.remittances ?? []).some(r => r.reference.toLowerCase() === reference.toLowerCase()) && !invoiceRows(job).some(i => i.receipts.some(r => r.reference.toLowerCase() === reference.toLowerCase())), 'This external receipt reference is already recorded on this job', 409, 'invoice_duplicate')
    const receipt: InvoiceReceipt = { id: crypto.randomUUID(), amount_cents, received_on: date(input.received_on, 'received_on'), reference, method: input.method, recorded_by: stamp(actor), label: 'Recorded by staff; Plinth did not move or independently verify funds' as const }
    row.receipts.push(receipt); recordApproval(job, actor, 'invoice.receipt', row, receipt)
   } else if (action === 'apply-deposit') {

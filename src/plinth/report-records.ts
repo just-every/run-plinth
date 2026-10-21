@@ -22,6 +22,7 @@ export async function reportRecords(db: D1Database, actor: Actor, scope: ReportR
  return all.flatMap(j => [
   ...j.quotes.map(q=>({id:q.id,kind:'quote',label:`${j.name}: quote ${q.revision}`,stage:q.status,amount:q.total_cents})),
   ...j.orders.map(o=>({id:o.id,kind:'order',label:`${j.name}: ${o.description}`,stage:o.status,amount:o.amount_cents})),
+  ...(j.remittances??[]).map(r=>({id:r.id,kind:'remittance',label:`${j.name}: ${r.reference}`,stage:r.returned?'returned':'recorded',amount:r.amount_cents})),
   ...(j.invoices??[]).map(i=>({id:i.id,kind:'invoice',label:`${j.name}: ${i.description}`,stage:i.status,amount:i.amount_cents})),
   ...j.claims.map(c=>({id:c.id,kind:'claim',label:`${j.name}: ${c.description}`,stage:c.status,amount:c.reconciliation.current_cents})),
   ...j.variations.map(v=>({id:v.id,kind:'variation',label:`${j.name}: ${v.description}`,stage:v.status,amount:v.amount_cents})),

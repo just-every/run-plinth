@@ -192,7 +192,7 @@ Every page, API, file, webhook, automation and export enforces current authority
 
 - **BILL-005 — Invoice corrections credits refunds and write-offs.** Correct issued invoices with linked credit/debit documents, approved refunds, voids where allowed and reasoned write-offs. Preserve numbering, original terms and ledger/payment references; refund authority and available settled funds are rechecked before a provider instruction. **Acceptance evidence:** Credit part of a paid change-order invoice, approve a partial refund through its processor and write off a separate disputed residual. Inspect original invoice, adjusted balance, settlement and accounting entries; replay produces no second refund.
 
-- **BILL-006 — Receivables aging receipts and remittance allocation.** Show due/overdue invoices, retainage and disputed balances with aging and collection ownership. Allocate provider or recorded bank/check receipts across invoices with remittance evidence, reconcile overpayments/unapplied cash and send a receipt only for recorded funds, not a browser return. **Acceptance evidence:** Apply one ACH receipt to two invoices and retain an overpayment, inspect aging, then record a returned payment. All balances and receipt histories reconcile without reporting unconfirmed funds as paid.
+- **BILL-006 — Receivables aging receipts and remittance allocation.** Show due/overdue invoices, retainage and disputed balances with aging and collection ownership. Allocate provider or recorded bank/check receipts across invoices with remittance evidence, reconcile overpayments/unapplied cash and send a receipt only for recorded funds, not a browser return. Current partial native semantics: bank/check evidence is staff-recorded, never provider-verified funds; one job-local remittance may allocate to multiple issued milestone invoices with the remainder held as unapplied cash, separately from deposit liability. A full recorded return appends reversing entries for its allocations and retires its unapplied balance without changing issued invoices or sending funds. Due dates are inclusive job-local calendar dates; aging uses calendar-day buckets current, 1–30, 31–60, 61–90 and 91+, with unreleased retainage separate. An as-of date changes age only; balances are the current recorded ledger, not historical reconstruction. These money records inherit RPT-004 financial fields and required-stage checks. **Acceptance evidence:** Apply one ACH receipt to two invoices and retain an overpayment, inspect aging, then record a returned payment. All balances and receipt histories reconcile without reporting unconfirmed funds as paid.
 
 - **PAY-001 — Stripe card ACH and wallet checkout.** Clients pay issued USD invoices through the builder's connected Stripe account using hosted card/ACH and eligible Apple Pay/Google Pay checkout. Fees and authorization are visible, card/bank secrets remain with the processor, and durable idempotent instructions and signed events connect payment to invoice. **Acceptance evidence:** Pay a draw by card, ACH and eligible wallet in provider test mode, then complete a controlled authorized live low-value transaction. Inspect processor/invoice references and duplicate event handling; no full account number enters Plinth storage/logs.
 
@@ -340,8 +340,8 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 25 | 21 | 74 | 120 |
-| All | 39 | 21 | 74 | 134 |
+| Target and push further | 25 | 22 | 73 | 120 |
+| All | 39 | 22 | 73 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -425,7 +425,7 @@ Judged from the code and tests at commit `58730bb834ea59a4ba62d0afcf1805c0dcf9a1
 | `BILL-003` | Retainage calculation release and balance | target | done | `src/plinth/retainage-model.ts`; `src/plinth/retainage.ts`; `src/plinth/supplier-retainage.ts`; `src/plinth/sov.ts`; `src/ui/retainage.tsx`; `tests/plinth/sov.test.mjs`; `tests/plinth/portable.test.mjs`; `tests/journeys/retainage.mjs` | |
 | `BILL-004` | Cost-plus and time-material billing | target | missing |  | No cost-plus and time-material billing workflow exists. |
 | `BILL-005` | Invoice corrections credits refunds and write-offs | target | missing |  | No invoice corrections credits refunds and write-offs workflow exists. |
-| `BILL-006` | Receivables aging receipts and remittance allocation | target | missing |  | No receivables aging receipts and remittance allocation workflow exists. |
+| `BILL-006` | Receivables aging receipts and remittance allocation | target | partial | `src/plinth/remittances.ts`; `src/plinth/invoices.ts`; `src/plinth/http.ts`; `src/plinth/report-records.ts`; `tests/plinth/invoices.test.mjs`; `tests/plinth/portable.test.mjs` | Staff-recorded job-local bank/check remittances allocate across issued milestone invoices, retain unapplied cash and append full-return reversals; current-balance aging separates unreleased retainage. Provider reconciliation, deposit/legacy-receipt returns, disputed balances, collection ownership and receipt delivery/interface remain absent. |
 | `PAY-001` | Stripe card ACH and wallet checkout | target | missing |  | No stripe card ach and wallet checkout workflow exists. |
 | `PAY-002` | Settlement failures returns and disputes | target | missing |  | No settlement failures returns and disputes workflow exists. |
 | `PAY-003` | Subcontractor payable approval and payment handoff | target | missing |  | No subcontractor payable approval and payment handoff workflow exists. |
