@@ -1,3 +1,4 @@
+import { TradeInbox } from './trade-inbox'
 import { Reports } from './reports'
 import { useEffect, useRef, useState } from 'react'
 import type { Job } from '../plinth/model'
@@ -33,6 +34,7 @@ export function Workspace() {
       <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
+        {view === 'trade' && <TradeInbox/>}
         {view === 'customers' && manager && <Customers />}
         {view === 'vendors' && manager && <Vendors />}
         {view === 'imports' && <Imports onChange={refresh} />}

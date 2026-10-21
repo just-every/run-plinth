@@ -1,3 +1,4 @@
+import { allocations } from './schedule-resource-model'
 import { travelFields } from './schedule-travel'
 import { templateTaskId } from './schedule-baseline-model'
 import { requireJobManager, requireManager } from './auth'
@@ -52,7 +53,7 @@ async function normalizeTemplate(actor: Actor, input: Input): Promise<{ calendar
  const preview = await previewSchedule(validationJob, actor, input, [])
  need(preview.tasks.length > 0, 'A template needs at least one task')
  need(preview.tasks.every(task => task.status !== 'cancelled'), 'Template tasks must be active')
- const tasks = preview.tasks.map(task => ({ id: task.id, trade: task.trade, description: task.description, owner: task.owner, start: task.start, duration_minutes: task.duration_minutes, milestone: task.milestone, predecessors: task.predecessors, ...travelFields(task as unknown as Input) }))
+ const tasks = preview.tasks.map(task => ({ id: task.id, trade: task.trade, description: task.description, owner: task.owner, start: task.start, duration_minutes: task.duration_minutes, milestone: task.milestone, predecessors: task.predecessors, ...allocations(task as unknown as Input), ...travelFields(task as unknown as Input) }))
  return { calendar: preview.calendar, tasks }
 }
 /** Called by the authenticated Plinth router; every mutation uses the authority/clock guard. */

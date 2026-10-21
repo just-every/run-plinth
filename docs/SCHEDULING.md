@@ -1,6 +1,6 @@
 # Travel-aware scheduling (SCH-003 partial)
 
-A builder manager can set `travel_minutes` through the existing authenticated native scheduling HTTP doors. These are human scheduling decisions; a feasible slot does not mean that a subcontractor confirmed attendance. There is no travel-buffer editor yet.
+A builder manager can set `travel_minutes` through the existing authenticated native scheduling HTTP doors. These are human scheduling decisions; a feasible slot does not mean that a subcontractor confirmed attendance. The Schedule capacity panel edits resource allocations and travel buffers, and displays cross-job allocations, calendars and confirmation risk.
 
 ## Book and move
 
@@ -18,6 +18,12 @@ Each task supplied to `POST /api/plinth/jobs/:job/schedule/preview` can include 
 
 Schedule templates retain their tasks' buffers. Their existing preview/apply doors enforce the translated schedule against current bookings. Approval, baseline and revision snapshots preserve the reviewed tasks and buffers; normal job archives carry them as part of the job without a schema migration.
 
-## Still open
+## Capacity calendars and confirmations
 
-SCH-003 remains partial. Availability and leave calendars, crew/equipment capacity and explicit subcontractor invitations, alternative dates and confirmations are not implemented. This travel slice does not narrow those requirements or claim attendance.
+Owners/admins create named crews and equipment in **Schedule → Capacity and trade confirmations → Crew and equipment calendars**. Capacity is whole units. Availability windows restrict when a resource can work; an empty list allows any time except leave. Leave and availability use half-open UTC intervals, displayed in the viewer’s local time. Calendar edits retain the reviewer and reason.
+
+Allocate resources and an elapsed travel buffer to each booked task. The panel lists their booked work across jobs. Native booking, approval, move, planner publication and template application refuse excess simultaneous units, leave, missing resources and out-of-window work. Other-job allocations include travel. Every save shares the global transaction clock; a concurrent publication or calendar revision invalidates stale checks. Existing published work stays put when a later calendar change creates a conflict, and its confirmation becomes visibly at risk.
+
+Invite a person through **People & access**, then request their explicit confirmation from the booking. The request appears in that person’s **Trade inbox**. This is a native inbox invitation, not an email-delivery claim. The inbox contains only that task’s site, trade and dates. It grants no access to the client job, financials or another job. A proposed alternative does not move or reserve anything; the builder must book feasible dates and issue a fresh invitation. Only the personally invited contact confirms the exact current slot, after live resource checks. Changing dates, trade, resources or travel invalidates an earlier invitation.
+
+SCH-003 remains partial pending ct approval of this conservative contact-grant/privacy default. SCH-004 and NOTIFY-001 carry outbound delivery and escalation.

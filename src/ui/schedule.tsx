@@ -1,3 +1,4 @@
+import { ScheduleCapacity } from './schedule-capacity'
 import { ScheduleConstraints } from './schedule-constraints'
 import { useEffect, useRef, useState } from 'react'
 import type { Schedule as Booking } from '../plinth/model'
@@ -71,6 +72,7 @@ export function Schedule(props: JobProps) {
         <ScheduleTemplates job={job} mutate={mutate} onPreview={(proposal, input) => { generation.current++; setPreview(proposal); setTemplateInput(input); setDirty(false) }} />
       </>}
       {manager && job.status === 'active' && <ScheduleConstraints job={job} mutate={mutate} />}
+      <ScheduleCapacity {...props}/>
       <ScheduleBaselines job={job} mutate={mutate} manager={manager} forecast={preview?.tasks} />
       <JobLog job={job} go={go} limit={4} />
       <CalendarSubscription mutate={mutate} />

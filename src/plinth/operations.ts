@@ -1,3 +1,4 @@
+import { allocations } from './schedule-resource-model'
 import { tradeConflicts, travelFields } from './schedule-travel'
 import { requireScheduleClearance } from './schedule-constraints'
 import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Order, type Schedule } from './model'
@@ -10,7 +11,7 @@ export function prepareSchedule(job:Job,actor:Actor,input:Input,all:Job[]) {
  requireJobManager(actor,true);active(job)
  need(!job.schedule_calendar,'Use the schedule planner to review this job’s tasks before publication',409,'schedule_review')
 
- const row:Schedule={...travelFields(input),id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
+ const row:Schedule={...allocations(input),...travelFields(input),id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
  need(row.end>row.start,'Schedule must end after it starts');job.schedules.push(row)
  if(actor.role!=='agent')approveSchedule(job,actor,row.id,all)
  return row

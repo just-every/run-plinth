@@ -1,3 +1,4 @@
+import { allocations } from './schedule-resource-model'
 import { tradeConflicts, travelFields } from './schedule-travel'
 import { scheduleBlockers, requireScheduleClearance } from './schedule-constraints'
 import { latestActual, taskActualDates } from './schedule-baseline-model'
@@ -29,7 +30,7 @@ function normalize(job: Job, actor: Actor, input: Input): Schedule[] {
    need(!predecessors.some(d => d.id === predecessor), 'A predecessor may appear only once')
    predecessors.push({ id: predecessor, lag_minutes: integer(dependency.lag_minutes, 'Lag') })
   }
-  return { ...travelFields(raw, old), id, trade: text(raw.trade, 'Trade', 200), description: text(raw.description, 'Task', 1000), owner: text(raw.owner ?? old?.owner ?? raw.trade, 'Responsible owner', 200), start, end: old?.end ?? start, duration_minutes: duration, milestone, predecessors, status: raw.status === 'cancelled' ? 'cancelled' as const : 'booked' as const, prepared_by: old?.prepared_by ?? stamp(actor), revision: old?.revision ?? 0, ...(old?.updated_at ? { updated_at: old.updated_at } : {}) }
+  return { ...allocations(raw,old), ...travelFields(raw, old), id, trade: text(raw.trade, 'Trade', 200), description: text(raw.description, 'Task', 1000), owner: text(raw.owner ?? old?.owner ?? raw.trade, 'Responsible owner', 200), start, end: old?.end ?? start, duration_minutes: duration, milestone, predecessors, status: raw.status === 'cancelled' ? 'cancelled' as const : 'booked' as const, prepared_by: old?.prepared_by ?? stamp(actor), revision: old?.revision ?? 0, ...(old?.updated_at ? { updated_at: old.updated_at } : {}) }
  })
  need(job.schedules.every(s => seen.has(s.id)), 'Keep every existing task; cancel a task explicitly instead of deleting its history')
  for (const task of tasks) {

@@ -2,8 +2,8 @@ import { need, type Input, type Job, type Schedule } from './model'
 
 export interface TravelFields { travel_minutes?: number }
 export interface TradeConflict {
- job_id: string; job_name: string; schedule_id: string; trade: string; start: string; end: string
- reason: 'overlap' | 'travel'; required_travel_minutes?: number; available_travel_minutes?: number
+ resource_id?: string; job_id: string; job_name: string; schedule_id: string; trade: string; start: string; end: string
+ reason: 'overlap' | 'travel' | 'capacity' | 'leave' | 'availability' | 'resource_missing'; required_travel_minutes?: number; available_travel_minutes?: number
 }
 /** Elapsed minutes between sites, independent of working calendars and DST. */
 export function travelFields(input: Input, previous?: Schedule): TravelFields {
