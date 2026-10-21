@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
-test('BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -48,6 +48,10 @@ test('BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 /
     const archiveSelection=await current('/selections',{room:'Kitchen',category:'Archive fixture decision',allowance_cents:30000,cost_code:'22-400',decision_on:'2020-01-01',lead_days:14,options:[{name:'Archive exact option',supplier:'Synthetic supply',specifications:'Archive retained specification',price_cents:30000}]})
     await current(`/selections/${archiveSelection.id}/present`,{revision_id:archiveSelection.revisions[0].id})
     await current(`/selections/${archiveSelection.id}/reminder`,{revision_id:archiveSelection.revisions[0].id,reason:'Archive pending decision reminder, not sent',attachments:[{name:'decision-source.pdf',mime:'application/pdf',base64:drawingBytes.toString('base64')}]})
+    const todoInput={title:'Archive closeout checklist',notes:'Private checklist original notes',due_at:'2031-01-01T17:00:00Z',priority:'high',tags:['closeout'],items:[{title:'Review original handover manual',assignee:{kind:'office',email:'builder@example.com'}}],attachments:[{name:'synthetic-plinth-1.png',mime:'image/png',base64:png}]}
+    const companyTodo=await f.json('/api/plinth/todos',{method:'POST',cookie:f.owner,body:todoInput});assert.equal(companyTodo.status,201,JSON.stringify(companyTodo.value));const archiveCompanyTodo=companyTodo.value.todo
+    const jobTodo=await f.json(`/api/plinth/jobs/${job.id}/todos`,{method:'POST',cookie:f.owner,body:{...todoInput,expected_version:job.version,links:[{kind:'schedule',id:archiveTask.id}]}});assert.equal(jobTodo.status,201,JSON.stringify(jobTodo.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
+    const savedTodo=structuredClone(job.todos[0]);assert.equal(savedTodo.attachments[0].base64,png)
     const csv=await readFile(new URL('../fixtures/import-accepted-jobs.csv',import.meta.url),'utf8')
     const preview=await f.json('/api/plinth/imports/preview',{method:'POST',cookie:f.owner,body:{csv}});assert.equal(preview.status,200)
     r=await f.json('/api/plinth/imports/commit',{method:'POST',cookie:f.owner,body:{csv,fingerprint:preview.value.fingerprint}});assert.equal(r.status,200)
@@ -117,6 +121,8 @@ test('BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 /
     for(const item of expected) if(item.table==='oa_auth_settings') item.row.generation++
     assert.deepEqual(rows(restored),expected)
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
+    assert.deepEqual(JSON.parse(recoveredJob.row.data).todos[0],savedTodo,'TODO-001 job checklist, original photo bytes, assignments and reserved notice identities survive CLI restore')
+    const recoveredCompany=rows(restored).find(item=>item.table==='pl_todo_library'&&item.row.id===archiveCompanyTodo.id);assert.ok(recoveredCompany,'TODO-001 company-level records are in the durable archive inventory');const companyData=JSON.parse(recoveredCompany.row.data);assert.equal(companyData.attachments[0].base64,png);assert.deepEqual(companyData.items,archiveCompanyTodo.items);assert.deepEqual(companyData.notices,archiveCompanyTodo.notices)
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
     const serialized=JSON.stringify(restored)
     assert.ok(serialized.includes('Signed archive retainage section RT-104')&&serialized.includes('Human reviewed signed inspection PI-104'),'BILL-003 immutable terms, withholding snapshots and release evidence survive CLI recovery')

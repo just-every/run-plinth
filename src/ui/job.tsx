@@ -1,3 +1,6 @@
+import { DailyWork } from './daily-work'
+import { LinkedTodos } from './linked-todos'
+import { Todos } from './todos'
 import { Bids } from './bids'
 import { Handover } from './handover'
 import { PunchWorkspace } from './punch'
@@ -18,7 +21,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Handover', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -48,7 +51,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
         <li><Icon name="money" />{job.status === 'active' ? <>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
         <li><Icon name="mail" />Client {job.client_email}</li>
       </ul>
-      <nav className="tabs" aria-label="Job sections">{sections.filter(s => !['Customer','Warranty','RFIs','Bids'].includes(s) || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
+      <nav className="tabs" aria-label="Job sections">{sections.filter(s => !['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
     <div className="job-body">
       {open !== 'Schedule' && <DecisionStrip job={job} manager={manager} go={setSection} />}
@@ -64,8 +67,11 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Warranty' && manager && <Warranties {...props} />}
       {open === 'Punch' && <PunchWorkspace {...props}/>}
       {open === 'Bids' && manager && <Bids {...props}/>}
+      {open === 'Today' && manager && <DailyWork {...props}/>}
+      {open === 'To-dos' && <Todos job={job}/>}
       {open === 'Handover' && <Handover {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}
+      {manager && <LinkedTodos job={job} section={open}/>}
     </div>
   </div>
 }

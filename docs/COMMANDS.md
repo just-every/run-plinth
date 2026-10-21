@@ -81,3 +81,13 @@ These native HTTP doors use the same signed-in owner, administrator or assigned 
 Remittances appear as `remittance` financial records in RPT-004 scoped reports and exports, with native stages `recorded` and `returned`. Owners/administrators may supply `custom_fields` as a field-ID/value object in remittance actions; required fields are checked in the same transaction. Other users retain their existing custom-field rights. Use the financial values door for later changes. Native record amount is the original remittance amount; filter its native status when distinguishing recorded and returned entries. Unapplied cash and net invoice receipt balances come from the receivables report.
 
 BILL-006 remains partial: provider reconciliation, partial remittance returns and returns consuming allocated deposit liability, disputed balances, collection ownership and receipt delivery/interface are unbuilt. Native bank/check evidence and browser navigation never establish provider settlement.
+
+## Scoped checklist work
+
+Signed-in people use `GET /api/plinth/todos?mine=true` for My to-dos and `/api/plinth/jobs/:job/todos` for granted job work. Owners/admins create company records; assigned project managers create job records. Every checklist item names a currently granted office, client or released subcontract contact. External people receive only the title and their own items, and no original attachments or office notes.
+
+A completion, reopening or comment posts to `/:todo/{complete,reopen,comment}` with `expected_revision`, an `operation_id` and optional `item_id`. Offline web completions keep their original operation id and revision; stale work requires explicit review. A replay cannot change the recorded person or items. The native apps of FIELD-003 are not implemented by this web queue.
+
+Owners/admins save reusable templates at `/api/plinth/todos/templates` and bind them to an actual schedule-template revision at `/api/plinth/todos/job-templates/:template`. Existing schedule preview/apply and quote acceptance create bound checklists atomically with their schedule. Current assignee grants are checked again, and reapplication preserves checklist state.
+
+`/api/plinth/todos/preferences` records the current person's email choices. Prepared assignment/comment/reminder notices do not assert delivery. Only the owner explicitly approves a named email attempt at `/:todo/notices/:notice/send` with `channel`, `email` and `confirm`. Each durable attempt is reserved before the configured mail transport; unknown/refused/development outcomes are distinct and never automatically retried. Other channels and Buildertrend export ingestion remain unavailable as TODO-001's Gap records.

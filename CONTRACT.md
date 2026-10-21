@@ -340,8 +340,8 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 27 | 25 | 68 | 120 |
-| All | 41 | 25 | 68 | 134 |
+| Target and push further | 27 | 26 | 67 | 120 |
+| All | 41 | 26 | 67 | 134 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -398,7 +398,7 @@ Judged from the code and tests at commit `626bf93f635d8cd64af428f3aeea8aeff9dcfa
 | `FIELD-003` | Offline mobile capture and conflict resolution | target | missing |  | No offline mobile capture and conflict resolution workflow exists. |
 | `FIELD-004` | Punch lists issues and configurable forms | target | done | `tests/plinth/domain.test.mjs` — “FIELD-004 — photo observations retain form revisions, qualified trade repairs and exact manager decisions with released client closeout” proves photo/form capture, scoped assignment, rejected first and accepted second repairs, retained answers/attempts and open search/export; `tests/journeys/punch.mjs` — “FIELD-004 PASS” proves the same installed owner/trade/client screens and original bytes at 1440/390 | |
 | `FIELD-005` | Deliveries inventory and equipment at the job | target | partial | `src/plinth/operations.ts`; `tests/plinth/domain.test.mjs` | Partial value receipts exist; quantity/stock, damage, return and equipment records are absent. |
-| `TODO-001` | Job to-dos with assignable checklists | target | missing |  | No to-do records, assignable checklist items, templates, cross-job to-do lists or reminders exist. |
+| `TODO-001` | Job to-dos with assignable checklists | target | partial | `tests/plinth/customers.test.mjs` — “TODO-001 — granted job and company checklists, reviewed templates, deduplicated completions, private portals and approved email notices” proves actual job-template checklist creation, per-item grants, exact photo bytes, operation replay/conflicts, completion/reopen attribution, overdue filters, one chosen email attempt and company My to-dos; `tests/journeys/todos.mjs` — “TODO-001 PASS” proves the real job-template, Today checklist, reverse schedule link, offline web queue and client/sub own-item screens at 1440/390; `tests/plinth/portable.test.mjs` — “TODO-001 / BILL-006 … CLI archive round trip” proves company/job checklist and original/notice custody | Native FIELD-003 iOS/Android offline completion remains unproved: Apple/Google signing and real-phone/native-app assets are unavailable to this run. NOTIFY-001 SMS/push/digest channels remain unavailable; only explicitly owner-approved, recipient-chosen email is implemented with network-edge proof. MOVE-002 to-do import needs an untouched authorized Buildertrend export containing checklist state and assignees (or an official export schema); public documentation supplies neither and this run holds no Buildertrend account/export. No substitute capture format is accepted. |
 | `CLIENT-001` | Client portal and job conversations | target | partial | `src/plinth/http.ts`; `src/ui/job.tsx`; `tests/plinth/domain.test.mjs` | Multiple authorized contacts share the client job view; conversations and the complete decision/payment portal remain absent. |
 | `CLIENT-002` | Selections allowances and deadlines | target | done | `src/plinth/selection-model.ts`; `src/plinth/selections.ts`; `src/plinth/purchase-order-model.ts`; `src/ui/selections.tsx`; `tests/plinth/selections.test.mjs` | |
 | `CLIENT-003` | Allowance overage underage and downstream effects | target | done | `src/plinth/allowance-model.ts`; `src/plinth/allowance-changes.ts`; `src/plinth/quotes.ts`; `src/plinth/budget.ts`; `src/ui/allowance-changes.tsx`; `tests/plinth/selections.test.mjs` | |
