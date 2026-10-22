@@ -33,6 +33,7 @@ export function clientPolicyProjection<T extends Job>(shown:T,source:Job):T {
  if(!portalEnabled(source,'client','billing'))next.invoice_deposit_liability_cents=undefined
  // Approval snapshots may contain the same record in another shape; never retain a disabled feature through history.
  next.approvals=next.approvals.filter(a=>{const f=a.kind.startsWith('selection.')?'selections':a.kind.startsWith('schedule')?'schedule':a.kind==='quote'?'contracts':a.kind==='variation'?'changes':a.kind==='diary'?'photos':undefined;return !!f&&portalEnabled(source,'client',f)})
+ next.portal_features=CLIENT_FEATURES.filter(f=>portalEnabled(source,'client',f))
  next.portal_policy=undefined;next.portal_submissions=undefined
  return next
 }

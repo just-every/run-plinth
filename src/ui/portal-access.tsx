@@ -1,0 +1,8 @@
+import type {JobProps} from './job'
+import {Field,Form} from './shared'
+const client=['contracts','selections','changes','schedule','photos','billing','todos','handover','punch','rfis'],subcontractor=['bids','schedule','todos','punch','rfis','bills','compliance']
+/** Extends the existing job history card with ordinary Plinth form controls; no new visual tokens. */
+export function PortalAccess({job,role,mutate}:Pick<JobProps,'job'|'role'|'mutate'>){
+ if(role!=='owner')return null
+ return <section className="card"><h2>External portal features</h2><p>Hide a feature for this job without granting any new access. Clients keep only their assigned job; subcontractors keep only their own company scope and explicitly assigned records. Changes apply on the next request, including files, exports and existing calendar links.</p><Form key={JSON.stringify(job.portal_policy)} reset={false} submit="Save external portal restrictions" action={async f=>mutate('/portal-policy',{disabled:{client:f.getAll('client'),subcontractor:f.getAll('subcontractor')},reason:f.get('reason')})}><fieldset><legend>Client preset for this job</legend>{client.map(feature=><label key={feature}><input type="checkbox" name="client" value={feature} defaultChecked={job.portal_policy?.client.includes(feature)??false}/> Hide client {feature}</label>)}</fieldset><fieldset><legend>Subcontractor preset for this job</legend>{subcontractor.map(feature=><label key={feature}><input type="checkbox" name="subcontractor" value={feature} defaultChecked={job.portal_policy?.subcontractor.includes(feature)??false}/> Hide subcontractor {feature}</label>)}</fieldset><Field label="Access change reason" name="reason"/></Form></section>
+}

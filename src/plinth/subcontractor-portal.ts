@@ -4,7 +4,7 @@ import {decisionFiles,decisionDownload} from './decision-files'
 import {complianceRecord,evaluate,rules,today} from './compliance'
 import {getVendor,save as saveVendor} from './vendors'
 import {currentQualification,type Vendor} from './vendor-model'
-import {find,need,stamp,text,cents,type Actor,type Attachment,type Job,type Stamp} from './model'
+import {find,need,stamp,text,cents,usdOnly,type Actor,type Attachment,type Job,type Stamp} from './model'
 import {jobRequest} from './job-request'
 import {jobOf,jobs,readClock,saveJob} from './store'
 import {portalEnabled,requirePortalFeature} from './portal-policy'
@@ -29,7 +29,7 @@ async function source(db:D1Database,job:Job,actor:Actor){
  const requirements=await rules(db),on=await today(db)
  const scopes=[]
  for(const {scope} of owned){const vendor=await getVendor(db,scope.vendor_id);scopes.push({id:scope.id,company:scope.vendor_name,trade:scope.trade,scope:scope.scope,status:scope.status??'awarded',...(office||portalEnabled(job,'subcontractor','compliance')?{compliance:evaluate(vendor,scope.trade,requirements,on),requests:(vendor.renewal_requests??[]).filter(r=>r.job_id===job.id).map(r=>({id:r.id,kind:r.kind,problem:r.problem,prepared_at:r.prepared_at}))}:{})})}
- return {id:job.id,version:job.version,name:job.name,scopes,submissions}
+ return {id:job.id,version:job.version,name:job.name,scopes,submissions,features:{bills:office||portalEnabled(job,'subcontractor','bills'),compliance:office||portalEnabled(job,'subcontractor','compliance')}}
 }
 /** Public JSON portal, search, export and original-file doors share exactly the same projection and live grant. No directory, W-9, rates, other company contacts or general job data are returned. */
 export async function subcontractorPortalResponse(request:Request,env:Bindings,actor:Actor,parts:string[]):Promise<Response|null>{
@@ -60,6 +60,7 @@ export async function subcontractorPortalResponse(request:Request,env:Bindings,a
  const idNew=crypto.randomUUID(),files=await decisionFiles(env.DB,job,idNew,input.attachments);need(files.attachments.length,'Upload original evidence')
  const row:PortalSubmission={id:idNew,subcontract_id:scopeId,vendor_id:grant.vendor.id,kind:feature==='bills'?'bill':'compliance',reference:text(input.reference,'Reference',240),note:text(input.note,'Submission note',4000),attachments:files.attachments,by:stamp(actor)}
  if(feature==='bills'){
+  usdOnly(job)
   need(!job.portal_submissions?.some(r=>r.kind==='bill'&&r.vendor_id===row.vendor_id&&r.reference.toLowerCase()===row.reference.toLowerCase()),'This company bill reference was already received',409,'bill_duplicate')
   row.amount_cents=cents(input.amount_cents,'Bill amount');need(row.amount_cents>0,'Bill amount must be positive')
  }else{
@@ -73,3 +74,5 @@ export async function subcontractorPortalResponse(request:Request,env:Bindings,a
  const next=structuredClone(job);(next.portal_submissions??=[]).push(row);await saveJob(env.DB,actor,job,next,files.writes,clock)
  return json({source:await source(env.DB,next,actor),record_id:row.id,label:feature==='bills'?'Bill received, not approved or paid':'Evidence received, not verified'})
 }
+
+export type PortalSource = Awaited<ReturnType<typeof source>>

@@ -1,3 +1,4 @@
+import {SubcontractorRecords} from './subcontractor-records'
 import { Todos } from './todos'
 import { BidInbox } from './bids'
 import { PunchInbox } from './punch'
@@ -39,6 +40,7 @@ export function Workspace() {
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
         {view === 'todos' && <Todos jobs={jobs}/>}
+        {view === 'subcontractor-records' && <SubcontractorRecords/>}
         {view === 'bids' && <BidInbox/>}
         {view === 'punch' && <PunchInbox/>}
         {view === 'rfis' && <RfiInbox/>}

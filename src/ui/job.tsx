@@ -1,3 +1,4 @@
+import {SubcontractorRecords} from './subcontractor-records'
 import { DailyWork } from './daily-work'
 import { LinkedTodos } from './linked-todos'
 import { Todos } from './todos'
@@ -42,6 +43,8 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   }
   if (!job) return <p className="loading" role={error ? 'alert' : 'status'}>{error || 'Opening job…'}</p>
   const open = section ?? (job.status === 'active' ? 'Schedule' : 'Quote')
+  const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
+  const sectionAllowed=(s:Section)=>manager||s==='History'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
   const props: JobProps = { job, manager, role, mutate, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
@@ -52,16 +55,16 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
         <li><Icon name="money" />{job.status === 'active' ? <>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
         <li><Icon name="mail" />Client {job.client_email}</li>
       </ul>
-      <nav className="tabs" aria-label="Job sections">{sections.filter(s => !['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
+      <nav className="tabs" aria-label="Job sections">{sections.filter(s => (!['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager)&&sectionAllowed(s)).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
-    <div className="job-body">
+    {!sectionAllowed(open)?<p className="notice">This feature is not available for your access.</p>:<div className="job-body">
       {open !== 'Schedule' && <DecisionStrip job={job} manager={manager} go={setSection} />}
       {open === 'Quote' && <Quotes {...props} />}
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Selections' && <Selections {...props} />}
-      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} /><Subcontracts {...props} /></>}
+      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} /><Subcontracts {...props} />{manager&&<SubcontractorRecords jobId={job.id}/>}</>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
@@ -73,6 +76,6 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Handover' && <Handover {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}
       {manager && <LinkedTodos job={job} section={open}/>}
-    </div>
+    </div>}
   </div>
 }
