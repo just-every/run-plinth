@@ -2,8 +2,8 @@ import { need, object, recordApproval, text, type Actor, type Input, type Job } 
 import { requireOwner } from './auth'
 
 /** Feature restrictions only subtract from current record grants. An enabled feature never creates a job, company or record grant. */
-export const CLIENT_FEATURES = ['contracts','selections','changes','schedule','photos','billing','todos','handover','punch','rfis','warranty'] as const
-export const SUB_FEATURES = ['bids','schedule','todos','punch','rfis','bills','compliance','warranty'] as const
+import {CLIENT_FEATURES,SUB_FEATURES} from './portal-features'
+export {CLIENT_FEATURES,SUB_FEATURES} from './portal-features'
 export type PortalKind = 'client' | 'subcontractor'
 export interface PortalPolicy { client: string[]; subcontractor: string[] }
 export function portalEnabled(job: Job, kind: PortalKind, feature: string) { return !(job.portal_policy?.[kind] ?? []).includes(feature) }

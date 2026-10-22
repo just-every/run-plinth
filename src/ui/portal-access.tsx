@@ -1,6 +1,6 @@
 import type {JobProps} from './job'
 import {Field,Form} from './shared'
-const client=['contracts','selections','changes','schedule','photos','billing','todos','handover','punch','rfis'],subcontractor=['bids','schedule','todos','punch','rfis','bills','compliance']
+import {CLIENT_FEATURES as client,SUB_FEATURES as subcontractor} from '../plinth/portal-features'
 /** Extends the existing job history card with ordinary Plinth form controls; no new visual tokens. */
 export function PortalAccess({job,role,mutate}:Pick<JobProps,'job'|'role'|'mutate'>){
  if(role!=='owner')return null
