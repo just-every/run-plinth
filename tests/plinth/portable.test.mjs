@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
-import { createActiveJob, createFixture } from './helpers.mjs'
+import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
 
-test('TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -105,6 +105,13 @@ test('TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 /
     let warranty=await f.json(`/api/plinth/jobs/${job.id}/warranties`,{method:'POST',cookie:f.owner,body:{expected_version:warrantyJob.version,kind:'component',name:'Archive HVAC',starts_on:'2030-01-01',ends_on:'2035-12-31',terms:'Signed original HVAC warranty',signed_terms_reference:'Archive warranty W-104'}});assert.equal(warranty.status,200);warrantyJob=warranty.value.job
     warranty=await f.json(`/api/plinth/jobs/${job.id}/warranties`,{method:'POST',cookie:f.owner,body:{expected_version:warrantyJob.version,kind:'promise',component_id:warrantyJob.warranties.components[0].id,title:'Archive maintenance agreement',anchor_on:'2031-01-31',interval_unit:'year',interval_count:1,recipient_kind:'office',recipient_email:'builder@example.com',agreement_reference:'Owner recorded explicit reminder agreement'}});assert.equal(warranty.status,200);job=warranty.value.job
     const workflowId=job.continuity[0].id;let resumed=await f.json(`/api/plinth/jobs/${job.id}/continuity/${workflowId}/resume`,{method:'POST',cookie:f.owner,body:{expected_version:job.version}});assert.equal(resumed.status,200);job=resumed.value.job;assert.equal(job.continuity[0].stage,'purchasing')
+    const portalContact=await f.invite('synthetic-plinth-portal@example.com','Archive trade contact')
+    const portalGrant=await createReleasedScope(f,job,'synthetic-plinth-portal@example.com','Portal trade');job=portalGrant.job
+    const portalInput={expected_version:job.version,subcontract_id:portalGrant.scope.id,reference:'synthetic-plinth-portal-1',note:'Private company original retained by CLI custody',attachments:[{name:'synthetic-plinth-portal-1.png',mime:'image/png',base64:png}]}
+    r=await f.json(`/api/plinth/subcontractor-portal/${job.id}/bills`,{method:'POST',cookie:portalContact,body:{...portalInput,amount_cents:123400}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
+    r=await f.json(`/api/plinth/subcontractor-portal/${job.id}/compliance`,{method:'POST',cookie:portalContact,body:{...portalInput,expected_version:job.version,kind:'license',issuer:'Synthetic state licensing authority',effective_on:'2026-01-01',expires_on:'2099-12-31'}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
+    const archivePortal=structuredClone(job.portal_submissions),portalCompliance=archivePortal.find(s=>s.kind==='compliance')
+    r=await f.json(`/api/plinth/jobs/${job.id}/portal-policy`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,disabled:{client:['photos'],subcontractor:['bills']},reason:'Archived owner access restriction'}});assert.equal(r.status,200);job=r.value.job
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
     succeeds(command(source,'export','--output',before))
@@ -121,6 +128,13 @@ test('TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 /
     for(const item of expected) if(item.table==='oa_auth_settings') item.row.generation++
     assert.deepEqual(rows(restored),expected)
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
+    const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
+    assert.deepEqual(recoveredPortalJob.portal_submissions,archivePortal,'ROLE-003 company/scope identities, submission status and original checksums survive CLI restore')
+    assert.deepEqual(recoveredPortalJob.portal_policy,job.portal_policy,'ROLE-003 owner feature restrictions survive CLI restore')
+    const recoveredPortalVendor=JSON.parse(rows(restored).find(item=>item.table==='pl_vendors'&&item.row.id===portalGrant.vendor.id).row.data)
+    assert.equal(recoveredPortalVendor.compliance[0].id,portalCompliance.compliance_id);assert.equal(recoveredPortalVendor.compliance[0].review,undefined,'ROLE-003 restore never verifies the submitted license')
+    assert.ok(rows(restored).some(item=>item.table==='pl_vendor_documents'&&item.row.id===portalCompliance.compliance_id),'ROLE-003 exact company compliance original is included in the private archive')
+    for(const submission of archivePortal)for(const file of submission.attachments)assert.ok(rows(restored).some(item=>item.table==='pl_attachments'&&item.row.id===file.id&&item.row.job_id===job.id),'ROLE-003 every job-local original is in the archive')
     assert.deepEqual(JSON.parse(recoveredJob.row.data).todos[0],savedTodo,'TODO-001 job checklist, original photo bytes, assignments and reserved notice identities survive CLI restore')
     const recoveredCompany=rows(restored).find(item=>item.table==='pl_todo_library'&&item.row.id===archiveCompanyTodo.id);assert.ok(recoveredCompany,'TODO-001 company-level records are in the durable archive inventory');const companyData=JSON.parse(recoveredCompany.row.data);assert.equal(companyData.attachments[0].base64,png);assert.deepEqual(companyData.items,archiveCompanyTodo.items);assert.deepEqual(companyData.notices,archiveCompanyTodo.notices)
     assert.ok(!restored[0].tables.some(t=>['oa_sessions','oa_credentials','oa_tokens'].includes(t.name)))
@@ -142,6 +156,10 @@ test('TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 /
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
+    const erasedRows=rows(await archive(after))
+    assert.ok(!erasedRows.some(item=>item.table==='pl_attachments'&&item.row.job_id===job.id),'ROLE-003 erasure removes job-local submission originals')
+    assert.ok(erasedRows.some(item=>item.table==='pl_vendor_documents'&&item.row.id===portalCompliance.compliance_id),'ROLE-003 company compliance evidence keeps its independent company custody')
+
     await cp(after,join(erased,'after-erasure.rer'))
     const refused=command(erased,'import','--input',before,'--journal','after-erasure.rer','--yes')
     assert.equal(refused.status,4); assert.match(refused.stdout+refused.stderr,/erasure_epoch/)
