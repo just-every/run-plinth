@@ -52,7 +52,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       <h1>{job.name}</h1>
       <ul className="chips" aria-label="Job facts">
         <li><Icon name="pin" />{job.address || 'Site address not entered'}</li>
-        <li><Icon name="money" />{job.status === 'active' ? <>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
+        <li><Icon name="money" />{job.status === 'active' ? job.portal_features&&!job.portal_features.includes('contracts')?'Active job':<>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
         <li><Icon name="mail" />Client {job.client_email}</li>
       </ul>
       <nav className="tabs" aria-label="Job sections">{sections.filter(s => (!['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager)&&sectionAllowed(s)).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>

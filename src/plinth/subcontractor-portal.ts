@@ -27,9 +27,9 @@ async function source(db:D1Database,job:Job,actor:Actor){
  const office=actor.role!=='member',owned=office?(job.subcontracts??[]).filter(s=>s.status!=='cancelled').map(scope=>({scope})):await ownScopes(db,job,actor),scopeIds=new Set(owned.map(r=>r.scope.id))
  const submissions=(job.portal_submissions??[]).filter(r=>office||scopeIds.has(r.subcontract_id)&&portalEnabled(job,'subcontractor',r.kind==='bill'?'bills':'compliance'))
  const requirements=await rules(db),on=await today(db)
- const scopes=[]
- for(const {scope} of owned){const vendor=await getVendor(db,scope.vendor_id);scopes.push({id:scope.id,company:scope.vendor_name,trade:scope.trade,scope:scope.scope,status:scope.status??'awarded',...(office||portalEnabled(job,'subcontractor','compliance')?{compliance:evaluate(vendor,scope.trade,requirements,on),requests:(vendor.renewal_requests??[]).filter(r=>r.job_id===job.id).map(r=>({id:r.id,kind:r.kind,problem:r.problem,prepared_at:r.prepared_at}))}:{})})}
- return {id:job.id,version:job.version,name:job.name,scopes,submissions,features:{bills:office||portalEnabled(job,'subcontractor','bills'),compliance:office||portalEnabled(job,'subcontractor','compliance')}}
+ const scopes=[],reviews=new Map<string,'pending'|'verified'|'rejected'>()
+ for(const {scope} of owned){const vendor=await getVendor(db,scope.vendor_id);for(const record of vendor.compliance??[])reviews.set(record.id,record.review?.decision??'pending');scopes.push({id:scope.id,company:scope.vendor_name,trade:scope.trade,scope:scope.scope,status:scope.status??'awarded',...(office||portalEnabled(job,'subcontractor','compliance')?{compliance:evaluate(vendor,scope.trade,requirements,on),requests:(vendor.renewal_requests??[]).filter(r=>r.job_id===job.id).map(r=>({id:r.id,kind:r.kind,problem:r.problem,prepared_at:r.prepared_at}))}:{})})}
+ return {id:job.id,version:job.version,name:job.name,scopes,submissions:submissions.map(row=>({...row,...(row.kind==='compliance'?{review_status:reviews.get(row.compliance_id!)??'pending'}:{})})),features:{bills:office||portalEnabled(job,'subcontractor','bills'),compliance:office||portalEnabled(job,'subcontractor','compliance')}}
 }
 /** Public JSON portal, search, export and original-file doors share exactly the same projection and live grant. No directory, W-9, rates, other company contacts or general job data are returned. */
 export async function subcontractorPortalResponse(request:Request,env:Bindings,actor:Actor,parts:string[]):Promise<Response|null>{
