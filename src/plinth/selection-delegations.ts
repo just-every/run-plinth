@@ -20,13 +20,14 @@ function narrow(job:Job,selection:Selection,grant:SelectionDelegation) {
  const revision=find(selection.revisions,grant.revision_id)
  return {version:job.version,selection_id:selection.id,delegation:delegationProof(grant),revision:publicProductSources({id:revision.id,revision:revision.revision,room:revision.room,category:revision.category,allowance_cents:revision.allowance_cents,decision_on:revision.decision_on,lead_days:revision.lead_days,options:revision.options,substitution:revision.substitution,status:revision.status}),signature:grant.status==='used'?revision.signature:undefined}
 }
-async function delegatedRecord(db:D1Database,actor:Actor,jobId:string,grantId:string) {
+async function delegatedRecord(db:D1Database,actor:Actor,jobId:string,grantId:string,expectedVersion?:unknown) {
  const clock=await readClock(db),row=await db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(jobId).first<{data:string}>()
  if(!row)return null
  const previous=JSON.parse(row.data) as Job,job=structuredClone(previous),selection=job.selections?.find(s=>s.delegations?.some(d=>d.id===grantId&&d.delegate.id===actor.id))
  if(!selection)return null
  const grant=find(selection.delegations??[],grantId)
  if(!['active','used'].includes(grant.status))return null
+ if(expectedVersion!==undefined)need(expectedVersion===previous.version,'Job changed; reload this exact revision',409,'stale_version')
  const reason=await delegationInvalid(db,job,selection,grant)
  if(reason){if(grant.status==='active'){grant.status='void';grant.voided={at:new Date().toISOString(),reason};await saveJob(db,actor,previous,job,[],clock)}return null}
  return {previous,job,selection,grant,clock}
@@ -61,10 +62,11 @@ export async function selectionDelegationsResponse(request:Request,original:Bind
   return json({delegations:records})
  }
  need(parts.length===3||parts.length===4,'Unknown delegated revision',404,'not_found')
- const current=await delegatedRecord(db,actor,parts[1],parts[2]);need(current,'Delegated revision not found',404,'not_found')
+ const input=request.method==='POST'?await body(request):{}
+ const current=await delegatedRecord(db,actor,parts[1],parts[2],input.expected_version);need(current,'Delegated revision not found',404,'not_found')
  const {previous,job,selection,grant,clock}=current
  if(request.method==='GET')return json(narrow(job,selection,grant))
- const input=await body(request);need(input.expected_version===previous.version,'Job changed; reload this exact revision',409,'stale_version');need(grant.status==='active','A delegation can be used once',409,'delegation_used')
+ need(input.expected_version===previous.version,'Job changed; reload this exact revision',409,'stale_version');need(grant.status==='active','A delegation can be used once',409,'delegation_used')
  need(input.revision_id===grant.revision_id,'This delegation covers only its exact revision',409,'revision')
  const revision=find(selection.revisions,grant.revision_id)
  signSelectionRevision(job,actor,input,selection,revision,{delegation_id:grant.id,revision_id:revision.id,delegated_by:grant.delegated_by,delegate:stamp(actor)});grant.status='used'

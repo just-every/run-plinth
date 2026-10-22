@@ -332,7 +332,11 @@ async function delegationFixture() {
   const read=async()=>{job=(await api('/jobs/'+job.id)).value.job;return job}
   const act=async(path,body={},cookie=f.owner,agent)=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body},cookie,agent);await read();return r}
   assert.equal((await act('/quotes',{lines:[{id:'flooring',description:'Kitchen flooring allowance',cost_code:'09-650',phase:'Finishes',category:'material',quantity:'1',unit:'job',unit_cents:100000,cost_unit_cents:50000}]})).status,200)
-  assert.equal((await act(`/quotes/${job.quotes[0].id}/accept`,{method:'email',evidence:'Recorded household contract acceptance',schedule_choice:{kind:'none',reason:'Dates follow selection approval'},budget:{allowances:[{cost_code:'09-650',amount_cents:20000}]}})).status,200)
+  const householdRate=(await api('/pricing-rates',{jurisdiction:'Synthetic household exemption',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'Reviewed household fixture exemption',human_reviewed:true})).value.rate
+  const householdPricing={basis:'sell',as_of:'2026-10-22',rules:[],tax:{rate_id:householdRate.id,taxable_line_ids:[],exemption_reference:'Reviewed household exemption'}}
+  const householdPreview=await act('/pricing/preview',householdPricing);assert.equal(householdPreview.status,200)
+  assert.equal((await act('/pricing/apply',{...householdPricing,digest:householdPreview.value.preview.digest})).status,200)
+  assert.equal((await act(`/quotes/${job.quotes.at(-1).id}/accept`,{method:'email',evidence:'Recorded household contract acceptance',schedule_choice:{kind:'none',reason:'Dates follow selection approval'},budget:{allowances:[{cost_code:'09-650',amount_cents:20000}]}})).status,200)
   const contacts=['client','second','designer','trade'].map((id,i)=>({id,name:['Alex Mason','Jordan Mason','Taylor Designer','Casey Trade'][i],email:emails[i]}))
   contacts.push({id:'office',name:'Builder',email:'builder@example.com'})
   let r=await api('/customers',{name:'Mason household',kind:'household',contacts,properties:[{id:'home',label:'Home',address:'4518 Alder Avenue'}]});assert.equal(r.status,201);const customer=r.value.customer
@@ -357,6 +361,14 @@ test('Delegated selection signing requires client consent and an eligible existi
   for(const [cookie,token] of [[f.owner],[undefined,x.token],[x.foreign],[x.trade],[x.designer]])assert.ok([403,404].includes((await x.act(x.path,x.consent,cookie,token)).status))
   for(const contact_id of ['client','second','trade','office','unknown'])assert.equal((await x.act(x.path,{...x.consent,contact_id},x.client)).status,403)
   assert.equal((await x.act(x.path,{...x.consent,confirm:false},x.client)).status,400)
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
+  let ordinary=await x.act('/diary',{date:'2026-10-23',note:'Published kitchen progress',attachments:[{name:'synthetic-plinth-211.png',mime:'image/png',base64:png}]});assert.equal(ordinary.status,200);const diary=ordinary.value.record
+  assert.equal(diary.status,'published')
+  ordinary=await x.act('/schedules',{trade:'Finishes',description:'Kitchen floor preparation',start:'2026-11-03T08:00:00Z',end:'2026-11-03T09:00:00Z'});assert.equal(ordinary.status,200);const task=ordinary.value.record
+  assert.equal(task.status,'booked')
+  ordinary=await x.act('/invoices',{kind:'deposit',description:'Kitchen deposit',recipient_email:x.emails[0],due_on:'2026-11-01',terms:'Due within 14 days',amount_cents:5000});assert.equal(ordinary.status,200,JSON.stringify(ordinary.value));const invoice=ordinary.value.record
+  assert.equal((await x.act(`/invoices/${invoice.id}/issue`)).status,200)
+  assert.equal((await x.act(`/invoices/${invoice.id}/receipt`,{amount_cents:1000,received_on:'2026-10-23',reference:'Synthetic client receipt',method:'bank',confirm:true})).status,200)
   const grant=await x.delegate();assert.equal((await x.act(x.path,x.consent,x.second)).status,409)
   await x.present({category:'Unrelated fixture',allowance_cents:0})
   r=await x.api(x.door(grant),undefined,x.designer);assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.revision.id,x.revision.id);assert.equal(r.value.delegation.delegated_by.name,'Alex Mason');assert.equal(r.value.delegation.statement,x.consent.statement)
@@ -365,6 +377,8 @@ test('Delegated selection signing requires client consent and an eligible existi
   const inbox=await x.api('/selection-delegations',undefined,x.designer);assert.equal(inbox.value.delegations.length,1);assert.equal(inbox.value.delegations[0].revision.id,x.revision.id)
   for(const cookie of [x.client,x.second,x.foreign,x.trade])assert.equal((await x.api(x.door(grant),undefined,cookie)).status,404)
   for(const cookie of [f.owner,undefined])assert.ok([401,403].includes((await x.api(x.door(grant),undefined,cookie,cookie?undefined:x.token)).status))
+  for(const path of [`/jobs/${x.job.id}/diary/${diary.id}/attachments/${diary.attachments[0].id}`,`/jobs/${x.job.id}/invoices/${invoice.id}/document.json`,`/jobs/${x.job.id}/receivables`])assert.equal((await x.api(path,undefined,x.designer)).status,404,path)
+  assert.equal((await x.act(`/schedules/${task.id}/move`,{start:'2026-11-04T08:00:00Z',end:'2026-11-04T09:00:00Z'},x.designer)).status,404)
   assert.equal((await x.api('/customers/'+x.customer.id,undefined,x.designer)).status,403)
   for(const path of ['', '/selections/'+x.selection.id+'/comment','/selections/'+x.selection.id+'/dispute','/selections/'+x.selection.id+'/withdraw','/selections/'+x.selection.id+'/sign','/variations/synthetic-plinth-1/approve']){
    const result=path?await x.act(path,{...x.signature,text:'No authority',reason:'No authority'},x.designer):await x.api('/jobs/'+x.job.id,undefined,x.designer);assert.equal(result.status,404,path)
@@ -417,7 +431,7 @@ test('Unused delegated revisions are void on the next request after revision, di
    if(change==='delegate-disabled'){await x.api(`/jobs/${x.job.id}${path}`,undefined,x.client);const people=(await f.json('/auth/operators',{cookie:f.owner})).value,person=people.find(p=>p.email===x.emails[2]);assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'active'}})).status,200);assert.equal((await f.request('/auth/magic-link',{method:'POST',body:{email:x.emails[2]}})).status,202);const message=[...f.messages].reverse().find(m=>m.to.includes(x.emails[2])),link=new URL(message.text.match(/https?:\/\/[^\s<>]+/g).find(v=>new URL(v).pathname==='/auth/confirm'));const confirmed=await f.request('/auth/confirm',{method:'POST',body:{token:link.searchParams.get('token')}});assert.equal(confirmed.status,303);x.designer=confirmed.headers.get('set-cookie').split(';')[0]}
    if(change==='delegator-grant')assert.equal((await x.act('/customer',{customer_id:x.customer.id,property_id:'home',client_contact_ids:['client','second']})).status,200)
    if(change==='selections-hidden'){const {setPortalFeatures}=await import('./helpers.mjs');await setPortalFeatures(f,x.job.id);await x.read()}
-   await x.read();const retained=x.job.selections.find(s=>s.id===selection.id).delegations[0];assert.equal(retained.status,change==='revoke'?'revoked':'void',change);if(change==='revoke')assert.equal(retained.revocation.by.name,'Alex Mason')
+   await x.read();const retained=x.job.selections.find(s=>s.id===selection.id).delegations[0];assert.equal(retained.status,change==='revoke'?'revoked':'void',change);if(change==='revoke'){assert.equal(retained.revocation.by.name,'Alex Mason');assert.ok(x.job.approvals.some(a=>a.kind==='selection.delegation.revoke'&&a.snapshot.id===grant.id&&a.snapshot.revision_id===revision.id&&a.snapshot.delegated_by.name==='Jordan Mason'&&a.snapshot.delegate.name==='Taylor Designer'&&a.snapshot.revocation.by.name==='Alex Mason'))}
    assert.equal((await x.api(door,undefined,x.designer)).status,404,change+' never revives')
   }
  }finally{await f.close()}
