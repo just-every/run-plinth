@@ -31,13 +31,19 @@ export function selectionAction(job: Job, actor: Actor, input: Input, id?: strin
  }
  need(action === 'sign', 'Unknown selection action', 404, 'not_found')
  need(actor.role === 'member' && (actor.email.toLowerCase() === job.client_email || actor.client_job_id === job.id), 'The assigned client must sign this choice', 403, 'client_required')
+ return signSelectionRevision(job,actor,input,row,revision)
+}
+/** Both authorized doors fix the same immutable choice and downstream snapshot. */
+export function signSelectionRevision(job:Job,actor:Actor,input:Input,row:import('./selection-model').Selection,revision:import('./selection-model').SelectionRevision,delegation?:import('./selection-delegation-model').DelegatedSignature) {
+ active(job);usdOnly(job)
+ need(revision===row.revisions.at(-1),'Review the latest selection revision',409,'revision')
  need(revision.status === 'presented', 'This revision is not awaiting a new client decision', 409, 'immutable')
  need(!decisionHeld(row,revision.id),'A disputed or withdrawn decision needs a replacement revision',409,'selection_held')
  need(!revision.substitution||revision.substitution.builder_approved_by,'The builder must approve this substitution first',409,'substitution_review')
  const option = find(revision.options, text(input.option_id, 'option_id', 100))
  const statement = text(input.statement, 'signature statement', 2000)
  need(input.confirm === true, 'Confirm that you approve this exact option')
- revision.signature = { option: structuredClone(option), by: stamp(actor), statement }; revision.status = 'signed'
+ revision.signature = { option: structuredClone(option), by: stamp(actor), statement, ...(delegation?{delegation}: {}) }; revision.status = 'signed'
  const { cost_code, ...snapshot } = revision
  recordApproval(job, actor, 'selection.sign', revision, snapshot); return row
 }

@@ -1,11 +1,12 @@
+import { delegationProof } from './selection-delegation-model'
 import { cents, find, need, object, stamp, text, type Actor, type Input, type Job, type Stamp } from './model'
 import { day, fulfillment } from './purchase-order-model'
 
 export interface SelectionOption { id: string; name: string; specifications: string; supplier: string; price_cents: number; product_notices?: string[]; product_source?: import('./product-model').ProductSource }
 export interface SelectionDecision { id: string; revision_id: string; kind: 'request' | 'reminder' | 'dispute' | 'withdraw'; reason: string; by: Stamp; attachments: import('./model').Attachment[] }
 export interface Substitution { previous_revision_id: string; previous_option: SelectionOption; unavailable_reason: string; available_on: string; previous_available_on: string; specification_comparison: string; date_impact_days: number; proposed_by: Stamp; builder_approved_by?: Stamp }
-export interface SelectionRevision { substitution?: Substitution; id: string; revision: number; room: string; category: string; allowance_cents: number; cost_code: string; decision_on: string; lead_days: number; options: SelectionOption[]; procurement?: ReturnType<typeof selectionTracker>; status: 'draft' | 'presented' | 'signed'; prepared_by: Stamp; presented_by?: Stamp; signature?: { option: SelectionOption; by: Stamp; statement: string } }
-export interface Selection { decisions?: SelectionDecision[]; id: string; revisions: SelectionRevision[]; comments: { id: string; revision_id: string; text: string; by: Stamp }[] }
+export interface SelectionRevision { substitution?: Substitution; id: string; revision: number; room: string; category: string; allowance_cents: number; cost_code: string; decision_on: string; lead_days: number; options: SelectionOption[]; procurement?: ReturnType<typeof selectionTracker>; status: 'draft' | 'presented' | 'signed'; prepared_by: Stamp; presented_by?: Stamp; signature?: { option: SelectionOption; by: Stamp; statement: string; delegation?: import('./selection-delegation-model').DelegatedSignature } }
+export interface Selection { delegations?: import('./selection-delegation-model').SelectionDelegation[]; decisions?: SelectionDecision[]; id: string; revisions: SelectionRevision[]; comments: { id: string; revision_id: string; text: string; by: Stamp }[] }
 
 export function selectionRevision(input: Input, actor: Actor, revision: number): SelectionRevision {
  need(Array.isArray(input.options) && input.options.length > 0 && input.options.length <= 30, 'Provide one to 30 priced options')
@@ -31,5 +32,5 @@ export function decisionHeld(selection: Selection, revisionId: string) {
  return !!selection.decisions?.some(d=>d.revision_id===revisionId&&['dispute','withdraw'].includes(d.kind)) || selection.revisions.slice(index+1).some(r=>r.substitution)
 }
 export function clientSelections(job: Job): Selection[] {
- return (job.selections ?? []).map(s => ({ ...s, decisions: s.decisions?.filter(d=>s.revisions.some(r=>r.id===d.revision_id&&r.status!=='draft')), revisions: s.revisions.filter(r => r.status !== 'draft').map(r => { const { cost_code, ...visible } = r; return visible as SelectionRevision }), comments: s.comments.filter(c => s.revisions.some(r => r.id === c.revision_id && r.status !== 'draft')) })).filter(s => s.revisions.length > 0)
+ return (job.selections ?? []).map(s => ({ ...s, delegations: s.delegations?.map(d=>delegationProof(d) as import('./selection-delegation-model').SelectionDelegation), decisions: s.decisions?.filter(d=>s.revisions.some(r=>r.id===d.revision_id&&r.status!=='draft')), revisions: s.revisions.filter(r => r.status !== 'draft').map(r => { const { cost_code, ...visible } = r; return visible as SelectionRevision }), comments: s.comments.filter(c => s.revisions.some(r => r.id === c.revision_id && r.status !== 'draft')) })).filter(s => s.revisions.length > 0)
 }
