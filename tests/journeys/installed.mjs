@@ -35,7 +35,7 @@ try {
  const client = new URL(ownerOpen), fragment = new URLSearchParams(client.hash.slice(1))
  assert.ok(fragment.has('rer-dev'), 'The synthetic installation supplies its own native local dev entrance')
  fragment.set('as','client');fragment.set('next','/auth/dev/enter?as=client&returnTo=/app');client.hash=fragment.toString()
- const env = {...process.env,HOME:userInfo().homedir,PLINTH_URL:base,PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
+ const env = {...process.env,HOME:userInfo().homedir,PLINTH_URL:base,PLINTH_SITE:[...output.matchAll(/RER_SITE\s+(https?:\/\/\S+)/g)].at(-1)?.[1],PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
  const bootstrap=spawn(process.execPath,['tests/journeys/installed-signin.mjs'],{env,stdio:'inherit'})
  const ready=await new Promise((resolve,reject)=>{bootstrap.once('error',reject);bootstrap.once('exit',code=>resolve(code))})
  assert.equal(ready,0,'The native setup browser uses the real HOME and completes')

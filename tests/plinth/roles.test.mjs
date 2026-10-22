@@ -159,7 +159,9 @@ test('ROLE-003 — two subcontractor companies keep bills and unverified complia
   assert.equal((await submit('bills',{reference:'synthetic-plinth-2',amount_cents:1})).status,404)
   assert.equal((await submit('compliance',{kind:'license',issuer:'Synthetic',effective_on:'2026-01-01',expires_on:'2099-12-31'})).status,404)
   r=await api(`/jobs/${job.id}/portal-policy`,{expected_version:job.version,disabled:{client:[],subcontractor:[]},reason:'Restore reviewed intake'});assert.equal(r.status,200);job=r.value.job
-  r=await api(`/vendors/${metadata.id}`,{expected_version:metadata.version,contacts:[]});assert.equal(r.status,200)
+  r=await api(`/vendors/${metadata.id}`,{expected_version:metadata.version,contacts:[{id:'synthetic-plinth-1',name:'Current client overlap',email:'synthetic-plinth-3@example.com'}]});assert.equal(r.status,200)
+  for(const path of ownPaths)assert.equal((await api(path,undefined,client)).status,404,'Client authority takes precedence over an overlapping company contact on the same job')
+
   for(const path of ownPaths)assert.equal((await api(path,undefined,subs[0])).status,404,'Directory removal revokes every read, search, export and file door')
   assert.deepEqual((await api('/subcontractor-portal',undefined,subs[0])).value.sources,[])
   assert.equal((await submit('bills',{reference:'synthetic-plinth-3',amount_cents:1})).status,404)

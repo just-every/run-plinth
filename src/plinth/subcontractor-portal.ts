@@ -1,3 +1,4 @@
+import {clientAccess} from './job-customers'
 import type {Bindings} from '../auth.server'
 import {requireJobManager} from './auth'
 import {decisionFiles,decisionDownload} from './decision-files'
@@ -14,6 +15,7 @@ const headers={'cache-control':'private, no-store','x-content-type-options':'nos
 const json=(v:unknown)=>Response.json(v,{headers})
 /** Contact identities come only from the current directory and this company's explicit award. A bid invitation is never sufficient. */
 async function ownScopes(db:D1Database,job:Job,actor:Actor){
+ if(await clientAccess(db,job,actor.email))return []
  const result: {scope:NonNullable<Job['subcontracts']>[number];vendor:Vendor}[]=[]
  for(const scope of job.subcontracts??[]){
   if(scope.status==='cancelled')continue

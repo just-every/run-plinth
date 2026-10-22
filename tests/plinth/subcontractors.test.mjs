@@ -257,6 +257,9 @@ test('BID-001 — three qualified contacts receive pre-award and released scoped
   assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:false})).status,400)
   assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:true})).status,200)
   assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[2],cost_codes:[codes[0]],confirm:true})).status,409,'A rival released scope cannot grant access')
+  let clientVendor=await api('/vendors',{kind:'subcontractor',name:'synthetic-plinth-client-company',trades:['Framing'],contacts:[{id:'synthetic-plinth-client-contact',name:'Current job client',email:'synthetic-plinth-4@example.com'}]});assert.equal(clientVendor.status,201);clientVendor=clientVendor.value.vendor
+  assert.equal((await api(`/vendors/${clientVendor.id}/qualifications`,{expected_version:clientVendor.version,trade:'Framing',status:'qualified',evidence:'Synthetic qualified directory company'})).status,200)
+  assert.equal((await act(`/${id}/invite`,{vendor_id:clientVendor.id,contact_id:'synthetic-plinth-client-contact',pre_award:true,cost_codes:[codes[0]],confirm:true})).status,409,'A current job client cannot gain vendor bids through an overlapping company contact')
   for(let n=0;n<3;n++)assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[n].id,contact_id:`synthetic-plinth-${n+1}`,...(n<2?{pre_award:true}:{subcontract_id:scopes[n]}),cost_codes:[codes[n]],confirm:true})).status,200)
   assert.equal((await api(`/jobs/${job.id}`)).value.job.subcontracts.length,1,'The two pre-award invitations never manufacture awards')
   for(const path of ['/subcontractor-portal','/trade-confirmations','/punch','/rfi-inbox','/todos']){const r=await api(path,undefined,cookies[0]);assert.equal(r.status,200);assert.ok(!(JSON.stringify(r.value).includes(job.id)),'A pre-award bid grants no work portal access')}
