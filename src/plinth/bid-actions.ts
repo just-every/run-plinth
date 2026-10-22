@@ -31,10 +31,11 @@ export async function bidAction(db:D1Database,job:BidJob,actor:Actor,input:Input
    need(bid.published_by,'Publish the package before inviting contacts or issuing addenda',409,'bid_draft')
    if(action==='invite'){
     need(input.confirm===true,'Explicitly invite this individual contact and selected cost codes')
-    const vendor=await getVendor(db,text(input.vendor_id,'Qualified company',100)),contact=find(vendor.contacts,text(input.contact_id,'Company contact',100)),email=contact.email.toLowerCase(),subcontract_id=text(input.subcontract_id,'Released company scope',100)
-    need(await bidContact(db,job,bid,{vendor_id:vendor.id,contact_id:contact.id,email,subcontract_id}),'Bid access requires a qualified trade contact, active member account and their own released company scope. Prospective access before award is pending a policy decision.',409,'bid_qualification')
+    const vendor=await getVendor(db,text(input.vendor_id,'Qualified company',100)),contact=find(vendor.contacts,text(input.contact_id,'Company contact',100)),email=contact.email.toLowerCase(),pre_award=input.pre_award===true,subcontract_id=pre_award?undefined:text(input.subcontract_id,'Released company scope',100)
+    need(!pre_award||input.subcontract_id===undefined,'A pre-award invitation cannot name an awarded scope')
+    need(await bidContact(db,job,bid,{vendor_id:vendor.id,contact_id:contact.id,email,subcontract_id,...(pre_award?{pre_award:true as const}:{})}),'Bid access requires a qualified current company contact, an active member account and either an explicitly confirmed pre-award bid invitation or their own released company scope.',409,'bid_qualification')
     need(!bid.invitations.some(i=>!i.revoked_by&&(i.email===email||i.vendor_id===vendor.id)),'This contact or company is already invited',409,'bid_invited')
-    bid.invitations.push({id:crypto.randomUUID(),subcontract_id,vendor_id:vendor.id,vendor_name:vendor.name,contact_id:contact.id,email,contact_name:contact.name,cost_codes:costCodes(input.cost_codes,bid),by:stamp(actor),acknowledgments:[],questions:[],responses:[]})
+    bid.invitations.push({id:crypto.randomUUID(),subcontract_id,...(pre_award?{pre_award:true as const}:{}),vendor_id:vendor.id,vendor_name:vendor.name,contact_id:contact.id,email,contact_name:contact.name,cost_codes:costCodes(input.cost_codes,bid),by:stamp(actor),acknowledgments:[],questions:[],responses:[]})
    }else if(action==='revoke'){const invite=find(bid.invitations,text(input.invitation_id,'Invitation',100));need(!invite.revoked_by,'Invitation already revoked',409,'immutable');invite.revoked_by=stamp(actor)}
    else if(action==='addendum'){
     need(input.confirm===true&&input.revision_id===bid.revisions.at(-1)!.id,'Explicitly issue an addendum against the current revision',409,'bid_revision')

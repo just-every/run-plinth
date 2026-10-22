@@ -1,3 +1,4 @@
+import {requirePortalFeature} from './portal-policy'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize } from './auth'
 import { decisionDownload } from './decision-files'
@@ -49,6 +50,7 @@ export async function punchResponse(request: Request, original: Bindings): Promi
   if (!jobId) { need(request.method === 'GET' && parts.length === 3, 'Method not allowed', 405, 'method_not_allowed'); return json({ jobs: await Promise.all(allowed.map(j => source(env.DB, j, actor, true))) }) }
   previous = find(allowed, jobId)
  } else previous = await jobOf(env.DB, actor, jobId)
+ if(actor.role==='member'&&!portal)requirePortalFeature(previous,'client','punch')
  const projected = await source(env.DB, previous, actor, portal)
  if (request.method === 'GET') {
   if (tail.length === 0) return json({ ...projected, issues: search(projected.issues, url) })

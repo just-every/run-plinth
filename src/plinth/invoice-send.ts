@@ -1,3 +1,4 @@
+import {portalEnabled} from './portal-policy'
 import type { Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
 import { requireJobManager } from './auth'
@@ -15,7 +16,7 @@ export async function sendInvoice(env: Bindings, previous: Job, actor: Actor, id
  need(current.issued && current.status === 'issued', 'Issue the invoice before sending it', 409, 'invoice_state')
  need(!current.delivery, 'This invoice already has a reserved send attempt; inspect its outcome and contact the client separately', 409, 'invoice_send_reserved')
  const email = current.issued.recipient_email, guards = await recipientGuards(env.DB, previous, { kind: 'client', email })
- need(guards, 'The invoice recipient is no longer authorized', 403, 'recipient')
+ need(portalEnabled(previous,'client','billing')&&guards, 'The invoice recipient is no longer authorized', 403, 'recipient')
  const reserved = structuredClone(previous), row = find(invoiceRows(reserved), id)
  const delivery: InvoiceDelivery = { attempt_id: crypto.randomUUID(), status: 'unknown', label: 'Send reserved; provider outcome unknown. No automatic resend.', to: email, approved_by: stamp(actor) }
  row.delivery = delivery
@@ -23,7 +24,7 @@ export async function sendInvoice(env: Bindings, previous: Job, actor: Actor, id
  await saveJob(env.DB, actor, previous, reserved, guards, clock)
  try {
   const latest = await jobOf(env.DB, actor, previous.id), eligible = await recipientGuards(env.DB, latest, { kind: 'client', email })
-  if (!eligible) { delivery.status = 'cancelled'; delivery.label = 'Recipient access changed; nothing was sent' }
+  if (!eligible||!portalEnabled(latest,'client','billing')) { delivery.status = 'cancelled'; delivery.label = 'Recipient access changed; nothing was sent' }
   else {
    await checkWarrantySend(env.DB, latest, await readClock(env.DB), eligible, actor)
    const sender = operatorMail(env)

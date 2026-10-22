@@ -1,3 +1,4 @@
+import {setPortalFeatures} from './helpers.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
@@ -101,6 +102,16 @@ test('TODO-001 — granted job and company checklists, reviewed templates, dedup
   r=await update('complete',{item_id:crewItem},client);assert.equal(r.status,404)
   r=await update('comment',{item_id:subItem,comment:'Synthetic pressure check complete'},sub);assert.equal(r.status,200);assert.equal((await get(path,client)).value.todo.items[0].history.length,0,'No other assignee comments escape')
   const assignmentNotices=todo.notices.filter(n=>n.event==='assignment');assert.equal(assignmentNotices.length,3)
+  job=await setPortalFeatures(f,job.id,['todos'],['todos'])
+  for(const cookie of [client,sub]){
+   assert.deepEqual((await get('/todos',cookie)).value.todos,[])
+   assert.equal((await get(path,cookie)).status,404)
+   assert.equal((await update('complete',{item_id:cookie===sub?subItem:clientItem},cookie)).status,404)
+  }
+  const heldMail=f.messages.length
+  for(const notice of assignmentNotices.filter(n=>n.email!=='synthetic-plinth-1@example.com'))assert.equal((await post(path+'/notices/'+notice.id+'/send',{channel:'email',email:notice.email,confirm:true})).status,409)
+  assert.equal(f.messages.length,heldMail,'Disabled external preset refuses email without a provider call')
+  job=await setPortalFeatures(f,job.id)
   const baseline=f.messages.length
   for(const n of assignmentNotices){r=await post(path+'/notices/'+n.id+'/send',{channel:'email',email:n.email,confirm:true});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.todo.notices.find(x=>x.id===n.id).status,'accepted');assert.equal((await post(path+'/notices/'+n.id+'/send',{channel:'email',email:n.email,confirm:true})).status,409)}
   const sent=f.messages.slice(baseline);assert.equal(sent.length,3);for(const m of sent){assert.ok(!m.text.includes(specs.notes));assert.ok(!m.text.includes('Client wall-location check')||m.to.includes('synthetic-plinth-2@example.com'));assert.ok(!m.text.includes('Plumbing rough-in check')||m.to.includes('synthetic-plinth-3@example.com'))}

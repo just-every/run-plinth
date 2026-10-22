@@ -1,3 +1,4 @@
+import {portalEnabled} from './portal-policy'
 import { clientAccess } from './job-customers'
 import { need, type Actor, type Job } from './model'
 import { scopeContact } from './scope-contacts'
@@ -8,7 +9,7 @@ export function todoManager(actor:Actor,job?:Job){return actor.role==='owner'||a
 export async function todoGrant(db:D1Database,job:Job|undefined,assignment:TodoAssignee){
  const person=await db.prepare("SELECT id,role FROM oa_operators WHERE lower(email)=? AND status='active'").bind(assignment.email).first<{id:string;role:string}>();if(!person)return false
  if(assignment.kind==='office'){if(!job){const t=person.role==='admin'?await teamGrant(db,person.id):null;return person.role==='owner'||person.role==='admin'&&!t}return !!await officeAuthority(db,job,person.id,true)}
- if(!job||person.role!=='member')return false
+ if(!job||person.role!=='member'||!portalEnabled(job,assignment.kind==='client'?'client':'subcontractor','todos'))return false
  return assignment.kind==='client'?clientAccess(db,job,assignment.email):!!await scopeContact(db,job,assignment.email,assignment.subcontract_id)
 }
 export async function ownItems(db:D1Database,job:Job|undefined,todo:Todo,actor:Actor){const items=[];for(const item of todo.items)if(item.assignee.email===actor.email.toLowerCase()&&await todoGrant(db,job,item.assignee))items.push(item);return items}

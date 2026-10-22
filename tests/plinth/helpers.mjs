@@ -40,3 +40,9 @@ export async function createReleasedScope(f,job,email,trade){
  r=await api(`/jobs/${job.id}/subcontracts`,{expected_version:job.version,vendor_id:vendor.id,trade,scope:'Assigned '+trade+' work',contact_ids:['scope-contact'],awarded_on:'2026-10-21'});assert.equal(r.status,200);job=r.value.job;const scope=r.value.record
  r=await api(`/jobs/${job.id}/subcontracts/${scope.id}/release`,{expected_version:job.version});assert.equal(r.status,200);return {job:r.value.job,scope:r.value.record,vendor}
 }
+/** Change only the named job's external preset through the owner public door, retaining the ordinary optimistic fence. */
+export async function setPortalFeatures(f,jobId,client=[],subcontractor=[]){
+ const current=await f.json('/api/plinth/jobs/'+jobId,{cookie:f.owner});assert.equal(current.status,200)
+ const result=await f.json('/api/plinth/jobs/'+jobId+'/portal-policy',{method:'POST',cookie:f.owner,body:{expected_version:current.value.job.version,disabled:{client,subcontractor},reason:'Synthetic owner-reviewed feature restriction'}})
+ assert.equal(result.status,200,JSON.stringify(result.value));return result.value.job
+}

@@ -36,7 +36,7 @@ try{
  for(let n=0;n<3;n++){
   const vendor=(await post('/vendors',{kind:'subcontractor',name:companies[n],trades:['Framing'],contacts:[{id:`synthetic-plinth-${n+1}`,name:identities[n+2].displayName,email:identities[n+2].email}]})).vendor;vendors.push(vendor)
   await post(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Framing',status:'qualified',evidence:'Synthetic human-reviewed qualification'})
-  const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:descriptions[n],contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`)
+  if(n===2){const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:descriptions[n],contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`)}else scopes.push('pre-award')
  }
  const url=base+`/app?job=${job.id}&tab=Bids`;await page.goto(url)
  const panel=page.getByRole('heading',{name:'Bid requests and responses',exact:true}).locator('..')
@@ -77,6 +77,6 @@ try{
  for(let n=0;n<3;n++){const response=await bidders[n].request.get(base+`/api/plinth/bids/${job.id}`),own=(await response.json()).source.bids[0];assert.equal(own.invitations.length,1);assert.deepEqual(own.lines.map(l=>l.cost_code),[codes[n]]);if(n!==0)assert.ok(!JSON.stringify(own).includes('Include two rows of blocking at the shower wall, as revised detail A2 shows.'))}
  await inbox(bp[0]);await capture(bp[0],'private-question-answered',async()=>expect(ownRecord(bp[0]).getByText('Private answer: Include two rows of blocking at the shower wall, as revised detail A2 shows.',{exact:false})).toBeVisible())
  await cp.goto(base+`/app?job=${job.id}&tab=Quote`);await expect(cp.getByRole('heading',{name:job.name,exact:true})).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/bids/${job.id}`)).status(),404);const clientJob=await (await client.request.get(base+`/api/plinth/jobs/${job.id}`)).json();assert.equal(clientJob.job.bids,undefined);await capture(cp,'client-private-bids-absent',async()=>{await expect(cp.getByText(title,{exact:true})).toHaveCount(0);await expect(cp.getByRole('button',{name:'Bids',exact:true})).toHaveCount(0)})
- console.log('BID-001 PASS: three individual qualified released-scope invitations, exact revised originals, private scope/questions/two prices and decline, estimator acknowledgments/lateness; 1440/390')
+ console.log('BID-001 PASS: three individual qualified pre-award/released-scope invitations, exact revised originals, private scope/questions/two prices and decline, estimator acknowledgments/lateness; 1440/390')
  for(const context of contexts)await context.close()
 }finally{await browser.close()}

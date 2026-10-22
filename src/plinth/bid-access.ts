@@ -1,16 +1,19 @@
+import {portalEnabled} from './portal-policy'
 import {scopeContact} from './scope-contacts'
 import {currentQualification, type Vendor} from './vendor-model'
 import {need, type Actor} from './model'
 import type {BidInvitation, BidJob, BidPackage, BidSource} from './bid-model'
 
 /** Current policy requires both a qualified contact and its own released company scope. */
-export async function bidContact(db:D1Database,job:BidJob,bid:BidPackage,invite:Pick<BidInvitation,'vendor_id'|'contact_id'|'email'|'subcontract_id'>){
+export async function bidContact(db:D1Database,job:BidJob,bid:BidPackage,invite:Pick<BidInvitation,'vendor_id'|'contact_id'|'email'|'subcontract_id'|'pre_award'>){
+ if(!portalEnabled(job,'subcontractor','bids'))return false
  const row=await db.prepare('SELECT data FROM pl_vendors WHERE id=?').bind(invite.vendor_id).first<{data:string}>()
  if(!row)return false
  const vendor=JSON.parse(row.data) as Vendor
  if(vendor.kind!=='subcontractor'||currentQualification(vendor,bid.trade)?.status!=='qualified'||!vendor.trades.some(t=>t.toLowerCase()===bid.trade.toLowerCase()))return false
- const scope=await scopeContact(db,job,invite.email,invite.subcontract_id,bid.trade)
- if(!scope||scope.vendor_id!==invite.vendor_id||!scope.contact_ids.includes(invite.contact_id))return false
+ const scope=invite.pre_award?undefined:await scopeContact(db,job,invite.email,invite.subcontract_id,bid.trade)
+ if(!invite.pre_award&&(!scope||scope.vendor_id!==invite.vendor_id||!scope.contact_ids.includes(invite.contact_id)))return false
+ if(invite.pre_award&&invite.subcontract_id)return false
  if(!vendor.contacts.some(c=>c.id===invite.contact_id&&c.email.toLowerCase()===invite.email))return false
  return !!await db.prepare("SELECT 1 FROM oa_operators WHERE lower(email)=? AND status='active' AND role='member'").bind(invite.email).first()
 }

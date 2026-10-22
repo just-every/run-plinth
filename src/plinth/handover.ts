@@ -1,3 +1,4 @@
+import {requirePortalFeature} from './portal-policy'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireJobManager } from './auth'
 import { decisionDownload } from './decision-files'
@@ -13,6 +14,7 @@ export async function handoverResponse(request: Request, original: Bindings): Pr
  if (!match) return null
  const env = runtimeBindings(original), actor = await authorize(request, env), clock = await readClock(env.DB), previous: HandoverJob = await jobOf(env.DB, actor, match[1]!), parts = match[2]?.split('/') ?? []
  need(actor.role !== 'agent', 'Handover requires a signed-in person', 403, 'human_required')
+ if(actor.role==='member')requirePortalFeature(previous,'client','handover')
  const state = actor.role === 'member' ? handoverClient(previous) : handoverState(previous)
  if (request.method === 'GET') {
   if (parts[0] === 'files' && parts.length === 2) {

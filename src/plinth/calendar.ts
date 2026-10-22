@@ -1,3 +1,4 @@
+import {portalEnabled} from './portal-policy'
 import type { Bindings } from '../auth.server'
 import { need, type Actor, type Input, type Job } from './model'
 import { clientAccess } from './job-customers'
@@ -93,7 +94,7 @@ export async function calendarFeed(request: Request, env: Bindings): Promise<Res
    AND NOT EXISTS(SELECT 1 FROM pl_team m WHERE m.operator_id=p.id AND NOT EXISTS(SELECT 1 FROM json_each(m.data,'$.job_ids') a WHERE a.value=j.id))
    AND NOT EXISTS(SELECT 1 FROM pl_erased_jobs e WHERE e.job_id=j.id)
  `).bind(await digest(match[1]!)).first<{ data: string; email: string; role: string }>()
- if (!row || row.role === 'member' && !await clientAccess(env.DB,JSON.parse(row.data) as Job,row.email)) return new Response(null, { status: 404, headers })
+ if (!row || row.role === 'member' && (!await clientAccess(env.DB,JSON.parse(row.data) as Job,row.email)||!portalEnabled(JSON.parse(row.data) as Job,'client','schedule'))) return new Response(null, { status: 404, headers })
  return new Response(calendar(JSON.parse(row.data) as Job), {
   headers: { ...headers, 'content-type': 'text/calendar; charset=utf-8' },
  })

@@ -1,3 +1,4 @@
+import {setPortalFeatures} from './helpers.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
@@ -24,6 +25,12 @@ test('BILL-002 — numbered deposit and milestone invoices retain reviewed sourc
   assert.equal((await act(`/invoices/${depositId}/issue`)).status,200)
   const issuedDeposit=structuredClone(job.invoices.find(i=>i.id===depositId).issued);assert.equal(issuedDeposit.earned_revenue_cents,0);assert.equal(issuedDeposit.gross_cents,200000);assert.equal(job.invoice_deposit_liability_cents,0)
   assert.equal((await act(`/invoices/${depositId}/issue`)).status,409)
+  job=await setPortalFeatures(f,job.id,['billing'])
+  const heldMail=f.messages.length
+  assert.equal((await act(`/invoices/${depositId}/send`,{confirm:true})).status,403)
+  assert.equal(f.messages.length,heldMail,'A disabled billing preset blocks outbound invoice details before reservation')
+  for(const ext of ['json','html','csv'])assert.equal((await f.request(`/api/plinth/jobs/${job.id}/invoices/${depositId}/document.${ext}`,{cookie:client})).status,404)
+  job=await setPortalFeatures(f,job.id)
   assert.equal((await act(`/invoices/${depositId}/send`,{confirm:true})).status,200);assert.equal(job.invoices.find(i=>i.id===depositId).delivery.status,'accepted');assert.equal(f.messages.at(-1).to[0],'invoice-client@example.com');assert.equal(job.invoice_deposit_liability_cents,0,'BILL-002 mail acceptance is not funds')
   assert.equal((await act(`/invoices/${depositId}/send`,{confirm:true})).status,409,'BILL-002 one durable mail attempt cannot silently resend')
   const acknowledgment=await act(`/invoices/${depositId}/accept`,{confirm:true,statement:'I acknowledge this exact deposit invoice'},client);assert.equal(acknowledgment.status,200);assert.ok(!JSON.stringify(acknowledgment.value.record).includes('cost_unit_cents'));assert.ok(!JSON.stringify(acknowledgment.value.record).includes('Reviewed fixture taxable materials')); await read();assert.equal(job.invoice_deposit_liability_cents,0,'BILL-002 client acknowledgment is not payment')

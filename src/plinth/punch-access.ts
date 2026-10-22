@@ -1,3 +1,4 @@
+import {portalEnabled} from './portal-policy'
 import { scopeContact } from './scope-contacts'
 import { evaluate, rules, today } from './compliance'
 import { getVendor } from './vendors'
@@ -10,6 +11,7 @@ export function requirePunchOffice(actor: Actor) { need(punchOffice(actor), 'Onl
 export function requirePunchManager(actor: Actor) { need(punchOffice(actor) || actor.role === 'project_manager', 'Job manager access required', 403, 'forbidden') }
 /** Scope release, current contact membership, qualification and current compliance are all needed; a historic assignment is never an enduring grant. */
 export async function punchScope(db: D1Database, job: PunchJob, email: string, scopeId: string | undefined) {
+ if(!portalEnabled(job,'subcontractor','punch'))return undefined
  const scope = await scopeContact(db, job, email, scopeId)
  if (!scope) return undefined
  const vendor = await getVendor(db, scope.vendor_id)

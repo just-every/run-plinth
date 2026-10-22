@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {setPortalFeatures} from './helpers.mjs'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
 test('SUB-001 — restricted subcontractor directory, private W-9 custody, reviewed rates, qualification and dated scope awards', async () => {
@@ -229,7 +230,7 @@ test('SUB-004 — conditional waiver for a sub draw, exact signed release, recor
  } finally { await f.close() }
 })
 
-test('BID-001 — three qualified contacts receive scoped revised plans, two private priced responses and one decline; current grants gate every door', async () => {
+test('BID-001 — three qualified contacts receive pre-award and released scoped revised plans, two private priced responses and one decline; current grants gate every door', async () => {
  const f=await createFixture()
  try{
   const cookies=await Promise.all([1,2,3,4].map(n=>f.invite(`synthetic-plinth-${n}@example.com`,`Synthetic bidder ${n}`))),agent=await f.agent()
@@ -243,7 +244,7 @@ test('BID-001 — three qualified contacts receive scoped revised plans, two pri
   for(let n=0;n<3;n++){
    let r=await api('/vendors',{kind:'subcontractor',name:`synthetic-plinth-${n+1}`,trades:['Framing'],contacts:[{id:`synthetic-plinth-${n+1}`,name:`Synthetic bidder ${n+1}`,email:`synthetic-plinth-${n+1}@example.com`}]});assert.equal(r.status,201);let vendor=r.value.vendor
    r=await api(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Framing',status:'qualified',evidence:'Synthetic human-reviewed qualification'});assert.equal(r.status,200);vendors.push(r.value.vendor)
-   const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:`Synthetic released scope ${n+1}`,contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`,{})
+   if(n===2){const scope=await jobAct('/subcontracts',{vendor_id:vendor.id,trade:'Framing',scope:`Synthetic released scope ${n+1}`,contact_ids:[`synthetic-plinth-${n+1}`],awarded_on:'2026-10-21'});scopes.push(scope.id);await jobAct(`/subcontracts/${scope.id}/release`,{})}else scopes.push(undefined)
   }
   const original=Buffer.from('%PDF-1.7\nsynthetic-plinth-1 plan\n%%EOF'),revised=Buffer.from('%PDF-1.7\nsynthetic-plinth-2 revised plan\n%%EOF'),file=(name,bytes)=>({name,base64:bytes.toString('base64')})
   let source=(await api(`/bids/${job.id}`)).value.source
@@ -252,11 +253,13 @@ test('BID-001 — three qualified contacts receive scoped revised plans, two pri
   assert.equal((await api(`/bids/${job.id}`,{expected_version:source.version,...initial},cookies[0])).status,404)
   assert.equal((await f.json(`/api/plinth/bids/${job.id}`,{method:'POST',token:agent,body:{expected_version:source.version,...initial}})).status,403)
   result=await act('',initial);assert.equal(result.status,201,JSON.stringify(result.value));const id=result.value.record_id,revision=source.bids[0].revisions[0].id
-  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[0],cost_codes:[codes[0]],confirm:true})).status,409,'Draft package cannot be invited')
+  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',pre_award:true,cost_codes:[codes[0]],confirm:true})).status,409,'Draft package cannot be invited')
   assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:false})).status,400)
   assert.equal((await act(`/${id}/publish`,{revision_id:revision,confirm:true})).status,200)
-  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[1],cost_codes:[codes[0]],confirm:true})).status,409,'A rival released scope cannot grant access')
-  for(let n=0;n<3;n++)assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[n].id,contact_id:`synthetic-plinth-${n+1}`,subcontract_id:scopes[n],cost_codes:[codes[n]],confirm:true})).status,200)
+  assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[0].id,contact_id:'synthetic-plinth-1',subcontract_id:scopes[2],cost_codes:[codes[0]],confirm:true})).status,409,'A rival released scope cannot grant access')
+  for(let n=0;n<3;n++)assert.equal((await act(`/${id}/invite`,{vendor_id:vendors[n].id,contact_id:`synthetic-plinth-${n+1}`,...(n<2?{pre_award:true}:{subcontract_id:scopes[n]}),cost_codes:[codes[n]],confirm:true})).status,200)
+  assert.equal((await api(`/jobs/${job.id}`)).value.job.subcontracts.length,1,'The two pre-award invitations never manufacture awards')
+  for(const path of ['/subcontractor-portal','/trade-confirmations','/punch','/rfi-inbox','/todos']){const r=await api(path,undefined,cookies[0]);assert.equal(r.status,200);assert.ok(!(JSON.stringify(r.value).includes(job.id)),'A pre-award bid grants no work portal access')}
   assert.equal((await api(`/jobs/${job.id}`,undefined,cookies[0])).status,404,'Invitation never grants general job access')
   assert.equal((await api(`/bids/${job.id}`,undefined,cookies[3])).status,404,'Uninvited job client cannot read bids')
   assert.equal((await api(`/jobs/${job.id}`,undefined,cookies[3])).value.job.bids,undefined,'General client projection strips private bid state')
@@ -294,6 +297,11 @@ test('BID-001 — three qualified contacts receive scoped revised plans, two pri
   assert.equal((await f.request(`/api/plinth/bids/${job.id}/files/${ownFile}`,{cookie:cookies[0]})).status,200)
   assert.equal((await api(`/jobs/${job.id}/bids`)).status,200,'Job route authenticates independently')
   assert.equal((await api(`/jobs/${job.id}/bids`,undefined,cookies[3])).status,404)
+  await setPortalFeatures(f,job.id,[],['bids']);source=(await api(`/bids/${job.id}`)).value.source
+  for(const path of [`/bids/${job.id}`,`/jobs/${job.id}/bids`,`/bids/${job.id}/files/${ownFile}`,`/bids/${job.id}/files/${planFile}`])assert.equal((await api(path,undefined,cookies[0])).status,404,'Disabled bid feature closes each bid door')
+  assert.deepEqual((await api('/bids',undefined,cookies[0])).value.sources,[])
+  assert.equal((await act(`/${id}/question`,{revision_id:current,text:'Disabled feature'},cookies[0])).status,404)
+  await setPortalFeatures(f,job.id);source=(await api(`/bids/${job.id}`)).value.source
   const messages=f.messages.length
   result=await act('',{...initial,title:'Synthetic unpriced package',mode:'unpriced'});assert.equal(result.status,201);assert.ok(source.bids.at(-1).lines.every(l=>l.budget_cents===undefined));assert.equal(f.messages.length,messages,'Bids never send automatic notices')
   result=await api(`/vendors/${vendors[0].id}/qualifications`,{expected_version:vendors[0].version,trade:'Framing',status:'rejected',evidence:'Synthetic qualification withdrawn'});assert.equal(result.status,200)

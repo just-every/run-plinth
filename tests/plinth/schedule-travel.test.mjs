@@ -1,3 +1,4 @@
+import {setPortalFeatures} from './helpers.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
@@ -124,6 +125,10 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   let draftJob=await createActiveJob(f,'Draft resource check')
   r=await act(draftJob,'/schedules',booking('Agent draft','17','18',[{resource_id:crew.id,units:2}]),undefined,agent);assert.equal(r.status,200);draftJob=r.value.job
   assert.equal((await act(draftJob,`/schedules/${r.value.record.id}/approve`)).value.error,'resource_conflict','Agent drafts cannot bypass the human capacity check')
+  south=await setPortalFeatures(f,south.id,[],['schedule'])
+  assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[])
+  assert.equal((await api(`/trade-confirmations/${invitation.id}/confirm`,{expected_version:south.version,confirm:true,reason:'Disabled feature'},trade)).status,404)
+  south=await setPortalFeatures(f,south.id)
   const currentVendor=(await api(`/vendors/${scopeSetup.vendor.id}`)).value.vendor
   assert.equal((await api(`/vendors/${currentVendor.id}`,{expected_version:currentVendor.version,contacts:[]})).status,200)
   assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[],'Removing the awarded company contact revokes inbox access on the next request')

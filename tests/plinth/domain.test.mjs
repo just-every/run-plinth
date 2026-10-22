@@ -1,3 +1,4 @@
+import {setPortalFeatures} from './helpers.mjs'
 import { takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -235,6 +236,11 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   assert.equal((await inboxAct(`/${id}/respond`,{...response,text:'Date-only coordination revision',cost_impact_cents:19000,date_impact_days:3},designer)).status,200)
   const dateOnly=job.rfis[0].responses.at(-1);assert.equal((await act(`/rfis/${id}/publish`,{response_id:dateOnly.id,confirm:true,cost_impact_cents:19000,date_impact_days:3})).status,200)
   const dateBudgets=structuredClone(job.budgets);const zeroChange=job.variations.at(-1);assert.equal(zeroChange.amount_cents,0);assert.equal((await act(`/variations/${zeroChange.id}/approve`,{},client)).status,200,'A date-only response still needs explicit native client approval');assert.deepEqual(job.budgets,dateBudgets,'Date-only approval preserves every economic and billing source')
+  job=await setPortalFeatures(f,job.id,[],['rfis'])
+  assert.deepEqual((await api('/rfi-inbox',undefined,trade)).value.jobs,[])
+  assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${answer.attachments[0].id}`,{cookie:trade})).status,404)
+  assert.equal((await inboxAct(`/${id}/acknowledge`,{response_id:dateOnly.id},trade)).status,404)
+  job=await setPortalFeatures(f,job.id)
   assert.equal((await act('/rfi-access',{email:'rfi-trade@example.com',revoke:true})).status,200)
   assert.deepEqual((await api('/rfi-inbox',undefined,trade)).value.jobs,[]);assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${job.rfis[0].responses[0].attachments[0].id}`,{cookie:trade})).status,404)
   const visible=(await api(`/jobs/${job.id}`,undefined,client)).value.job;assert.equal(visible.rfis,undefined);assert.equal(visible.rfi_access,undefined)
@@ -312,6 +318,12 @@ test('FIELD-004 — photo observations retain form revisions, qualified trade re
   r=await api(`/vendors/${assignedVendor.id}/qualifications`,{expected_version:currentVendor.version,trade:'Tile',status:'rejected',evidence:'Qualification withdrawn after inspection'});assert.equal(r.status,200)
   assert.deepEqual((await api('/punch',undefined,trade)).value.jobs,[])
   assert.equal((await f.request(`/api/plinth/punch/${job.id}/files/${issue.photo.id}`,{cookie:trade})).status,404,'Qualification withdrawal removes file access on the next request')
+  job=await setPortalFeatures(f,job.id,[],['punch'])
+  assert.deepEqual((await api('/punch',undefined,trade)).value.jobs,[])
+  assert.equal((await f.request(`/api/plinth/punch/${job.id}/export.json`,{cookie:trade})).status,404)
+  assert.equal((await f.request(`/api/plinth/punch/${job.id}/files/${issue.photo.id}`,{cookie:trade})).status,404)
+  assert.equal((await repair('Disabled repair')).status,404)
+  job=await setPortalFeatures(f,job.id)
   const final=job.punch.issues[0];assert.deepEqual(final.attempts[0],rejected);assert.equal(final.attempts[1].review.decision,'accepted');assert.equal(job.approvals.filter(a=>a.kind==='punch.inspect').length,2)
  }finally{await f.close()}
 })

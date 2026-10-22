@@ -1,3 +1,4 @@
+import {portalEnabled} from './portal-policy'
 import { scopeContact } from './scope-contacts'
 import { requireManager, requireJobManager } from './auth'
 import { decisionFiles, decisionDownload } from './decision-files'
@@ -6,7 +7,7 @@ import { day } from './purchase-order-model'
 import type { Rfi, RfiGrant, RfiResponse } from './rfi-model'
 
 export function rfiGrant(job:Job,email:string){return job.rfi_access?.findLast(g=>g.email===email.toLowerCase())}
-export async function rfiCurrent(db:D1Database,job:Job,email:string){const grant=rfiGrant(job,email);if(!grant||grant.revoked_by)return false;return grant.role!=='trade'||!!await scopeContact(db,job,email,grant.subcontract_id)}
+export async function rfiCurrent(db:D1Database,job:Job,email:string){const grant=rfiGrant(job,email);if(!grant||grant.revoked_by||!portalEnabled(job,grant.role==='trade'?'subcontractor':'client','rfis'))return false;return grant.role!=='trade'||!!await scopeContact(db,job,email,grant.subcontract_id)}
 export function rfiPermitted(job:Job,actor:Actor){const grant=rfiGrant(job,actor.email);return actor.role!=='member'||!!grant&&!grant.revoked_by}
 export function rfiVisible(job:Job,actor:Actor,rfi:Rfi){if(actor.role!=='member')return true;const grant=rfiGrant(job,actor.email);return !!grant&&!grant.revoked_by&&(rfi.assignee_email===actor.email.toLowerCase()||rfi.recipient_emails.includes(actor.email.toLowerCase())||rfi.by.id===actor.id)}
 export function rfiProjection(job:Job,actor:Actor){return (job.rfis??[]).filter(r=>rfiVisible(job,actor,r)).map(r=>({...r,responses:r.responses.filter(a=>actor.role!=='member'||a.by.id===actor.id||a.published_by&&(r.by.id===actor.id||r.assignee_email===actor.email.toLowerCase()||a.recipient_emails?.includes(actor.email.toLowerCase()))).map(a=>actor.role==='member'?{...a,recipient_emails:a.recipient_emails?.filter(e=>e===actor.email.toLowerCase()),acknowledgments:a.acknowledgments.filter(ack=>ack.email===actor.email.toLowerCase())}:a).map(a=>actor.role==='member'&&rfiGrant(job,actor.email)?.role!=='designer'?{...a,cost_impact_cents:undefined,variation_id:undefined,change_pending:!!a.variation_id&&job.variations.find(v=>v.id===a.variation_id)?.status!=='approved'}:a),...(actor.role==='member'?{recipient_emails:r.recipient_emails.filter(e=>e===actor.email.toLowerCase()),history:r.history.filter(h=>h.kind!=='routed')}:{})}))}
