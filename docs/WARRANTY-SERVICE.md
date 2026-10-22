@@ -1,0 +1,17 @@
+# Warranty service records
+
+The native HTTP service workflow builds on the component terms and reminder agreements in **Warranty**. Dedicated client and trade screens are not yet implemented. The service sharing policy below is conservative and awaits ct ratification; CARE-002 remains partial.
+
+An assigned job client reads `GET /api/plinth/jobs/:job/service` and submits a request to the same path with the current `expected_version`, a listed `component_id`, `description`, `availability`, and one to five original PNG/JPEG `attachments` in the standard `{name, mime, base64}` shape, up to 2 MB each. Submission records a request only: it sends no message, determines no coverage and books no work.
+
+A current owner, administrator or assigned project manager acknowledges ownership with `POST .../service/:case/acknowledge-owner` and a reason. That person becomes the designated coverage reviewer under the existing `warranties/:case/review` door; a reasoned coverage decision remains a human judgment under the signed terms.
+
+The office uses `.../service/:case/assign` with `subcontract_id`, `email` and a reason to route the case to an active invited contact of that company's own released scope. Assignment grants only the case, request photos and availability, appointments, shared coverage decisions and repair history. It gives no whole-job, client, office-cost, private coverage-source or other-company access. Removing a contact, holding its award, disabling its account or the warranty portal feature ends inbox and file access on the next request.
+
+`.../service/:case/book` takes explicit timezone-qualified `start` and `end`, an optional whole-minute `travel_minutes` and a reason. It books a real task through ordinary cross-job conflict and resource checks; it does not send an invitation or claim attendance. Existing reviewed-planner jobs still require that planner; the direct service-booking bridge for this mode is unfinished. Current appointment reads reflect moves/cancellations of the linked task, while each visit retains its original agreed interval.
+
+The trade reads `GET /api/plinth/warranty-service`, downloads only its assigned cases' originals at `/api/plinth/warranty-service/:job/files/:file`, and posts its exact `visit_id`, reason and original evidence to `/api/plinth/warranty-service/:job/:case/submit`. The office accepts or rejects that exact submission at the job service `.../:case/review` door with `visit_id`, boolean `accepted` and a reason. A rejection stays open and allows a separately booked return visit; it preserves the first evidence and review.
+
+An accepted fix stays open until an assigned client explicitly posts `visit_id` and reason to `.../:case/acknowledge-client`. The latest visit must have builder acceptance and a resolved coverage decision. The atomic closure retains both decisions, every visit and all evidence. Office callers cannot bypass client acknowledgment through the older warranty-close door. Closure pauses explicitly agreed case reminders under CARE-003, without altering signed component terms or erasing history. Rejected fixes and builder acceptance alone never stop those reminders. No new automatic outbound action is introduced.
+
+Every mutation requires the current job `expected_version`, a signed-in person and matching Origin. Bearer agents are refused. Owners may disable `warranty` independently in the client and subcontractor portal presets. Private archives already carry job records and original attachment bytes; no new session or credential is included.

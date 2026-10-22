@@ -118,16 +118,8 @@ async function changeCase(db: D1Database, job: Job, actor: Actor, row: WarrantyC
   return review
  }
  if (action === 'close') {
-  const review = row.reviews.at(-1)
-  need(review && review.decision !== 'needs_evidence', 'A reasoned coverage decision is required before closing the case', 409, 'coverage_required')
-  const by = stamp(actor)
-  row.closure = { reason: text(input.reason, 'closure reason', 4000), evidence_reference: text(input.evidence_reference, 'closure evidence reference', 1000), review_id: review.id, closed_by: by }
-  row.status = 'closed'
-  for (const agreement of warrantyState(job).promises.filter(p => p.case_id === row.id && p.status === 'active')) {
-   agreement.status = 'paused'
-   agreement.revision++
-   agreement.history.push({ action: 'case_closed', reason: 'The linked case was closed with evidence', by })
-  }
+  need(!row.service,'Service requests close only after builder acceptance and explicit client acknowledgment',409,'client_acknowledgment')
+  closeReviewedWarrantyCase(job,actor,row,input)
   return row
  }
  need(false, 'Unknown warranty case action', 404, 'not_found')
@@ -149,4 +141,18 @@ export async function warrantyAction(db: D1Database, job: Job, actor: Actor, inp
  const item = find(state.cases, id)
  need(input.kind === undefined || input.kind === 'case', 'Record kind does not match')
  return changeCase(db, job, actor, item, input, action)
+}
+
+/** The service door calls this only after exact builder/client closure gates. */
+export function closeReviewedWarrantyCase(job:Job,actor:Actor,row:WarrantyCase,input:Input){
+  const review = row.reviews.at(-1)
+  need(review && review.decision !== 'needs_evidence', 'A reasoned coverage decision is required before closing the case', 409, 'coverage_required')
+  const by = stamp(actor)
+  row.closure = { reason: text(input.reason, 'closure reason', 4000), evidence_reference: text(input.evidence_reference, 'closure evidence reference', 1000), review_id: review.id, closed_by: by }
+  row.status = 'closed'
+  for (const agreement of warrantyState(job).promises.filter(p => p.case_id === row.id && p.status === 'active')) {
+   agreement.status = 'paused'
+   agreement.revision++
+   agreement.history.push({ action: 'case_closed', reason: 'The linked case was closed with evidence', by })
+  }
 }

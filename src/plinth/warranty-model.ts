@@ -1,6 +1,6 @@
 import type { Stamp } from './model'
 
-/** All aftercare records are office-only and travel with the owning job. */
+/** Office records travel with the job; service records use explicit client/company projections. */
 export interface WarrantyState {
  components: WarrantyComponent[]
  promises: WarrantyPromise[]
@@ -39,6 +39,7 @@ export interface WarrantyReview {
  reason: string; source_reference: string; reviewed_by: Stamp
 }
 export interface WarrantyCase {
+ service?: import('./warranty-service-model').WarrantyService
  id: string; component_id: string; defect_key: string; description: string; reported_on: string
  reviewer_email: string; reviewer_id: string; repeated: boolean; earlier_case_ids: string[]
  escalation?: { reviewer_email: string; reason: string; recorded_by: Stamp }
