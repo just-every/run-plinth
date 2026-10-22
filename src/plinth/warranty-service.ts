@@ -73,7 +73,7 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
    requireJobManager(actor);const assignment=service.assignment;need(assignment&&await scopeContact(db,job,assignment.email,assignment.subcontract_id),'Choose a currently released repair contact',409,'scope_required')
    need(!service.visits.at(-1)||service.visits.at(-1)?.review?.accepted===false,'Review the prior fix before booking another visit',409,'visit_pending');need(service.visits.length<100,'Visit history limit reached')
    const scope=find(job.subcontracts??[],assignment.subcontract_id),all=await jobs(db)
-   const task=value.task_id?find(job.schedules,text(value.task_id,'Reviewed appointment task',100)):prepareSchedule(job,actor,{trade:scope.trade,description:'Warranty visit: '+item.description,start:value.start,end:value.end,travel_minutes:value.travel_minutes??0},all)
+   const task=value.task_id?find(job.schedules,text(value.task_id,'Reviewed appointment task',100)):prepareSchedule(job,actor,{trade:scope.trade,description:'Warranty service visit',start:value.start,end:value.end,travel_minutes:value.travel_minutes??0},all)
    need(task.status==='booked'&&!task.milestone&&task.trade.toLowerCase()===scope.trade.toLowerCase(),'Choose a booked work task in this repair trade',409,'visit_task')
    need(!serviceCases(job).some(c=>c.service!.visits.some(v=>v.task_id===task.id)),'This task already belongs to a service visit',409,'visit_task')
    await requireResources(db,job,all,actor);service.visits.push({id:crypto.randomUUID(),task_id:task.id,start:task.start,end:task.end,booked_by:by,assignment:{email:assignment.email,subcontract_id:assignment.subcontract_id}})
@@ -93,4 +93,11 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
  recordApproval(job,actor,'warranty.service',{id:item.id,prepared_by:item.recorded_by},{action:tail[1]??'request',status:item.status,service:item.service})
  await saveJob(db,actor,previous,job,writes,clock)
  return json({...await projection(db,job,actor,portal),record:shownCase(job,item,actor.role!=='member')})
+}
+
+/** Ordinary job/list reads must not turn draft-agent access into service-case access. */
+export function warrantyAgentProjection(job:Job){
+ const state=job.warranties;if(!state)return undefined
+ const hidden=new Set(state.cases.filter(c=>c.service).map(c=>c.id)),promises=state.promises.filter(p=>!p.case_id||!hidden.has(p.case_id)),allowed=new Set(promises.map(p=>p.id))
+ return {...state,cases:state.cases.filter(c=>!c.service),promises,reminders:state.reminders.filter(r=>allowed.has(r.promise_id))}
 }

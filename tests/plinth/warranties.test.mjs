@@ -117,6 +117,7 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   assert.equal((await act('/service',request)).status,403)
   assert.equal((await act('/service',{...request,attachments:[]},client)).status,400)
   r=await act('/service',request,client);assert.equal(r.status,200,JSON.stringify(r.value));const id=r.value.record.id,item=()=>job.warranties.cases.find(c=>c.id===id),path=a=>`/service/${id}/${a}`
+  const agentJob=(await api(`/jobs/${job.id}`,undefined,undefined,agent)).value.job;assert.equal(agentJob.warranties.cases.length,0);assert.ok(!agentJob.approvals.some(a=>a.subject_id===id),'Draft-agent job/list reads never expose service snapshots')
   assert.equal(item().recorded_by.name,'Repair Client');assert.equal(job.schedules.length,0);assert.equal(job.warranties.promises.length,0,'A client request sends and schedules nothing automatically')
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).value.cases[0].costs,undefined)
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).value.components[0].terms,undefined)
