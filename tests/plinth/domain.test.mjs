@@ -238,6 +238,7 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   const dateBudgets=structuredClone(job.budgets);const zeroChange=job.variations.at(-1);assert.equal(zeroChange.amount_cents,0);assert.equal((await act(`/variations/${zeroChange.id}/approve`,{},client)).status,200,'A date-only response still needs explicit native client approval');assert.deepEqual(job.budgets,dateBudgets,'Date-only approval preserves every economic and billing source')
   const pm=await f.invite('rfi-pm@example.com','Assigned RFI PM','admin'),pmRow=(await api('/team')).value.team.find(p=>p.email==='rfi-pm@example.com')
   assert.equal((await f.json('/api/plinth/team/'+pmRow.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[job.id],po_limit_cents:0}})).status,200)
+  assert.equal((await act('/rfi-access',{email:'field@example.com',role:'field',sheet_ids:[sheet.id]},pm)).status,200,'The assigned PM grants only within this job')
   assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:['rfi-trade@example.com'],reason:'Assigned PM coordination'},pm)).status,200)
   assert.equal((await act(`/rfis/${id}/respond`,{...response,text:'Assigned PM exact office response',cost_impact_cents:19000,date_impact_days:0},pm)).status,200)
   const pmAnswer=job.rfis[0].responses.at(-1)
@@ -250,7 +251,7 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
    for(const fileId of [sheet.revisions[0].document.id,answer.attachments[0].id])assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${fileId}`,{cookie:trade})).status,404)
    assert.equal((await inboxAct(`/${id}/acknowledge`,{response_id:pmAnswer.id},trade)).status,404)
    assert.equal((await act(`/rfis/${id}/resolve`,{reason:'Old acknowledgment must not bypass revocation'},pm)).value.error,'rfi_contact')
-   if(change.contact_ids)assert.equal((await act(`/subcontracts/${scopeId}/access`,{contact_ids:contacts,reason:'Owner reassigns company contact'})).status,200)
+   if(change.contact_ids){assert.equal((await act(`/subcontracts/${scopeId}/access`,{contact_ids:contacts,reason:'Owner reassigns company contact'})).status,200);assert.equal((await act(`/rfis/${id}/resolve`,{reason:'Restoration still needs a fresh distribution'},pm)).value.error,'rfi_contact')}
   }
   assert.equal((await act(`/rfis/${id}/route`,{assignee_email:'designer@example.com',recipient_emails:[],reason:'Publish a new revision to current recipients'},pm)).status,200)
   assert.equal((await act(`/rfis/${id}/resolve`,{reason:'Routing alone cannot repair the old distribution'},pm)).value.error,'rfi_contact')

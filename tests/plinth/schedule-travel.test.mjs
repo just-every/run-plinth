@@ -132,6 +132,7 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   // The original confirmed invitation remains a historical record; a new exact snapshot needs a new confirmation.
   r=await act(south,`/schedules/${st}/resources`,{resources:[],travel_minutes:1});assert.equal(r.status,200);south=r.value.job
   r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com',subcontract_id:scopeId},pm);assert.equal(r.status,200);south=r.value.job;invitation=r.value.record;assert.equal(invitation.invited_by.name,'Capacity PM')
+  assert.equal((await act(south,`/subcontracts/${scopeId}/access`,{hold:true,reason:'PM cannot change company access'},pm)).status,403)
   const contacts=south.subcontracts[0].contact_ids
   for(const change of [{contact_ids:[]},{hold:true}]){
    r=await act(south,`/subcontracts/${scopeId}/access`,{...change,reason:'Owner revokes trade scope access'});assert.equal(r.status,200);south=r.value.job
