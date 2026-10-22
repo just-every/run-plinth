@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import {mkdir} from 'node:fs/promises'
+import {mkdir,readFile} from 'node:fs/promises'
+import {parseContract} from '../../src/base/seed-contract.mjs'
 import {chromium,expect} from '@playwright/test'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
 assert.ok(base&&shots&&process.env.PLINTH_OWNER_OPEN,'Use the disposable installation and its own private native entrance')
@@ -81,13 +82,14 @@ try{
  assert.equal((await s1.request.get(base+`/api/plinth/subcontractor-portal/${jobs[0].id}/files/${bill.attachments[0].id}`)).status(),404)
  const held=await s1.request.post(base+`/api/plinth/punch/${jobs[0].id}/issues/${issue.id}/submit`,{headers:{origin:base},data:{expected_version:jobs[0].version,note:'Revoked queued upload',attachments:[file]}});assert.equal(held.status(),404)
  await page.goto(base+`/app?job=${jobs[0].id}&tab=Punch`);await capture(page,'owner-retained-submission',async()=>expect(page.getByText('Awaiting inspection',{exact:false})).toBeVisible())
+ const contract=parseContract(await readFile(new URL('../../CONTRACT.md',import.meta.url),'utf8'))
  const site=process.env.PLINTH_SITE;assert.ok(site,'The same rer dev session supplies the public run site preview')
  const publicContext=await browser.newContext(),publicPage=await publicContext.newPage();await publicPage.goto(site+'/contract')
  for(const width of [1440,390]){
-  await publicPage.setViewportSize({width,height:1000});await publicPage.evaluate(()=>scrollTo(0,0));await expect(publicPage.locator('#progress')).toHaveAttribute('data-done','42');await expect(publicPage.locator('#progress')).toHaveAttribute('data-partial','27');await expect(publicPage.locator('#progress')).toHaveAttribute('data-missing','65')
+  await publicPage.setViewportSize({width,height:1000});await publicPage.evaluate(()=>scrollTo(0,0));for(const status of ['done','partial','missing'])await expect(publicPage.locator('#progress')).toHaveAttribute('data-'+status,String(contract.counts[status]))
   assert.ok(await publicPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Contract fits '+width)
   await publicPage.screenshot({path:`${shots}/ROLE-003-contract-progress-${width}.png`,animations:'disabled'})
-  for(const id of ['BID-001','ROLE-003','ROLE-006']){const row=publicPage.locator(`tr.clause[data-id="${id}"]`);await expect(row).toHaveAttribute('data-status','partial');await row.screenshot({path:`${shots}/${id}-contract-evidence-${width}.png`,animations:'disabled'})}
+  for(const id of ['BID-001','ROLE-003','ROLE-006']){const row=publicPage.locator(`tr.clause[data-id="${id}"]`);await expect(row).toHaveAttribute('data-status',contract.clauses.find(c=>c.id===id).status);await row.screenshot({path:`${shots}/${id}-contract-evidence-${width}.png`,animations:'disabled'})}
  }
  await publicPage.goto(site+'/docs/agent-commands');const portalDoc=publicPage.getByRole('heading',{name:'External portal grants and records',exact:true})
  for(const width of [1440,390]){await publicPage.setViewportSize({width,height:1000});await portalDoc.scrollIntoViewIfNeeded();await expect(portalDoc).toBeVisible();assert.ok(await publicPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Portal documentation fits '+width);await publicPage.screenshot({path:`${shots}/ROLE-003-portal-docs-${width}.png`,animations:'disabled'})}
