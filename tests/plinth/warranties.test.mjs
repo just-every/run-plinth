@@ -2,6 +2,149 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture, createReleasedScope, setPortalFeatures } from './helpers.mjs'
 
+const noRepairPhoto={name:'synthetic-plinth-201.png',mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='}
+async function noRepairJourney(f){
+ const client=await f.invite('synthetic-plinth-201@example.com','Service Client')
+ let job=await createActiveJob(f,'Synthetic no-repair service','synthetic-plinth-201@example.com')
+ const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{cookie,token,...(body===undefined?{}:{method:'POST',body})})
+ const read=async()=>{const r=await api('/jobs/'+job.id);assert.equal(r.status,200);job=r.value.job}
+ const act=async(path,body={},cookie=f.owner,token)=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body},cookie,token);await read();return r}
+ let r=await act('/warranties',{kind:'component',name:'Kitchen fixture',starts_on:'2026-01-01',ends_on:'2035-12-31',terms:'Original signed fixture terms',signed_terms_reference:'Synthetic signed terms 201'});assert.equal(r.status,200)
+ const component=structuredClone(job.warranties.components[0])
+ const request=async(description='Fixture leaks')=>{const r=await act('/service',{component_id:component.id,description,availability:'Weekday mornings by agreement',attachments:[noRepairPhoto]},client);assert.equal(r.status,200,JSON.stringify(r.value));return r.value.record.id}
+ const id=await request(),item=(caseId=id)=>job.warranties.cases.find(c=>c.id===caseId),path=action=>`/service/${id}/${action}`
+ const review=async decision=>{const r=await act(`/warranties/${id}/review`,{decision,reason:'Reviewer inspected fixture documentation: '+decision,source_reference:'Synthetic coverage source 201'});assert.equal(r.status,200,JSON.stringify(r.value));return item().reviews.at(-1)}
+ const promise=async(title,caseId=id)=>{const r=await act('/warranties',{kind:'promise',component_id:component.id,...(caseId?{case_id:caseId}:{}),title,anchor_on:'2031-01-01',interval_unit:'month',interval_count:1,recipient_kind:'client',recipient_email:'synthetic-plinth-201@example.com',agreement_reference:'Client agreed to this monthly inspection reminder'});assert.equal(r.status,200);return job.warranties.promises.at(-1).id}
+ const scheduled=async time=>{assert.equal((await (await f.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'0 * * * *'})).outcome,'ok');await read()}
+ return {get job(){return job},client,api,read,act,component,id,item,path,review,request,promise,scheduled}
+}
+
+test('CARE-005 — exact not-covered review and builder resolution await client acknowledgment; closure preserves originals and isolates reminders',async()=>{
+ const f=await createFixture()
+ try{
+  const j=await noRepairJourney(f)
+  assert.equal((await j.act(j.path('acknowledge-owner'),{reason:'Builder owns the coverage review'})).status,200)
+  const otherCase=await j.request('Another fixture remains open'),linked=await j.promise('This case follow-up'),other=await j.promise('Other case follow-up',otherCase),unlinked=await j.promise('Component maintenance',null),paused=await j.promise('Previously paused follow-up'),revoked=await j.promise('Previously revoked follow-up')
+  assert.equal((await j.act(`/warranties/${paused}/pause`,{reason:'Client paused this agreement'})).status,200)
+  assert.equal((await j.act(`/warranties/${revoked}/revoke`,{reason:'Client revoked this agreement'})).status,200)
+  const untouched=structuredClone(j.job.warranties.promises.filter(p=>p.id!==linked))
+  const notices=()=>f.messages.filter(m=>m.subject.startsWith('Maintenance reminder:'))
+  await j.scheduled('2031-01-01T09:00:00Z');assert.equal(notices().length,3)
+  const first=await j.review('not_covered')
+  assert.equal((await j.act(j.path('acknowledge-not-covered'),{reason:'Acknowledge before resolution',review_id:first.id},j.client)).status,409)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Builder explains the not-covered outcome',review_id:first.id})).status,200)
+  const oldResolution=structuredClone(j.item().service.no_repair_resolutions.at(-1))
+  assert.equal(j.item().status,'open');assert.equal(j.job.warranties.promises.find(p=>p.id===linked).status,'active')
+  assert.equal((await j.act(j.path('acknowledge-not-covered'),{reason:'Exact resolution is required',review_id:first.id},j.client)).status,409)
+  const latest=await j.review('not_covered')
+  assert.equal((await j.act(j.path('acknowledge-not-covered'),{reason:'Stale review acknowledgment',review_id:first.id,resolution_id:oldResolution.id},j.client)).status,409)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Stale builder review reference',review_id:first.id})).status,409)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Builder resolves the revised not-covered finding',review_id:latest.id})).status,200)
+  const resolution=j.item().service.no_repair_resolutions.at(-1)
+  assert.equal((await j.act(j.path('acknowledge-not-covered'),{reason:'Wrong builder resolution',review_id:latest.id,resolution_id:oldResolution.id},j.client)).status,409)
+  await j.scheduled('2031-02-01T09:00:00Z');assert.equal(notices().length,6,'Coverage and builder resolution leave all agreed reminders active')
+  assert.equal((await j.api(`/jobs/${j.job.id}/service`,undefined,j.client)).value.cases.find(c=>c.id===j.id).status,'open')
+  const messages=f.messages.length,body={expected_version:j.job.version,review_id:latest.id,resolution_id:resolution.id,reason:'Client explicitly acknowledges this not-covered decision and builder resolution'}
+  const closes=await Promise.all([1,2].map(()=>j.api(`/jobs/${j.job.id}${j.path('acknowledge-not-covered')}`,body,j.client)))
+  assert.deepEqual(closes.map(r=>r.status).sort(),[200,409]);await j.read()
+  assert.equal(f.messages.length,messages,'Closure introduces no outbound notice')
+  assert.equal(j.item().status,'closed');assert.equal(j.item().service.visits.length,0)
+  assert.deepEqual(j.item().service.no_repair_resolutions[0],oldResolution)
+  assert.equal(j.item().closure.review_id,latest.id);assert.equal(j.item().closure.resolution_id,resolution.id)
+  assert.equal(j.item().service.not_covered_acknowledgment.statement,body.reason)
+  assert.equal(j.item().reviews.length,2);assert.deepEqual(j.job.warranties.components,[j.component])
+  const closed=structuredClone(j.item()),agreement=j.job.warranties.promises.find(p=>p.id===linked)
+  assert.equal(agreement.status,'paused');assert.equal(agreement.history.at(-1).action,'case_closed')
+  assert.deepEqual(j.job.warranties.promises.filter(p=>p.id!==linked),untouched)
+  for(const action of ['withdraw-client','acknowledge-not-covered'])assert.equal((await j.act(j.path(action),{reason:'Attempt to rewrite closed history',review_id:latest.id,resolution_id:resolution.id},j.client)).status,409)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Attempt to rewrite builder resolution',review_id:latest.id})).status,409)
+  assert.equal((await j.act(`/warranties/${j.id}/review`,{decision:'covered',reason:'Attempt to revise closed coverage',source_reference:'New source'})).status,409)
+  assert.deepEqual(j.item(),closed)
+  await j.scheduled('2031-03-01T09:00:00Z');assert.equal(notices().length,8)
+  assert.equal(j.job.warranties.promises.find(p=>p.id===other).status,'active');assert.equal(j.job.warranties.promises.find(p=>p.id===unlinked).status,'active')
+  const view=(await j.api(`/jobs/${j.job.id}/service`,undefined,j.client)).value.cases.find(c=>c.id===j.id)
+  assert.equal(view.status,'closed');assert.equal(view.service.not_covered_acknowledgment.statement,body.reason)
+  const original=await f.request(`/api/plinth/jobs/${j.job.id}/service/files/${closed.service.attachments[0].id}`,{cookie:j.client})
+  assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),Buffer.from(noRepairPhoto.base64,'base64'))
+ }finally{await f.close()}
+})
+
+test('CARE-005 — client withdrawal before ownership, review or visit waits for a currently assigned human builder resolution',async()=>{
+ const f=await createFixture()
+ try{
+  const j=await noRepairJourney(f),pm=await f.invite('synthetic-plinth-202@example.com','Assigned PM','admin'),secondClient=await f.invite('synthetic-plinth-204@example.com','Second assigned client'),linked=await j.promise('Withdrawn case follow-up')
+  const customer=await j.api('/customers',{name:'Synthetic service household',kind:'household',contacts:[{id:'second-client',name:'Second assigned client',email:'synthetic-plinth-204@example.com'}],properties:[{id:'service-home',label:'Service home',address:'22 Example Street'}]})
+  assert.equal(customer.status,201)
+  const contacts=client_contact_ids=>j.act('/customer',{customer_id:customer.value.customer.id,property_id:'service-home',client_contact_ids})
+  assert.equal((await contacts(['second-client'])).status,200)
+  for(const cookie of [j.client,secondClient])assert.equal((await j.api(`/jobs/${j.job.id}/service`,undefined,cookie)).value.cases[0].status,'open')
+  assert.equal((await contacts([])).status,200)
+  assert.equal((await j.act(j.path('withdraw-client'),{reason:'A removed client cannot withdraw'},secondClient)).status,404)
+  assert.equal((await contacts(['second-client'])).status,200)
+  const person=(await j.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-202@example.com')
+  const assign=job_ids=>f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:job_ids.length?1:0,role:'project_manager',job_ids,po_limit_cents:0}})
+  assert.equal((await assign([])).status,200)
+  const messages=f.messages.length
+  assert.equal((await j.act(j.path('withdraw-client'),{reason:'Client found the leak came from their portable appliance and withdraws this request'},secondClient)).status,200)
+  const withdrawal=structuredClone(j.item().service.withdrawal)
+  assert.equal(j.item().status,'open');assert.equal(j.job.warranties.promises.find(p=>p.id===linked).status,'active')
+  assert.equal(withdrawal.by.name,'Second assigned client')
+  assert.equal((await j.api(`/jobs/${j.job.id}/service`,undefined,j.client)).value.cases[0].service.withdrawal.statement,withdrawal.statement)
+  assert.equal((await j.act(j.path('withdraw-client'),{reason:'Replace the first statement'},j.client)).status,409)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Unassigned PM attempts closure'},pm)).status,404)
+  assert.equal((await assign([j.job.id])).status,200)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Builder records the client withdrawal and resolves the request without a visit'},pm)).status,200)
+  assert.equal(f.messages.length,messages)
+  assert.equal(j.item().status,'closed');assert.equal(j.item().reviews.length,0);assert.equal(j.item().service.visits.length,0);assert.equal(j.item().service.ownership,undefined)
+  assert.deepEqual(j.item().service.withdrawal,withdrawal);assert.equal(j.item().closure.withdrawal_id,withdrawal.id);assert.equal(j.item().closure.closed_by.role,'project_manager')
+  assert.equal(j.item().service.no_repair_resolutions[0].basis,'withdrawal');assert.equal(j.job.warranties.promises.find(p=>p.id===linked).status,'paused');assert.deepEqual(j.job.warranties.components,[j.component])
+  const original=await f.request(`/api/plinth/jobs/${j.job.id}/service/files/${j.item().service.attachments[0].id}`,{cookie:j.client})
+  assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),Buffer.from(noRepairPhoto.base64,'base64'))
+ }finally{await f.close()}
+})
+
+test('CARE-005 — unresolved or covered requests stay open; office, agent and trade cannot replace client closure statements',async()=>{
+ const f=await createFixture()
+ try{
+  const j=await noRepairJourney(f),trade=await f.invite('synthetic-plinth-203@example.com','Assigned trade'),agent=await f.agent()
+  const setup=await createReleasedScope(f,j.job,'synthetic-plinth-203@example.com','Plumbing');await j.read()
+  assert.equal((await j.act(j.path('acknowledge-owner'),{reason:'Builder owns coverage review'})).status,200)
+  assert.equal((await j.act(j.path('assign'),{subcontract_id:setup.scope.id,email:'synthetic-plinth-203@example.com',reason:'Assign released plumbing contact'})).status,200)
+  assert.equal((await j.act(j.path('book'),{start:'2031-01-02T09:00:00Z',end:'2031-01-02T10:00:00Z',reason:'Book the agreed inspection'})).status,200)
+  const visit=j.item().service.visits[0]
+  assert.equal((await j.api(`/warranty-service/${j.job.id}/${j.id}/submit`,{expected_version:j.job.version,visit_id:visit.id,reason:'Trade documents the attempted repair',attachments:[{...noRepairPhoto,name:'synthetic-plinth-205.png'}]},trade)).status,200);await j.read()
+  assert.equal((await j.act(j.path('review'),{visit_id:visit.id,accepted:false,reason:'Builder found the attempted fix did not resolve the leak'})).status,200)
+  const retainedVisits=structuredClone(j.item().service.visits)
+  for(const decision of [null,'needs_evidence','covered']){
+   const review=decision?await j.review(decision):null
+   assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Cannot close unresolved or covered request',review_id:review?.id})).status,409)
+   assert.equal((await j.act(j.path('acknowledge-not-covered'),{reason:'Cannot acknowledge unresolved or covered request',review_id:review?.id},j.client)).status,409)
+   assert.equal((await j.act(`/warranties/${j.id}/close`,{reason:'Office-only bypass attempt',evidence_reference:'Office note'})).status,409)
+   assert.equal(j.item().status,'open')
+  }
+  const review=await j.review('not_covered')
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Builder resolves not-covered finding',review_id:review.id})).status,200)
+  const resolution=j.item().service.no_repair_resolutions.at(-1),body={reason:'Attempt client statement impersonation',review_id:review.id,resolution_id:resolution.id}
+  for(const action of ['withdraw-client','acknowledge-not-covered']){
+   assert.equal((await j.act(j.path(action),body)).status,403)
+   assert.equal((await j.act(j.path(action),body,undefined,agent)).status,403)
+   assert.equal((await j.api(`/warranty-service/${j.job.id}/${j.id}/${action}`,{expected_version:j.job.version,...body},trade)).status,403)
+  }
+  assert.equal((await j.act(j.path('resolve-no-repair'),body,j.client)).status,403)
+  assert.equal((await j.act(j.path('resolve-no-repair'),body,undefined,agent)).status,403)
+  assert.equal((await j.api(`/warranty-service/${j.job.id}/${j.id}/resolve-no-repair`,{expected_version:j.job.version,...body},trade)).status,403)
+  assert.equal(j.item().status,'open')
+  await j.review('covered')
+  assert.equal((await j.act(j.path('acknowledge-not-covered'),body,j.client)).status,409,'Re-reviewing coverage invalidates the staged resolution')
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Covered request has no accepted repair'})).status,409)
+  assert.equal((await j.act(j.path('withdraw-client'),{reason:'Client withdraws this covered request'},j.client)).status,200)
+  assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Builder resolves the client withdrawal'})).status,200)
+  assert.equal(j.item().status,'closed');assert.equal(j.item().reviews.at(-1).decision,'covered');assert.deepEqual(j.item().service.visits,retainedVisits)
+  const original=await f.request(`/api/plinth/warranty-service/${j.job.id}/files/${retainedVisits[0].submission.attachments[0].id}`,{cookie:trade})
+  assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),Buffer.from(noRepairPhoto.base64,'base64'))
+ }finally{await f.close()}
+})
+
 test('CARE-003 — immutable component terms, recurring agreed reminders, repeat defects, callback costs and designated coverage decisions',async()=>{
  let mailMode='accepted'
  const f=await createFixture({mailResponse:message=>message.subject.startsWith('Maintenance reminder:')&&message.subject.includes('HVAC')&&mailMode!=='accepted'?new Response(null,{status:mailMode==='unknown'?503:403}):Response.json({id:crypto.randomUUID()})})
@@ -101,12 +244,13 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
  const f=await createFixture()
  try{
   const client=await f.invite('service-client@example.com','Repair Client'),trade=await f.invite('service-trade@example.com','Repair Trade'),other=await f.invite('service-other@example.com','Other Company'),agent=await f.agent()
+  let repairContact=trade
   let job=await createActiveJob(f,'Synthetic leaking fixture','service-client@example.com')
   const setup=await createReleasedScope(f,job,'service-trade@example.com','Plumbing');job=setup.job
   const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{cookie,token,...(body===undefined?{}:{method:'POST',body})})
   const read=async()=>{job=(await api('/jobs/'+job.id)).value.job}
   const act=async(path,body={},cookie=f.owner,token)=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body},cookie,token);await read();return r}
-  const portal=async(path,body={})=>{const r=await api(`/warranty-service/${job.id}${path}`,{expected_version:job.version,...body},trade);await read();return r}
+  const portal=async(path,body={})=>{const r=await api(`/warranty-service/${job.id}${path}`,{expected_version:job.version,...body},repairContact);await read();return r}
   const scheduled=async time=>{assert.equal((await (await f.mf.getWorker()).scheduled({scheduledTime:new Date(time),cron:'0 * * * *'})).outcome,'ok');await read()}
   const photo={name:'synthetic-plinth-101.png',mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='}
   let r=await act('/warranties',{kind:'component',name:'Kitchen faucet',starts_on:'2026-01-01',ends_on:'2035-12-31',terms:'Signed original two-year fixture terms remain unchanged',signed_terms_reference:'Private signed contract reference'});assert.equal(r.status,200)
@@ -119,6 +263,10 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   r=await act('/service',request,client);assert.equal(r.status,200,JSON.stringify(r.value));const id=r.value.record.id,item=()=>job.warranties.cases.find(c=>c.id===id),path=a=>`/service/${id}/${a}`
   const agentJob=(await api(`/jobs/${job.id}`,undefined,undefined,agent)).value.job;assert.equal(agentJob.warranties.cases.length,0);assert.ok(!agentJob.approvals.some(a=>a.subject_id===id),'Draft-agent job/list reads never expose service snapshots')
   assert.equal(item().recorded_by.name,'Repair Client');assert.equal(job.schedules.length,0);assert.equal(job.warranties.promises.length,0,'A client request sends and schedules nothing automatically')
+  const external=view=>{const raw=JSON.stringify(view);for(const value of ['service-trade@example.com','service-other@example.com','builder@example.com',...job.subcontracts.map(s=>s.id)])assert.ok(!raw.includes(value),'External service views omit directory emails and award ids');const walk=(v,key)=>{if(!v||typeof v!=='object')return;if(['by','requested_by','booked_by','reviewed_by','closed_by'].includes(key)){assert.deepEqual(Object.keys(v).sort(),['at','name','role']);return}for(const [k,c] of Object.entries(v)){assert.ok(!['subcontract_id','email'].includes(k),'No directory identity field');walk(c,k)}};walk(view)}
+  external(r.value)
+  r=await act('/service',{...request,description:'Another unassigned service request'},client);assert.equal(r.status,200);const unassignedId=r.value.record.id,unassignedPhoto=job.warranties.cases.find(c=>c.id===unassignedId).service.attachments[0].id
+  assert.equal((await act('/warranties',{kind:'case',component_id:component.id,defect_key:'office-only',description:'Office-private coverage case',reported_on:'2031-01-01',reviewer_email:'builder@example.com'})).status,200)
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).value.cases[0].costs,undefined)
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).value.components[0].terms,undefined)
   assert.deepEqual((await api('/warranty-service',undefined,trade)).value.jobs,[])
@@ -130,8 +278,11 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   let inbox=(await api('/warranty-service',undefined,trade)).value.jobs;assert.equal(inbox.length,1);assert.equal(inbox[0].cases[0].service.ownership.by.name,'Builder');assert.equal(inbox[0].cases[0].reviews[0].reason,'Covered under the signed fixture warranty');assert.equal(inbox[0].cases[0].reviews[0].source_reference,undefined)
   assert.equal((await api(`/jobs/${job.id}`,undefined,trade)).status,404,'Repair assignment never creates a client job grant')
   assert.deepEqual((await api('/warranty-service',undefined,other)).value.jobs,[])
+  assert.deepEqual(inbox[0].cases.map(c=>c.id),[id]);external(inbox)
+  assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${unassignedPhoto}`,{cookie:trade})).status,404)
+  assert.deepEqual((await api(`/jobs/${job.id}/service`,undefined,client)).value.cases.map(c=>c.id),[id,unassignedId],'Clients see service requests and no office-only case')
   const originalId=item().service.attachments[0].id
-  for(const [route,cookie] of [[`/jobs/${job.id}/service`,client],[`/warranty-service/${job.id}`,trade]]){const download=await f.request('/api/plinth'+route+'/files/'+originalId,{cookie});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),Buffer.from(photo.base64,'base64'))}
+  for(const [route,cookie] of [[`/jobs/${job.id}/service`,client],[`/warranty-service/${job.id}`,trade]]){const download=await f.request('/api/plinth'+route+'/files/'+originalId,{cookie});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),Buffer.from(photo.base64,'base64'));external(Object.fromEntries(download.headers))}
   assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${originalId}`,{cookie:other})).status,404)
   const promise={kind:'promise',component_id:component.id,case_id:id,title:'Agreed open repair follow-up',anchor_on:'2031-01-01',interval_unit:'month',interval_count:1,recipient_kind:'client',recipient_email:'service-client@example.com',agreement_reference:'Client explicitly agreed to monthly follow-up until recorded closure'}
   assert.equal((await act('/warranties',promise)).status,200);const agreement=job.warranties.promises[0]
@@ -143,12 +294,21 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).value.cases[0].service.visits[0].appointment.start,'2031-01-02T10:00:00.000Z')
   assert.equal((await act(path('acknowledge-client'),{visit_id:visit.id,reason:'Too early'},client)).value.error,'builder_acceptance')
   r=await api(`/warranty-service/${job.id}/${id}/submit`,{expected_version:job.version,visit_id:visit.id,reason:'Outsider fix',attachments:[photo]},other);assert.equal(r.status,404)
-  assert.equal((await portal(`/${id}/submit`,{visit_id:visit.id,reason:'Replaced the fixture seal; see original photo',attachments:[photo]})).status,200)
+  r=await portal(`/${id}/submit`,{visit_id:visit.id,reason:'Replaced the fixture seal; see original photo',attachments:[photo]});assert.equal(r.status,200);external(r.value);const firstEvidence=item().service.visits[0].submission.attachments[0].id
   assert.equal((await act(path('review'),{visit_id:visit.id,accepted:false,reason:'Leak persists under pressure; return to replace connector'})).status,200)
   assert.equal((await act(`/warranties/${id}/close`,{reason:'Bypass client',evidence_reference:'none'})).value.error,'client_acknowledgment')
   await scheduled('2031-02-01T09:00:00Z');assert.equal(notices().length,2,'Rejecting a fix never closes or pauses agreed follow-up')
+  const replacement=await createReleasedScope(f,job,'service-other@example.com','Plumbing');job=replacement.job
+  assert.equal((await act(path('assign'),{subcontract_id:replacement.scope.id,email:'service-other@example.com',reason:'Second released company takes the rejected repair'})).status,200);repairContact=other
+  assert.deepEqual((await api('/warranty-service',undefined,trade)).value.jobs,[])
+  for(const file of [originalId,firstEvidence])assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${file}`,{cookie:trade})).status,404)
+  let reassigned=(await api(`/warranty-service/${job.id}`,undefined,other)).value;external(reassigned)
+  assert.deepEqual(Object.keys(reassigned.cases[0].service.visits[0]).sort(),['end','review','start']);assert.equal(reassigned.cases[0].service.visits[0].review.accepted,false)
+  assert.ok(!JSON.stringify(reassigned).includes('Replaced the fixture seal'));assert.ok(!JSON.stringify(reassigned).includes(firstEvidence))
+  assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${firstEvidence}`,{cookie:other})).status,404)
+  assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${originalId}`,{cookie:other})).status,200)
   visit=await book('2031-02-02T09:00:00Z','2031-02-02T10:00:00Z')
-  assert.equal((await portal(`/${id}/submit`,{visit_id:visit.id,reason:'Replaced connector; pressure tested without leak',attachments:[{...photo,name:'synthetic-plinth-102.png'}]})).status,200)
+  r=await portal(`/${id}/submit`,{visit_id:visit.id,reason:'Replaced connector; pressure tested without leak',attachments:[{...photo,name:'synthetic-plinth-102.png'}]});assert.equal(r.status,200);external(r.value)
   assert.equal((await act(path('review'),{visit_id:visit.id,accepted:true,reason:'Builder inspected dry connector and pressure test'})).status,200)
   assert.equal(item().status,'open');assert.equal(agreement.status,'active','Builder acceptance alone never closes a case')
   for(const cookie of [f.owner,trade])assert.ok([403,404].includes((await act(path('acknowledge-client'),{visit_id:visit.id,reason:'Impersonate client'},cookie)).status))
@@ -157,7 +317,10 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   assert.equal(item().status,'closed');assert.equal(item().service.client_acknowledgment.by.name,'Repair Client');assert.equal(item().service.visits.length,2);assert.equal(item().service.visits[0].review.accepted,false);assert.equal(item().service.visits[1].review.accepted,true)
   assert.equal(job.warranties.promises[0].status,'paused');assert.equal(job.warranties.promises[0].history.at(-1).action,'case_closed');assert.deepEqual(job.warranties.components,[component])
   await scheduled('2031-03-01T09:00:00Z');assert.equal(notices().length,2,'Only recorded two-party closure stops the agreed reminders')
-  for(const cookie of [client,trade]){const view=await api(cookie===client?`/jobs/${job.id}/service`:'/warranty-service',undefined,cookie),shown=cookie===client?view.value:view.value.jobs[0];assert.equal(shown.cases[0].service.visits.length,2);assert.equal(shown.cases[0].status,'closed')}
+  for(const cookie of [client,repairContact]){const view=await api(cookie===client?`/jobs/${job.id}/service`:'/warranty-service',undefined,cookie),shown=cookie===client?view.value:view.value.jobs[0];assert.equal(shown.cases[0].service.visits.length,2);assert.equal(shown.cases[0].status,'closed');external(shown)}
+  const people=(await f.json('/auth/operators',{cookie:f.owner})).value,disabled=people.find(p=>p.email==='service-other@example.com')
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:disabled.id,status:'inactive'}})).status,200)
+  assert.equal((await api('/warranty-service',undefined,other)).status,401);assert.equal((await f.request(`/api/plinth/warranty-service/${job.id}/files/${originalId}`,{cookie:other})).status,401)
   // Jobs with a reviewed schedule use that public planner, then link the exact booked task.
   r=await act('/service',{...request,description:'A second fixture needs a planned visit'},client);assert.equal(r.status,200);const plannedId=r.value.record.id
   assert.equal((await act(`/service/${plannedId}/acknowledge-owner`,{reason:'Builder owns the planned repair'})).status,200)

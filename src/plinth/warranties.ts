@@ -147,8 +147,13 @@ export async function warrantyAction(db: D1Database, job: Job, actor: Actor, inp
 export function closeReviewedWarrantyCase(job:Job,actor:Actor,row:WarrantyCase,input:Input){
   const review = row.reviews.at(-1)
   need(review && review.decision !== 'needs_evidence', 'A reasoned coverage decision is required before closing the case', 409, 'coverage_required')
+  finalizeWarrantyCase(job,actor,row,{ reason: text(input.reason, 'closure reason', 4000), evidence_reference: text(input.evidence_reference, 'closure evidence reference', 1000), review_id: review.id })
+}
+/** Shared finalization after the caller has recorded the required human evidence. */
+export function finalizeWarrantyCase(job:Job,actor:Actor,row:WarrantyCase,closure:Omit<NonNullable<WarrantyCase['closure']>,'closed_by'>){
+  need(row.status === 'open', 'The closed case is immutable', 409, 'immutable')
   const by = stamp(actor)
-  row.closure = { reason: text(input.reason, 'closure reason', 4000), evidence_reference: text(input.evidence_reference, 'closure evidence reference', 1000), review_id: review.id, closed_by: by }
+  row.closure = {...closure,closed_by:by}
   row.status = 'closed'
   for (const agreement of warrantyState(job).promises.filter(p => p.case_id === row.id && p.status === 'active')) {
    agreement.status = 'paused'

@@ -44,7 +44,7 @@ export interface WarrantyCase {
  reviewer_email: string; reviewer_id: string; repeated: boolean; earlier_case_ids: string[]
  escalation?: { reviewer_email: string; reason: string; recorded_by: Stamp }
  status: 'open' | 'closed'; recorded_by: Stamp; costs: WarrantyCost[]; reviews: WarrantyReview[]
- closure?: { reason: string; evidence_reference: string; review_id: string; closed_by: Stamp }
+ closure?: { reason: string; evidence_reference: string; review_id?: string; resolution_id?: string; withdrawal_id?: string; closed_by: Stamp }
 }
 export type WarrantyReminderStatus = 'unknown' | 'accepted' | 'refused' | 'development' | 'unconfigured' | 'cancelled'
 export interface WarrantyReminder {

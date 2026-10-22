@@ -1,3 +1,5 @@
+import {shownServiceCase,serviceOriginals} from './warranty-service-view'
+import {noRepairAction} from './warranty-no-repair'
 import type {Bindings} from '../auth.server'
 import {authorize,requireJobManager} from './auth'
 import {clientAccess} from './job-customers'
@@ -15,14 +17,9 @@ import type {WarrantyCase} from './warranty-model'
 const json=(v:unknown)=>Response.json(v,{headers:{'cache-control':'private, no-store','x-content-type-options':'nosniff'}})
 const serviceCases=(job:Job)=>(job.warranties?.cases??[]).filter(c=>c.service)
 async function tradeAllowed(db:D1Database,job:Job,actor:Actor,item:WarrantyCase){const a=item.service?.assignment;return portalEnabled(job,'subcontractor','warranty')&&a?.email===actor.email.toLowerCase()&&!!await scopeContact(db,job,actor.email,a.subcontract_id)}
-function shownCase(job:Job,item:WarrantyCase,office:boolean){
- if(office)return item
- // External service records never contain office costs, signed terms, internal coverage source references or other cases.
- return {id:item.id,component_id:item.component_id,description:item.description,reported_on:item.reported_on,status:item.status,service:{...item.service,visits:item.service!.visits.map(v=>({...v,appointment:(()=>{const task=job.schedules.find(t=>t.id===v.task_id);return task?{start:task.start,end:task.end,status:task.status}:undefined})()}))},reviews:item.reviews.map(r=>({id:r.id,decision:r.decision,reason:r.reason,reviewed_by:{name:r.reviewed_by.name,at:r.reviewed_by.at}})),closure:item.closure?{reason:item.closure.reason,closed_by:{name:item.closure.closed_by.name,at:item.closure.closed_by.at}}:undefined}
-}
 async function projection(db:D1Database,job:Job,actor:Actor,portal:boolean){
  const office=actor.role!=='member',items=portal?await Promise.all(serviceCases(job).map(async c=>await tradeAllowed(db,job,actor,c)?c:null)):serviceCases(job)
- return {id:job.id,version:job.version,name:job.name,address:job.address,components:(job.warranties?.components??[]).filter(c=>!portal||items.some(i=>i?.component_id===c.id)).map(c=>({id:c.id,name:c.name})),cases:items.filter((c):c is WarrantyCase=>!!c).map(c=>shownCase(job,c,office))}
+ return {id:job.id,version:job.version,name:job.name,address:job.address,components:(job.warranties?.components??[]).filter(c=>!portal||items.some(i=>i?.component_id===c.id)).map(c=>({id:c.id,name:c.name})),cases:items.filter((c):c is WarrantyCase=>!!c).map(c=>shownServiceCase(job,c,office,portal?c.service!.assignment?.subcontract_id:undefined))}
 }
 async function input(request:Request){need(request.headers.get('content-type')?.split(';')[0]==='application/json','Send application/json',415,'content_type');const raw=await request.text();need(raw.length<=15_000_000,'Request too large',413,'body_size');try{return object(JSON.parse(raw))}catch{need(false,'Invalid JSON');throw new Error()}}
 /** Client job door and separate company-scoped trade inbox; all reads, actions and originals recheck current grants. */
@@ -43,7 +40,7 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
   if(tail.length===0)return json(view)
   if(tail.length===2&&tail[0]==='files'){
    const allowed=portal?serviceCases(previous).filter(c=>view.cases.some(v=>v.id===c.id)):serviceCases(previous)
-   return decisionDownload(db,previous,allowed.flatMap(c=>[...c.service!.attachments,...c.service!.visits.flatMap(v=>v.submission?.attachments??[])]),tail[1])
+   return decisionDownload(db,previous,allowed.flatMap(c=>serviceOriginals(c,portal?c.service!.assignment?.subcontract_id:undefined)),tail[1])
   }
   need(false,'Unknown service route',404,'not_found')
  }
@@ -87,12 +84,13 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
    need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.email),'Only an assigned client acknowledges closure',403,'client_required')
    const visit=find(service.visits,text(value.visit_id,'Exact accepted visit',100));need(visit===service.visits.at(-1)&&visit.review?.accepted===true,'The builder must accept the current repair first',409,'builder_acceptance')
    service.client_acknowledgment={by,visit_id:visit.id,statement:reason};closeReviewedWarrantyCase(job,actor,item,{reason,evidence_reference:'Accepted service visit '+visit.id})
-  }else need(false,'Unknown service action',404,'not_found')
-  service.history.push({kind:action,by,reason})
+  }else if(await noRepairAction(db,job,actor,item,value,action,portal)){}
+  else need(false,'Unknown service action',404,'not_found')
+  service.history.push({kind:action,by,reason,...(['assign','book','submit','review'].includes(action)&&service.assignment?{subcontract_id:service.assignment.subcontract_id}:{}),...(['book','submit','review'].includes(action)?{visit_id:action==='book'?service.visits.at(-1)!.id:text(value.visit_id,'Exact visit',100)}:{})})
  }
  recordApproval(job,actor,'warranty.service',{id:item.id,prepared_by:item.recorded_by},{action:tail[1]??'request',status:item.status,service:item.service})
  await saveJob(db,actor,previous,job,writes,clock)
- return json({...await projection(db,job,actor,portal),record:shownCase(job,item,actor.role!=='member')})
+ return json({...await projection(db,job,actor,portal),record:shownServiceCase(job,item,actor.role!=='member',portal?item.service!.assignment?.subcontract_id:undefined)})
 }
 
 /** Ordinary job/list reads must not turn draft-agent access into service-case access. */
