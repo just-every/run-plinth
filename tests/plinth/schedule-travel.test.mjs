@@ -125,6 +125,21 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   let draftJob=await createActiveJob(f,'Draft resource check')
   r=await act(draftJob,'/schedules',booking('Agent draft','17','18',[{resource_id:crew.id,units:2}]),undefined,agent);assert.equal(r.status,200);draftJob=r.value.job
   assert.equal((await act(draftJob,`/schedules/${r.value.record.id}/approve`)).value.error,'resource_conflict','Agent drafts cannot bypass the human capacity check')
+  const pm=await f.invite('capacity-pm@example.com','Capacity PM','admin'),person=(await api('/team')).value.team.find(p=>p.email==='capacity-pm@example.com')
+  assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[south.id],po_limit_cents:0}})).status,200)
+  const pmCapacity=await api(`/jobs/${south.id}/capacity`,undefined,pm);assert.equal(pmCapacity.status,200);assert.ok(!JSON.stringify(pmCapacity.value).includes(north.name));assert.ok(!JSON.stringify(pmCapacity.value).includes('Private North job'))
+  assert.equal((await api(`/jobs/${north.id}/capacity`,undefined,pm)).status,404)
+  // The original confirmed invitation remains a historical record; a new exact snapshot needs a new confirmation.
+  r=await act(south,`/schedules/${st}/resources`,{resources:[],travel_minutes:1});assert.equal(r.status,200);south=r.value.job
+  r=await act(south,`/schedules/${st}/invite`,{email:'trade@example.com',subcontract_id:scopeId},pm);assert.equal(r.status,200);south=r.value.job;invitation=r.value.record;assert.equal(invitation.invited_by.name,'Capacity PM')
+  const contacts=south.subcontracts[0].contact_ids
+  for(const change of [{contact_ids:[]},{hold:true}]){
+   r=await act(south,`/subcontracts/${scopeId}/access`,{...change,reason:'Owner revokes trade scope access'});assert.equal(r.status,200);south=r.value.job
+   assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[])
+   assert.equal((await api(`/trade-confirmations/${invitation.id}/confirm`,{expected_version:south.version,confirm:true,reason:'Revoked invitation'},trade)).status,404)
+   if(change.contact_ids){r=await act(south,`/subcontracts/${scopeId}/access`,{contact_ids:contacts,reason:'Owner reassigns contact'});assert.equal(r.status,200);south=r.value.job}
+  }
+  assert.equal((await act(south,`/subcontracts/${scopeId}/release`)).status,200);south=await reload(south)
   south=await setPortalFeatures(f,south.id,[],['schedule'])
   assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[])
   assert.equal((await api(`/trade-confirmations/${invitation.id}/confirm`,{expected_version:south.version,confirm:true,reason:'Disabled feature'},trade)).status,404)

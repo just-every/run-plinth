@@ -267,9 +267,11 @@ test('CLIENT-005 — overdue requests never accept; disputed substitutions requi
  const f=await createFixture()
  try {
   const client=await f.invite('client@example.com','Decision Client'),foreign=await f.invite('foreign@example.com'),agent=await f.agent()
-  let job=await createActiveJob(f),r
+  let r=await f.json('/api/plinth/jobs',{method:'POST',cookie:f.owner,body:{name:'Decision hold',client_email:'client@example.com'}}),job=r.value.job
   const read=async(cookie=f.owner)=>(await f.json(`/api/plinth/jobs/${job.id}`,{cookie})).value.job
   const act=async(path,input={},cookie=f.owner,token)=>{const result=await f.json(`/api/plinth/jobs/${job.id}${path}`,{method:'POST',cookie,token,body:{expected_version:job.version,...input}});job=await read();return result}
+  assert.equal((await act('/quotes',{lines:[{id:'fixture',description:'Agreed works',cost_code:'22-400',phase:'Finishes',category:'material',quantity:'1',unit:'job',unit_cents:1000000,cost_unit_cents:500000}]})).status,200)
+  assert.equal((await act(`/quotes/${job.quotes[0].id}/accept`,{method:'email',evidence:'Recorded scope acceptance',schedule_choice:{kind:'none',reason:'Procurement first'},budget:{allowances:[{cost_code:'22-400',amount_cents:30000}]}})).status,200)
   const terms={room:'Kitchen',category:'Faucet',allowance_cents:30000,cost_code:'22-400',decision_on:'2020-01-01',lead_days:21,options:[{name:'Original brass faucet',supplier:'Synthetic supply',specifications:'Single hole, 8 inch reach',price_cents:30000}]}
   r=await act('/selections',terms);const id=r.value.record.id,current=()=>job.selections[0].revisions.at(-1),path=action=>`/selections/${id}/${action}`
   assert.equal((await act(path('present'),{revision_id:current().id})).status,200)
@@ -300,11 +302,17 @@ test('CLIENT-005 — overdue requests never accept; disputed substitutions requi
   let signed=structuredClone(current())
   r=await act(path('order'),{revision_id:current().id,vendor_email:'vendor@example.com'});assert.equal(r.status,200);const order=r.value.record
   assert.equal(order.status,'draft');assert.equal(order.amount_cents,29000);assert.equal((await act(`/orders/${order.id}/issue`)).status,200)
+  r=await f.json('/api/plinth/pricing-rates',{method:'POST',cookie:f.owner,body:{jurisdiction:'Synthetic exemption',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'Reviewed synthetic exemption',human_reviewed:true}});assert.equal(r.status,201);const rate=r.value.rate
+  const allowanceInput={selection_id:id,revision_id:current().id,schedule_days:7,impact_reference:'Reviewed substitution credit and delivery impact',impacts_reviewed:true,basis:'sell',as_of:'2026-10-22',rules:[],tax:{rate_id:rate.id,taxable_line_ids:[],exemption_reference:'Synthetic reviewed exemption'},lines:[{id:'credit',description:'Faucet credit',cost_code:'22-400',phase:'Finishes',category:'material',quantity:'1',unit:'each',unit_cents:1000,cost_unit_cents:500}]}
+  r=await act('/allowance-changes/preview',allowanceInput);assert.equal(r.status,200,JSON.stringify(r.value))
+  r=await act('/allowance-changes/apply',{...allowanceInput,digest:r.value.preview.digest});assert.equal(r.status,200);const pendingAllowance=r.value.record.id,budgets=structuredClone(job.budgets)
   signed=structuredClone(current())
   assert.equal((await act(path('dispute'),{revision_id:current().id,reason:'Stop further action pending site review'},client)).status,200)
   assert.equal((await act(`/orders/${order.id}/send`)).value.error,'selection_held','A dispute fences even an approved but unsent PO')
+  assert.equal((await act(`/variations/${pendingAllowance}/approve`,{},client)).value.error,'selection_held','CLIENT-005: a disputed decision refuses its pending allowance approval')
+  assert.deepEqual(job.budgets,budgets);assert.equal(job.variations[0].status,'draft')
   assert.equal(f.messages.length,beforeMessages);assert.deepEqual(current(),signed,'A dispute never erases or changes an earlier signature')
-  assert.equal(job.orders.length,1);assert.equal(job.variations.length,0);assert.equal(job.quotes[0].total_cents,1000000)
+  assert.equal(job.orders.length,1);assert.equal(job.variations.length,1);assert.equal(job.quotes[0].total_cents,1000000)
   r=await act('/selections',{...terms,category:'Withdrawal'});const other=r.value.record,rev=other.revisions[0]
   assert.equal((await act(`/selections/${other.id}/present`,{revision_id:rev.id})).status,200)
   assert.equal((await act(`/selections/${other.id}/withdraw`,{revision_id:rev.id,reason:'Scope removed by builder'})).status,200)

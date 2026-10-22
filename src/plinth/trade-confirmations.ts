@@ -1,7 +1,7 @@
 import {portalEnabled} from './portal-policy'
 import { scopeContact } from './scope-contacts'
 import type { Bindings } from '../auth.server'
-import { requireManager } from './auth'
+import { requireJobManager } from './auth'
 import { find, need, stamp, text, type Actor, type Input, type Job } from './model'
 import { checkConflicts, scheduleTime } from './operations'
 import { invitationSnapshot, type TradeInvitation } from './schedule-resource-model'
@@ -9,7 +9,7 @@ import { requireResources, resources, resourceConflicts } from './schedule-resou
 import { jobs, readClock, saveJob } from './store'
 const json=(v:unknown)=>Response.json(v,{headers:{'cache-control':'private, no-store','x-content-type-options':'nosniff'}})
 export async function inviteTrade(db:D1Database,job:Job,actor:Actor,input:Input,taskId:string){
- requireManager(actor);const task=find(job.schedules,taskId);need(task.status==='booked'&&!task.milestone,'Invite a booked work task',409,'schedule_state')
+ requireJobManager(actor);const task=find(job.schedules,taskId);need(task.status==='booked'&&!task.milestone,'Invite a booked work task',409,'schedule_state')
  const email=text(input.email,'Invited trade contact email',254).toLowerCase()
  need(await db.prepare("SELECT 1 FROM oa_operators WHERE lower(email)=? AND role='member' AND status='active'").bind(email).first(),'First invite this person through People & access',409,'contact_required')
  const scope=await scopeContact(db,job,email,text(input.subcontract_id,'Released subcontract scope',100),task.trade);need(scope,'The invited person must be an assigned contact of this task trade’s released company scope',403,'scope_required')

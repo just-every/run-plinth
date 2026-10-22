@@ -62,7 +62,7 @@ import { approveClaim, exportClaim, prepareClaim } from './claims'
 import { company, companyResponse } from './company'
 import { currencyTotals } from './currency-report'
 import { vendorsResponse } from './vendors'
-import { awardSubcontract, releaseSubcontract } from './subcontracts'
+import { awardSubcontract, releaseSubcontract, subcontractAccess } from './subcontracts'
 import { rulesResponse, today } from './compliance'
 import { lienAction, packetResponse, releaseFile, templatesResponse } from './lien-waivers'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
@@ -100,7 +100,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}
- if(parts.length===3&&parts[2]==='capacity'&&method==='GET'){requireManager(actor);const conflicts=resourceConflicts(await resources(env.DB),await jobs(env.DB),previous);return json({resources:await resources(env.DB),bookings:(await jobs(env.DB)).flatMap(j=>j.schedules.filter(t=>t.status==='booked'&&!t.milestone).map(t=>({job_name:j.name,description:t.description,start:t.start,end:t.end,resources:t.resources??[]}))),conflicts:conflicts.map(c=>actor.role==='project_manager'&&!actor.team!.job_ids.includes(c.job_id)?{reason:c.reason,resource_id:c.resource_id,job_name:'Another job',start:c.start,end:c.end}:c)})}
+ if(parts.length===3&&parts[2]==='capacity'&&method==='GET'){requireJobManager(actor);const conflicts=resourceConflicts(await resources(env.DB),await jobs(env.DB),previous);return json({resources:(await resources(env.DB)).map(r=>actor.role==='project_manager'?{...r,history:[],leave:r.leave.map(w=>({...w,reason:'Unavailable'}))}:r),bookings:(await jobs(env.DB)).flatMap(j=>j.schedules.filter(t=>t.status==='booked'&&!t.milestone).map(t=>({job_name:actor.role==='project_manager'&&!actor.team!.job_ids.includes(j.id)?'Another job':j.name,description:actor.role==='project_manager'&&!actor.team!.job_ids.includes(j.id)?'Allocated resource':t.description,start:t.start,end:t.end,resources:t.resources??[]}))),conflicts:conflicts.map(c=>actor.role==='project_manager'&&!actor.team!.job_ids.includes(c.job_id)?{reason:c.reason,resource_id:c.resource_id,job_name:'Another job',start:c.start,end:c.end}:c)})}
  if(parts.length===3&&parts[2]==='receivables'&&method==='GET'){requireJobManager(actor);return json(receivables(previous,new URL(request.url).searchParams.get('as_of')??undefined))}
  if(parts.length===3&&parts[2]==='customer'&&method==='GET'){requireManager(actor);return json({customer:previous.customer_id?await getCustomer(env.DB,previous.customer_id):null})}
  if(parts.length===3&&parts[2]==='calendar'&&method==='POST'){const input=await body(request);need(input.expected_version===previous.version,'Job changed. Reload before changing the feed.',409,'stale_version');return json(await manageCalendar(env.DB,actor,previous,input,clock))}
@@ -181,6 +181,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  else if(category==='schedule-constraints'&&(parts.length===3||parts.length===4)){const result=await constraintAction(env.DB,job,actor,input,id);record=result.record;writes=result.writes}
  else if(parts.length===4&&category==='schedule'&&id==='publish'){record=await publishSchedule(job,actor,input,await jobs(env.DB));recordRevision(job,actor,input)}
  else if(parts.length===4&&category==='schedule-template'&&id==='apply'){record=await applyScheduleTemplate(job,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB));await applyJobTemplateTodos(env.DB,job,actor)}
+ else if(category==='subcontracts'&&parts.length===5&&action==='access')record=await subcontractAccess(env.DB,job,actor,id!,input)
  else if(category==='subcontracts'&&parts.length===5&&action==='retainage')record=configureSupplierRetainage(job,actor,id!,input)
  else if(category==='subcontracts'&&parts.length===6&&action==='retainage'&&parts[5]==='release')record=releaseSupplierRetainage(job,actor,id!,input)
  else if(category==='subcontracts'&&parts.length>=5&&['lien','draws'].includes(action!)){const result=await lienAction(env.DB,job,actor,parts.slice(3),input);record=result.record;writes=result.writes}

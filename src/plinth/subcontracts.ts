@@ -4,7 +4,7 @@ import { currentQualification } from './vendor-model'
 import { getVendor, save } from './vendors'
 import type { Draw, LienSetup } from './lien-waiver-model'
 
-export interface Subcontract { retainage?: import('./supplier-retainage-model').SupplierRetainageState; retainage_balance?: import('./supplier-retainage-model').SupplierRetainageBalance; id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released' | 'cancelled'; bid_comparison_award_id?: string; bid_cancellation?: { reason: string; by: Stamp; award_id: string }; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
+export interface Subcontract { access_revision?:number;  retainage?: import('./supplier-retainage-model').SupplierRetainageState; retainage_balance?: import('./supplier-retainage-model').SupplierRetainageBalance; id: string; vendor_id: string; vendor_name: string; trade: string; scope: string; contact_ids: string[]; awarded_on: string; amount_cents?: number; awarded_by: Stamp; status?: 'awarded' | 'on_hold' | 'released' | 'cancelled'; bid_comparison_award_id?: string; bid_cancellation?: { reason: string; by: Stamp; award_id: string }; compliance?: ComplianceCheck; released_by?: Stamp; lien?: LienSetup; draws?: Draw[] }
 /** A person awards a scope on a job to a company currently qualified for that trade, with dated award terms.
  * Client job responses never include awards; SUB-003 adds insurance and license holds before release. */
 export async function awardSubcontract(db: D1Database, job: Job, actor: Actor, input: Input): Promise<{ row: Subcontract; writes: D1PreparedStatement[] }> {
@@ -32,5 +32,22 @@ export async function releaseSubcontract(db: D1Database, job: Job, actor: Actor,
  if (check.holds.length) throw new DomainError('compliance_hold', 'Required insurance or license evidence is missing, expired or not verified', 409, check)
  row.compliance = check; row.status = 'released'; row.released_by = stamp(actor)
  recordApproval(job, actor, 'subcontract.release', { id: row.id, prepared_by: row.awarded_by }, { id: row.id, vendor_id: row.vendor_id, trade: row.trade, compliance: check })
+ return row
+}
+
+/** Access changes preserve the award, financial obligations, confirmations and original history. */
+export async function subcontractAccess(db:D1Database,job:Job,actor:Actor,id:string,input:Input){
+ need(actor.role==='owner'||actor.role==='admin','Only the owner or administrator changes company contact access',403,'forbidden')
+ const row=find(job.subcontracts??[],id),before={contact_ids:[...row.contact_ids],status:row.status},reason=text(input.reason,'Access change reason',2000)
+ need(row.status!=='cancelled','A cancelled scope is immutable',409,'immutable')
+ if(input.contact_ids!==undefined){
+  need(Array.isArray(input.contact_ids)&&input.contact_ids.length<=20,'Supply up to 20 company contacts')
+  const vendor=await getVendor(db,row.vendor_id),ids=[...new Set(input.contact_ids.map(v=>text(v,'Contact id',100)))]
+  need(ids.every(id=>vendor.contacts.some(c=>c.id===id)),'Assign contacts of this company only');row.contact_ids=ids
+ }
+ if(input.hold===true){need(row.status==='released','Only released scope can be held',409,'scope_state');row.status='on_hold'}
+ need(input.contact_ids!==undefined||input.hold===true,'Choose contacts or explicitly hold the released scope')
+ row.access_revision=(row.access_revision??0)+1
+ recordApproval(job,actor,'subcontract.access',{id:row.id,prepared_by:row.awarded_by},{before,after:{contact_ids:row.contact_ids,status:row.status},reason})
  return row
 }
