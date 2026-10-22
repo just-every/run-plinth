@@ -72,7 +72,10 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
   }else if(action==='book'){
    requireJobManager(actor);const assignment=service.assignment;need(assignment&&await scopeContact(db,job,assignment.email,assignment.subcontract_id),'Choose a currently released repair contact',409,'scope_required')
    need(!service.visits.at(-1)||service.visits.at(-1)?.review?.accepted===false,'Review the prior fix before booking another visit',409,'visit_pending');need(service.visits.length<100,'Visit history limit reached')
-   const scope=find(job.subcontracts??[],assignment.subcontract_id),all=await jobs(db),task=prepareSchedule(job,actor,{trade:scope.trade,description:'Warranty visit: '+item.description,start:value.start,end:value.end,travel_minutes:value.travel_minutes??0},all)
+   const scope=find(job.subcontracts??[],assignment.subcontract_id),all=await jobs(db)
+   const task=value.task_id?find(job.schedules,text(value.task_id,'Reviewed appointment task',100)):prepareSchedule(job,actor,{trade:scope.trade,description:'Warranty visit: '+item.description,start:value.start,end:value.end,travel_minutes:value.travel_minutes??0},all)
+   need(task.status==='booked'&&!task.milestone&&task.trade.toLowerCase()===scope.trade.toLowerCase(),'Choose a booked work task in this repair trade',409,'visit_task')
+   need(!serviceCases(job).some(c=>c.service!.visits.some(v=>v.task_id===task.id)),'This task already belongs to a service visit',409,'visit_task')
    await requireResources(db,job,all,actor);service.visits.push({id:crypto.randomUUID(),task_id:task.id,start:task.start,end:task.end,booked_by:by,assignment:{email:assignment.email,subcontract_id:assignment.subcontract_id}})
   }else if(action==='submit'){
    need(portal&&await tradeAllowed(db,job,actor,item),'Only the assigned current trade contact submits repairs',403,'scope_required')

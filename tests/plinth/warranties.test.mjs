@@ -157,6 +157,17 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   assert.equal(job.warranties.promises[0].status,'paused');assert.equal(job.warranties.promises[0].history.at(-1).action,'case_closed');assert.deepEqual(job.warranties.components,[component])
   await scheduled('2031-03-01T09:00:00Z');assert.equal(notices().length,2,'Only recorded two-party closure stops the agreed reminders')
   for(const cookie of [client,trade]){const view=await api(cookie===client?`/jobs/${job.id}/service`:'/warranty-service',undefined,cookie),shown=cookie===client?view.value:view.value.jobs[0];assert.equal(shown.cases[0].service.visits.length,2);assert.equal(shown.cases[0].status,'closed')}
+  // Jobs with a reviewed schedule use that public planner, then link the exact booked task.
+  r=await act('/service',{...request,description:'A second fixture needs a planned visit'},client);assert.equal(r.status,200);const plannedId=r.value.record.id
+  assert.equal((await act(`/service/${plannedId}/acknowledge-owner`,{reason:'Builder owns the planned repair'})).status,200)
+  assert.equal((await act(`/service/${plannedId}/assign`,{subcontract_id:setup.scope.id,email:'service-trade@example.com',reason:'Responsible released plumbing company'})).status,200)
+  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]},tasks=[...job.schedules.map(t=>({...t,duration_minutes:60})),{id:'planned-repair-visit',trade:'Plumbing',description:'Reviewed warranty visit',start:'2031-04-01T09:00:00Z',duration_minutes:60}]
+  r=await act('/schedule/preview',{calendar,tasks});assert.equal(r.status,200);const digest=r.value.preview.digest
+  assert.equal((await act('/schedule/publish',{calendar,tasks,digest})).status,200)
+  const booked=job.schedules.find(t=>t.description==='Reviewed warranty visit'),schedule=structuredClone(job.schedules)
+  assert.equal((await act(`/service/${plannedId}/book`,{task_id:booked.id,reason:'Link the exact planner-reviewed appointment'})).status,200)
+  assert.deepEqual(job.schedules,schedule,'Linking an already published task never rewrites the reviewed plan')
+  assert.equal(job.warranties.cases.find(c=>c.id===plannedId).service.visits[0].task_id,booked.id)
   job=await setPortalFeatures(f,job.id,['warranty'],['warranty'])
   assert.equal((await api(`/jobs/${job.id}/service`,undefined,client)).status,404);assert.deepEqual((await api('/warranty-service',undefined,trade)).value.jobs,[])
   job=await setPortalFeatures(f,job.id)
