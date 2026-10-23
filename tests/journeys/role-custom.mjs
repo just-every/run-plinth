@@ -24,7 +24,7 @@ try{
  const capture=async(p,name,check)=>{for(const width of [1440,390]){await p.setViewportSize({width,height:1000});if(check)await check();await p.evaluate(()=>scrollTo(0,0));assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width);await p.screenshot({path:`${shots}/ROLE-006-${name}-${width}.png`,fullPage:true,animations:'disabled'})}}
  // The owner copies two presets in the screen, adjusts one and assigns both.
  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app');await page.getByRole('button',{name:'People & access'}).first().click()
- const create=async(preset,name)=>{await page.getByLabel('Copy preset').selectOption({label:preset});await page.getByLabel('New role name').fill(name);await page.getByRole('button',{name:'Create role from preset',exact:true}).click();await expect(page.getByText(name,{exact:false}).first()).toBeVisible()}
+ const create=async(preset,name)=>{await page.getByLabel('Copy preset').selectOption({label:preset});await page.getByLabel('New role name').fill(name);await page.getByRole('button',{name:'Create role from preset',exact:true}).click();await expect(page.locator('summary',{hasText:name})).toBeVisible()}
  await create('Superintendent','Lead Carpenter – no financials');await create('Project manager','Office Manager')
  await page.getByText('Office Manager · copy of Project manager',{exact:false}).click()
  const office=page.locator('details',{hasText:'Office Manager · copy of Project manager'});await office.getByLabel('Purchase order approval limit',{exact:false}).fill('5000.00');await office.getByRole('button',{name:'Save role',exact:true}).click();await expect(page.getByText('Saved.',{exact:false}).first()).toBeVisible()
