@@ -7,7 +7,7 @@ import { Action, api, Field, Form, money } from './shared'
 type RuleEditor = { id: string; scope: PricingRule['scope'] }
 const newRule = (): RuleEditor => ({ id: crypto.randomUUID(), scope: 'project' })
 
-export function EstimatePricing({ job, mutate }: Pick<JobProps, 'job' | 'mutate'>) {
+export function EstimatePricing({ job, mutate, rates: maintain = true }: Pick<JobProps, 'job' | 'mutate'> & { rates?: boolean }) {
  const [rates, setRates] = useState<PricingRate[]>([]), [error, setError] = useState(''), [rateId, setRateId] = useState(''), [editId, setEditId] = useState('')
  const [rules, setRules] = useState<RuleEditor[]>([newRule()]), [preview, setPreview] = useState<any>(), [review, setReview] = useState<Record<string, unknown>>()
  const current = job.quotes.at(-1), snapshot = (current as typeof current & { pricing?: PricingSnapshot })?.pricing
@@ -20,7 +20,7 @@ export function EstimatePricing({ job, mutate }: Pick<JobProps, 'job' | 'mutate'
  return <details className="side-section"><summary>Overhead, markup, discounts and reviewed tax</summary>
   <p>Review scoped overhead, markup or target gross margin, then discounts and sales or use tax. Every stage rounds half-up to cents. Within each stage, line rules run before phase rules, then project rules; wider rules compound on the earlier result. Rounded scope totals are allocated to lines proportionally, with remaining cents assigned by largest remainder in line order.</p>
   {error && <p role="alert">{error}</p>}
-  <details><summary>Record a human-reviewed jurisdiction rate</summary>
+  {maintain && <details><summary>Record a human-reviewed jurisdiction rate</summary>
    <label>Rate to revise<select aria-label="Rate to revise" value={editId} onChange={event => setEditId(event.target.value)}><option value="">New reviewed rate</option>{rates.map(rate => <option key={rate.id} value={rate.id}>{rate.revisions.at(-1)!.jurisdiction} · revision {rate.version}</option>)}</select></label>
    <Form key={`${editId}-${selectedRate?.version ?? 0}`} reset={false} submit={selectedRate ? 'Record reviewed rate revision' : 'Record reviewed rate'} action={async form => {
     await api('/pricing-rates' + (editId ? '/' + editId : ''), { expected_version: selectedRate?.version, jurisdiction: form.get('jurisdiction'), kind: form.get('kind'), percent: form.get('percent'), effective_on: form.get('effective_on'), reference: form.get('reference'), human_reviewed: form.get('human_reviewed') === 'on' })
@@ -33,7 +33,7 @@ export function EstimatePricing({ job, mutate }: Pick<JobProps, 'job' | 'mutate'
     <label><input name="human_reviewed" type="checkbox" required />I have reviewed the dated jurisdiction rate and source evidence.</label>
    </Form>
    {selectedRate && <ul>{selectedRate.revisions.map(revision => <li key={revision.version}>Revision {revision.version}: {revision.kind} {revision.percent}% · {revision.effective_on} · {revision.reference} · human reviewed by {revision.approved_by.name}</li>)}</ul>}
-  </details>
+  </details>}
   {!current ? <p>Prepare an estimate before reviewing pricing.</p> : <>
    <Form reset={false} submit="Preview pricing and tax" action={async form => {
     const input = { quote_id: current.id, basis: form.get('basis'), as_of: form.get('as_of'), rules: rules.map(rule => ({ scope: rule.scope, ...(rule.scope === 'project' ? {} : { key: form.get(`${rule.id}-key`) }), overhead_percent: form.get(`${rule.id}-overhead`), method: form.get(`${rule.id}-method`), percent: form.get(`${rule.id}-percent`), discount_percent: form.get(`${rule.id}-discount`) })), tax: { rate_id: form.get('rate_id'), provider: 'manual', taxable_line_ids: form.getAll('taxable_line_ids'), exemption_reference: form.get('exemption_reference') } }

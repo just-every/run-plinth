@@ -1,4 +1,4 @@
-import { requireManager } from './auth'
+import { requireRateAccess } from './auth'
 import { need, object, stamp, text, type Actor, type Input } from './model'
 import { catalogValue } from './catalog-input'
 import { readClock, transaction } from './store'
@@ -6,7 +6,7 @@ import type { Assembly, CatalogEntry, EstimateTemplate } from './catalog-model'
 export async function catalogEntry(db:D1Database,id:string,kind?:CatalogEntry['kind']):Promise<CatalogEntry> {const row=await db.prepare('SELECT data FROM pl_estimate_catalog WHERE id=?').bind(id).first<{data:string}>();need(row,'Catalog record not found',404,'not_found');const entry=JSON.parse(row.data) as CatalogEntry;need(!kind||entry.kind===kind,'Wrong catalog record kind');return entry}
 export async function catalogResponse(request:Request,db:D1Database,actor:Actor,parts:string[],readBody:(r:Request)=>Promise<Input>):Promise<Response|null> {
  if(parts[0]!=='estimate-catalog')return null
- requireManager(actor,request.method==='GET');need(parts.length<=2,'Unknown catalog route',404,'not_found')
+ requireRateAccess(actor,request.method);need(parts.length<=2,'Unknown catalog route',404,'not_found')
  const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff'}
  if(request.method==='GET'){const rows=await db.prepare('SELECT data FROM pl_estimate_catalog ORDER BY rowid').all<{data:string}>();return Response.json({entries:rows.results.map(r=>JSON.parse(r.data))},{headers})}
  need(request.method==='POST','Method not allowed',405)

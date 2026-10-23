@@ -1,4 +1,4 @@
-import {requireManager} from './auth'
+import {requireBidDrafting,requireManager} from './auth'
 import {decisionFiles} from './decision-files'
 import {day} from './purchase-order-model'
 import {cents,find,need,object,stamp,sum,text,usdOnly,type Actor,type Input} from './model'
@@ -15,7 +15,7 @@ async function revision(db:D1Database,job:BidJob,actor:Actor,input:Input,number:
 function costCodes(value:unknown,bid:BidPackage){need(Array.isArray(value)&&value.length>0&&value.length<=100,'Choose scoped cost codes');const codes=value.map(c=>text(c,'Cost code',40));need(new Set(codes).size===codes.length&&codes.every(c=>bid.lines.some(l=>l.cost_code===c)),'Choose unique cost codes within this package');return codes}
 export async function bidAction(db:D1Database,job:BidJob,actor:Actor,input:Input,id?:string,action?:string){
  if(!id){
-  requireManager(actor);usdOnly(job);need((job.bids?.length??0)<100,'A job supports up to 100 bid packages');need(input.mode==='priced'||input.mode==='unpriced','Choose priced or unpriced')
+  requireBidDrafting(actor);usdOnly(job);need((job.bids?.length??0)<100,'A job supports up to 100 bid packages');need(input.mode==='priced'||input.mode==='unpriced','Choose priced or unpriced')
   need(Array.isArray(input.lines)&&input.lines.length>0&&input.lines.length<=100,'Supply up to 100 scoped bid items')
   const codes=new Set(job.quotes.at(-1)?.lines.flatMap(l=>l.cost_code?[l.cost_code]:[])??[])
   const lines:BidLine[]=input.lines.map(value=>{const l=object(value),code=text(l.cost_code,'Cost code',40);need(codes.has(code),'Choose cost codes from the latest job estimate');return {cost_code:code,description:text(l.description,'Bid item scope',2000),...(input.mode==='priced'?{budget_cents:cents(l.budget_cents,'Reviewed package price')}: {})}})

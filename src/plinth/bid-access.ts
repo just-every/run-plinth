@@ -23,7 +23,7 @@ export async function bidInvite(db:D1Database,job:BidJob,bid:BidPackage,actor:Ac
  const invite=bid.invitations.find(i=>i.email===actor.email.toLowerCase()&&!i.revoked_by)
  return bid.published_by&&invite&&await bidContact(db,job,bid,invite)?invite:undefined
 }
-export function bidOffice(actor:Actor){return actor.role==='owner'||actor.role==='admin'||actor.role==='project_manager'}
+export function bidOffice(actor:Actor){return actor.role==='owner'||actor.role==='admin'||actor.role==='project_manager'||actor.role==='estimator'}
 export function bidStatus(bid:BidPackage,invite:BidInvitation){
  const revision=bid.revisions.at(-1)!,response=invite.responses.at(-1),received=invite.decline?.by.at??(response?.revision_id===revision.id?response.by.at:undefined)
  const late=(received??new Date().toISOString())>revision.due_on+'T23:59:59.999Z'

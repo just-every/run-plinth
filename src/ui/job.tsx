@@ -13,6 +13,7 @@ import { Selections } from './selections'
 import { useEffect, useState } from 'react'
 import type { Job } from '../plinth/model'
 import { api, money } from './shared'
+import { limited, office } from './authority'
 import { Icon } from './icons'
 import { DecisionStrip } from './decisions'
 import { Quotes, Changes } from './scope'
@@ -30,7 +31,7 @@ export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'a
 
 export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: string; onBack: () => void; onChange: () => Promise<void>}) {
   const [job, setJob] = useState<Job>(), [section, setSection] = useState<Section>(), [error, setError] = useState('')
-  const manager = ['owner', 'admin', 'project_manager'].includes(role)
+  const manager = office(role)
   async function refresh() { const result = await api('/jobs/' + id); setJob(result.job) }
   useEffect(() => { const tab = new URLSearchParams(window.location.search).get('tab'); setJob(undefined); setSection(sections.find(s => s === tab)); refresh().catch(e => setError(e.message)) }, [id])
   useEffect(() => { if (!section) return; const url = new URL(window.location.href); url.searchParams.set('tab', section); window.history.replaceState(null, '', url) }, [section])
@@ -42,9 +43,10 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
     } catch (e) { await refresh(); throw e }
   }
   if (!job) return <p className="loading" role={error ? 'alert' : 'status'}>{error || 'Opening job…'}</p>
-  const open = section ?? (job.status === 'active' ? 'Schedule' : 'Quote')
+  const open = section ?? (role === 'estimator' ? 'Quote' : limited(role) ? 'Today' : job.status === 'active' ? 'Schedule' : 'Quote')
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
-  const sectionAllowed=(s:Section)=>manager||s==='History'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
+  const roleSections:Record<string,readonly Section[]>={estimator:['Quote','Bids','To-dos'],superintendent:['Today','Schedule','Daily logs','Punch','To-dos'],crew:['Today','Schedule','Daily logs','Punch','To-dos']}
+  const sectionAllowed=(s:Section)=>limited(role)?roleSections[role]!.includes(s):manager||s==='History'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
   const props: JobProps = { job, manager, role, mutate, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
@@ -52,13 +54,13 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       <h1>{job.name}</h1>
       <ul className="chips" aria-label="Job facts">
         <li><Icon name="pin" />{job.address || 'Site address not entered'}</li>
-        <li><Icon name="money" />{job.status === 'active' ? job.portal_features&&!job.portal_features.includes('contracts')?'Active job':<>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
-        <li><Icon name="mail" />Client {job.client_email}</li>
+        <li><Icon name="money" />{job.status === 'active' ? limited(role)||job.portal_features&&!job.portal_features.includes('contracts')?'Active job':<>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
+        {job.client_email&&<li><Icon name="mail" />Client {job.client_email}</li>}
       </ul>
-      <nav className="tabs" aria-label="Job sections">{sections.filter(s => (!['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager)&&sectionAllowed(s)).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
+      <nav className="tabs" aria-label="Job sections">{sections.filter(s => (!['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager || limited(role))&&sectionAllowed(s)).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
     {!sectionAllowed(open)?<p className="notice">This feature is not available for your access.</p>:<div className="job-body">
-      {open !== 'Schedule' && <DecisionStrip job={job} manager={manager} go={setSection} />}
+      {open !== 'Schedule' && !limited(role) && <DecisionStrip job={job} manager={manager} go={setSection} />}
       {open === 'Quote' && <Quotes {...props} />}
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}
@@ -70,8 +72,8 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
       {open === 'Warranty' && manager && <Warranties {...props} />}
       {open === 'Punch' && <PunchWorkspace {...props}/>}
-      {open === 'Bids' && manager && <><Bids {...props}/><BidComparisons {...props}/></>}
-      {open === 'Today' && manager && <DailyWork {...props}/>}
+      {open === 'Bids' && (manager || role === 'estimator') && <><Bids {...props}/>{manager&&<BidComparisons {...props}/>}</>}
+      {open === 'Today' && (manager || limited(role)) && <DailyWork {...props}/>}
       {open === 'To-dos' && <Todos job={job}/>}
       {open === 'Handover' && <Handover {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}

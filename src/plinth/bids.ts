@@ -1,5 +1,5 @@
 import {runtimeBindings,type Bindings} from '../auth.server'
-import {authorize,requireManager} from './auth'
+import {authorize,isTeamRole,requireBidDrafting} from './auth'
 import {DomainError,find,need,object,type Input} from './model'
 import {jobs,readClock,saveJob} from './store'
 import {decisionDownload} from './decision-files'
@@ -23,7 +23,7 @@ export async function bidsResponse(request:Request,original:Bindings):Promise<Re
   const env=runtimeBindings(original),db=env.DB,actor=await authorize(request,env),office=bidOffice(actor)
   need(office||actor.role==='member','Bid access requires a personally signed-in estimator or invited member',403,'forbidden')
   const parts=match[2]?[match[2],...(match[3]?.split('/')??[])]:match[1]?.split('/')??[]
-  const clock=request.method==='GET'?undefined:await readClock(db),all=(await jobs(db) as BidJob[]).filter(j=>actor.role!=='project_manager'||actor.team!.job_ids.includes(j.id))
+  const clock=request.method==='GET'?undefined:await readClock(db),all=(await jobs(db) as BidJob[]).filter(j=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(j.id))
   if(!parts.length){need(request.method==='GET','Method not allowed',405,'method_not_allowed');const sources=await Promise.all(all.map(j=>bidSource(db,j,actor)));return json({sources:sources.filter(s=>office||s.bids.length)})}
   const previous=find(all,parts[0]!),source=await bidSource(db,previous,actor);need(office||source.bids.length,'Bid job not found',404,'not_found')
   if(request.method==='GET'){
@@ -32,7 +32,7 @@ export async function bidsResponse(request:Request,original:Bindings):Promise<Re
    const files=source.bids.flatMap(b=>[...b.revisions.flatMap(r=>r.plans),...b.invitations.flatMap(i=>i.responses.flatMap(r=>r.attachments))]);return await decisionDownload(db,previous,files,parts[2]!)
   }
   need(request.method==='POST'&&(parts.length===1||parts.length===3),'Unknown bid action',404,'not_found')
-  if(parts.length===1)requireManager(actor)
+  if(parts.length===1)requireBidDrafting(actor)
   else need(source.bids.some(b=>b.id===parts[1]),'Bid package not found',404,'not_found')
   const input=await body(request);need(input.expected_version===previous.version,'The bid job changed; reload before acting',409,'stale_version')
   const job=structuredClone(previous),result=await bidAction(db,job,actor,input,parts[1],parts[2]);await saveJob(db,actor,previous,job,result.writes,clock)

@@ -16,7 +16,7 @@ export async function officeAuthority(db: D1Database, job: Job, identity: string
  const person = await db.prepare(`SELECT id,email,version,role FROM oa_operators WHERE ${byId ? 'id' : 'lower(email)'}=? AND status='active' AND role IN ('owner','admin')`).bind(byId ? identity : identity.toLowerCase()).first<WarrantyAuthority>()
  if (!person) return null
  const team = person.role === 'admin' ? await teamGrant(db, person.id) : null
- if (team && !team.grant.job_ids.includes(job.id)) return null
+ if (team && (team.grant.role !== 'project_manager' || !team.grant.job_ids.includes(job.id))) return null
  return { id: person.id, email: person.email.toLowerCase(), version: person.version, role: person.role, ...(team ? { team_version: team.version } : {}) }
 }
 export function authorityGuards(db: D1Database, authority: WarrantyAuthority): D1PreparedStatement[] {

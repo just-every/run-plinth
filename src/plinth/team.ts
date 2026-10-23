@@ -1,22 +1,24 @@
 import { requireOwner } from './auth'
-import { cents, need, object, stamp, text, type Actor, type Input, type Stamp } from './model'
+import { cents, need, object, stamp, text, type Actor, type Input, type Stamp, type TeamRole } from './model'
 import { readClock, transaction } from './store'
 
-/** A project manager is an operator-auth administrator narrowed to assigned jobs and an owner-set PO approval limit (USD cents, inclusive). */
-export interface TeamGrant { role: 'project_manager'; job_ids: string[]; po_limit_cents: number; updated_by: Stamp }
+/** A project manager is an operator-auth administrator narrowed to assigned jobs and an owner-set PO approval limit (USD cents, inclusive).
+ * ROLE-002: an estimator, superintendent or crew member is the same narrowing with a different preset; their PO limit is always zero. */
+export interface TeamGrant { role: TeamRole; job_ids: string[]; po_limit_cents: number; updated_by: Stamp }
+const presets: TeamRole[] = ['project_manager', 'estimator', 'superintendent', 'crew']
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
 /** Read on every request, so a role or assignment change applies on that person's next request. */
 export async function teamGrant(db: D1Database, operatorId: string): Promise<{ version: number; grant: TeamGrant } | null> {
  const row = await db.prepare('SELECT version,data FROM pl_team WHERE operator_id=?').bind(operatorId).first<{ version: number; data: string }>()
  return row ? { version: row.version, grant: JSON.parse(row.data) as TeamGrant } : null
 }
-/** GET /team lists internal people and their preset role; PUT /team/:operator sets admin or project_manager (owner only, audited). */
+/** GET /team lists internal people and their preset role; PUT /team/:operator sets admin or a job-assigned preset: project_manager, estimator, superintendent or crew (owner only, audited). */
 export async function teamResponse(request: Request, db: D1Database, actor: Actor, parts: string[], readBody: (request: Request) => Promise<Input>): Promise<Response | null> {
  if (parts[0] !== 'team') return null
  need(actor.role === 'owner' || actor.role === 'admin', 'Only an owner or administrator reads the team', 403, 'forbidden')
  if (request.method === 'GET' && parts.length === 1) {
   const { results } = await db.prepare("SELECT o.id,o.email,o.display_name,o.role,t.version,t.data FROM oa_operators o LEFT JOIN pl_team t ON t.operator_id=o.id WHERE o.status='active' AND o.role IN ('owner','admin') ORDER BY o.email").all<{ id: string; email: string; display_name: string; role: string; version: number | null; data: string | null }>()
-  return Response.json({ team: results.map(r => ({ id: r.id, email: r.email, name: r.display_name, role: r.data ? 'project_manager' : r.role, ...(r.data ? { version: r.version, ...JSON.parse(r.data) as TeamGrant } : {}) })) }, { headers })
+  return Response.json({ team: results.map(r => ({ id: r.id, email: r.email, name: r.display_name, role: r.data ? (JSON.parse(r.data) as TeamGrant).role : r.role, ...(r.data ? { version: r.version, ...JSON.parse(r.data) as TeamGrant } : {}) })) }, { headers })
  }
  need(request.method === 'PUT' && parts.length === 2, 'Unknown team route', 404, 'not_found'); requireOwner(actor)
  const input = object(await readBody(request)), clock = await readClock(db), id = text(parts[1], 'operator id', 100)
@@ -24,7 +26,7 @@ export async function teamResponse(request: Request, db: D1Database, actor: Acto
  need(person?.role === 'admin', 'Invite the person as an administrator under People & access first', 409, 'not_admin')
  const previous = await teamGrant(db, id)
  need(input.expected_version === (previous?.version ?? 0), 'Their role changed; reload before saving', 409, 'stale_version')
- need(input.role === 'admin' || input.role === 'project_manager', 'role must be admin or project_manager')
+ need(input.role === 'admin' || presets.includes(input.role as TeamRole), 'role must be admin, project_manager, estimator, superintendent or crew')
  const audit = (value: string) => db.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'plinth.role',?,?)").bind(crypto.randomUUID(), actor.id, value, Date.now())
  const stale = previous ? db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_team WHERE operator_id=? AND version=?) THEN 1 ELSE 0 END').bind(id, previous.version) : db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pl_team WHERE operator_id=?) THEN 1 ELSE 0 END').bind(id)
  if (input.role === 'admin') {
@@ -35,7 +37,7 @@ export async function teamResponse(request: Request, db: D1Database, actor: Acto
  const job_ids = [...new Set((input.job_ids as unknown[]).map(j => text(j, 'job id', 100)))]
  const known = job_ids.length ? (await db.prepare(`SELECT count(*) AS n FROM pl_jobs WHERE id IN (${job_ids.map(() => '?').join(',')})`).bind(...job_ids).first<{ n: number }>())!.n : 0
  need(known === job_ids.length, 'Assign existing jobs only', 404, 'not_found')
- const grant: TeamGrant = { role: 'project_manager', job_ids, po_limit_cents: cents(input.po_limit_cents, 'po_limit_cents'), updated_by: stamp(actor) }, version = (previous?.version ?? 0) + 1, data = JSON.stringify(grant)
- await transaction(db, actor, null, [stale, db.prepare('INSERT INTO pl_team(operator_id,version,data) VALUES(?,?,?) ON CONFLICT(operator_id) DO UPDATE SET version=excluded.version,data=excluded.data').bind(id, version, data), audit(`${id}:project_manager:${version}`)], clock)
+ const role = input.role as TeamRole, grant: TeamGrant = { role, job_ids, po_limit_cents: role === 'project_manager' ? cents(input.po_limit_cents, 'po_limit_cents') : 0, updated_by: stamp(actor) }, version = (previous?.version ?? 0) + 1, data = JSON.stringify(grant)
+ await transaction(db, actor, null, [stale, db.prepare('INSERT INTO pl_team(operator_id,version,data) VALUES(?,?,?) ON CONFLICT(operator_id) DO UPDATE SET version=excluded.version,data=excluded.data').bind(id, version, data), audit(`${id}:${role}:${version}`)], clock)
  return Response.json({ member: { id, version, ...grant } }, { headers })
 }

@@ -73,3 +73,11 @@ body:has(.workspace) { margin: 0; padding: 0; background: var(--paper); color: v
 .workspace .chips .icon { width: 19px; height: 19px; color: var(--blue); }
 .workspace .chips li.is-late { border-color: color-mix(in srgb, var(--ox) 40%, #fff); color: var(--ox); }
 .workspace .chips li.is-late .icon { color: var(--ox); }
+
+/* Owner UI rule: every icon-only control carries a couple-of-words tip, shown after 300 ms of hover and at once on keyboard focus. */
+.workspace [data-tip] { position: relative; }
+.workspace [data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; padding: 4px 9px; border-radius: 6px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; opacity: 0; visibility: hidden; }
+.workspace .rail-close[data-tip]::after { left: auto; right: 0; }
+.workspace [data-tip]:hover::after { opacity: 1; visibility: visible; transition: opacity .12s .3s, visibility 0s .3s; }
+.workspace [data-tip]:focus-visible::after { opacity: 1; visibility: visible; }
+@media (hover: none) { .workspace [data-tip]:hover:not(:focus-visible)::after { opacity: 0; visibility: hidden; } }

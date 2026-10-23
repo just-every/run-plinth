@@ -8,6 +8,8 @@ import { punchClientProjection, punchState, type PunchIssue, type PunchJob } fro
 
 export const punchOffice = (actor: Actor) => actor.role === 'owner' || actor.role === 'admin'
 export function requirePunchOffice(actor: Actor) { need(punchOffice(actor), 'Only the owner or an administrator manages punch observations', 403, 'forbidden') }
+/** A superintendent captures observations on assigned jobs; assigning, inspecting and releasing stay with the office. */
+export function requirePunchCapture(actor: Actor) { need(punchOffice(actor) || actor.role === 'project_manager' || actor.role === 'superintendent', 'Job manager access required', 403, 'forbidden') }
 export function requirePunchManager(actor: Actor) { need(punchOffice(actor) || actor.role === 'project_manager', 'Job manager access required', 403, 'forbidden') }
 /** Scope release, current contact membership, qualification and current compliance are all needed; a historic assignment is never an enduring grant. */
 export async function punchScope(db: D1Database, job: PunchJob, email: string, scopeId: string | undefined) {

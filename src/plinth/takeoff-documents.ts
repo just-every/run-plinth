@@ -1,4 +1,4 @@
-import { requireJobManager } from './auth'
+import { requireEstimating, requirePlans } from './auth'
 import { digest, fromBase64 } from './attachments'
 import { find, need, object, stamp, text, usdOnly, type Actor, type Attachment, type Input, type Job } from './model'
 import { decimal } from './estimate-math'
@@ -7,7 +7,7 @@ import type { Calibration, DrawingRevision, TakeoffMeasurement, TakeoffSheet } f
 
 /** Original PDFs share existing job-owned binary custody; deletion and private archives already cover this table. */
 export async function takeoffAction(db:D1Database,job:Job,actor:Actor,input:Input,id?:string,action?:string){
- requireJobManager(actor,true);usdOnly(job)
+ requireEstimating(actor,true);usdOnly(job)
  const sheets=job.takeoff??=[],writes:D1PreparedStatement[]=[]
  if(!id||action==='revise'){
   need(sheets.length<100||id,'A job supports up to 100 takeoff sheets')
@@ -36,4 +36,4 @@ export async function takeoffAction(db:D1Database,job:Job,actor:Actor,input:Inpu
  if(row.deduct_from){const parent=find(sheet.measurements,row.deduct_from);need(!parent.deduct_from&&parent.revision_id===revision.id,'An opening must deduct from a parent on the same revision');need(parent.kind===row.kind&&parent.dimension===row.dimension&&parent.calibration_id===row.calibration_id,'Opening must use the same kind, dimension and calibration as its parent');validateOpening(parent,row,sheet.measurements.filter(m=>m.deduct_from===parent.id));sheet.measurements.push(row);measured(sheet,parent)}else {sheet.measurements.push(row);measured(sheet,row)}
  return {record:row,writes}
 }
-export async function takeoffFile(db:D1Database,job:Job,actor:Actor,id:string){requireJobManager(actor,true);const file=job.takeoff?.flatMap(s=>s.revisions.map(r=>r.document)).find(f=>f.id===id);need(file,'Drawing not found',404,'not_found');const row=await db.prepare('SELECT bytes FROM pl_attachments WHERE id=? AND job_id=?').bind(id,job.id).first<{bytes:ArrayBuffer}>();need(row,'Drawing bytes missing',503,'document_missing');const bytes=new Uint8Array(row.bytes);need(bytes.length===file.size&&await digest(bytes)===file.checksum,'Drawing integrity check failed',503,'document_integrity');return new Response(bytes,{headers:{'content-type':'application/pdf','content-disposition':`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,'content-security-policy':"sandbox; default-src 'none'",'x-content-type-options':'nosniff','cache-control':'private, no-store'}})}
+export async function takeoffFile(db:D1Database,job:Job,actor:Actor,id:string){requirePlans(actor,true);const file=job.takeoff?.flatMap(s=>s.revisions.map(r=>r.document)).find(f=>f.id===id);need(file,'Drawing not found',404,'not_found');const row=await db.prepare('SELECT bytes FROM pl_attachments WHERE id=? AND job_id=?').bind(id,job.id).first<{bytes:ArrayBuffer}>();need(row,'Drawing bytes missing',503,'document_missing');const bytes=new Uint8Array(row.bytes);need(bytes.length===file.size&&await digest(bytes)===file.checksum,'Drawing integrity check failed',503,'document_integrity');return new Response(bytes,{headers:{'content-type':'application/pdf','content-disposition':`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,'content-security-policy':"sandbox; default-src 'none'",'x-content-type-options':'nosniff','cache-control':'private, no-store'}})}

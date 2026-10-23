@@ -8,7 +8,7 @@ import type { Todo, TodoAssignee, TodoView } from './todo-model'
 export function todoManager(actor:Actor,job?:Job){return actor.role==='owner'||actor.role==='admin'||!!job&&actor.role==='project_manager'&&!!actor.team?.job_ids.includes(job.id)}
 export async function todoGrant(db:D1Database,job:Job|undefined,assignment:TodoAssignee){
  const person=await db.prepare("SELECT id,role FROM oa_operators WHERE lower(email)=? AND status='active'").bind(assignment.email).first<{id:string;role:string}>();if(!person)return false
- if(assignment.kind==='office'){if(!job){const t=person.role==='admin'?await teamGrant(db,person.id):null;return person.role==='owner'||person.role==='admin'&&!t}return !!await officeAuthority(db,job,person.id,true)}
+ if(assignment.kind==='office'){if(!job){const t=person.role==='admin'?await teamGrant(db,person.id):null;return person.role==='owner'||person.role==='admin'&&!t}const team=person.role==='admin'?await teamGrant(db,person.id):null;if(team&&team.grant.role!=='project_manager')return team.grant.job_ids.includes(job.id);return !!await officeAuthority(db,job,person.id,true)}
  if(!job||person.role!=='member'||!portalEnabled(job,assignment.kind==='client'?'client':'subcontractor','todos'))return false
  return assignment.kind==='client'?clientAccess(db,job,assignment.email):!!await scopeContact(db,job,assignment.email,assignment.subcontract_id)
 }

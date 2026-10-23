@@ -1,7 +1,7 @@
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Input } from './model'
 import { day } from './purchase-order-model'
 import { decisionFiles } from './decision-files'
-import { requirePunchManager, requirePunchOffice, punchScope } from './punch-access'
+import { requirePunchCapture, requirePunchManager, requirePunchOffice, punchScope } from './punch-access'
 import { punchAnswers, punchFields, punchState, type PunchForm, type PunchIssue, type PunchJob } from './punch-model'
 
 /** Each repair submission and inspection is append-only. The server chooses identities, numbering and status. */
@@ -15,7 +15,7 @@ export async function punchAction(db: D1Database, job: PunchJob, actor: Actor, i
  }
  need(section === 'issues', 'Unknown punch action', 404, 'not_found')
  if (!id) {
-  requirePunchManager(actor)
+  requirePunchCapture(actor)
   need(!action, 'Unknown punch action', 404, 'not_found')
   const kind = input.kind ?? 'punch', severity = input.severity ?? 'normal'
   need(kind === 'punch' || kind === 'quality' || kind === 'safety', 'Observation kind must be punch, quality or safety')

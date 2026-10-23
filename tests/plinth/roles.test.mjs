@@ -168,3 +168,104 @@ test('ROLE-003 — two subcontractor companies keep bills and unverified complia
   assert.equal((await api(`/jobs/${other.id}`,undefined,subs[0])).status,404)
  }finally{await f.close()}
 })
+
+test('ROLE-002 — estimator, superintendent and crew work assigned jobs; margin, pay, money and approval routes stay closed and unassigned jobs write nothing', async () => {
+ const { takeoffPlan } = await import('../fixtures/takeoff-plan.mjs')
+ const f = await createFixture()
+ try {
+  const people = {}
+  for (const [key, name] of [['estimator', 'Erin Estimator'], ['superintendent', 'Sam Superintendent'], ['crew', 'Casey Crew']]) people[key] = { cookie: await f.invite(`${key}@example.com`, name, 'admin'), email: `${key}@example.com` }
+  const api = (path, { method = 'GET', body, cookie = f.owner, token } = {}) => f.json('/api/plinth' + path, { method, cookie, token, ...(body ? { body } : {}) })
+  const team = (await api('/team')).value.team
+  for (const key of Object.keys(people)) people[key].id = team.find(m => m.email === people[key].email).id
+  // The lead is a job still being quoted; the site is an active job; the other job is assigned to nobody.
+  let r = await api('/jobs', { method: 'POST', body: { name: 'Shelburne kitchen lead', client_email: 'lead@example.com', address: '9 Lake Road' } }); assert.equal(r.status, 201); let lead = r.value.job
+  const site = await createActiveJob(f, 'Charlotte addition', 'site@example.com'), other = await createActiveJob(f, 'Hinesburg garage', 'garage@example.com')
+  const assign = async (key, job_ids, expected_version = 0, role = key) => api(`/team/${people[key].id}`, { method: 'PUT', body: { expected_version, role, job_ids, po_limit_cents: 0 } })
+  assert.equal((await assign('estimator', [lead.id], 0)).status, 200); assert.equal((await assign('superintendent', [site.id], 0)).status, 200); assert.equal((await assign('crew', [site.id], 0)).status, 200)
+  assert.equal((await api(`/team/${people.crew.id}`, { method: 'PUT', cookie: people.superintendent.cookie, body: { expected_version: 1, role: 'admin' } })).status, 403, 'Only the owner changes a role')
+  const version = async id => (await api(`/jobs/${id}`)).value.job.version
+  const closed = async (cookie, method, path, body) => { const result = await api(path, { method, cookie, body }); assert.ok([401, 403, 404].includes(result.status), `${method} ${path} must be closed: ${result.status}`); return result }
+
+  // Estimator: lead, proposal, takeoff, rates, bid package; no acceptance, money or award.
+  const est = people.estimator.cookie
+  r = await api('/jobs', { cookie: est }); assert.deepEqual(r.value.jobs.map(j => j.id), [lead.id]); assert.equal(r.value.role, 'estimator'); assert.equal(r.value.currency_totals, undefined)
+  for (const job of [site, other]) { assert.equal((await api(`/jobs/${job.id}`, { cookie: est })).status, 404); const held = await version(job.id); assert.equal((await api(`/jobs/${job.id}/quotes`, { method: 'POST', cookie: est, body: { expected_version: held, lines: [{ description: 'Unassigned', quantity: 1, unit_cents: 100 }] } })).status, 404); assert.equal(await version(job.id), held, 'An unassigned job is not written') }
+  const act = async (path, body = {}, cookie = est) => { const result = await api(`/jobs/${lead.id}${path}`, { method: 'POST', cookie, body: { expected_version: lead.version, ...body } }); if (result.status === 200) lead = (await api(`/jobs/${lead.id}`)).value.job; return result }
+  const codes = ['06-100', '06-200']
+  r = await act('/quotes', { lines: codes.map((code, n) => ({ id: `synthetic-plinth-${n + 1}`, description: `Synthetic estimate scope ${n + 1}`, quantity: '1', unit: 'job', unit_cents: 100000, cost_code: code, phase: 'Structure', category: 'labor' })) }); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.equal(r.value.record.prepared_by.role, 'estimator')
+  const drawing = { name: 'synthetic-plinth-plan.pdf', mime: 'application/pdf', base64: takeoffPlan().toString('base64') }
+  r = await act('/takeoff', { name: 'A1 Kitchen', page: 1, width: 400, height: 400, document: drawing }); assert.equal(r.status, 200, JSON.stringify(r.value))
+  assert.equal((await f.request(`/api/plinth/jobs/${lead.id}/takeoff-files/${lead.takeoff[0].revisions[0].document.id}`, { cookie: est })).status, 200)
+  assert.equal((await api(`/jobs/${lead.id}/quotes/${lead.quotes[0].id}/cost-codes.json`, { cookie: est })).status, 200)
+  assert.equal((await api('/pricing-rates', { cookie: est })).status, 200); assert.equal((await api('/estimate-catalog', { cookie: est })).status, 200)
+  assert.equal((await api('/pricing-rates', { method: 'POST', cookie: est, body: { jurisdiction: 'VT' } })).status, 403, 'Rates are maintained by owners and administrators')
+  assert.equal((await api('/estimate-catalog', { method: 'POST', cookie: est, body: { kind: 'rate' } })).status, 403)
+  const bid = { title: 'Synthetic framing package', trade: 'Framing', scope: 'Estimator draft', mode: 'priced', lines: codes.map((cost_code, n) => ({ cost_code, description: `Scope ${n + 1}`, budget_cents: 100000 })), note: 'Initial plans', due_on: '2099-12-31', plans: [{ name: 'synthetic-plinth-1.pdf', base64: Buffer.from('%PDF-1.7\nsynthetic-plinth-1 plan\n%%EOF').toString('base64') }] }
+  r = await api(`/bids/${lead.id}`, { method: 'POST', cookie: est, body: { expected_version: lead.version, ...bid } }); assert.equal(r.status, 201, JSON.stringify(r.value)); const package_id = r.value.record_id
+  assert.equal((await api(`/bids/${lead.id}/${package_id}/publish`, { method: 'POST', cookie: est, body: { expected_version: (await version(lead.id)), confirm: true } })).status, 403, 'Publishing a bid package to subcontractors stays with owners and administrators')
+  lead = (await api(`/jobs/${lead.id}`)).value.job
+  const held = lead.version, quote = lead.quotes[0]
+  for (const [path, body] of [[`/quotes/${quote.id}/accept`, { method: 'email', evidence: 'x', schedule_choice: { kind: 'none', reason: 'x' } }], ['/variations', { description: 'x', amount_cents: 1 }], ['/orders', { supplier: 'x', description: 'x', amount_cents: 1 }], ['/invoices', {}], ['/remittances', {}], ['/claims', {}], ['/selections', {}], ['/subcontracts', {}], ['/budget', {}]]) assert.equal((await act(path, body)).status, 403, path + ' is refused')
+  assert.equal(await version(lead.id), held, 'Refused routes write nothing')
+  for (const path of ['/vendors', '/company', '/team', '/reports/records', `/jobs/${lead.id}/invoices/x/document.json`, `/jobs/${lead.id}/orders/x`]) await closed(est, 'GET', path)
+  const view = (await api(`/jobs/${lead.id}`, { cookie: est })).value.job
+  for (const key of ['approvals', 'invoices', 'orders', 'claims', 'variations', 'diary', 'schedules']) assert.deepEqual(view[key] ?? [], [], `${key} is hidden from the estimator`)
+  assert.equal(view.remittances, undefined); assert.equal(view.budgets, undefined)
+
+  // Superintendent and crew: assigned plans, tasks, logs, issues and their own checklist items; no client pricing, margins, pay or approvals.
+  const sup = people.superintendent.cookie, crew = people.crew.cookie
+  let job = site
+  const owner = async (path, body = {}) => { const result = await api(`/jobs/${job.id}${path}`, { method: 'POST', body: { expected_version: job.version, ...body } }); assert.equal(result.status, result.status < 300 ? result.status : 200, JSON.stringify(result.value)); job = (await api(`/jobs/${job.id}`)).value.job; return result.value }
+  await owner('/takeoff', { name: 'S1 Addition', page: 1, width: 400, height: 400, document: drawing })
+  await owner('/schedules', { trade: 'Framing', description: 'Frame addition walls', start: '2026-11-06T08:00:00Z', end: '2026-11-06T16:00:00Z' })
+  const todo = (await owner('/todos', { title: 'Wall layout walk', due_at: '2026-11-05T17:00', items: [{ title: 'Superintendent layout check', assignee: { kind: 'office', email: people.superintendent.email } }, { title: 'Crew stud check', assignee: { kind: 'office', email: people.crew.email } }] })).todo
+  for (const [name, cookie] of [['superintendent', sup], ['crew', crew]]) {
+   r = await api('/jobs', { cookie }); assert.deepEqual(r.value.jobs.map(j => j.id), [site.id], name + ' lists only the assigned job'); assert.equal(r.value.currency_totals, undefined)
+   const show = r.value.jobs[0]
+   assert.equal(show.schedules[0].description, 'Frame addition walls'); assert.equal(show.takeoff[0].name, 'S1 Addition')
+   for (const key of ['quotes', 'variations', 'orders', 'claims', 'approvals']) assert.deepEqual(show[key], [], `${key} client pricing is hidden from ${name}`)
+   for (const key of ['invoices', 'remittances', 'budgets', 'subcontracts', 'retainage', 'bids', 'todos']) assert.equal(show[key], undefined, `${key} is hidden from ${name}`)
+   assert.equal(show.client_email, '')
+   assert.equal((await f.request(`/api/plinth/jobs/${site.id}/takeoff-files/${job.takeoff[0].revisions[0].document.id}`, { cookie })).status, 200, 'Assigned plans download')
+   assert.equal((await api(`/jobs/${other.id}`, { cookie })).status, 404, 'The unassigned job is absent'); assert.equal((await api(`/jobs/${other.id}/punch`, { cookie })).status, 404)
+   const held = await version(other.id); assert.equal((await api(`/jobs/${other.id}/diary`, { method: 'POST', cookie, body: { expected_version: held, note: 'Unassigned' } })).status, name === 'crew' ? 403 : 404); assert.equal(await version(other.id), held)
+   for (const [method, path] of [['GET', `/jobs/${site.id}/quotes/${job.quotes[0].id}/cost-codes.json`], ['GET', `/jobs/${site.id}/invoices/x/document.json`], ['GET', '/vendors'], ['GET', '/company'], ['GET', '/team'], ['GET', '/reports/records'], ['GET', `/jobs/${site.id}/time`], ['GET', '/payroll'], ['GET', `/jobs/${site.id}/labor-rates`], ['GET', '/pricing-rates'], ['GET', '/estimate-catalog'], ['GET', `/bids/${site.id}`], ['POST', '/agent-credentials'], ['DELETE', `/jobs/${site.id}`]]) await closed(cookie, method, path, method === 'GET' ? undefined : {})
+   const before = await version(site.id)
+   for (const path of ['/orders', '/quotes', '/variations', '/schedules', '/invoices', '/selections', `/quotes/${site.id}/accept`]) assert.equal((await api(`/jobs/${site.id}${path}`, { method: 'POST', cookie, body: { expected_version: before } })).status, 403, `${name} ${path}`)
+   assert.equal(await version(site.id), before, 'Refused routes write nothing')
+  }
+  // Daily work: the superintendent saves a log draft with a photo and captures an observation; the office publishes; crew read.
+  const photo = { name: 'synthetic-plinth-photo.png', mime: 'image/png', base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=' }
+  const field = async (cookie, path, body = {}) => api(`/jobs/${site.id}${path}`, { method: 'POST', cookie, body: { expected_version: (await version(site.id)), ...body } })
+  assert.equal((await field(crew, '/diary', { note: 'Crew log', attachments: [photo] })).status, 403, 'Crew read logs; they do not write them')
+  r = await field(sup, '/diary', { note: 'Walls framed to the second plate', attachments: [photo] }); assert.equal(r.status, 200, JSON.stringify(r.value)); const diary = r.value.record
+  assert.equal(diary.status, 'draft'); assert.equal(diary.prepared_by.role, 'superintendent')
+  assert.equal((await field(sup, `/diary/${diary.id}/approve`)).status, 403, 'Publishing to the client is an office approval')
+  const shown = cookie => api(`/jobs/${site.id}`, { cookie }).then(x => x.value.job.diary.map(d => d.id))
+  assert.deepEqual(await shown(sup), [diary.id]); assert.deepEqual(await shown(crew), [], 'Crew see published logs only')
+  const photoPath = `/api/plinth/jobs/${site.id}/diary/${diary.id}/attachments/${diary.attachments[0].id}`
+  assert.equal((await f.request(photoPath, { cookie: sup })).status, 200); assert.equal((await f.request(photoPath, { cookie: crew })).status, 404)
+  job = (await api(`/jobs/${site.id}`)).value.job; await owner(`/diary/${diary.id}/approve`)
+  assert.deepEqual(await shown(crew), [diary.id]); assert.equal((await f.request(photoPath, { cookie: crew })).status, 200)
+  const observation = { title: 'Stud out of plumb', description: 'North wall stud 7 is 1/2 inch out of plumb', kind: 'quality', severity: 'normal', due_on: '2026-11-04', location: 'North wall', photo, annotation: { x: .4, y: .6, note: 'Stud 7' } }
+  assert.equal((await api(`/jobs/${site.id}/punch/issues`, { method: 'POST', cookie: crew, body: { expected_version: await version(site.id), ...observation } })).status, 403)
+  r = await api(`/jobs/${site.id}/punch/issues`, { method: 'POST', cookie: sup, body: { expected_version: await version(site.id), ...observation } }); assert.equal(r.status, 200, JSON.stringify(r.value)); const issue = r.value.record
+  assert.equal((await api(`/jobs/${site.id}/punch`, { cookie: crew })).value.issues[0].id, issue.id, 'Crew see the observation')
+  for (const action of ['assign', 'review', 'release']) assert.equal((await api(`/jobs/${site.id}/punch/issues/${issue.id}/${action}`, { method: 'POST', cookie: sup, body: { expected_version: await version(site.id) } })).status, 403, `Punch ${action} stays with the office`)
+  // Checklist items are each person's own.
+  const path = `/jobs/${site.id}/todos/${todo.id}`, item = i => todo.items[i].id, revision = async () => (await api(path)).value.todo.revision
+  for (const [cookie, mine, theirs] of [[sup, 0, 1], [crew, 1, 0]]) {
+   const seen = (await api('/todos', { cookie })).value.todos; assert.deepEqual(seen.flatMap(t => t.items.map(i => i.id)), [item(mine)], 'Each person sees their own item')
+   assert.equal((await api(`${path}/complete`, { method: 'POST', cookie, body: { expected_revision: await revision(), operation_id: crypto.randomUUID(), item_id: item(theirs) } })).status, 404)
+   assert.equal((await api(`${path}/complete`, { method: 'POST', cookie, body: { expected_revision: await revision(), operation_id: crypto.randomUUID(), item_id: item(mine) } })).status, 200)
+   assert.equal((await api(`${path}/edit`, { method: 'POST', cookie, body: { expected_revision: await revision(), operation_id: crypto.randomUUID(), title: 'x' } })).status, 403)
+  }
+  // The owner narrows a preset; the next request applies it and each change is audited.
+  assert.equal((await assign('superintendent', [site.id], 1, 'crew')).status, 200)
+  assert.equal((await field(sup, '/diary', { note: 'After narrowing' })).status, 403); assert.equal((await api('/jobs', { cookie: sup })).value.role, 'crew')
+  assert.equal((await assign('superintendent', [], 2, 'admin')).status, 200); assert.equal((await api('/jobs', { cookie: sup })).value.role, 'admin')
+  const audited = await f.db.prepare("SELECT value FROM oa_auth_audit WHERE action='plinth.role' AND value LIKE ? ORDER BY created_at").bind(people.superintendent.id + ':%').all()
+  assert.deepEqual(audited.results.map(a => a.value), [`${people.superintendent.id}:superintendent:1`, `${people.superintendent.id}:crew:2`, `${people.superintendent.id}:admin`])
+ } finally { await f.close() }
+})

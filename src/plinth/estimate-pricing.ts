@@ -1,4 +1,4 @@
-import { requireJobManager, requireManager } from './auth'
+import { requireEstimating, requireRateAccess } from './auth'
 import { date } from './catalog-input'
 import { need, object, usdOnly, recordApproval, stamp, text, type Actor, type Input, type Line, type Job, type Quote } from './model'
 import { calculatePricing, pricingPercent, pricingRules, type PricingRate, type PricingRateRevision, type PricingSnapshot } from './pricing-model'
@@ -13,7 +13,7 @@ export async function pricingRate(db: D1Database, id: string): Promise<PricingRa
 /** Only a signed-in human manager records reviewed rates; bearer credentials remain preview-only. */
 export async function pricingResponse(request: Request, db: D1Database, actor: Actor, parts: string[], readBody: (request: Request) => Promise<Input>): Promise<Response | null> {
  if (parts[0] !== 'pricing-rates') return null
- requireManager(actor, request.method === 'GET'); need(parts.length <= 2, 'Unknown pricing rate route', 404, 'not_found')
+ requireRateAccess(actor, request.method); need(parts.length <= 2, 'Unknown pricing rate route', 404, 'not_found')
  if (request.method === 'GET') {
   if (parts[1]) return Response.json({ rate: await pricingRate(db, parts[1]) }, { headers })
   const rows = await db.prepare('SELECT data FROM pl_pricing_rates ORDER BY rowid').all<{ data: string }>()
@@ -52,7 +52,7 @@ export async function reviewedPricing(db: D1Database, input: Input, base_lines: 
 
 async function digest(value: unknown) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2, '0')).join('') }
 export async function previewPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
- requireJobManager(actor, true); usdOnly(job)
+ requireEstimating(actor, true); usdOnly(job)
  const current = job.quotes.at(-1); need(current, 'Prepare an estimate before pricing', 409, 'quote_required')
  need(input.quote_id === undefined || input.quote_id === current.id, 'Price the current quote revision', 409, 'revision')
  const existing = (current as Quote & { pricing?: PricingSnapshot }).pricing
@@ -64,7 +64,7 @@ export async function previewPricing(db: D1Database, job: Job, actor: Actor, inp
  return { proposal, previous_total_cents: current.total_cents, total_delta_cents: calculated.total_cents - current.total_cents, sold: job.status !== 'quoting', digest: await digest([job.id, job.version, proposal]) }
 }
 export async function applyPricing(db: D1Database, job: Job, actor: Actor, input: Input) {
- requireJobManager(actor); usdOnly(job)
+ requireEstimating(actor); usdOnly(job)
  const preview = await previewPricing(db, job, actor, input)
  need(input.digest === preview.digest, 'Quote, pricing inputs or reviewed rate revisions changed; preview again before approving', 409, 'pricing_review')
  need(!preview.sold, 'Sold estimates stay frozen; use a change order', 409, 'quote_frozen')

@@ -1,4 +1,4 @@
-import { requireJobManager } from './auth'
+import { requireEstimating } from './auth'
 import { currencyOf, find, sum, type Actor, type Job, type Line, type Quote } from './model'
 
 const included = (line: Line) => line.included !== false
@@ -9,7 +9,7 @@ export function estimateTotals(quote: Quote) {
 }
 /** Legacy uncoded lines remain explicit and export their original stored cents. */
 export function costCodeReport(job: Job, actor: Actor, quoteId: string) {
- requireJobManager(actor)
+ requireEstimating(actor)
  const quote = find(job.quotes, quoteId)
  const grouped = new Map<string, { cost_code: string | null; phase: string | null; category: string | null; lines: Line[] }>()
  for (const line of quote.lines.filter(included)) {

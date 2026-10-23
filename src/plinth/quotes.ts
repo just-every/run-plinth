@@ -1,11 +1,11 @@
 import { assertRfiChange } from './rfis'
 import { assertAllowanceChange } from './allowance-model'
 import { active, cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job, type Quote, type Variation } from './model'
-import { requireJobManager } from './auth'
+import { requireEstimating, requireJobManager } from './auth'
 import { estimateLines } from './estimate-input'
 /** Adapted from Glove quote revisions/accept and Locket immutable version custody. */
 export function prepareQuote(job:Job,actor:Actor,input:Input):Quote {
- requireJobManager(actor,true);need(job.status==='quoting','An accepted quote is frozen; use a change order',409,'quote_frozen')
+ requireEstimating(actor,true);need(job.status==='quoting','An accepted quote is frozen; use a change order',409,'quote_frozen')
  const quote:Quote={id:crypto.randomUUID(),revision:job.quotes.length+1,...estimateLines(input,job),notes:text(input.notes,'notes',4000,true),status:'draft',prepared_by:stamp(actor)}
  for(const previous of job.quotes)if(previous.status==='draft')previous.status='superseded'
  job.quotes.push(quote);return quote

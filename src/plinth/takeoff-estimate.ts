@@ -1,4 +1,4 @@
-import { requireJobManager } from './auth'
+import { requireEstimating } from './auth'
 import { catalogPreview } from './catalog-quote'
 import { catalogEntry } from './estimate-catalog'
 import { decimal } from './estimate-math'
@@ -11,7 +11,7 @@ import type { Assembly, EstimateTemplate } from './catalog-model'
 
 /** A dimension means one physical unit. Conversions occur from retained measured units before catalog pricing. */
 export async function previewTakeoff(db:D1Database,job:Job,actor:Actor,input:Input){
- requireJobManager(actor,true)
+ requireEstimating(actor,true)
  const source=combined(job.takeoff??[],input),template=await catalogEntry(db,text(input.template_id,'Template id',100),'template'),definition=template.revisions.at(-1)!.value as EstimateTemplate
  const dimensions:Record<string,string>={},conversions:Record<string,{from:string;to:string;numerator:string;denominator:string}>={}
  need(Object.keys(source.dimensions).length===Object.keys(definition.dimensions).length&&Object.keys(definition.dimensions).every(key=>Object.hasOwn(source.dimensions,key)),'Measured dimensions must match exactly the selected template dimensions')
@@ -30,4 +30,4 @@ export async function previewTakeoff(db:D1Database,job:Job,actor:Actor,input:Inp
  const reviewedSource={...source,dimensions,previous_dimensions,dimension_changes,conversions,catalog:structuredClone(catalog.proposal.cost_catalog),assembly_snapshots:await Promise.all(catalog.proposal.cost_catalog.assemblies.map(async a=>{const entry=await catalogEntry(db,a.id,'assembly');return {id:entry.id,revision:entry.revisions.find(r=>r.version===a.version)!}}))}
  return {catalog,source:reviewedSource,digest:await digest(new TextEncoder().encode(JSON.stringify([job.id,job.version,catalog,reviewedSource])))}
 }
-export async function applyTakeoff(db:D1Database,job:Job,actor:Actor,input:Input){requireJobManager(actor);const preview=await previewTakeoff(db,job,actor,input);need(input.digest===preview.digest,'Drawings, annotations, calibration or prices changed; preview again before approval',409,'takeoff_stale');need(!preview.catalog.sold,'Accepted estimates are immutable; review the measured impact and use a change order',409,'quote_frozen');const quote=prepareQuote(job,actor,preview.catalog.proposal);quote.cost_catalog=preview.catalog.proposal.cost_catalog;quote.takeoff_source=preview.source;recordApproval(job,actor,'estimate.takeoff',quote,{quote_id:quote.id,source:quote.takeoff_source,lines:quote.lines,total_cents:quote.total_cents,cost_total_cents:quote.cost_total_cents});return quote}
+export async function applyTakeoff(db:D1Database,job:Job,actor:Actor,input:Input){requireEstimating(actor);const preview=await previewTakeoff(db,job,actor,input);need(input.digest===preview.digest,'Drawings, annotations, calibration or prices changed; preview again before approval',409,'takeoff_stale');need(!preview.catalog.sold,'Accepted estimates are immutable; review the measured impact and use a change order',409,'quote_frozen');const quote=prepareQuote(job,actor,preview.catalog.proposal);quote.cost_catalog=preview.catalog.proposal.cost_catalog;quote.takeoff_source=preview.source;recordApproval(job,actor,'estimate.takeoff',quote,{quote_id:quote.id,source:quote.takeoff_source,lines:quote.lines,total_cents:quote.total_cents,cost_total_cents:quote.cost_total_cents});return quote}

@@ -4,7 +4,7 @@ import { Icon, type IconName } from './icons'
 
 export type View = 'jobs' | 'imports' | 'people' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids' | 'todos' | 'subcontractor-records'
 export type Me = { displayName: string; email: string; role: string }
-const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', client: 'Client', member: 'Client' }
+const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew', client: 'Client', member: 'Client' }
 
 type RailProps = { view: View; role: string; me?: Me; jobs: { id: string; name: string }[]; selected: string; open: boolean; onView: (view: View) => void; onJob: (id: string) => void; onClose: () => void }
 
@@ -13,7 +13,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
   const item = (to: View, icon: IconName, label: string, badge?: number) => <li><button aria-current={view === to && (to !== 'jobs' || !selected) ? 'page' : undefined} className={view === to ? 'is-active' : undefined} onClick={() => onView(to)}><Icon name={icon} />{label}{badge !== undefined && <span className="rail-count">{badge}</span>}</button></li>
   return <aside className={`rail${open ? ' is-open' : ''}`} aria-label="Workspace">
-    <div className="rail-top"><a className="lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span data-rer-name>Plinth</span></a><button className="icon-button rail-close" aria-label="Close menu" onClick={onClose}><Icon name="close" /></button></div>
+    <div className="rail-top"><a className="lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span data-rer-name>Plinth</span></a><button className="icon-button rail-close" aria-label="Close menu" data-tip="Close menu" onClick={onClose}><Icon name="close" /></button></div>
     <ul className="rail-nav">
       {item('jobs', 'folder', 'Jobs', jobs.length)}
       {item('todos','folder','My to-dos')}
@@ -36,7 +36,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
 
 export function TopBar({ query, onQuery, onMenu, onNew, manager }: { query: string; onQuery: (value: string) => void; onMenu: () => void; onNew: () => void; manager: boolean }) {
   return <header className="topbar">
-    <button className="icon-button menu-button" aria-label="Open menu" onClick={onMenu}><Icon name="menu" /></button>
+    <button className="icon-button menu-button" aria-label="Open menu" data-tip="Open menu" onClick={onMenu}><Icon name="menu" /></button>
     <a className="lockup topbar-lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span>Plinth</span></a>
     <label className="search"><Icon name="search" /><span className="visually-hidden">Search jobs</span><input type="search" value={query} onChange={e => onQuery(e.target.value)} placeholder="Search jobs, clients or addresses" /></label>
     <p className="today">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).replace(',', '')}</p>
