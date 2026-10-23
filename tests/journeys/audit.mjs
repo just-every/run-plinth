@@ -26,7 +26,7 @@ try{
  await capture('hold-blocks-erasure',async()=>{await expect(page.getByText('Erasure is blocked',{exact:false})).toBeVisible()})
  await page.getByLabel('Reason for releasing').fill('Dispute settled in writing');await page.getByRole('button',{name:'Release this hold',exact:true}).click();await expect(page.getByText('released',{exact:false}).first()).toBeVisible()
  // The audit history shows the events and exports them.
- await page.goto(base+'/app');await page.getByRole('button',{name:'Audit history'}).first().click()
+ await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app');await page.getByRole('button',{name:'Audit history'}).first().click()
  await capture('audit-history',async()=>{await expect(page.getByText('quotes.accept',{exact:true}).first()).toBeVisible();await expect(page.getByText('jobs.erase_refused',{exact:true}).first()).toBeVisible();await expect(page.getByText('holds.legal_hold',{exact:true}).first()).toBeVisible()})
  await page.getByLabel('Search',{exact:true}).fill('quotes');await page.getByLabel('Kind').selectOption('financial');await page.getByRole('button',{name:'Search history',exact:true}).click()
  await expect(page.getByText('jobs.erase_refused',{exact:true})).toHaveCount(0);await expect(page.getByText('quotes.accept',{exact:true}).first()).toBeVisible()
