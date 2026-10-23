@@ -46,7 +46,7 @@ try{
  const small=await order(400000),large=await order(600000)
  assert.equal((await act(`/orders/${small}/issue`,{},contexts[2])).status,200);assert.equal((await act(`/orders/${large}/issue`,{},contexts[2])).status,403)
  await officePage.goto(base+`/app?job=${job.id}&tab=Purchasing`)
- await capture(officePage,'office-manager-limit',async()=>{await expect(officePage.getByText('PO 400000',{exact:false}).first().or(officePage.getByText('Champlain Lumber',{exact:false}).first())).toBeVisible()})
+ await capture(officePage,'office-manager-limit',async()=>{await expect(officePage.getByText('PO 400000',{exact:true})).toBeVisible()})
  const contract=parseContract(await readFile(new URL('../../CONTRACT.md',import.meta.url),'utf8')),site=process.env.PLINTH_SITE;assert.ok(site)
  const publicContext=await browser.newContext(),publicPage=await publicContext.newPage();await publicPage.goto(site+'/contract')
  for(const width of [1440,390]){await publicPage.setViewportSize({width,height:1000});const row=publicPage.locator('tr.clause[data-id="ROLE-006"]');await expect(row).toHaveAttribute('data-status',contract.clauses.find(c=>c.id==='ROLE-006').status);assert.ok(await publicPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Contract fits '+width);await row.screenshot({path:`${shots}/ROLE-006-contract-evidence-${width}.png`,animations:'disabled'})}
