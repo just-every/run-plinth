@@ -6,8 +6,8 @@ const sourceKey=(job:Job)=>JSON.stringify({entries:actualEntries(job).map(e=>[e.
 export function discrepancies(job:Job){
  const state=costs(job),ledger=costLedger(job),policy=state.policy,items:{key:string;kind:string;amount_cents:number;evidence:string}[]=[]
  for(const r of ledger.rows){
-  const actual=r.posted_actual_cents,budget=r.approved_budget_cents
-  if(budget!==null&&actual-budget>(policy?.budget_limit_cents??0))items.push({key:'budget:'+r.cost_code,kind:'budget',amount_cents:actual-budget,evidence:`${r.cost_code}: actual ${actual}, budget ${budget}`})
+  const actual=sum([r.posted_actual_cents,r.open_commitment_cents]),budget=r.approved_budget_cents
+  if(budget!==null&&actual-budget>(policy?.budget_limit_cents??0))items.push({key:'budget:'+r.cost_code,kind:'budget',amount_cents:actual-budget,evidence:`${r.cost_code}: actual plus unconsumed commitment ${actual}, budget ${budget}`})
   if(budget!==null&&r.commitment_cents-budget>(policy?.commitment_limit_cents??0))items.push({key:'commitment:'+r.cost_code,kind:'commitment',amount_cents:r.commitment_cents-budget,evidence:`${r.cost_code}: commitments exceed approved budget`})
   if(r.received_not_billed_cents<0||r.open_commitment_cents<0)items.push({key:'receipt:'+r.cost_code,kind:'receipt',amount_cents:Math.min(r.received_not_billed_cents,r.open_commitment_cents),evidence:`${r.cost_code}: matched bills exceed current source receipts or commitment`})
  }

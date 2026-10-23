@@ -22,13 +22,22 @@ test('COST-004 — half-complete framing, worse productivity, posted costs and a
 
 test('COST-006 — owner limits and separated approval assign budget and missing-accounting exceptions; only approved correction and source agreement permit clearance',async()=>{
  const f=await createFixture();try{
-  const c=await costFixture(f),admin=await f.invite('synthetic-plinth-admin@example.com','Cost reviewer','admin')
+  const c=await costFixture(f),admin=await f.invite('synthetic-plinth-admin@example.com','Cost preparer','admin'),reviewer=await f.invite('synthetic-plinth-limit-reviewer@example.com','Independent cost reviewer','admin')
   const operators={id:c.job.created_by.id}
   await c.ok('/costs/policy',{budget_limit_cents:0,commitment_limit_cents:0,bill_limit_cents:100000,separate_approval:true,owner_id:operators.id,due_on:'2026-11-01'})
+  const team=(await c.api('/team')).value.team,reviewerId=team.find(p=>p.email==='synthetic-plinth-limit-reviewer@example.com').id
+  let commitment=await c.ok('/orders',{supplier:'Synthetic Lumber',description:'Additional framing commitment above owner variance',source:{kind:'budget',cost_code:'06-100'},lines:[{id:'extra',description:'Additional framing package',cost_code:'06-100',quantity:'1',unit:'lot',unit_cents:1000}]});const extra=commitment.record
+  await c.ok(`/orders/${extra.id}/issue`)
+  assert.ok((await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value.items.some(e=>e.kind==='commitment'&&e.amount_cents===1000),'The issued-order public door assigns an over-limit commitment exception')
+  await c.ok(`/orders/${extra.id}/cancel`,{reason:'Owner cancels the unstarted excess package after source review'})
   const invoice=c.bill();invoice.lines=[{...invoice.lines[0],subtotal_cents:160000,taxable:false,matches:[]}]
   let r=await c.act('/costs/bills',invoice,admin);assert.equal(r.status,200,JSON.stringify(r.value));const id=r.value.record.id;await c.read()
   await c.ok(`/costs/bills/${id}/review`,{reason:'Receipt missing; reviewed original supplier evidence and assigned follow-up'})
-  assert.equal((await c.act(`/costs/bills/${id}/post`,{},admin)).status,403,'Preparing clerk cannot approve; also exceeds their limit')
+  await c.ok(`/costs/bills/${id}/route`,{reviewer_id:r.value.record.prepared_by.id,reason:'Exercise the configured independent-preparer fence'})
+  assert.equal((await c.act(`/costs/bills/${id}/post`,{},admin)).value.error,'cost_separation','A designated preparing clerk still cannot approve their own bill')
+  await c.ok(`/costs/bills/${id}/route`,{reviewer_id:reviewerId,reason:'Independent office reviewer checks the over-limit invoice'})
+  assert.equal((await c.act(`/costs/bills/${id}/post`,{},reviewer)).value.error,'cost_limit','A different designated administrator still cannot approve above the owner bill limit')
+  await c.ok(`/costs/bills/${id}/route`,{reviewer_id:operators.id,reason:'Route the over-limit decision to the owner'})
   await c.ok(`/costs/bills/${id}/post`)
   await c.ok('/costs/reconcile',{period:'2026-10',balances:[],reference:'synthetic-plinth-accounting-export-removed-entry'})
   let exceptions=(await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value
@@ -36,7 +45,12 @@ test('COST-006 — owner limits and separated approval assign budget and missing
   for(const e of active)assert.equal((await c.act(`/costs/exceptions/${e.id}`,{reason:'Dismiss without correction'})).status,409)
   const credit={...invoice,kind:'credit',credit_of:id,reference:'synthetic-plinth-variance-credit',lines:[{...invoice.lines[0],subtotal_cents:60000}]}
   r=await c.act('/costs/bills',credit,admin);assert.equal(r.status,200);await c.read();await c.ok(`/costs/bills/${r.value.record.id}/review`,{reason:'Supplier corrected overbill'});await c.ok(`/costs/bills/${r.value.record.id}/post`)
-  await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:100000}],reference:'synthetic-plinth-accounting-corrected-export'})
+  await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:100000}],reference:'synthetic-plinth-accounting-partial-correction'})
+  const budgetException=active.find(e=>e.kind==='budget')
+  assert.equal((await c.act(`/costs/exceptions/${budgetException.id}`,{reason:'Actual alone is inside budget but commitments remain'})).value.error,'cost_unresolved','Accounting agreement alone cannot hide actual plus open commitment exposure')
+  const remainder={...credit,reference:'synthetic-plinth-variance-credit-remaining',lines:[{...invoice.lines[0],subtotal_cents:100000}]}
+  r=await c.act('/costs/bills',remainder,admin);assert.equal(r.status,200);await c.read();await c.ok(`/costs/bills/${r.value.record.id}/review`,{reason:'Remaining erroneous supplier invoice is credited; original commitments remain separate'});await c.ok(`/costs/bills/${r.value.record.id}/post`)
+  await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:0}],reference:'synthetic-plinth-accounting-corrected-export'})
   for(const e of active)await c.ok(`/costs/exceptions/${e.id}`,{reason:'Approved credit and exact accounting reconciliation agree'})
   exceptions=(await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value;assert.ok(exceptions.items.filter(e=>active.some(a=>a.id===e.id)).every(e=>e.status==='cleared'&&e.resolutions.length===1));assert.equal(exceptions.unassigned.length,0);assert.equal(exceptions.healthy,false,'Historical source follow-ups still need explicit human resolution')
   for(const e of exceptions.items.filter(e=>!e.resolutions.length&&!e.current))await c.ok(`/costs/exceptions/${e.id}`,{reason:'Approved source is now posted and the current external ledger agrees'})
