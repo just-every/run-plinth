@@ -1,3 +1,10 @@
+import { auditStatement } from './audit'
+import { costRecords, costFields, costQuery, costView, runCostView } from './cost-fields'
+import { reportCsv } from './report-query'
+import { sourceAction, payrollAction } from './cost-labor'
+import { transferCost } from './cost-transfer'
+import { forecastAction } from './cost-forecast'
+import { exceptionAction, exceptionView, refreshExceptions } from './cost-exceptions'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireManager } from './auth'
 import { active, DomainError, find, need, object, usdOnly, type Actor, type Input, type Job } from './model'
@@ -16,13 +23,24 @@ export async function costResponse(request:Request,original:Bindings):Promise<Re
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,m[1]!);usdOnly(previous)
  if(request.method==='GET'){
   if(!m[2]||m[2]==='ledger'&&!m[3]){const report=costLedger(previous),code=new URL(request.url).searchParams.get('code');return json(code?{...report,rows:report.rows.filter(r=>r.cost_code===code)}:report)}
-  if(m[2]==='bills'&&m[3]&&m[4]==='original'){const d=find(costs(previous).bills,m[3]).document;return new Response(Uint8Array.from(atob(d.base64),c=>c.charCodeAt(0)),{headers:{...headers,'content-type':d.mime,'content-disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(d.name),'content-security-policy':"default-src 'none'; sandbox",'x-content-sha256':d.checksum}})}
+  if(m[2]==='bills'&&m[3]&&m[4]==='original'){const d=find(costs(previous).bills,m[3]).document;await env.DB.batch([auditStatement(env.DB,actor,{kind:'export',action:'cost.bill.original',job_id:previous.id,subject_kind:'cost_bill',subject_id:m[3],detail:{checksum:d.checksum}})]);return new Response(Uint8Array.from(atob(d.base64),c=>c.charCodeAt(0)),{headers:{...headers,'content-type':d.mime,'content-disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(d.name),'content-security-policy':"default-src 'none'; sandbox",'x-content-sha256':d.checksum}})}
+  if(m[2]==='records'&&!m[3])return json(await costRecords(env.DB,previous))
+  if(m[2]==='views'&&!m[3])return json({views:(costs(previous).views??[]).filter(v=>v.sharing==='shared'||v.created_by===actor.id)})
+  if(m[2]==='views'&&m[3]){const result=await runCostView(env.DB,previous,actor,m[3]);return m[4]==='export.csv'?new Response(reportCsv(result.report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=job-cost-view.csv'}}):json(result)}
+  if(m[2]==='sources'&&!m[3])return json({version:previous.version,sources:costs(previous).sources.map(({document,...s})=>({...s,document:document?{...document,base64:undefined}:undefined}))})
+  if(m[2]==='sources'&&m[3]&&m[4]==='original'){const d=find(costs(previous).sources,m[3]).document;need(d,'Source has no original',404,'not_found');await env.DB.batch([auditStatement(env.DB,actor,{kind:'export',action:'cost.source.original',job_id:previous.id,subject_kind:'cost_source',subject_id:m[3],detail:{checksum:d.checksum}})]);return new Response(Uint8Array.from(atob(d.base64),c=>c.charCodeAt(0)),{headers:{...headers,'content-type':d.mime,'content-disposition':'attachment; filename=employee-receipt','content-security-policy':"default-src 'none'; sandbox"}})}
+  if(m[2]==='payroll'&&m[3]&&m[4]==='original'){const d=find(costs(previous).payroll_imports??[],m[3]).document;await env.DB.batch([auditStatement(env.DB,actor,{kind:'export',action:'cost.payroll.original',job_id:previous.id,subject_kind:'cost_payroll',subject_id:m[3],detail:{checksum:d.checksum}})]);return new Response(Uint8Array.from(atob(d.base64),c=>c.charCodeAt(0)),{headers:{...headers,'content-type':'text/csv','content-disposition':'attachment; filename=payroll.csv'}})}
+  if(m[2]==='forecasts'&&!m[3])return json({version:previous.version,forecasts:costs(previous).forecasts.map(f=>({...f,stale:f.source_version!==previous.version}))})
+  if(m[2]==='exceptions'&&!m[3])return json(exceptionView(previous))
   if(m[2]==='bills'&&!m[3])return json({version:previous.version,bills:costs(previous).bills.map(({document,...b})=>({...b,document:{...document,base64:undefined}}))})
   throw new DomainError('not_found','Unknown cost route',404)
  }
  need(request.method==='POST','Method not allowed',405,'method_not_allowed');active(previous);const input=await body(request);need(input.expected_version===previous.version,'Job changed; reload before writing costs',409,'stale_version')
+ if(m[2]==='query'&&!m[3])return json(await costQuery(env.DB,previous,actor,input))
+ if(m[2]==='transfers'&&!m[3])return json(await transferCost(env.DB,actor,previous,input,clock))
  const job=structuredClone(previous);let record:unknown
- if(m[2]==='bills'){if(!m[3])need(!(await jobs(env.DB)).some(j=>costs(j).bills.some(b=>b.vendor.toLowerCase()===String(input.vendor).trim().toLowerCase()&&b.reference.toLowerCase()===String(input.reference).trim().toLowerCase())),'Vendor invoice reference already exists in this installation',409,'cost_duplicate');record=await billAction(job,actor,input,m[3],m[4]);}else throw new DomainError('not_found','Unknown cost action',404)
+ if(m[2]==='refresh'&&!m[3]){refreshExceptions(job);record=exceptionView(job)}else if(m[2]==='bills'){if(input.reviewer_id!==undefined){const reviewer=await env.DB.prepare("SELECT id FROM oa_operators WHERE id=? AND status='active' AND role IN ('owner','admin') AND NOT EXISTS(SELECT 1 FROM pl_team WHERE operator_id=oa_operators.id)").bind(input.reviewer_id).first();need(reviewer,'Bill reviewer must be an active owner or administrator')}if(!m[3])need(!(await jobs(env.DB)).some(j=>costs(j).bills.some(b=>b.vendor.toLowerCase()===String(input.vendor).trim().toLowerCase()&&b.reference.toLowerCase()===String(input.reference).trim().toLowerCase())),'Vendor invoice reference already exists in this installation',409,'cost_duplicate');record=await billAction(job,actor,input,m[3],m[4]);await costFields(env.DB,job,(record as {id:string}).id,input,(record as {status:string}).status);}else if(m[2]==='sources'){record=await sourceAction(job,actor,input,m[3],m[4]);await costFields(env.DB,job,(record as {id:string}).id,input,(record as {approved_by?:unknown}).approved_by?'approved':'draft');}else if(m[2]==='payroll'&&!m[3]){const imported=await payrollAction(job,actor,input);for(const r of imported.records)await costFields(env.DB,job,r.id,input,'approved');record=imported;}else if(m[2]==='forecasts'&&!m[3]){record=await forecastAction(job,actor,input);await costFields(env.DB,job,(record as {id:string}).id,input,'recorded');}else if(m[2]==='values'&&m[3]){need((await costRecords(env.DB,job)).records.some(r=>r.local_id===m[3]),'Cost record not found',404,'not_found');record=await costFields(env.DB,job,m[3],input)}else if(m[2]==='views'&&!m[3])record=await costView(env.DB,job,actor,input);else if(['policy','reconcile','exceptions'].includes(m[2]!)){if(m[2]==='policy'){need(actor.role==='owner','Only the owner defines cost approval policy',403,'forbidden');const person=await env.DB.prepare("SELECT id FROM oa_operators WHERE id=? AND status='active' AND role IN ('owner','admin') AND NOT EXISTS(SELECT 1 FROM pl_team WHERE operator_id=oa_operators.id)").bind(input.owner_id).first();need(person,'Exception owner must be an active owner or administrator')}record=exceptionAction(job,actor,input,m[2]!,m[3])}else throw new DomainError('not_found','Unknown cost action',404)
+ refreshExceptions(job)
  await saveJob(env.DB,actor,previous,job,[],clock)
  return json({version:job.version,record:record&&typeof record==='object'?'document' in record?{...record,document:{...(record as {document:object}).document,base64:undefined}}:record:record,ledger:costLedger(job)})
 }
@@ -30,6 +48,6 @@ export async function costResponse(request:Request,original:Bindings):Promise<Re
 export async function protectCosts(response:Response,actor?:Actor){
  if(!response.headers.get('content-type')?.includes('application/json'))return response
  const office=actor&&!actor.permissions&&(actor.role==='owner'||actor.role==='admin')
- const scrub=(value:unknown,key=''):unknown=>Array.isArray(value)?value.filter(v=>key!=='approvals'||office||!v?.kind?.startsWith('cost.')).map(v=>scrub(v)):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='cost_records').map(([k,v])=>[k,scrub(v,k)])):value
+ const scrub=(value:unknown,key=''):unknown=>Array.isArray(value)?value.filter(v=>key!=='approvals'||office||!v?.kind?.startsWith('cost.')).map(v=>scrub(v)):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='cost_records'&&(office||k!=='cost_ledger')).map(([k,v])=>[k,scrub(v,k)])):value
  return new Response(JSON.stringify(scrub(await response.json())),{status:response.status,headers:response.headers})
 }

@@ -11,6 +11,7 @@ export async function costFixture(f){
  r=await api('/pricing-rates',{jurisdiction:'Synthetic jurisdiction',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'synthetic-plinth-rate-1',human_reviewed:true});assert.equal(r.status,201);const pricing={basis:'sell',as_of:'2026-10-23',rules:[],tax:{rate_id:r.value.rate.id,taxable_line_ids:['framing','labor']}}
  r=await ok('/pricing/preview',pricing);await ok('/pricing/apply',{...pricing,digest:r.preview.digest})
  await ok(`/quotes/${job.quotes.at(-1).id}/accept`,{method:'email',evidence:'synthetic-plinth-client-acceptance',schedule_choice:{kind:'none',reason:'Separately scheduled'}})
+ await ok('/costs/policy',{budget_limit_cents:0,commitment_limit_cents:0,bill_limit_cents:1000000,separate_approval:false,owner_id:job.created_by.id,due_on:'2026-11-01'})
  await ok('/orders',{supplier:'Synthetic Lumber',description:'Framing package',source:{kind:'budget',cost_code:'06-100'},lines:[{id:'lumber',description:'Studs',cost_code:'06-100',quantity:'10',unit:'pack',unit_cents:10000}]})
  const order=job.orders.at(-1);await ok(`/orders/${order.id}/issue`);await ok(`/orders/${order.id}/receive`,{lines:[{line_id:'lumber',quantity:'3'}],reference:'synthetic-plinth-delivery-1'});await ok(`/orders/${order.id}/receive`,{lines:[{line_id:'lumber',quantity:'2'}],reference:'synthetic-plinth-delivery-2'});await read()
  const receipts=job.orders.at(-1).receipts

@@ -23,10 +23,13 @@ function validateMatches(job:Job,bill:CostBill){
   if(order.source?.kind==='award'){
    const sub=find(job.subcontracts??[],order.source.subcontract_id)
    need(sub.status==='released','Subcontract progress is not released',409,'cost_scope')
-   const gross=sum(sub.draws?.map(d=>d.amount_cents)??[])
-   need(sum([used(other=>job.orders.find(o=>o.id===other.order_id)?.source?.kind==='award'&&(job.orders.find(o=>o.id===other.order_id)!.source as {subcontract_id:string}).subcontract_id===sub.id),sign*sum(proposed.map(p=>p.amount_cents))])<=gross,'Bill exceeds recorded approved subcontract progress',409,'cost_progress')
+   const draw=find(sub.draws??[],text(m.draw_id,'Approved progress draw_id',100))
+   const sameDraw=(other:CostMatch)=>other.draw_id===draw.id
+   const progress=sum([used(sameDraw),sign*sum(proposed.filter(sameDraw).map(p=>p.amount_cents))])
+   need(progress>=0&&progress<=draw.amount_cents,'Bill exceeds recorded approved subcontract progress',409,'cost_progress')
+   need(sub.lien,'Record the subcontract lien parties before matching a bill',409,'cost_waiver')
    const packet=lienPacket([sub],bill.dated_on)
-   need(!packet.unresolved.length,'Resolve required subcontract waivers before posting its matched bill',409,'cost_waiver')
+   need(!packet.unresolved.some(w=>w.draw_id===draw.id&&!draw.exception),'Resolve the matched draw’s required waivers or record the existing owner exception before posting its bill',409,'cost_waiver')
   }
  }
  if(bill.kind==='credit'){
@@ -50,22 +53,24 @@ export async function billAction(job:Job,actor:Actor,input:Input,id?:string,acti
   const raw=input.lines.map((value,i)=>{const l=object(value);need(typeof l.taxable==='boolean','Each line explicitly chooses taxable or exempt');return {id:String(i+1),cost_code:costCode(job,l.cost_code),description:text(l.description,'description',500),quantity:1,unit_cents:positive(l.subtotal_cents,'subtotal_cents'),total_cents:positive(l.subtotal_cents,'subtotal_cents'),taxable:l.taxable,matches:l.matches??[]}})
   need(raw.every(l=>l.taxable)||exemption_reference,'Exempt lines require evidence')
   const pricing=calculatePricing(raw,'sell',[],percent,raw.filter(l=>l.taxable).map(l=>l.id))
-  const lines:CostLine[]=raw.map((l,i)=>{need(Array.isArray(l.matches)&&l.matches.length<=50,'Send up to 50 receipt matches per line');const matches=l.matches.map(value=>{const m=object(value);return {order_id:text(m.order_id,'order_id',100),receipt_id:text(m.receipt_id,'receipt_id',100),cost_code:text(m.cost_code??l.cost_code,'Receipt cost_code',80),amount_cents:positive(m.amount_cents)}});need(sum(matches.map(m=>m.amount_cents))<=l.total_cents,'Receipt matches cannot exceed line subtotal');return {id:l.id,cost_code:l.cost_code,description:l.description,subtotal_cents:l.total_cents,amount_cents:pricing.lines[i]!.total_cents,tax_cents:pricing.lines[i]!.total_cents-l.total_cents,matches}})
+  const lines:CostLine[]=raw.map((l,i)=>{need(Array.isArray(l.matches)&&l.matches.length<=50,'Send up to 50 receipt matches per line');const matches=l.matches.map(value=>{const m=object(value);return {order_id:text(m.order_id,'order_id',100),receipt_id:text(m.receipt_id,'receipt_id',100),cost_code:text(m.cost_code??l.cost_code,'Receipt cost_code',80),amount_cents:positive(m.amount_cents),...(m.draw_id?{draw_id:text(m.draw_id,'draw_id',100)}:{})}});need(sum(matches.map(m=>m.amount_cents))<=l.total_cents,'Receipt matches cannot exceed line subtotal');return {id:l.id,cost_code:l.cost_code,description:l.description,subtotal_cents:l.total_cents,amount_cents:pricing.lines[i]!.total_cents,tax_cents:pricing.lines[i]!.total_cents-l.total_cents,matches}})
   const dated=costDate(input),due_on=localDate(input.due_on,'due_on');need(due_on>=dated.dated_on,'Due date cannot precede invoice date')
-  const row:CostBill={id:crypto.randomUUID(),kind,vendor,reference,...dated,due_on,status:'draft',lines,amount_cents:sum(lines.map(l=>l.amount_cents)),document:await document(input.document),prepared_by:stamp(actor),reviews:[],tax:{percent,reference:taxReference,exemption_reference,verification:'Human reviewed; no provider verification',taxable_line_ids:raw.filter(l=>l.taxable).map(l=>l.id)},flags:[],...(kind==='credit'?{credit_of:text(input.credit_of,'credit_of',100)}:{})}
+  const row:CostBill={id:crypto.randomUUID(),reviewer_id:text(input.reviewer_id??state.policy?.owner_id??actor.id,'Designated reviewer',100),kind,vendor,reference,...dated,due_on,status:'draft',lines,amount_cents:sum(lines.map(l=>l.amount_cents)),document:await document(input.document),prepared_by:stamp(actor),reviews:[],tax:{as_of:dated.dated_on,reviewed_by:stamp(actor),taxable_cents:pricing.taxable_cents,exempt_cents:pricing.exempt_cents,tax_cents:pricing.tax_cents,stages:pricing.stages,percent,reference:taxReference,exemption_reference,verification:'Human reviewed; no provider verification',taxable_line_ids:raw.filter(l=>l.taxable).map(l=>l.id)},flags:[],...(kind==='credit'?{credit_of:text(input.credit_of,'credit_of',100)}:{})}
   row.flags=lines.flatMap(l=>[...(sum(l.matches.map(m=>m.amount_cents))<l.subtotal_cents?['Missing receipt: line '+l.id]:[]),...(l.matches.some(m=>m.cost_code!==l.cost_code)?['Scope/code discrepancy: line '+l.id]:[])])
   validateMatches(job,row);state.bills.push(row);return row
  }
  const row=find(state.bills,id);need(row.status==='draft','Posted originals and coding are immutable; enter a credit or explicit transfer',409,'cost_posted')
+ if(action==='route'){row.reviewer_id=text(input.reviewer_id,'Designated reviewer',100);row.reviews.push({reason:text(input.reason,'Approval routing reason',2000),by:stamp(actor)});return row}
  if(action==='review'){row.reviews.push({reason:text(input.reason,'Approval routing evidence',2000),by:stamp(actor)});return row}
  if(action==='recode'){
-  const line=find(row.lines,text(input.line_id,'line_id',100)),before=line.cost_code;line.cost_code=costCode(job,input.cost_code);row.reviews=[];recordApproval(job,actor,'cost.bill.recode',row,{bill_id:row.id,line_id:line.id,before,after:line.cost_code,reason:text(input.reason,'Recode reason',2000)});return row
+  const line=find(row.lines,text(input.line_id,'line_id',100)),before=line.cost_code;line.cost_code=costCode(job,input.cost_code);row.flags=row.lines.flatMap(l=>[...(sum(l.matches.map(m=>m.amount_cents))<l.subtotal_cents?['Missing receipt: line '+l.id]:[]),...(l.matches.some(m=>m.cost_code!==l.cost_code)?['Scope/code discrepancy: line '+l.id]:[])]);row.reviews=[];recordApproval(job,actor,'cost.bill.recode',row,{bill_id:row.id,line_id:line.id,before,after:line.cost_code,reason:text(input.reason,'Recode reason',2000)});return row
  }
  need(action==='post','Unknown bill action',404,'not_found')
  validateMatches(job,row)
  need(!row.flags.length||row.reviews.length,'Review every missing-receipt or scope discrepancy before posting',409,'cost_review')
  const policy=state.policy
- need(!policy?.separate_approval||row.prepared_by.id!==actor.id,'A different authorized person must approve this bill',403,'cost_separation')
+ need(row.reviewer_id===actor.id,'Only the designated current office reviewer approves this bill',403,'cost_reviewer')
+ need(!(policy?.separate_approval??true)||row.prepared_by.id!==actor.id,'A different authorized person must approve this bill',403,'cost_separation')
  need(!policy||row.amount_cents<=policy.bill_limit_cents||actor.role==='owner','Only the owner approves a bill over its limit',403,'cost_limit')
  const sign=row.kind==='credit'?-1:1
  for(const line of row.lines)state.entries.push({id:crypto.randomUUID(),source_id:row.id,source_line_id:line.id,source_kind:row.kind,cost_code:line.cost_code,amount_cents:sign*line.amount_cents,dated_on:row.dated_on,period:row.period,matches:line.matches.map(m=>({...m,amount_cents:sign*m.amount_cents})),by:stamp(actor)})
