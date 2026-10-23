@@ -48,7 +48,7 @@ try{
  await capture(sup,'superintendent-today',async()=>{await tabs(sup,['Schedule','Daily logs','Punch','Today','To-dos']);await expect(sup.getByRole('heading',{name:'My job day',exact:true})).toBeVisible();await expect(sup.getByText('Check stud layout',{exact:false})).toBeVisible();await expect(sup.getByText('Stack lumber by wall',{exact:false})).toHaveCount(0);await expect(sup.getByText('Contract $',{exact:false})).toHaveCount(0)})
  await sup.getByRole('button',{name:'Daily logs',exact:true}).click();await sup.getByLabel('Work, conditions and decisions').fill('Walls framed to the second plate; weather dry.');await sup.getByRole('button',{name:'Save daily log draft',exact:true}).click()
  await expect(sup.getByText('Walls framed to the second plate',{exact:false})).toBeVisible();await expect(sup.getByRole('button',{name:'Publish daily log',exact:true})).toHaveCount(0)
- await capture(sup,'superintendent-log-draft',async()=>{await expect(sup.getByText('draft',{exact:true}).first()).toBeVisible()})
+ await capture(sup,'superintendent-log-draft',async()=>{await expect(sup.getByText('Draft',{exact:true}).first()).toBeVisible()})
  // Crew: assigned work and published logs only.
  await crew.goto(base+`/app?job=${site.id}&tab=Daily%20logs`)
  await capture(crew,'crew-logs',async()=>{await tabs(crew,['Schedule','Daily logs','Punch','Today','To-dos']);await expect(crew.getByText('Walls framed to the second plate',{exact:false})).toHaveCount(0);await expect(crew.getByRole('heading',{name:'Write a daily log',exact:true})).toHaveCount(0)})
