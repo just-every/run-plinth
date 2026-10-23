@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
+import { costFixture, original as costOriginal } from './cost-support.mjs'
 
 test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
@@ -116,6 +117,16 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     r=await f.json(`/api/plinth/subcontractor-portal/${job.id}/compliance`,{method:'POST',cookie:portalContact,body:{...portalInput,expected_version:job.version,kind:'license',issuer:'Synthetic state licensing authority',effective_on:'2026-01-01',expires_on:'2099-12-31'}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     const archivePortal=structuredClone(job.portal_submissions),portalCompliance=archivePortal.find(s=>s.kind==='compliance')
     r=await f.json(`/api/plinth/jobs/${job.id}/portal-policy`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,disabled:{client:['photos'],subcontractor:['bills']},reason:'Archived owner access restriction'}});assert.equal(r.status,200);job=r.value.job
+    // COST-001..006 share this same private archive and erasure journey.
+    const c=await costFixture(f)
+    let costResponse=await c.ok('/costs/bills',c.bill());await c.ok(`/costs/bills/${costResponse.record.id}/review`,{reason:'Archive reviewed original'});await c.ok(`/costs/bills/${costResponse.record.id}/post`)
+    costResponse=await c.ok('/costs/sources',{kind:'expense',reference:'synthetic-plinth-archive-expense',employee_reference:'synthetic-plinth-employee-1',cost_code:'01-100',dated_on:'2026-10-23',period:'2026-10',amount_cents:1000,document:costOriginal});await c.ok(`/costs/sources/${costResponse.record.id}/approve`)
+    costResponse=await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-archive-time',employee_reference:'synthetic-plinth-employee-1',cost_code:'01-100',dated_on:'2026-10-23',period:'2026-10',minutes:480,hour_cents:3000,burden_bps:2000});const time=costResponse.record;await c.ok(`/costs/sources/${time.id}/approve`)
+    const payrollCsv=`external_id,time_source_id,gross_cents,burden_cents\nsynthetic-plinth-archive-payroll,${time.id},25000,5500\n`;await c.ok('/costs/payroll',{csv:payrollCsv,reference:'synthetic-plinth-archive-register',dated_on:'2026-10-24',period:'2026-10'})
+    await c.ok('/costs/forecasts',{as_of:'2026-10-23',source_as_of:'Archive sources checked',codes:[{cost_code:'06-100',remaining_quantity:'50',minutes_per_unit:'24',labor_hour_cents:3000,outstanding_commitment_cents:60000,unbought_cents:0,risk_cents:0,reference:'Archive framing half complete'},{cost_code:'01-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:0,unbought_cents:1000,risk_cents:0,reference:'Archive remaining labor'}]})
+    await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:33000},{cost_code:'01-100',amount_cents:41500}],reference:'synthetic-plinth-archive-accounting'})
+    await c.ok('/costs/periods',{period:'2026-10',accountant_approved:true,accountant_name:'Synthetic archive accountant',approval_reference:'synthetic-plinth-archive-close',opening_cash_cents:200000,months:3})
+    const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
     succeeds(command(source,'export','--output',before))
@@ -125,6 +136,8 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     const receiver=await createFixture({persistTo:destination,ownerCookie:cookie})
     try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
     const rows = records => records.filter(r=>r.kind==='part').flatMap(r=>r.items)
+    const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
+    assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     // The complete part stream, including binary cells, is unchanged by a restore.
     assert.ok(rows(original).length > 0)
     const expected=structuredClone(rows(original))
@@ -161,9 +174,12 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     assert.ok(!serialized.includes('test-session-secret-for-plinth-integration-only-2026'))
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
+    const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
+    const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
     assert.ok(!erasedRows.some(item=>item.table==='pl_attachments'&&item.row.job_id===job.id),'ROLE-003 erasure removes job-local submission originals')
     assert.ok(erasedRows.some(item=>item.table==='pl_vendor_documents'&&item.row.id===portalCompliance.compliance_id),'ROLE-003 company compliance evidence keeps its independent company custody')
 
