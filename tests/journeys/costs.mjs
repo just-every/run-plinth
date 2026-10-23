@@ -36,7 +36,10 @@ try{
  for(const e of exceptions.items.filter(e=>!e.resolutions.length&&!e.current))await c.ok(`/costs/exceptions/${e.id}`,{reason:'Approved correction and reviewed source reconciliation now agree'})
  assert.equal((await f.json(`/api/plinth/jobs/${c.job.id}/costs/exceptions`)).value.healthy,true)
  await page.reload();await capture('COST-006-cleared-history')
+ const cash=(await f.json(`/api/plinth/jobs/${c.job.id}/costs/cash?start_period=2026-10&months=3&opening_cash_cents=200000`)).value;assert.equal(cash.rows.length,3);assert.equal(cash.wip.actual_cents,80750)
+ await c.ok('/costs/periods',{period:'2026-10',accountant_approved:true,accountant_name:'Synthetic external accountant',approval_reference:'Reviewed exact October as-of records; externally recorded decision',opening_cash_cents:200000,months:3})
+ await page.reload();await expect(page.getByText('cost.period.close',{exact:false}).first()).toBeVisible();await capture('COST-005-closed-history')
  // The shared shell is unchanged, but its icon-only controls remain part of these screens.
  await page.setViewportSize({width:390,height:1000});const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').opacity),'0');await page.waitForTimeout(450);assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').opacity),'1');await page.mouse.move(250,500);await menu.focus();await page.keyboard.press('Shift+Tab');await page.keyboard.press('Tab');assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').opacity),'1');await page.screenshot({path:`${shots}/COST-001-tooltip-390.png`,animations:'disabled'})
- await context.close();console.log('COST-001/002/003/004/006 native cost workflows and existing Purchasing/History screens PASS at 1440/390; icon tooltip delay/focus PASS')
+ await context.close();console.log('COST-001/002/003/004/005/006 native cost workflows and existing Purchasing/History screens PASS at 1440/390; icon tooltip delay/focus PASS')
 }finally{await browser.close()}

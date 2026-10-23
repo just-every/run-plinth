@@ -1,5 +1,6 @@
+import { requireOpenCostPeriod } from './cost-periods'
 import { cents, find, need, object, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
-import { appendEntry, costCode, costDate, costs, digest, document, positive, type CostSource } from './cost-model'
+import { appendEntry, costCode, costDate, costs, digest, document, positive, period, type CostSource } from './cost-model'
 import { localDate } from './remittances'
 const rounded=(n:bigint,d:bigint)=>cents(Number((2n*n+d)/(2n*d)))
 export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,action?:string):Promise<CostSource>{
@@ -28,14 +29,15 @@ export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,ac
  }
  need(action==='approve','Unknown cost source action',404,'not_found');need(!row.approved_by,'This source is already approved',409,'cost_duplicate')
  need(!(state.policy?.separate_approval??true)||actor.id!==row.prepared_by.id,'A different authorized person must approve this source',403,'cost_separation')
- if(!row.detail.warranty_cost_id)appendEntry(job,actor,{source_id:row.id,source_line_id:row.id,source_kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,dated_on:row.dated_on,period:row.period,matches:[]})
- row.approved_by=stamp(actor);recordApproval(job,actor,'cost.source.approve',{id:row.id,prepared_by:row.prepared_by},{id:row.id,kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,period:row.period,detail:row.detail,document_checksum:row.document?.checksum});return row
+ const posting_period=period(input.posting_period??row.period);requireOpenCostPeriod(job,posting_period)
+ if(!row.detail.warranty_cost_id)appendEntry(job,actor,{source_id:row.id,source_line_id:row.id,source_kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,dated_on:row.dated_on,period:posting_period,matches:[]})
+ row.posted_period=posting_period;row.approved_by=stamp(actor);recordApproval(job,actor,'cost.source.approve',{id:row.id,prepared_by:row.prepared_by},{id:row.id,kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,period:row.period,detail:row.detail,document_checksum:row.document?.checksum});return row
 }
 /** Deliberately narrow documented CSV, not a provider export claim. Whole-file review is atomic. */
 export async function payrollAction(job:Job,actor:Actor,input:Input){
  text(input.csv,'Payroll allocation CSV',262144);const csv=input.csv as string,rows=csv.replace(/^\uFEFF/,'').split(/\r?\n/);if(rows.at(-1)==='')rows.pop()
  need(rows.shift()==='external_id,time_source_id,gross_cents,burden_cents','Expected external_id,time_source_id,gross_cents,burden_cents CSV header');need(rows.length>0&&rows.length<=100,'Payroll import requires one to 100 rows')
- const state=costs(job),dated=costDate(input),reference=text(input.reference,'Payroll source evidence',1000)
+ const state=costs(job),dated=costDate(input);requireOpenCostPeriod(job,dated.period);const reference=text(input.reference,'Payroll source evidence',1000)
  const parsed=rows.map(line=>{const cells=line.split(',');need(cells.length===4&&cells.every(c=>/^[A-Za-z0-9_.:-]+$/.test(c)),'Payroll CSV fields are unquoted identifiers and integer cents');const [external_id,time_source_id,gross,burden]=cells;need(/^\d+$/.test(gross!)&&/^\d+$/.test(burden!),'Payroll amounts must be nonnegative integer cents');const gross_cents=cents(Number(gross)),burden_cents=cents(Number(burden));return {external_id:external_id!,time_source_id:time_source_id!,gross_cents,burden_cents}})
  need(new Set(parsed.map(r=>r.external_id)).size===parsed.length&&new Set(parsed.map(r=>r.time_source_id)).size===parsed.length,'Each payroll id and timesheet appears once per file')
  need(!state.sources.some(s=>s.kind==='payroll'&&parsed.some(r=>s.reference===r.external_id||s.detail.time_source_id===r.time_source_id)),'Payroll id or timesheet was already allocated; repeat import cannot post',409,'cost_duplicate')

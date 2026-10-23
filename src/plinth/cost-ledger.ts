@@ -12,7 +12,7 @@ export function procurement(job:Job){
   for(const r of [...o.receipts,...(o.returns??[]).map(r=>({...r,amount_cents:-r.amount_cents}))]){
    const weights=lines.map(l=>r.lines?.length?(()=>{const [n,f='']=String(r.lines.find(q=>q.line_id===l.id)?.quantity??'0').split('.');return (BigInt(n!)*1000n+BigInt(f.padEnd(3,'0')))*BigInt(l.rate)})():l.amount),amounts=allocate(r.amount_cents,weights)
    const date=('received_on' in r?r.received_on:undefined)??r.recorded_by.at.slice(0,10)
-   lines.forEach((l,i)=>{if(amounts[i])rows.push({order_id:o.id,receipt_id:r.id,cost_code:l.code,amount_cents:amounts[i]!,kind:'receipt',dated_on:date,period:date.slice(0,7),reference:r.reference})})
+   lines.forEach((l,i)=>{if(amounts[i])rows.push({order_id:o.id,receipt_id:r.id,cost_code:l.code,amount_cents:amounts[i]!,kind:'receipt',dated_on:date,period:costs(job).finance_periods?.[r.id]??date.slice(0,7),reference:r.reference})})
   }
  }
  // An award already represented by a PO is represented only once. Uncoded legacy scopes stay explicit.
@@ -30,9 +30,10 @@ export function billingSources(job:Job){
   for(const e of events.sort((a,b)=>a.at.localeCompare(b.at))){const before=allocate(collected,amounts);collected=sum([collected,e.amount]);const after=allocate(collected,amounts);const allocated=invoice.kind==='deposit'?[e.amount]:after.map((n,i)=>n-before[i]!);const groups=invoice.kind==='deposit'?['Unassigned']:codes;groups.forEach((code,i)=>rows.push({id:e.id,cost_code:code,kind:'collected',amount_cents:allocated[i]!,dated_on:e.date,period:e.date.slice(0,7),reference:e.ref}))}
   if(invoice.kind==='deposit')for(const a of (job.invoices??[]).flatMap(i=>i.deposit_applications.filter(a=>a.deposit_invoice_id===invoice.id)))rows.push({id:a.id,cost_code:'Unassigned',kind:'collected',amount_cents:-a.amount_cents,dated_on:a.recorded_by.at.slice(0,10),period:a.recorded_by.at.slice(0,7),reference:'Deposit applied to earned billing'})
  }
- return rows
+ for(const r of (job.remittances??[]).filter(r=>!r.returned)){const remaining=sum([r.amount_cents,-sum(r.allocations.map(a=>a.amount_cents))]);if(remaining)rows.push({id:r.id,cost_code:'Unassigned',kind:'collected',amount_cents:remaining,dated_on:r.received_on,period:r.received_on.slice(0,7),reference:r.reference+' (unapplied)'})}
+ return rows.map(r=>({...r,period:costs(job).finance_periods?.[r.id]??r.period}))
 }
-export function actualEntries(job:Job):CostEntry[]{return [...costs(job).entries,...(job.warranties?.cases??[]).flatMap(c=>c.costs.map(w=>({id:w.id,source_id:w.id,source_line_id:w.id,source_kind:'warranty',cost_code:w.cost_code,amount_cents:w.amount_cents,dated_on:w.recorded_by.at.slice(0,10),period:w.recorded_by.at.slice(0,7),matches:[],by:w.recorded_by})))]}
+export function actualEntries(job:Job):CostEntry[]{return [...costs(job).entries,...(job.warranties?.cases??[]).flatMap(c=>c.costs.map(w=>({id:w.id,source_id:w.id,source_line_id:w.id,source_kind:'warranty',cost_code:w.cost_code,amount_cents:w.amount_cents,dated_on:w.recorded_by.at.slice(0,10),period:costs(job).callback_periods?.[w.id]??w.recorded_by.at.slice(0,7),matches:[],by:w.recorded_by})))]}
 export function supplierCostHolds(job:Job){
  const entries=costs(job).entries,result:{cost_code:string;subcontract_id:string;draw_id:string;amount_cents:number}[]=[]
  for(const sub of job.subcontracts??[])for(const draw of supplierRetainageBalance(sub)?.draws??[]){

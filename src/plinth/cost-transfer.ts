@@ -1,3 +1,4 @@
+import { requireOpenCostPeriod } from './cost-periods'
 import { active, cents, find, need, recordApproval, stamp, sum, text, usdOnly, type Actor, type Input, type Job } from './model'
 import { costs, costCode, costDate, positive } from './cost-model'
 import { auditStatement, jobRef } from './audit'
@@ -11,6 +12,7 @@ export async function transferCost(db:D1Database,actor:Actor,previous:Job,input:
  need(amount<=source.amount_cents-moved,'Correction exceeds this source’s remaining allocation',409,'cost_transfer')
  const code=costCode(to,input.target_cost_code);need(to.id!==from.id||code!==source.cost_code,'Choose another code or job')
  const reason=text(input.reason,'Correction evidence',2000),reference=text(input.reference,'Correction reference',200),dated=costDate(input),id=crypto.randomUUID()
+ requireOpenCostPeriod(from,dated.period);requireOpenCostPeriod(to,dated.period)
  need(!costs(from).entries.some(e=>e.source_kind==='transfer.out'&&e.source_line_id===reference),'Correction reference already used',409,'cost_duplicate')
  for(const [job,sign,kind,cost_code] of [[from,-1,'transfer.out',source.cost_code],[to,1,'transfer.in',code]] as const){const entry={id:crypto.randomUUID(),source_id:source.id,source_line_id:reference,source_kind:kind,cost_code,amount_cents:sign*amount,...dated,matches:[],by:stamp(actor)};costs(job).entries.push(entry);recordApproval(job,actor,'cost.transfer',{id,prepared_by:source.by},{entry,from_job_id:from.id,to_job_id:to.id,reason});refreshExceptions(job)}
  from.version=previous.version+1;to.version=target.id===from.id?from.version:target.version+1

@@ -1,3 +1,5 @@
+import { requireOpenCostPeriod } from './cost-periods'
+import { period } from './cost-model'
 import { cents, find, need, object, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
 import { calculatePricing, pricingPercent } from './pricing-model'
 import { costs, costCode, costDate, document, positive, type CostBill, type CostLine, type CostMatch } from './cost-model'
@@ -72,9 +74,10 @@ export async function billAction(job:Job,actor:Actor,input:Input,id?:string,acti
  need(row.reviewer_id===actor.id,'Only the designated current office reviewer approves this bill',403,'cost_reviewer')
  need(!(policy?.separate_approval??true)||row.prepared_by.id!==actor.id,'A different authorized person must approve this bill',403,'cost_separation')
  need(!policy||row.amount_cents<=policy.bill_limit_cents||actor.role==='owner','Only the owner approves a bill over its limit',403,'cost_limit')
+ const posting_period=period(input.posting_period??row.period);requireOpenCostPeriod(job,posting_period)
  const sign=row.kind==='credit'?-1:1
- for(const line of row.lines)state.entries.push({id:crypto.randomUUID(),source_id:row.id,source_line_id:line.id,source_kind:row.kind,cost_code:line.cost_code,amount_cents:sign*line.amount_cents,dated_on:row.dated_on,period:row.period,matches:line.matches.map(m=>({...m,amount_cents:sign*m.amount_cents})),by:stamp(actor)})
- row.status='posted';row.posted_by=stamp(actor)
+ for(const line of row.lines)state.entries.push({id:crypto.randomUUID(),source_id:row.id,source_line_id:line.id,source_kind:row.kind,cost_code:line.cost_code,amount_cents:sign*line.amount_cents,dated_on:row.dated_on,period:posting_period,matches:line.matches.map(m=>({...m,amount_cents:sign*m.amount_cents})),by:stamp(actor)})
+ row.status='posted';row.posted_period=posting_period;row.posted_by=stamp(actor)
  recordApproval(job,actor,'cost.bill.post',row,{bill_id:row.id,reference:row.reference,amount_cents:sign*row.amount_cents,period:row.period,lines:row.lines,tax:row.tax,document_checksum:row.document.checksum,label:'Posted once to Plinth ledger; QBO/Xero sync held under INT-001/INT-002/INT-003; no funds moved'})
  return row
 }

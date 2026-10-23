@@ -27,6 +27,8 @@ test('COST-001 — coded budgets, receipt-matched actuals and client draws recon
   r=await c.ledger();assert.equal(r.totals.client_billed_cents,70000,'Invoice never duplicates its application');assert.equal(r.totals.client_collected_cents,35000);assert.equal(row(r,'06-100').client_collected_cents,25000);assert.equal(row(r,'01-100').client_collected_cents,10000)
   for(const n of [1,2])await c.ok(`/invoices/${invoice.id}/receipt`,{confirm:true,method:'check',received_on:'2026-10-24',reference:'synthetic-plinth-penny-'+n,amount_cents:1})
   r=await c.ledger();assert.equal(r.totals.client_collected_cents,35002);assert.equal(row(r,'06-100').client_collected_cents,25001);assert.equal(row(r,'01-100').client_collected_cents,10001,'Cumulative allocation closes partial-receipt pennies across codes')
+  await c.ok('/remittances',{confirm:true,method:'check',reference:'synthetic-plinth-unapplied-1',amount_cents:123,received_on:'2026-10-24',evidence:'Staff reviewed unallocated check',allocations:[]})
+  r=await c.ledger();assert.equal(row(r,'Unassigned').client_collected_cents,123);assert.equal(r.totals.client_collected_cents,35125,'Unapplied remittance money is collected once, visibly Unassigned')
   const file=await f.request(`/api/plinth/jobs/${c.job.id}/costs/bills/${id}/original`,{cookie:f.owner});assert.equal(file.status,200);assert.deepEqual(Buffer.from(await file.arrayBuffer()),costOriginal);assert.equal(file.headers.get('x-content-sha256').length,64)
   const audit=(await c.api(`/audit?job_id=${c.job.id}&q=cost.bill.original`)).value;assert.ok(audit.events.some(e=>e.action==='cost.bill.original'&&e.subject_id===id))
   const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()

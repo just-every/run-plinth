@@ -1,13 +1,14 @@
 import { find, need, object, stamp, text, type Actor, type Input, type Job } from './model'
 import { costs } from './cost-model'
 import { fieldConfig } from './report-store'
+import { actualEntries } from './cost-ledger'
 import { financialId, reportColumns } from './report-records'
 import { parseFieldValues, requireFieldsAtStage } from './report-field-model'
 import { parseReportView, queryReport, type ReportView } from './report-query'
 /** New costs inherit the existing financial schema in an explicitly job-scoped report door. */
 export async function costRecords(db:D1Database,job:Job){
  const state=costs(job),config=await fieldConfig(db)
- const rows=[...state.bills.map(b=>({id:b.id,kind:'cost_bill',label:b.reference,stage:b.status,amount:(b.kind==='credit'?-1:1)*b.amount_cents})),...state.sources.map(s=>({id:s.id,kind:'cost_'+s.kind,label:s.reference,stage:s.approved_by?'approved':'draft',amount:s.amount_cents})),...state.forecasts.map(f=>({id:f.id,kind:'cost_forecast',label:f.as_of+' forecast',stage:'recorded',amount:f.final_cents}))]
+ const rows=[...state.bills.map(b=>({id:b.id,kind:'cost_bill',label:b.reference,stage:b.status,amount:(b.kind==='credit'?-1:1)*b.amount_cents})),...state.sources.map(s=>({id:s.id,kind:'cost_'+s.kind,label:s.reference,stage:s.approved_by?'approved':'draft',amount:s.amount_cents})),...state.forecasts.map(f=>({id:f.id,kind:'cost_forecast',label:f.as_of+' forecast',stage:'recorded',amount:f.final_cents})),...(state.periods??[]).map(p=>({id:p.id,kind:'cost_period',label:p.period+' close',stage:'closed',amount:actualEntries(job).filter(e=>e.period===p.period).reduce((n,e)=>n+e.amount_cents,0)}))]
  const records=rows.map(r=>{const saved=state.record_fields?.[r.id];return {id:financialId(job.id,r.kind,r.id),local_id:r.id,job_id:job.id,record_scope:'financial' as const,label:r.label,currency:'USD' as const,stage:saved?.stage??r.stage,values:{'native.kind':r.kind,'native.stage':r.stage,'native.custom_stage':saved?.stage??null,'native.amount':{currency:'USD' as const,amount_cents:r.amount},...saved?.values}}})
  return {job_id:job.id,records,columns:reportColumns(config.fields,'financial'),fields:config.fields.filter(f=>f.record_scope==='financial')}
 }
