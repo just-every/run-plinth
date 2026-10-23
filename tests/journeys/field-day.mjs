@@ -49,7 +49,7 @@ try{
  await sup.goto(base+`/app?job=${other.id}`);await expect(sup.getByRole('alert')).toContainText('Job not found')
  // The office sees the same actual work and quantity in the schedule.
  await page.setViewportSize({width:1440,height:900});await page.goto(base+`/app?job=${job.id}&tab=Schedule`)
- await capture(page,'office-actuals',async()=>{await expect(page.getByText('North and east walls framed to the top plate',{exact:false})).toBeVisible();await expect(page.getByText('40 studs',{exact:false})).toBeVisible()})
+ await capture(page,'office-actuals',async()=>{await expect(page.getByText('North and east walls framed to the top plate',{exact:false}).first()).toBeVisible();await expect(page.getByText('40 studs',{exact:false}).first()).toBeVisible()})
  const contract=parseContract(await readFile(new URL('../../CONTRACT.md',import.meta.url),'utf8')),site=process.env.PLINTH_SITE;assert.ok(site)
  const publicContext=await browser.newContext(),publicPage=await publicContext.newPage();await publicPage.goto(site+'/contract')
  for(const width of [1440,390]){await publicPage.setViewportSize({width,height:1000});const row=publicPage.locator('tr.clause[data-id="SCH-005"]');await expect(row).toHaveAttribute('data-status',contract.clauses.find(c=>c.id==='SCH-005').status);assert.ok(await publicPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Contract fits '+width);await row.screenshot({path:`${shots}/SCH-005-contract-evidence-${width}.png`,animations:'disabled'})}
