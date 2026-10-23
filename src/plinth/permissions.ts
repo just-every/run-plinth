@@ -12,7 +12,7 @@ const feature: Record<string, Feature> = {
  selections: 'selections', 'selection-delegations': 'selections', 'decision-files': 'selections',
  variations: 'changes', 'variation-pricing': 'changes', 'allowance-changes': 'changes',
  orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
- schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
+ schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', forecast: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
  diary: 'logs',
  rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
  invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
@@ -31,6 +31,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (!area) return null
  const verbs = rest.slice(1).filter(part => !isId(part)), verb = verbs.at(-1) ?? ''
  const financial = /cost-codes\.(?:json|csv)$/.test(relative) || area === 'estimates' && ['pricing-rates', 'pricing'].includes(category) && method !== 'GET'
+ if (category === 'schedule-actuals' && method === 'POST') return { feature: 'schedule', action: 'edit' }
  const collection = !verb && method === 'POST' && (!rest.slice(1).some(isId) || !job && category === 'bids' && rest.length === 2)
  const action: Action = method === 'GET' ? 'view' : method === 'DELETE' ? 'delete' : verb === 'preview' || verb === 'plan-preview' ? 'view' : approving.has(verb) ? 'approve' : collection ? 'create' : 'edit'
  return { feature: area, action, ...(financial ? { financial: true } : {}) }

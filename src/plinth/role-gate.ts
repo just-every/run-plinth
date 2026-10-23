@@ -11,7 +11,7 @@ const id = '[^/]+'
 const rule = (method: string, path: string): Rule => [method, new RegExp(`^${path}$`)]
 /** Own work for every internal preset: assigned jobs, published plans, photos, to-do items assigned to the person, and the punch list to read. */
 const common: Rule[] = [
- rule('GET', 'jobs'), rule('GET', `jobs/${id}`),
+ rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/forecast`),
  rule('GET', `jobs/${id}/takeoff-files/${id}`), rule('GET', `jobs/${id}/diary/${id}/attachments/${id}`),
  rule('GET', 'todos'), rule('GET', 'todos/preferences'), rule('POST', 'todos/preferences'), rule('GET', `jobs/${id}/todos`), rule('GET', `jobs/${id}/todos/${id}`), rule('POST', `jobs/${id}/todos/${id}/(?:complete|reopen|comment)`),
  rule('GET', `jobs/${id}/punch`), rule('GET', `jobs/${id}/punch/export\\.(?:json|csv)`), rule('GET', `jobs/${id}/punch/files/${id}`),
@@ -27,7 +27,7 @@ const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
   rule('GET', 'bids'), rule('GET', `bids/${id}`), rule('GET', `bids/${id}/files/${id}`), rule('POST', `bids/${id}`),
  ],
  // Superintendents record the day: logs are saved as drafts for the office to publish, and observations are captured with photos.
- superintendent: [...common, rule('POST', `jobs/${id}/diary`), rule('POST', `jobs/${id}/punch/issues`)],
+ superintendent: [...common, rule('POST', `jobs/${id}/diary`), rule('POST', `jobs/${id}/punch/issues`), rule('POST', `jobs/${id}/schedule-actuals`)],
  crew: common,
 }
 export function roleGate(actor: Actor, request: Request) {

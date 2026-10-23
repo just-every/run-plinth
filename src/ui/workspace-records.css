@@ -100,4 +100,6 @@
 .workspace .lines.estimate-lines th:first-child { width: 40%; }
 .workspace .lines.estimate-lines th:nth-child(2) { width: 35%; }
 .workspace .table-scroll { max-width: 100%; overflow-x: auto; }
-.workspace .table-scroll .lines td, .workspace .table-scroll .lines th { overflow-wrap: anywhere; }
+.workspace .table-scroll .lines { min-width: 460px; }
+.workspace .table-scroll .lines td, .workspace .table-scroll .lines th { white-space: nowrap; }
+.workspace .table-scroll .lines td:last-child, .workspace .table-scroll .lines th:last-child { text-align: left; }

@@ -44,6 +44,8 @@ export function requireBidDrafting(actor:Actor){if(actor.role!=='estimator')requ
 export function requireRateAccess(actor:Actor,method:string){if(actor.role==='estimator'&&method==='GET')return;requireManager(actor,method==='GET')}
 /** The drawings an assigned estimator, superintendent or crew member works from. */
 export function requirePlans(actor:Actor,allowAgent=false){need(isFieldRole(actor)||actor.role==='estimator'||actor.role==='project_manager'||actor.role==='owner'||actor.role==='admin'||allowAgent&&actor.role==='agent','Plan access required',403,'forbidden')}
+/** Field progress (actual start, finish and installed quantity) is recorded by superintendents and the office. */
+export function requireProgress(actor:Actor){need(actor.role==='superintendent'||actor.role==='project_manager'||actor.role==='owner'||actor.role==='admin','Progress recording access required',403,'forbidden')}
 /** Superintendents write daily logs and capture punch observations; crew read them. */
 export function requireFieldLog(actor:Actor,allowAgent=false){need(actor.role==='superintendent'||actor.role==='project_manager'||actor.role==='owner'||actor.role==='admin'||allowAgent&&actor.role==='agent','Field log access required',403,'forbidden')}
 /** Estimator, superintendent and crew are Plinth role-table presets on an operator-auth administrator, like a project manager. */

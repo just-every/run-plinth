@@ -14,7 +14,8 @@ export function roleJobView(job: Job, actor: Actor): Job {
  const identity = { id: job.id, version: job.version, name: job.name, address: job.address, status: job.status, created_by: job.created_by, ...(job.time_zone ? { time_zone: job.time_zone } : {}), ...(job.currency ? { currency: job.currency } : {}) }
  if (actor.role === 'estimator') return { ...empty, ...identity, client_email: job.client_email, ...(job.client_name ? { client_name: job.client_name } : {}), quotes: job.quotes, ...keep(job, ['takeoff', 'products', 'bids', 'bid_comparisons', 'bid_cost_adjustments']) } as Job
  const crew = actor.role === 'crew'
- return { ...empty, ...identity, client_email: '', schedules: job.schedules.filter(task => !crew || task.status === 'booked'), diary: job.diary.filter(entry => !crew || entry.status === 'published'), ...keep(job, [...scheduleKeys(job), 'schedule_constraints', 'takeoff', 'punch']) } as Job
+ const materials = job.orders.filter(order => order.status === 'issued').map(order => ({ id: order.id, supplier: order.supplier, description: order.description, promised_on: order.promised_on ?? null, received: order.receipts.length > 0 })).sort((a, b) => (a.promised_on ?? '9999').localeCompare(b.promised_on ?? '9999'))
+ return { ...empty, ...identity, client_email: '', materials_due: materials, schedules: job.schedules.filter(task => !crew || task.status === 'booked'), diary: job.diary.filter(entry => !crew || entry.status === 'published'), ...keep(job, [...scheduleKeys(job), 'schedule_constraints', 'takeoff', 'punch']) } as Job
 }
 
 /**

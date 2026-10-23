@@ -1,7 +1,7 @@
 import { allocations } from './schedule-resource-model'
 import { travelFields } from './schedule-travel'
 import { templateTaskId } from './schedule-baseline-model'
-import { requireJobManager, requireManager } from './auth'
+import { requireJobManager, requireManager, requireProgress } from './auth'
 import { active, emptyJob, find, need, object, recordApproval, stamp, text, type Actor, type Input, type Job } from './model'
 import { workingCalendar } from './schedule-calendar'
 import { previewSchedule, publishSchedule } from './schedule-plan'
@@ -145,7 +145,8 @@ export function recordRevision(job: BaselineJob, actor: Actor, input: Input): Sc
 
 /** Actual evidence and baseline decisions append history; neither changes a published feed. */
 export async function scheduleBaselineAction(job: BaselineJob, actor: Actor, input: Input, action: 'baseline' | 'actuals', all: Job[]) {
- requireJobManager(actor); active(job)
+ if (action === 'baseline') requireJobManager(actor); else requireProgress(actor)
+ active(job)
  if (action === 'baseline') {
   need(job.schedules.some(task => task.status === 'booked') && job.schedules.every(task => task.status !== 'draft'), 'Publish the reviewed schedule before recording a baseline', 409, 'schedule_review')
   const baseline: ScheduleBaseline = { id: crypto.randomUUID(), revision: (job.schedule_baselines?.length ?? 0) + 1, name: uniqueName(job.schedule_baselines ?? [], input.name, 'baseline name'), reason: text(input.reason, 'Baseline reason', 4000), approval_id: '', approved_by: stamp(actor), ...snapshot(job) }
@@ -159,10 +160,17 @@ export async function scheduleBaselineAction(job: BaselineJob, actor: Actor, inp
  const previous = job.schedule_actuals?.findLast(actual => actual.task_id === task.id)
  const actual: ScheduleActual = { id: crypto.randomUUID(), task_id: task.id, actual_start: utc(input.actual_start, 'actual_start'), evidence: text(input.evidence, 'Actual work evidence', 4000), recorded_by: stamp(actor), ...(previous ? { supersedes: previous.id } : {}) }
  if (input.actual_finish !== undefined && input.actual_finish !== '') actual.actual_finish = utc(input.actual_finish, 'actual_finish')
+ if (input.installed !== undefined) {
+  const installed = object(input.installed), quantity = text(installed.quantity, 'Installed quantity', 30)
+  need(/^\d{1,12}(?:\.\d{1,4})?$/.test(quantity) && Number(quantity) > 0, 'Installed quantity must be a positive number')
+  actual.installed = { quantity, unit: text(installed.unit, 'Installed unit', 20), ...(installed.cost_code ? { cost_code: text(installed.cost_code, 'Cost code', 40) } : {}) }
+ }
  need(!actual.actual_finish || actual.actual_finish >= actual.actual_start, 'Actual finish must be at or after actual start')
  need(!previous?.actual_finish || actual.actual_finish, 'A completed task retains its actual finish')
  if (previous && (previous.actual_start !== actual.actual_start || previous.actual_finish !== actual.actual_finish && previous.actual_finish !== undefined)) actual.reason = text(input.reason, 'Correction reason', 4000)
  ;(job.schedule_actuals ??= []).push(actual)
- const forecast = await previewSchedule(job, actor, { calendar: job.schedule_calendar, tasks: job.schedules }, all)
+ // The planner only reads: a field recorder receives the resulting dates, never another job's conflicts.
+ const forecast = await previewSchedule(job, { ...actor, role: 'admin' }, { calendar: job.schedule_calendar, tasks: job.schedules }, all)
+ if (actor.role === 'superintendent') return { actual, forecast: { completion_before: forecast.completion_before, completion_after: forecast.completion_after, tasks: forecast.tasks.map(t => ({ id: t.id, description: t.description, start: t.start, end: t.end, status: t.status })) } }
  return { actual, forecast }
 }

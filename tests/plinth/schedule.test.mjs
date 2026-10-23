@@ -136,3 +136,58 @@ test('SCH-001 — reviewed working-calendar dependencies, milestones, critical p
   assert.equal((await f.json(root, { cookie: f.owner })).value.job.schedules.find(s => s.id === 'drywall').status, 'cancelled', 'Reload retains published cancellation')
  } finally { await f.close() }
 })
+
+test('SCH-005 — a superintendent reads today, tomorrow and the look-ahead with contacts, sheet, prerequisites and materials, completes a checklist item and records progress that moves the office forecast; unassigned jobs stay hidden', async () => {
+ const { takeoffPlan } = await import('../fixtures/takeoff-plan.mjs')
+ const f = await createFixture()
+ try {
+  const sup = await f.invite('field-super@example.com', 'Sam Superintendent', 'admin'), crew = await f.invite('field-crew@example.com', 'Casey Crew', 'admin')
+  const api = (path, { method = 'GET', body, cookie = f.owner } = {}) => f.json('/api/plinth' + path, { method, cookie, ...(body ? { body } : {}) })
+  const team = (await api('/team')).value.team
+  let job = await createActiveJob(f, 'Orchard addition framing', 'field-client@example.com'); const other = await createActiveJob(f, 'Unassigned garage', 'garage-client@example.com')
+  for (const [email, role] of [['field-super@example.com', 'superintendent'], ['field-crew@example.com', 'crew']]) assert.equal((await api(`/team/${team.find(m => m.email === email).id}`, { method: 'PUT', body: { expected_version: 0, role, job_ids: [job.id], po_limit_cents: 0 } })).status, 200)
+  const post = async (path, body = {}, cookie = f.owner) => { job = (await api(`/jobs/${job.id}`)).value.job; const r = await api(`/jobs/${job.id}${path}`, { method: 'POST', cookie, body: { expected_version: job.version, ...body } }); if (r.status === 200 && r.value.job) job = (await api(`/jobs/${job.id}`)).value.job; return r }
+  const day = n => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10)
+  const calendar = { weekdays: [0, 1, 2, 3, 4, 5, 6], start_hour: 8, end_hour: 17, holidays: [] }
+  let r = await post('/schedules', { trade: 'Framing', description: 'Frame addition walls', start: `${day(0)}T08:00:00Z`, end: `${day(0)}T12:00:00Z` }); assert.equal(r.status, 200); const frame = job.schedules[0].id
+  let tasks = [{ ...job.schedules[0], duration_minutes: 240 }, { id: 'drywall', trade: 'Drywall', description: 'Hang drywall', start: `${day(1)}T08:00:00Z`, duration_minutes: 240, predecessors: [{ id: frame, lag_minutes: 0 }] }, { id: 'paint', trade: 'Painting', description: 'Prime and paint', start: `${day(2)}T08:00:00Z`, duration_minutes: 240, predecessors: [{ id: 'drywall', lag_minutes: 0 }] }]
+  r = await post('/schedule/preview', { calendar, tasks }); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.equal((await post('/schedule/publish', { calendar, tasks: r.value.preview.tasks, digest: r.value.preview.digest })).status, 200)
+  const drywall = job.schedules.find(t => t.description === 'Hang drywall').id
+  r = await post('/schedule-constraints', { kind: 'inspection', title: 'Rough framing inspection', jurisdiction: 'City of Burlington', accountable: 'Sam Superintendent', task_ids: [drywall], reason: 'Inspection requested before drywall' }); assert.equal(r.status, 200)
+  assert.equal((await post('/takeoff', { name: 'S1 Framing plan', page: 1, width: 400, height: 400, document: { name: 'synthetic-plinth-plan.pdf', mime: 'application/pdf', base64: takeoffPlan().toString('base64') } })).status, 200)
+  r = await post('/orders', { supplier: 'Champlain Lumber', description: 'Framing lumber package', amount_cents: 250_000 }); const order = r.value.record.id
+  assert.equal((await post(`/orders/${order}/issue`)).status, 200); assert.equal((await post(`/orders/${order}/promise`, { promised_on: day(1), reason: 'Promised in the vendor acknowledgment' })).status, 200)
+  r = await post('/todos', { title: 'Layout walk', due_at: `${day(-1)}T17:00`, items: [{ title: 'Check stud layout', assignee: { kind: 'office', email: 'field-super@example.com' } }, { title: 'Stack lumber', assignee: { kind: 'office', email: 'field-crew@example.com' } }] }); assert.equal(r.status, 201, JSON.stringify(r.value))
+
+  // The plan: contacts, current sheet, prerequisites, materials without amounts, and only their own checklist item.
+  const view = (await api(`/jobs/${job.id}`, { cookie: sup })).value.job
+  assert.deepEqual(view.site_contacts.map(c => [c.role, c.email]), [['Builder', 'builder@example.com'], ['Crew', 'field-crew@example.com'], ['Superintendent', 'field-super@example.com']], 'The owner and the assigned people are the site contacts')
+  assert.equal(view.address, '22 Example Street'); assert.equal(view.takeoff[0].name, 'S1 Framing plan'); assert.equal(view.takeoff[0].revisions.at(-1).revision, 1)
+  assert.deepEqual(view.materials_due.map(m => [m.supplier, m.promised_on, m.received]), [['Champlain Lumber', day(1), false]]); assert.ok(!JSON.stringify(view.materials_due).includes('amount'), 'Materials due carry no price')
+  assert.equal(view.schedule_constraints[0].title, 'Rough framing inspection'); assert.deepEqual(view.schedules.filter(t => t.predecessors?.length).map(t => t.predecessors[0].id), [frame, drywall])
+  const mine = (await api(`/jobs/${job.id}/todos?mine=true`, { cookie: sup })).value.todos; assert.deepEqual(mine.flatMap(t => t.items.map(i => i.title)), ['Check stud layout'])
+  assert.equal((await api(`/jobs/${job.id}/todos/${mine[0].id}/complete`, { method: 'POST', cookie: sup, body: { expected_revision: mine[0].revision, operation_id: crypto.randomUUID(), item_id: mine[0].items[0].id } })).status, 200)
+  assert.deepEqual((await api(`/jobs/${job.id}/todos?mine=true`, { cookie: sup })).value.todos.flatMap(t => t.items.filter(i => !i.completed)), [], 'The completed item leaves the open list')
+
+  // Unassigned job data stays hidden and a refused recording writes nothing.
+  assert.equal((await api(`/jobs/${other.id}`, { cookie: sup })).status, 404)
+  const held = (await api(`/jobs/${other.id}`)).value.job.version; assert.equal((await api(`/jobs/${other.id}/schedule-actuals`, { method: 'POST', cookie: sup, body: { expected_version: held, task_id: 'x', actual_start: new Date().toISOString(), evidence: 'x' } })).status, 404); assert.equal((await api(`/jobs/${other.id}`)).value.job.version, held)
+  const actual = { task_id: frame, actual_start: `${day(0)}T08:00:00Z`, installed: { quantity: '40', unit: 'studs', cost_code: '06-100' }, evidence: 'North and east walls framed to the top plate' }
+  assert.equal((await post('/schedule-actuals', actual, crew)).status, 403, 'Crew read the plan; they do not record progress')
+  assert.equal((await post('/schedule-actuals', { ...actual, installed: { quantity: '-3', unit: 'studs' } }, sup)).status, 400)
+  const before = job.version; r = await post('/schedule-actuals', actual, sup); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.equal(job.version, before + 1)
+  assert.deepEqual(r.value.record.actual.installed, { quantity: '40', unit: 'studs', cost_code: '06-100' }); assert.equal(r.value.record.actual.recorded_by.role, 'superintendent'); assert.ok(r.value.record.actual.recorded_by.at)
+  assert.equal(r.value.record.forecast.conflicts, undefined, 'A field recorder receives dates, not other jobs’ conflicts')
+
+  // Finishing two days late moves tomorrow's dependent work; the office preview agrees with the forecast the worker saw.
+  const late = { ...actual, actual_finish: `${day(2)}T12:00:00Z`, evidence: 'Corrected after the wall plates arrived late' }
+  r = await post('/schedule-actuals', { ...late, reason: undefined, evidence: undefined }, sup); assert.equal(r.status, 400, JSON.stringify(r.value))
+  r = await post('/schedule-actuals', { ...late, reason: 'Plates delivered late' }, sup); assert.equal(r.status, 200, JSON.stringify(r.value))
+  const forecast = r.value.record.forecast; assert.ok(forecast.completion_after > forecast.completion_before, 'The forecast finish moves out'); assert.ok(forecast.tasks.find(t => t.id === drywall).start >= `${day(2)}T12:00`)
+  assert.equal(job.schedule_actuals.length, 2); assert.equal(job.schedule_actuals[1].supersedes, job.schedule_actuals[0].id); assert.equal(job.schedule_actuals[0].installed.quantity, '40', 'The earlier record is retained')
+  const preview = (await post('/schedule/preview', { calendar, tasks: job.schedules })).value.preview
+  for (const cookie of [sup, crew]) assert.deepEqual((await api(`/jobs/${job.id}/forecast`, { cookie })).value.forecast.completion_after, forecast.completion_after, 'The plan shows the same forecast on load')
+  assert.equal((await api(`/jobs/${other.id}/forecast`, { cookie: sup })).status, 404)
+  assert.equal(preview.completion_after, forecast.completion_after); assert.equal(preview.tasks.find(t => t.id === drywall).start, forecast.tasks.find(t => t.id === drywall).start)
+ } finally { await f.close() }
+})

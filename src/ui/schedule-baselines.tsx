@@ -44,6 +44,7 @@ export function ScheduleBaselines({ job, mutate, manager, forecast }: { job: Bas
           <div><dt>Selected baseline{selected ? ` · ${selected.name}` : ''}</dt><dd>{recordedDate(row.baseline_start, zone)} – {recordedDate(row.baseline_finish, zone)}</dd></div>
           <div><dt>Current / forecast</dt><dd>{recordedDate(row.forecast_start, zone)} – {recordedDate(row.forecast_finish, zone)}<br />Start: {variance(row.forecast_start_variance_minutes)}. Finish: {variance(row.forecast_finish_variance_minutes)}.</dd></div>
           <div><dt>Actual work</dt><dd>{recordedDate(row.actual_start, zone)} – {recordedDate(row.actual_finish, zone)}<br />Start: {variance(row.actual_start_variance_minutes)}. Finish: {variance(row.actual_finish_variance_minutes)}.</dd></div>
+          {job.schedule_actuals?.findLast(a => a.task_id === row.task_id)?.installed && <div><dt>Installed so far</dt><dd>{job.schedule_actuals.findLast(a => a.task_id === row.task_id)!.installed!.quantity} {job.schedule_actuals.findLast(a => a.task_id === row.task_id)!.installed!.unit}{job.schedule_actuals.findLast(a => a.task_id === row.task_id)!.installed!.cost_code && ` · ${job.schedule_actuals.findLast(a => a.task_id === row.task_id)!.installed!.cost_code}`}</dd></div>}
           {row.evidence && <div><dt>Latest evidence</dt><dd>{row.evidence}{row.recorded_by && <p>{row.recorded_by.name} · {scheduleInstant(row.recorded_by.at, zone)}</p>}</dd></div>}
         </dl>
       </div><div className="row-end"><Badge>{row.status}</Badge></div></li>

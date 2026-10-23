@@ -21,6 +21,8 @@ export interface ScheduleRevision extends ScheduleSnapshot {
 }
 export interface ScheduleActual {
  id: string; task_id: string; actual_start: string; actual_finish?: string; evidence: string
+ /** SCH-005: the quantity a field worker reports installed so far, kept with the actual time for cost forecasting. */
+ installed?: { quantity: string; unit: string; cost_code?: string }
  reason?: string; supersedes?: string; recorded_by: Stamp
 }
 export interface TemplateApplication {
