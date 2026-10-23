@@ -44,7 +44,7 @@ try{
  await sup.getByText('Record progress on Frame addition walls',{exact:true}).click()
  await sup.getByLabel('Installed quantity so far').fill('40');await sup.getByLabel('Unit',{exact:true}).fill('studs');await sup.getByLabel('Evidence: what was done and seen').fill('North and east walls framed to the top plate')
  await sup.getByRole('button',{name:'Save progress',exact:true}).click()
- await expect(sup.getByText('Started',{exact:true}).first()).toBeVisible();await expect(sup.getByText('Office forecast: project finish',{exact:false})).toBeVisible()
+ await sup.waitForTimeout(2500);console.log('PAGE',(await sup.locator('main').innerText()).slice(0,1500));await expect(sup.getByText('Started',{exact:true}).first()).toBeVisible();await expect(sup.getByText('Office forecast: project finish',{exact:false})).toBeVisible()
  await capture(sup,'progress-recorded')
  await sup.goto(base+`/app?job=${other.id}`);await expect(sup.getByRole('alert')).toContainText('Job not found')
  // The office sees the same actual work and quantity in the schedule.
