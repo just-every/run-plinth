@@ -11,6 +11,7 @@ export function discrepancies(job:Job){
   if(budget!==null&&r.commitment_cents-budget>(policy?.commitment_limit_cents??0))items.push({key:'commitment:'+r.cost_code,kind:'commitment',amount_cents:r.commitment_cents-budget,evidence:`${r.cost_code}: commitments exceed approved budget`})
   if(r.received_not_billed_cents<0||r.open_commitment_cents<0)items.push({key:'receipt:'+r.cost_code,kind:'receipt',amount_cents:Math.min(r.received_not_billed_cents,r.open_commitment_cents),evidence:`${r.cost_code}: matched bills exceed current source receipts or commitment`})
  }
+ for(const sub of job.subcontracts??[])for(const d of sub.draws??[])if(d.payment){const matched=sum(state.entries.flatMap(e=>e.matches.filter(m=>m.draw_id===d.id).map(m=>m.amount_cents))),unmatched=d.payment.amount_cents-matched;if(unmatched>0)items.push({key:'payment:'+d.id,kind:'unmatched_payment',amount_cents:unmatched,evidence:'Recorded supplier payment '+d.payment.reference+' has unmatched job cost'})}
  const rec=state.reconciliations.at(-1)
  if(actualEntries(job).length&&!rec)items.push({key:'ledger:missing',kind:'stale',amount_cents:sum(actualEntries(job).map(e=>e.amount_cents)),evidence:'No reviewed accounting reconciliation is recorded'})
  if(rec&&rec.source_key!==sourceKey(job))items.push({key:'ledger:stale',kind:'stale',amount_cents:0,evidence:'Cost/procurement sources changed since the latest accounting reconciliation'})

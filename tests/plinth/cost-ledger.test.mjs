@@ -82,5 +82,8 @@ test('COST-002 — subcontract invoices bind exact released progress, preserve w
   const over={...bill,reference:'synthetic-plinth-sub-over-progress',lines:[{...bill.lines[0],subtotal_cents:15000,matches:[{...bill.lines[0].matches[0],amount_cents:15000}]}]};assert.equal((await c.act('/costs/bills',over)).value.error,'cost_progress')
   await c.ok(`/subcontracts/${sub.id}/retainage/release`,{draw_id:draw.id,milestone_id:'frame',lines:[{draw_id:draw.id,amount_cents:4000}],completion_references:[{requirement:'Framing inspection',reference:'synthetic-plinth-frame-inspection'}],waiver_references:[]})
   ledger=await c.ledger();assert.equal(ledger.totals.supplier_retained_cents,0);assert.equal(ledger.totals.payable_cents,30000);assert.equal(ledger.totals.posted_actual_cents,30000,'Supplier release never posts another job cost')
+  await c.ok(`/subcontracts/${sub.id}/draws/${draw.id}/payment`,{paid_on:'2026-10-24',amount_cents:40000,reference:'synthetic-plinth-recorded-sub-check'})
+  ledger=await c.ledger();assert.equal(ledger.totals.recorded_supplier_payment_cents,30000);assert.equal(ledger.totals.payable_cents,0);assert.equal(ledger.totals.posted_actual_cents,30000,'Recorded supplier funds do not post another cost')
+  assert.ok((await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value.items.some(e=>e.kind==='unmatched_payment'&&e.amount_cents===10000))
  }finally{await f.close()}
 })
