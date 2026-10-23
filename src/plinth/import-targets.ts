@@ -1,3 +1,4 @@
+import { heldSql } from './holds.ts'
 import type { D1Database, D1Sql, D1TargetAdapter, Json, TargetRow } from '../modules/import-kit/src/d1/index.ts'
 
 interface NativeValue { data: string; version: number; attachments: AttachmentSnapshot[] }
@@ -35,7 +36,8 @@ export const importTargets: D1TargetAdapter = {
     if (next.attachments.length) throw new Error('IMPORT_CANNOT_WRITE_ATTACHMENTS')
     return [sql('INSERT INTO pl_jobs(id,version,data,import_revision) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,data=excluded.data,import_revision=excluded.import_revision', row.targetId, next.version, next.data, row.revision), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')]
   },
-  remove(destination, kind, id) { scope(destination, kind); return [sql('DELETE FROM pl_jobs WHERE id=?', id), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')] },
+  /** A job under an owner hold is never retired by an import undo or rollback; the guard fails the whole batch. */
+  remove(destination, kind, id) { scope(destination, kind); const held = heldSql('job', id); return [sql(`INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT ${held.sql} THEN 1 ELSE 0 END`, ...held.params), sql('DELETE FROM pl_jobs WHERE id=?', id), sql('DELETE FROM pl_guard'), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')] },
   async list(db, destination) {
     const { results } = await db.prepare('SELECT id FROM pl_jobs WHERE import_revision IS NOT NULL ORDER BY id').all<{ id: string }>()
     const rows: TargetRow[] = []

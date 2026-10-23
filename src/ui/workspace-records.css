@@ -99,3 +99,5 @@
 .workspace .lines.estimate-lines td:nth-child(2), .workspace .lines.estimate-lines td:last-child { white-space: normal; }
 .workspace .lines.estimate-lines th:first-child { width: 40%; }
 .workspace .lines.estimate-lines th:nth-child(2) { width: 35%; }
+.workspace .table-scroll { max-width: 100%; overflow-x: auto; }
+.workspace .table-scroll .lines td, .workspace .table-scroll .lines th { overflow-wrap: anywhere; }

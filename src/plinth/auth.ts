@@ -2,7 +2,12 @@ import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { need, type Actor, type Job, type TeamRole } from './model'
 import { roleGate } from './role-gate'
 import { teamGrant } from './team'
+/** The actor each request was authenticated as, so edge records (exports) name them without a second sign-in check. */
+export const authenticated=new WeakMap<Request,Actor>()
 export async function authorize(request:Request,original:Bindings):Promise<Actor> {
+ const actor=await authenticate(request,original);authenticated.set(request,actor);return actor
+}
+async function authenticate(request:Request,original:Bindings):Promise<Actor> {
  const env=runtimeBindings(original),url=new URL(request.url)
  need(url.origin===new URL(env.AUTH_ORIGIN).origin,'Wrong application origin',403,'origin')
  need(request.headers.get('sec-fetch-site')!=='cross-site','Cross-site requests are refused',403,'origin')
@@ -11,13 +16,13 @@ export async function authorize(request:Request,original:Bindings):Promise<Actor
   const credential=await auth.authenticateCredential(request);need(credential,'Sign in required',401,'unauthenticated')
   const person=await env.DB.prepare("SELECT id,email,display_name,role,version FROM oa_operators WHERE id=? AND status='active'").bind(credential.personId).first<{id:string;email:string;display_name:string;role:string;version:number}>()
   need(person&&['owner','admin'].includes(person.role),'Only manager credentials may prepare drafts',403,'forbidden')
-  return {id:person.id,email:person.email,name:person.display_name,role:'agent',version:credential.fence,credential_id:credential.id}
+  return {id:person.id,email:person.email,name:person.display_name,role:'agent',version:credential.fence,credential_id:credential.id,request:{method:request.method,path:url.pathname}}
  }
  const session=await auth.getSession(request);need(session,'Sign in required',401,'unauthenticated')
  if(!['GET','HEAD'].includes(request.method))need(request.headers.get('origin')===url.origin,'A matching Origin header is required',403,'origin')
- const o=session.operator,grant=o.role==='admin'?await teamGrant(env.DB,o.id):null
- if(grant){const actor:Actor={id:o.id,email:o.email,name:o.displayName,role:grant.grant.role,version:o.version,session_id:session.id,team:{version:grant.version,job_ids:grant.grant.job_ids,po_limit_cents:grant.grant.po_limit_cents}};roleGate(actor,request);return actor}
- return {id:o.id,email:o.email,name:o.displayName,role:o.role,version:o.version,session_id:session.id}
+ const o=session.operator,request_info={method:request.method,path:url.pathname},grant=o.role==='admin'?await teamGrant(env.DB,o.id):null
+ if(grant){const actor:Actor={id:o.id,email:o.email,name:o.displayName,role:grant.grant.role,version:o.version,session_id:session.id,team:{version:grant.version,job_ids:grant.grant.job_ids,po_limit_cents:grant.grant.po_limit_cents},request:request_info};roleGate(actor,request);return actor}
+ return {id:o.id,email:o.email,name:o.displayName,role:o.role,version:o.version,session_id:session.id,request:request_info}
 }
 export function requireManager(actor:Actor,allowAgent=false){need(actor.role==='owner'||actor.role==='admin'||allowAgent&&actor.role==='agent','Builder manager access required',403,'forbidden')}
 /** ROLE-001: job work is open to project managers too; jobOf has already refused jobs outside their assignments. */

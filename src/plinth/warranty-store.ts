@@ -4,6 +4,7 @@ import { DomainError, need, type Actor, type Job } from './model'
 import { readClock } from './store'
 import { teamGrant } from './team'
 import type { WarrantyAuthority, WarrantyPromise, WarrantyRecipient, WarrantyReminder, WarrantyState } from './warranty-model'
+import { auditStatement, automation, jobRef } from './audit'
 
 export const warrantyState = (job: Job): WarrantyState => job.warranties ??= { components: [], promises: [], cases: [], reminders: [] }
 export async function warrantyGeneration(db: D1Database): Promise<number> {
@@ -78,7 +79,8 @@ export async function saveWarrantyJob(db: D1Database, previous: Job, next: Job, 
   ...(actor ? [authGuard(db, actor)] : []), ...guards,
  ]
  try {
-  await db.batch([...checks, db.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(next.version, data, next.id, previous.version), db.prepare('UPDATE pl_clock SET version=version+1 WHERE id=1'), db.prepare('DELETE FROM pl_guard')])
+  const audit = auditStatement(db, actor ?? automation('warranty-scheduler', 'Warranty reminder scheduler'), { ...(actor ? {} : { kind: 'automation' as const, action: 'warranty.reminders' }), job_id: next.id, version_before: previous.version, version_after: next.version, before_ref: await jobRef(JSON.stringify(previous)), after_ref: await jobRef(data) })
+ await db.batch([...checks, db.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(next.version, data, next.id, previous.version), audit, db.prepare('UPDATE pl_clock SET version=version+1 WHERE id=1'), db.prepare('DELETE FROM pl_guard')])
  } catch (error) {
   if (/CHECK constraint failed|UNIQUE constraint failed|job_erased|FOREIGN KEY constraint failed/.test(String(error))) throw new DomainError('conflict', 'The job or reminder authority changed; reload before trying again', 409)
   throw error

@@ -4,6 +4,7 @@ import { authorize, requireManager, requireOwner } from './auth'
 import { DomainError, need, object, text, type Actor, type Input } from './model'
 import { complianceRecord, review, rules } from './compliance'
 import { readClock, transaction } from './store'
+import { heldSql, requireNoHold } from './holds'
 import { addRate, documentBytes, qualify, summary, taxIdentity, vendorFields, type Vendor, type VendorDocument } from './vendor-model'
 
 const root = '/api/plinth/vendors'
@@ -64,7 +65,9 @@ async function handle(request: Request, original: Bindings): Promise<Response> {
  if (method === 'DELETE') {
   requireOwner(actor); need(parts.length === 1, 'Unknown directory route', 404, 'not_found')
   const input = await body(request); need(input.expected_version === previous.version, 'Company changed. Reload before erasing.', 409, 'stale_version')
-  await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_vendors WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(previous.id, previous.version), db.prepare('DELETE FROM pl_vendor_documents WHERE vendor_id=?').bind(previous.id), db.prepare('DELETE FROM pl_vendors WHERE id=?').bind(previous.id), audit(db, actor, 'vendor.erase', previous.id)], clock)
+  await requireNoHold(db, actor, 'vendor', previous.id)
+  const held = heldSql('vendor', previous.id)
+  await transaction(db, actor, null, [db.prepare(`INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_vendors WHERE id=? AND version=?) AND NOT ${held.sql} THEN 1 ELSE 0 END`).bind(previous.id, previous.version, ...held.params), db.prepare('DELETE FROM pl_vendor_documents WHERE vendor_id=?').bind(previous.id), db.prepare('DELETE FROM pl_vendors WHERE id=?').bind(previous.id), audit(db, actor, 'vendor.erase', previous.id)], clock)
   return json({ erased: true, vendor_id: previous.id })
  }
  need(method === 'POST', 'Method not allowed', 405, 'method_not_allowed')

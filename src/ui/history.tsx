@@ -2,6 +2,7 @@ import {PortalAccess} from './portal-access'
 import type { Approval } from '../plinth/model'
 import { api, Action, dateTime, day, time } from './shared'
 import type { JobProps } from './job'
+import { JobHolds } from './holds'
 
 const kinds: Record<string, string> = { 'schedule.publish': 'published reviewed schedule dates', 'schedule.baseline': 'approved a schedule baseline', 'schedule.revision': 'approved a named schedule revision', 'schedule.template': 'applied an approved schedule template', 'client.contacts': 'updated authorized job contacts', quote: 'recorded the client’s quote acceptance', schedule: 'approved a trade booking', 'schedule.move': 'approved new booking dates', 'schedule.cancel': 'cancelled a trade booking', diary: 'published a daily log', variation: 'approved a change order', purchase_order: 'issued a purchase order', receipt: 'recorded a supplier receipt', claim: 'approved a pay app' }
 const subject = (a: Approval) => { const s = a.snapshot as Record<string, any>; return s?.after?.description ?? s?.description ?? s?.trade ?? s?.supplier ?? s?.reference ?? (s?.revision ? `Quote ${s.revision}` : '') }
@@ -23,6 +24,6 @@ export function History({ job, role, mutate, onErased }: JobProps & { onErased: 
       {job.approvals.length === 0 && <p className="empty">No approvals yet.</p>}
       <ol className="rows">{newest(job.approvals).map(a => <li className="row" key={a.id}><div className="row-main"><strong>{logLine(a)}</strong>{subject(a) && <span className="muted">{subject(a)}</span>}<span className="muted">{dateTime(a.approved_by.at)} · prepared by {a.prepared_by.name} · revision {a.revision}</span><details><summary>Approved record</summary><pre>{JSON.stringify(a.snapshot, null, 2)}</pre></details></div></li>)}</ol>
     </section>
-    {role === 'owner' && <aside className="side"><PortalAccess job={job} role={role} mutate={mutate}/><section className="card danger-zone"><details><summary>Erase this job</summary><p>Permanently removes the job, photos and imported source custody. Export your records first if retention is required. Later erasure journals prevent restoring older archives.</p><Action className="danger-button" action={async () => { if (!window.confirm('Permanently erase this job and its photos?')) return; await api('/jobs/' + job.id, { expected_version: job.version }, 'DELETE'); onErased() }}>Erase job permanently</Action></details></section></aside>}
+    {role === 'owner' && <aside className="side"><PortalAccess job={job} role={role} mutate={mutate}/><JobHolds jobId={job.id}/><section className="card danger-zone"><details><summary>Erase this job</summary><p>Permanently removes the job, photos and imported source custody. Export your records first if retention is required. Later erasure journals prevent restoring older archives.</p><Action className="danger-button" action={async () => { if (!window.confirm('Permanently erase this job and its photos?')) return; await api('/jobs/' + job.id, { expected_version: job.version }, 'DELETE'); onErased() }}>Erase job permanently</Action></details></section></aside>}
   </div>
 }

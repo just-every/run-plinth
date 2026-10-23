@@ -9,6 +9,7 @@ import { DomainError, need } from './model.ts'
 import { acceptedJobsSource, IMPORT_LIMITS } from './import-source.ts'
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
+import { auditStatement } from './audit.ts'
 
 const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
 async function body(request: Request): Promise<Record<string, unknown>> {
@@ -81,6 +82,7 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
       const approved = { ...context, reviewedFingerprint: input.fingerprint, operationKey: `accepted-jobs:${input.fingerprint}` }
       const created = await createD1ImportJob(plan, approved)
       const job = created.state === 'queued' || created.state === 'applying' ? await applyD1ImportBatches(created.id, approved) : created
+      await env.DB.batch([auditStatement(env.DB, actor, { detail: { job_id: job.id, fingerprint: input.fingerprint } })])
       return respond({ job })
     }
     const match = /^\/([^/]+)(?:\/(resume|undo|rollback|originals|report))?$/.exec(route)
@@ -89,9 +91,10 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
       if (request.method === 'GET' && !action) return respond({ job: await readD1ImportJob(id, context) })
       if (request.method === 'GET' && action === 'originals') return respond({ originals: await readD1ImportOriginals(id, context) })
       if (request.method === 'GET' && action === 'report') return respond({ report: await readD1ImportUndoReport(id, context) })
-      if (request.method === 'POST' && action === 'resume') return respond({ job: await resumeD1Import(id, context) })
+      if (request.method === 'POST' && action === 'resume') { const job = await resumeD1Import(id, context); await env.DB.batch([auditStatement(env.DB, actor, { subject_id: id })]); return respond({ job }) }
       if (request.method === 'POST' && (action === 'undo' || action === 'rollback')) {
         const job = action === 'undo' ? await undoD1Import(id, context) : await rollbackD1Import(id, context)
+        await env.DB.batch([auditStatement(env.DB, actor, { subject_id: id })])
         return respond({ job, report: await readD1ImportUndoReport(id, context) })
       }
     }

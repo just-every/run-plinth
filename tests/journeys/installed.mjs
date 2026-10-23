@@ -8,7 +8,7 @@ import { resolve, join } from 'node:path'
 import { createServer } from 'node:net'
 
 const name = process.argv[2]
-assert.ok(['punch','handover','bids','todos','bid-comparison','portal-rights','role-field'].includes(name), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights or role-field')
+assert.ok(['punch','handover','bids','todos','bid-comparison','portal-rights','role-field','audit'].includes(name), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights, role-field or audit')
 assert.ok(!existsSync('.dev.vars') && !existsSync('.wrangler/state'), 'Use a fresh disposable checkout; this runner never resets an existing installation')
 const screenshotRoot = process.env.PLINTH_SCREENSHOTS_ROOT ?? join(homedir(), '.cache', 'plinth-journeys')
 await mkdir(screenshotRoot, {recursive:true})

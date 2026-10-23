@@ -12,7 +12,7 @@ export const currencyOf = (job: { currency?: Currency }): Currency => job.curren
 export type Input = Record<string, unknown>
 export type TeamRole = 'project_manager' | 'estimator' | 'superintendent' | 'crew'
 export type Role = 'owner' | 'admin' | TeamRole | 'member' | 'agent'
-export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string; client_job_id?: string; team?: { version: number; job_ids: string[]; po_limit_cents: number } }
+export interface Actor { id: string; email: string; name: string; role: Role; version: number; session_id?: string; credential_id?: string; request?: { method: string; path: string }; client_job_id?: string; team?: { version: number; job_ids: string[]; po_limit_cents: number } }
 export interface Stamp { id: string; name: string; role: Role; at: string }
 export interface Approval { id: string; kind: string; subject_id: string; revision: number; prepared_by: Stamp; approved_by: Stamp; decision: 'approved'; snapshot: unknown }
 export interface Line extends EstimateLineFields { description: string; quantity: number | string; unit_cents: number; total_cents: number }

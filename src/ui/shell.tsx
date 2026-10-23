@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { api, initials } from './shared'
 import { Icon, type IconName } from './icons'
 
-export type View = 'jobs' | 'imports' | 'people' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids' | 'todos' | 'subcontractor-records'
+export type View = 'jobs' | 'imports' | 'people' | 'audit' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids' | 'todos' | 'subcontractor-records'
 export type Me = { displayName: string; email: string; role: string }
 const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew', client: 'Client', member: 'Client' }
 
@@ -26,6 +26,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
       {manager && item('customers', 'people', 'Customers')}
       {manager && item('vendors', 'people', 'Subcontractors')}
       {manager && item('people', 'people', 'People & access')}
+      {manager && item('audit', 'clock', 'Audit history')}
       <li><a href="/auth/settings/identity"><Icon name="account" />Account</a></li>
     </ul>
     {jobs.length > 0 && <nav className="recent" aria-label="Recent jobs"><p>Recent jobs</p><ul>{jobs.slice(0, 8).map(job => <li key={job.id}><button aria-current={selected === job.id ? 'page' : undefined} onClick={() => onJob(job.id)}>{job.name}</button></li>)}</ul></nav>}

@@ -44,7 +44,9 @@ import { catalogPreview, applyCatalog } from './catalog-quote'
 import { costCodeReport, costCodeCsv, projectEstimateCosts } from './estimate-report'
 import { constraintAction, constraintFile, requireScheduleClearance } from './schedule-constraints'
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
-import { authorize, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
+import { auditExport, auditResponse } from './audit-http'
+import { holdsResponse } from './holds'
+import { authenticated, authorize, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
 import { roleJobView } from './role-view'
 import { teamResponse } from './team'
 import { emptyJob, DomainError, need, object, recordApproval, type Actor, type Input, type Job } from './model'
@@ -90,6 +92,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const subPortal=await subcontractorPortalResponse(request,env,actor,parts);if(subPortal)return subPortal
  const reports=await reportsResponse(request,env.DB,actor,parts,body);if(reports)return reports
  const team=await teamResponse(request,env.DB,actor,parts,body);if(team)return team
+ const history=await auditResponse(request,env.DB,actor,parts);if(history)return history
+ const holds=await holdsResponse(request,env.DB,actor,parts,body);if(holds)return holds
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
  const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
@@ -200,4 +204,4 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  return json({job:display((await named(env.DB,[job]))[0]!,actor),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
 }
 /** Each direct API request authenticates independently of document-route guards. */
-export async function plinthResponse(request:Request,env:Bindings):Promise<Response|null>{if(!new URL(request.url).pathname.startsWith('/api/plinth/'))return null;try{return await selectionDelegationsResponse(request,env) ?? await warrantyServiceResponse(request,env) ?? await bidComparisonResponse(request,env) ?? await todosResponse(request,env) ?? await bidsResponse(request,env) ?? await handoverResponse(request,env) ?? await punchResponse(request,env) ?? await customersResponse(request,env) ?? await vendorsResponse(request,env) ?? await calendarFeed(request,env) ?? await handle(request,env)}catch(error){if(error instanceof DomainError)return json({error:error.code,message:error.message,...(error.details?{details:error.details}:{})},error.status);const e=error as {status?:number;code?:string;message?:string};if(e.status&&e.status<500)return json({error:e.code??'forbidden',message:e.message??'Request refused'},e.status);console.error('Plinth request failed',error instanceof Error?error.message:'unknown error');return json({error:'server_error',message:'The request could not be completed'},500)}}
+export async function plinthResponse(request:Request,env:Bindings):Promise<Response|null>{if(!new URL(request.url).pathname.startsWith('/api/plinth/'))return null;try{const response=await selectionDelegationsResponse(request,env) ?? await warrantyServiceResponse(request,env) ?? await bidComparisonResponse(request,env) ?? await todosResponse(request,env) ?? await bidsResponse(request,env) ?? await handoverResponse(request,env) ?? await punchResponse(request,env) ?? await customersResponse(request,env) ?? await vendorsResponse(request,env) ?? await calendarFeed(request,env) ?? await handle(request,env);await auditExport(request,runtimeBindings(env).DB,authenticated.get(request),response.status);return response}catch(error){if(error instanceof DomainError)return json({error:error.code,message:error.message,...(error.details?{details:error.details}:{})},error.status);const e=error as {status?:number;code?:string;message?:string};if(e.status&&e.status<500)return json({error:e.code??'forbidden',message:e.message??'Request refused'},e.status);console.error('Plinth request failed',error instanceof Error?error.message:'unknown error');return json({error:'server_error',message:'The request could not be completed'},500)}}

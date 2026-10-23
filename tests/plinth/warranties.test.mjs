@@ -173,6 +173,7 @@ test('CARE-003 — immutable component terms, recurring agreed reminders, repeat
   mailMode='unknown';await Promise.all([scheduled('2031-01-31T14:00:00Z'),scheduled('2031-01-31T14:00:00Z')]);assert.equal(job.warranties.reminders.length,2)
   const uncertain=structuredClone(job.warranties.reminders.find(r=>r.promise_id===agreement.id));assert.equal(uncertain.status,'unknown');assert.ok(uncertain.label.includes('not be resent'));assert.equal(uncertain.dispatched_by.kind,'scheduler')
   assert.equal(job.warranties.reminders.find(r=>r.promise_id!==agreement.id).status,'accepted')
+  assert.ok((await f.db.prepare("SELECT count(*) AS n FROM pl_audit WHERE source='automation' AND action='warranty.reminders' AND actor_id LIKE 'automation:%' AND job_id=?").bind(job.id).first()).n>0,'The scheduler records itself as an automation in the audit history')
   const notices=()=>f.messages.filter(m=>m.subject.startsWith('Maintenance reminder:'))
   assert.equal(notices().length,2)
   mailMode='accepted';await scheduled('2031-01-31T15:00:00Z');assert.equal(notices().length,2,'An uncertain occurrence is never automatically resent')
