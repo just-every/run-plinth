@@ -344,8 +344,8 @@ Judged from the code and tests at commit `941f4ba16084b885c7ffe57a440d5f0a3ab793
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 33 | 26 | 63 | 122 |
-| All | 47 | 26 | 63 | 136 |
+| Target and push further | 34 | 26 | 62 | 122 |
+| All | 48 | 26 | 62 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -414,8 +414,8 @@ Judged from the code and tests at commit `941f4ba16084b885c7ffe57a440d5f0a3ab793
 | `SUB-003` | Insurance licenses and expiry controls | target | done | `src/plinth/compliance.ts`; `src/plinth/subcontracts.ts`; `src/plinth/vendors.ts`; `src/ui/vendors.tsx`; `src/ui/job-subcontracts.tsx`; `tests/plinth/subcontractors.test.mjs` |  |
 | `SUB-004` | Conditional and unconditional lien waivers | target | done | `src/plinth/lien-waiver-model.ts`; `src/plinth/lien-waivers.ts`; `src/plinth/claims.ts`; `src/plinth/http.ts`; `src/ui/job-subcontracts.tsx`; `migrations/core/202610200600_lien_waivers.sql`; `tests/plinth/subcontractors.test.mjs` |  |
 | `SUB-005` | Purchase work orders amendments and fulfillment | target | done | `src/plinth/purchase-order-model.ts`; `src/plinth/purchase-orders.ts`; `src/plinth/purchase-order-send.ts`; `src/plinth/operations.ts`; `src/plinth/claims.ts`; `src/ui/money.tsx`; `tests/plinth/purchase-orders.test.mjs` |  |
-| `COST-001` | Cost-code budget committed actual and billed ledger | target | partial | `src/plinth/claims.ts`; `src/plinth/model.ts` | Contract, commitment and receipt totals exist; cost codes, actual/billed/collected ledgers and matched consumption are absent. |
-| `COST-002` | Vendor and subcontractor bill matching | target | missing |  | No vendor and subcontractor bill matching workflow exists. |
+| `COST-001` | Cost-code budget committed actual and billed ledger | target | done | `tests/plinth/cost-ledger.test.mjs` — “COST-001 — coded budgets, receipt-matched actuals and client draws reconcile without double consumption through native HTTP” proves original/revised/approved and pending changes, PO/two receipts/split-code posted actual, consumed/open/received-not-billed columns, SOV/invoice/collection reconciliation, every dated and period-bearing source and no duplicate consumption; `tests/journeys/costs.mjs` proves the native ledger with existing Purchasing/History screens at 1440/390 and icon tips; `src/plinth/cost-ledger.ts`; `docs/COSTS.md` |  |
+| `COST-002` | Vendor and subcontractor bill matching | target | partial | `tests/plinth/cost-ledger.test.mjs` — “COST-002 — originals, duplicate and overbill refusal, draft recoding, immutable reviewed tax, credits and stale posting preserve the payable ledger” and the COST-001 journey prove supplier original bytes, two receipts, split codes, duplicate/overbill refusal, reviewed exact tax, review/post once, retained credit and balance/source reconciliation; `src/plinth/cost-bills.ts`; `docs/COSTS.md` | Remaining: native subcontract progress/retainage/waiver matching branch and approval routing lack acceptance proof; RPT-004 financial custom-field/stage/view discovery is not integrated for these new bill records. Native ledger posting is implemented; QBO/Xero provider sync is held under INT-001/INT-002/INT-003, no authorized company grant measured in this run. |
 | `COST-003` | Labor equipment expenses and payroll costs | target | missing |  | No labor equipment expenses and payroll costs workflow exists. |
 | `COST-004` | Forecast cost to complete and projected margin | target | missing |  | No forecast cost to complete and projected margin workflow exists. |
 | `COST-005` | Cash requirements WIP and period controls | target | missing |  | No cash requirements wip and period controls workflow exists. |
