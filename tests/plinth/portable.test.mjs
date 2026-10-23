@@ -125,7 +125,12 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     const payrollCsv=`external_id,time_source_id,gross_cents,burden_cents\nsynthetic-plinth-archive-payroll,${time.id},25000,5500\n`;await c.ok('/costs/payroll',{csv:payrollCsv,reference:'synthetic-plinth-archive-register',dated_on:'2026-10-24',period:'2026-10'})
     await c.ok('/costs/forecasts',{as_of:'2026-10-23',source_as_of:'Archive sources checked',codes:[{cost_code:'06-100',remaining_quantity:'50',minutes_per_unit:'24',labor_hour_cents:3000,outstanding_commitment_cents:60000,unbought_cents:0,risk_cents:0,reference:'Archive framing half complete'},{cost_code:'01-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:0,unbought_cents:1000,risk_cents:0,reference:'Archive remaining labor'}]})
     await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:33000},{cost_code:'01-100',amount_cents:41500}],reference:'synthetic-plinth-archive-accounting'})
-    await c.ok('/costs/periods',{period:'2026-10',accountant_approved:true,accountant_name:'Synthetic archive accountant',approval_reference:'synthetic-plinth-archive-close',opening_cash_cents:200000,months:3})
+    const accountant=await f.invite('synthetic-plinth-archive-accountant@example.com','Archive accountant','admin'), accountantId=(await c.api('/team')).value.team.find(p=>p.name==='Archive accountant').id
+    assert.equal((await f.json('/api/plinth/team/'+accountantId,{method:'PUT',cookie:f.owner,body:{role:'bookkeeper',job_ids:[c.job.id],expected_version:0}})).status,200)
+    await c.ok('/costs/accountant',{accountant_id:accountantId,reason:'Owner granted archive accountant review'})
+    const nativeInput={period:'2026-10',opening_cash_cents:200000,months:3},nativePreview=(await c.api(`/jobs/${c.job.id}/costs/period-preview?period=2026-10&opening_cash_cents=200000&months=3`,undefined,accountant)).value
+    const review=await c.act('/costs/period-reviews',{...nativeInput,confirm:true,digest:nativePreview.digest,reference:'synthetic-plinth-archive-native-review'},accountant);assert.equal(review.status,200);await c.read()
+    await c.ok('/costs/periods',{...nativeInput,native_review_id:review.value.record.id})
     const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -138,6 +143,8 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     const rows = records => records.filter(r=>r.kind==='part').flatMap(r=>r.items)
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
+    const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
+    assert.deepEqual(authority(restoredRows),authority(originalRows));assert.equal(authority(restoredRows).accountant_id,accountantId);assert.equal(getCost(restoredRows).periods[0].native_review.by.id,accountantId);assert.deepEqual(getCost(restoredRows).periods[0].snapshot,nativePreview.snapshot)
     // The complete part stream, including binary cells, is unchanged by a restore.
     assert.ok(rows(original).length > 0)
     const expected=structuredClone(rows(original))

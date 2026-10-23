@@ -1,3 +1,4 @@
+import { costFixture } from './cost-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture } from './helpers.mjs'
@@ -285,13 +286,12 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   const assign = (key, body, expected_version = 0) => api(`/team/${people[key].id}`, { method: 'PUT', body: { expected_version, ...body } })
 
   // The owner copies two presets; the owner role and the presets themselves stay fixed.
-  let r = await api('/roles'); assert.deepEqual(r.value.presets.map(p => p.id), ['owner', 'administrator', 'project_manager', 'estimator', 'superintendent', 'crew'])
+  let r = await api('/roles'); assert.ok(r.value.presets.find(p => p.id === 'owner').locked)
   r = await api('/roles', { method: 'POST', body: { copy_of: 'superintendent', name: 'Lead Carpenter – no financials', permissions: { budgets: { view: false } }, financial_visible: false } }); assert.equal(r.status, 201, JSON.stringify(r.value)); let carpenter = r.value.role
   assert.equal(carpenter.permissions.logs.create, true, 'The copy keeps the superintendent defaults'); assert.equal(carpenter.permissions.budgets.view, false)
   r = await api('/roles', { method: 'POST', body: { copy_of: 'project_manager', name: 'Office Manager', permissions: { orders: { approve: true } }, po_limit_cents: 500_000 } }); assert.equal(r.status, 201, JSON.stringify(r.value)); let manager = r.value.role
   r = await api('/roles', { method: 'POST', body: { copy_of: 'administrator', name: 'Junior Admin', permissions: { invoices: { approve: false } } } }); assert.equal(r.status, 201); const junior = r.value.role
   assert.equal((await api('/roles', { method: 'POST', body: { copy_of: 'crew', name: 'Lead Carpenter – no financials' } })).status, 409, 'Role names are unique')
-  assert.equal((await api('/roles', { method: 'POST', body: { copy_of: 'bookkeeper', name: 'Bookkeeper copy' } })).status, 400)
   for (const id of ['owner', 'superintendent']) { assert.equal((await api(`/roles/${id}`, { method: 'PUT', body: { expected_version: 1, name: 'x' } })).status, 403); assert.equal((await api(`/roles/${id}`, { method: 'DELETE', body: { expected_version: 1 } })).status, 403) }
   assert.equal((await assign('lead', { role: 'custom', role_id: carpenter.id, job_ids: [job.id] })).status, 200)
   // A ROLE-001 project manager moved to a custom role uses its permissions on the next request.
@@ -323,6 +323,22 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   const held = job.version; r = await act(`/orders/${large}/issue`, {}, office); assert.equal(r.status, 403); assert.equal(r.value.error, 'over_limit'); assert.equal(job.version, held, 'The over-limit PO writes nothing')
   assert.equal(job.orders.find(o => o.id === small).issued_by.role, 'project_manager')
 
+  // Native cost doors apply the bill and budget switches immediately, including originals and forecasts.
+  const costs = (path, cookie = office) => api(`/jobs/${job.id}/costs${path}`, { cookie })
+  for (const path of ['/bills', '/forecasts', '/ledger', '/cash?start_period=2026-10&months=3&opening_cash_cents=0']) {
+   assert.equal((await costs(path, lead)).status, 403, path + ' hidden from the carpenter')
+   assert.equal((await costs(path)).status, 200, path + ' available to the assigned office manager')
+  }
+  const updateManager = async body => { const result = await api(`/roles/${manager.id}`, { method: 'PUT', body: { expected_version: manager.version, ...body } }); assert.equal(result.status, 200); manager = result.value.role }
+  await updateManager({ permissions: { budgets: { view: false }, bills: { view: false } } })
+  for (const path of ['/bills', '/forecasts', '/ledger', '/bills/missing/original']) assert.equal((await costs(path)).status, 403, 'Revocation applies before reading ' + path)
+  assert.equal((await view(office)).budgets, undefined)
+  await updateManager({ permissions: { budgets: { view: true }, bills: { view: true } } })
+  await updateManager({ financial_visible: false })
+  for (const path of ['/bills', '/forecasts', '/ledger']) assert.equal((await costs(path)).status, 403, 'Financial visibility fences ' + path)
+  await updateManager({ financial_visible: true })
+  assert.equal((await costs('/forecasts')).status, 200)
+
   // Turning budget view on, and financial visibility, applies on the next request; the audit history names each change.
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, permissions: { budgets: { view: true } }, financial_visible: true } })).status, 200)
   seen = await view(lead); assert.ok(seen.budgets.length, 'The next request shows the budget')
@@ -333,12 +349,50 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   const permissionEvents = (await api('/audit?kind=permission')).value.events.map(e => e.action)
   for (const action of ['roles.create', 'roles.update', 'team.update']) assert.ok(permissionEvents.includes(action), action + ' is audited')
 
+  const narrowed = await api('/roles/' + junior.id, { method: 'PUT', body: { expected_version: junior.version, permissions: { budgets: { view: false }, bills: { approve: false } } } }); assert.equal(narrowed.status, 200)
+  const costJob = await costFixture(f), entered = await costJob.act('/costs/bills', costJob.bill('synthetic-plinth-limited-bill'), people.junior.cookie); assert.equal(entered.status, 200); assert.equal(entered.value.ledger, undefined, 'Bill entry never bypasses hidden budgets'); await costJob.read()
+  assert.equal((await costJob.act('/costs/bills/' + entered.value.record.id + '/post', {}, people.junior.cookie)).status, 403, 'Posting is approval, never data entry')
+
   // An administrator cannot grant what they lack, and cannot do what their role switches off.
   const jr = people.junior.cookie
-  r = await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'project_manager', name: 'Sneaky Manager' } }); assert.equal(r.status, 403); assert.equal(r.value.error, 'escalation'); assert.match(r.value.message, /invoices approve/)
-  assert.equal((await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'administrator', name: 'Another Junior Admin', permissions: { invoices: { approve: false } } } })).status, 201, 'Narrower copies are allowed')
+  r = await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'project_manager', name: 'Sneaky Manager' } }); assert.equal(r.status, 403); assert.equal(r.value.error, 'escalation'); assert.match(r.value.message, /You cannot grant/)
+  assert.equal((await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'administrator', name: 'Another Junior Admin', permissions: { invoices: { approve: false }, budgets: { view: false }, bills: { approve: false } } } })).status, 201, 'Narrower copies are allowed')
   assert.equal((await api(`/jobs/${job.id}/invoices/none/issue`, { method: 'POST', cookie: jr, body: { expected_version: job.version } })).status, 403, 'The Junior Admin cannot approve invoices')
   assert.equal((await api(`/jobs/${job.id}/orders`, { method: 'POST', cookie: jr, body: { expected_version: job.version, supplier: 'x', description: 'x', amount_cents: 100 } })).status, 200, 'The same role still creates POs')
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'DELETE', body: { expected_version: carpenter.version + 1 } })).status, 409, 'A role in use is not deleted')
+ } finally { await f.close() }
+})
+
+
+test('ROLE-004 — assigned bookkeeper enters and recodes a bill for a separate manager; lender reads only draw evidence and revocation applies immediately', async () => {
+ const f = await createFixture()
+ try {
+  const c = await costFixture(f), clerk = await f.invite('synthetic-plinth-bookkeeper@example.com', 'Bookkeeper', 'admin'), lender = await f.invite('synthetic-plinth-reader@example.com', 'Lender', 'admin'), manager = await f.invite('synthetic-plinth-reviewer@example.com', 'Designated manager', 'admin')
+  const api = (path, { method = 'GET', body, cookie = f.owner } = {}) => f.json('/api/plinth' + path, { method, cookie, ...(body ? { body } : {}) })
+  const people = (await api('/team')).value.team, person = name => people.find(p => p.name === name)
+  const assign = (name, role, job_ids = [c.job.id], expected_version = 0) => api('/team/' + person(name).id, { method: 'PUT', body: { expected_version, role, job_ids } })
+  assert.equal((await assign('Bookkeeper', 'bookkeeper')).status, 200); assert.equal((await assign('Lender', 'reader')).status, 200)
+  for (const preset of ['bookkeeper', 'reader']) assert.equal((await api('/roles', { method: 'POST', body: { copy_of: preset, name: 'Scoped ' + preset } })).status, 201)
+  await c.ok('/costs/policy', { budget_limit_cents: 0, commitment_limit_cents: 0, bill_limit_cents: 1000000, separate_approval: true, owner_id: c.job.created_by.id, due_on: '2026-11-01' })
+  let r = await c.act('/costs/bills', { ...c.bill(), reviewer_id: person('Designated manager').id }, clerk); assert.equal(r.status, 200, JSON.stringify(r.value)); const bill = r.value.record; await c.read()
+  assert.equal((await c.act(`/costs/bills/${bill.id}/recode`, { line_id: bill.lines[0].id, cost_code: '01-100', reason: 'Reviewed original coding' }, lender)).status, 403)
+  assert.equal((await c.act(`/costs/bills/${bill.id}/recode`, { line_id: bill.lines[0].id, cost_code: '01-100', reason: 'Reviewed original coding' }, clerk)).status, 200); await c.read()
+  assert.equal((await c.act(`/costs/bills/${bill.id}/review`, { reason: 'Checked the receipt and original coding discrepancy' }, clerk)).status, 200); await c.read()
+  const before = c.job.version
+  for (const cookie of [clerk, lender, f.owner]) assert.equal((await c.act(`/costs/bills/${bill.id}/post`, {}, cookie)).status, 403)
+  assert.equal((await c.read()).version, before, 'Unauthorized approvals write nothing')
+  assert.equal((await c.act(`/costs/bills/${bill.id}/post`, {}, manager)).status, 200); await c.read()
+  assert.equal((await c.ledger()).totals.posted_actual_cents, 43000)
+  assert.equal((await c.act('/costs/reconcile', { period: '2026-10', balances: [{ cost_code: '01-100', amount_cents: 43000 }], reference: 'Bookkeeper reviewed the external ledger extract' }, clerk)).status, 200); await c.read()
+  for (const cookie of [clerk, lender]) for (const path of ['/costs/periods', '/costs/sources/missing/reimburse', '/subcontracts/missing/draws/missing/payment']) assert.equal((await c.act(path, {}, cookie)).status, 403, 'No payment or period authority: ' + path)
+  await c.ok('/sov'); await c.read()
+  r = await c.ok('/claims', { description: 'October lender draw', lines: c.job.sov.at(-1).lines.map((l, i) => ({ line_id: l.id, completed_cents: i ? 0 : 15000, stored_cents: 0, evidence: 'Reviewed installed work' })) }); await c.ok(`/claims/${r.record.id}/approve`)
+  const packet = await api(`/jobs/${c.job.id}/costs/draw-packet`, { cookie: lender }); assert.equal(packet.status, 200); assert.equal(packet.value.applications[0].current_cents, 15000); assert.equal(packet.value.applications[0].lines[0].evidence, 'Reviewed installed work')
+  assert.ok(!/cost_unit_cents|margin|supplier|Synthetic Lumber|base64|client_email|source_digest/.test(JSON.stringify(packet.value)), 'Draw evidence excludes internal costs, contacts and originals')
+  for (const path of ['/costs/bills', `/costs/bills/${bill.id}/original`, '/costs/ledger', '/costs/forecasts']) assert.equal((await api(`/jobs/${c.job.id}${path}`, { cookie: lender })).status, 403)
+  const other = (await api('/jobs', { method: 'POST', body: { name: 'Unassigned job', client_email: 'synthetic-plinth-other@example.com', address: 'Other site' } })).value.job
+  for (const cookie of [clerk, lender]) { assert.equal((await api(`/jobs/${other.id}/costs/draw-packet`, { cookie })).status, cookie === lender ? 404 : 403); const jobs = (await api('/jobs', { cookie })).value.jobs; assert.deepEqual(jobs.map(j => j.id), [c.job.id]); assert.equal(jobs[0].client_email, ''); assert.deepEqual(jobs[0].approvals, []) }
+  assert.equal((await assign('Lender', 'reader', [], 1)).status, 200); assert.equal((await api(`/jobs/${c.job.id}/costs/draw-packet`, { cookie: lender })).status, 404)
+  assert.equal((await assign('Bookkeeper', 'bookkeeper', [], 1)).status, 200); assert.equal((await api(`/jobs/${c.job.id}/costs/bills`, { cookie: clerk })).status, 404)
  } finally { await f.close() }
 })

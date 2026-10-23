@@ -6,7 +6,7 @@ import { CustomRoles } from './roles'
 type Member = { id: string; email: string; name: string; role: string; role_name?: string; role_id?: string; version?: number; job_ids?: string[]; po_limit_cents?: number }
 type CustomRole = { id: string; name: string }
 /** ROLE-001 and ROLE-002: the owner narrows an administrator to a preset for chosen jobs (project manager with a PO approval limit, estimator, superintendent or crew), or back. */
-const presets: Record<string, string> = { project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew' }
+const presets: Record<string, string> = { project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew', bookkeeper: 'Bookkeeper', reader: 'Reader' }
 export function TeamRoles({ jobs }: { jobs: Job[] }) {
   const [team, setTeam] = useState<Member[]>([]), [custom, setCustom] = useState<CustomRole[]>([])
   const load = () => api('/team').then(r => setTeam(r.team)).catch(() => setTeam([]))

@@ -15,7 +15,27 @@ test('COST-005 — three-month source cash and WIP expose a delayed collection t
   const initial=await report();assert.deepEqual(initial.rows.map(r=>r.closing_cents),[10000,15000,5000]);assert.equal(initial.trough_cents,5000);assert.equal(initial.wip.actual_cents,30000);assert.equal(initial.wip.forecast_final_cents,150000);assert.equal(initial.wip.earned_cents,60000);assert.equal(initial.wip.billed_cents,15000);assert.equal(initial.wip.under_billed_cents,45000);assert.ok(initial.outside_horizon.some(e=>e.kind==='expected_delivery'&&e.out_cents===100000),'Unphased open procurement never disappears');assert.ok(initial.outside_horizon.some(e=>e.kind==='forecast_unbought_labor_material_risk'&&e.out_cents===20000&&e.expected_on==='2027-01-20'))
   await c.ok('/costs/cash-dates',{kind:'invoice',source_id:invoice.id,expected_on:'2026-12-20',reference:'Client advised expected December collection; no payment claimed'})
   const delayed=await report();assert.deepEqual(delayed.rows.map(r=>r.closing_cents),[10000,0,5000]);assert.equal(delayed.trough_cents,0)
-  r=await c.ok('/costs/periods',{period:'2026-10',accountant_approved:true,accountant_name:'Synthetic external accountant',approval_reference:'synthetic-plinth-accountant-reviewed-october',opening_cash_cents:20000,months:3});const closed=r.record
+  const accountant=await f.invite('synthetic-plinth-accountant@example.com','Named accountant','admin'), people=(await c.api('/team')).value.team, person=people.find(p=>p.name==='Named accountant')
+  const assign=async(jobs,expected_version)=>{const r=await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{role:'bookkeeper',job_ids:jobs,expected_version}});assert.equal(r.status,200)}
+  await assign([c.job.id],0)
+  await c.ok('/costs/accountant',{accountant_id:person.id,reason:'Owner designates the named accountant account for this job'})
+  const closeInput={period:'2026-10',opening_cash_cents:20000,months:3}
+  const preview=async()=>{const r=await c.api(`/jobs/${c.job.id}/costs/period-preview?period=2026-10&opening_cash_cents=20000&months=3`,undefined,accountant);assert.equal(r.status,200);return r.value}
+  let reviewed=await preview()
+  assert.equal((await c.act('/costs/period-reviews',{...closeInput,confirm:true,digest:'stale',reference:'No'},accountant)).status,409)
+  r=await c.act('/costs/period-reviews',{...closeInput,confirm:true,digest:reviewed.digest,reference:'Exact October accountant review'},accountant);assert.equal(r.status,200);let nativeReview=r.value.record;await c.read()
+  await assign([],1)
+  assert.equal((await c.act('/costs/periods',{...closeInput,native_review_id:nativeReview.id})).status,403,'Revoked accountant authority cannot close a period')
+  assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{role:'admin',expected_version:2}})).status,200)
+  assert.equal((await c.api(`/jobs/${c.job.id}/costs/period-preview?period=2026-10&opening_cash_cents=20000`,undefined,accountant)).status,403,'An administrator reassignment does not retain designated accountant authority')
+  await assign([c.job.id],0)
+  await c.ok('/costs/cash-dates',{kind:'invoice',source_id:invoice.id,expected_on:'2026-12-20',reference:'Owner rechecked collection date'})
+  assert.equal((await c.act('/costs/periods',{...closeInput,native_review_id:nativeReview.id})).status,409,'A changed job needs a new accountant review')
+  reviewed=await preview();r=await c.act('/costs/period-reviews',{...closeInput,confirm:true,digest:reviewed.digest,reference:'Exact refreshed October accountant review'},accountant);assert.equal(r.status,200);nativeReview=r.value.record;await c.read()
+  assert.equal((await c.act('/costs/periods',{...closeInput,native_review_id:nativeReview.id},accountant)).status,403,'Review authority does not grant owner close authority')
+  r=await c.ok('/costs/periods',{...closeInput,native_review_id:nativeReview.id});const closed=r.record
+  assert.match(closed.label,/recorded by owner/);assert.equal(closed.closed_by.role,'owner');assert.equal(closed.accountant_name,'Named accountant');assert.equal(closed.native_review.by.id,person.id);assert.equal(closed.approval_reference,'Exact refreshed October accountant review');assert.deepEqual(closed.snapshot,reviewed.snapshot);assert.ok(Date.parse(closed.closed_by.at)>Date.now()-600000)
+
   assert.equal((await c.act('/costs/periods',{period:'2026-10',accountant_approved:true,accountant_name:'Another',approval_reference:'Cannot rewrite',opening_cash_cents:20000})).status,409)
   r=await c.ok('/costs/sources',{kind:'equipment',reference:'synthetic-plinth-late-october-cost',equipment_reference:'synthetic-plinth-lift-1',dated_on:'2026-10-31',period:'2026-10',cost_code:'06-100',minutes:60,hour_cents:500});const source=r.record;assert.equal((await c.act(`/costs/sources/${source.id}/approve`)).value.error,'cost_period_closed')
   await c.ok(`/costs/sources/${source.id}/approve`,{posting_period:'2026-11'})

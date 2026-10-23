@@ -6,7 +6,7 @@ export const actions = ['view', 'create', 'edit', 'delete', 'approve'] as const
 export type Feature = typeof features[number]
 export type Action = typeof actions[number]
 export type Matrix = Record<Feature, Record<Action, boolean>>
-export type Preset = 'administrator' | 'project_manager' | 'estimator' | 'superintendent' | 'crew'
+export type Preset = 'administrator' | 'project_manager' | 'estimator' | 'superintendent' | 'crew' | 'bookkeeper' | 'reader'
 export interface RoleSpec { name: string; copy_of: Preset; permissions: Matrix; /** Cost, margin, markup and pay rates are their own switch. */ financial_visible: boolean; /** Largest purchase order the role may approve, USD cents; null is no limit. */ po_limit_cents: number | null }
 export interface Role extends RoleSpec { id: string; version: number; created_by: { id: string; name: string; at: string }; updated_by: { id: string; name: string; at: string } }
 /** v view, c create, e edit, d delete, a approve. */
@@ -14,18 +14,20 @@ const letters: Record<string, Action> = { v: 'view', c: 'create', e: 'edit', d: 
 const matrix = (spec: Partial<Record<Feature, string>>): Matrix => Object.fromEntries(features.map(f => [f, Object.fromEntries(actions.map(a => [a, (spec[f] ?? '').split('').some(l => letters[l] === a)]))])) as Matrix
 const all = Object.fromEntries(features.map(f => [f, 'vcdea'])) as Record<Feature, string>
 /** The operator-auth role each preset rides on; every preset's job reach is still its own doors (ROLE-001, ROLE-002). */
-export const presets: Record<Preset, { name: string; base: 'admin' | 'project_manager' | 'estimator' | 'superintendent' | 'crew'; permissions: Matrix; financial_visible: boolean; po_limit_cents: number | null }> = {
+export const presets: Record<Preset, { name: string; base: 'admin' | 'project_manager' | 'estimator' | 'superintendent' | 'crew' | 'bookkeeper' | 'reader'; permissions: Matrix; financial_visible: boolean; po_limit_cents: number | null }> = {
  administrator: { name: 'Administrator', base: 'admin', permissions: matrix(all), financial_visible: true, po_limit_cents: null },
  project_manager: { name: 'Project manager', base: 'project_manager', permissions: matrix({ ...all, company: 'v', reports: 'vc', bills: 'v' }), financial_visible: true, po_limit_cents: 0 },
  estimator: { name: 'Estimator', base: 'estimator', permissions: matrix({ leads: 'vce', estimates: 'vce', documents: 'v' }), financial_visible: true, po_limit_cents: 0 },
  superintendent: { name: 'Superintendent', base: 'superintendent', permissions: matrix({ schedule: 've', logs: 'vc', documents: 'vc' }), financial_visible: false, po_limit_cents: 0 },
+ bookkeeper: { name: 'Bookkeeper', base: 'bookkeeper', permissions: matrix({ budgets: 'v', bills: 'vce', reports: 'vcea' }), financial_visible: true, po_limit_cents: 0 },
+ reader: { name: 'Reader', base: 'reader', permissions: matrix({ reports: 'v' }), financial_visible: true, po_limit_cents: 0 },
  crew: { name: 'Crew', base: 'crew', permissions: matrix({ schedule: 'v', logs: 'v', documents: 'v' }), financial_visible: false, po_limit_cents: 0 },
 }
 export const holds = (role: { permissions: Matrix }, feature: Feature, action: Action) => role.permissions[feature][action]
 /** Validate a role's switches; unknown features or actions are refused rather than ignored. */
 export function parseSpec(input: Input, previous?: RoleSpec): RoleSpec {
  const copy = previous?.copy_of ?? input.copy_of
- need(typeof copy === 'string' && copy in presets, 'Copy one of administrator, project_manager, estimator, superintendent or crew')
+ need(typeof copy === 'string' && copy in presets, 'Copy one of administrator, project_manager, estimator, superintendent, crew, bookkeeper or reader')
  const source = previous ?? { ...structuredClone(presets[copy as Preset]), copy_of: copy as Preset }
  const next: RoleSpec = { name: input.name === undefined && previous ? previous.name : text(input.name, 'Role name', 80), copy_of: source.copy_of, permissions: structuredClone(source.permissions), financial_visible: source.financial_visible, po_limit_cents: source.po_limit_cents }
  if (input.permissions !== undefined) {

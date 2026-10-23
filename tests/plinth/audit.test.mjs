@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createFixture } from './helpers.mjs'
 
+import { costFixture } from './cost-support.mjs'
+
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
 
 test('ROLE-005 — role, invoice, send, export and import events are searchable and exportable without content; a hold blocks erasure with its reason and only audit metadata survives', async () => {
@@ -31,6 +33,15 @@ test('ROLE-005 — role, invoice, send, export and import events are searchable 
   assert.equal((await f.request(`/api/plinth/jobs/${job.id}/invoices/${invoice}/document.csv`, { cookie: f.owner })).status, 200)
   assert.equal((await f.request(`/api/plinth/jobs/${job.id}/quotes/${job.quotes[0].id}/cost-codes.csv`, { cookie: f.owner })).status, 200)
 
+  // Native bill recoding carries financial actor, subject and immutable before and after references.
+  const c = await costFixture(f), bill = (await c.ok('/costs/bills', c.bill())).record
+  await c.ok(`/costs/bills/${bill.id}/recode`, { line_id: bill.lines[0].id, cost_code: '01-100', reason: 'Reviewed original against labor allocation' })
+  const recode = (await search('?kind=financial&action=cost.bills.recode&job_id=' + c.job.id))[0]
+  assert.equal(recode.subject_id, bill.id); assert.equal(recode.actor_name, 'Builder'); assert.equal(recode.source, 'session')
+  assert.equal(recode.version_after, recode.version_before + 1); assert.match(recode.before_ref, /^[0-9a-f]{64}$/); assert.match(recode.after_ref, /^[0-9a-f]{64}$/); assert.notEqual(recode.before_ref, recode.after_ref); assert.ok(Date.parse(recode.at) > Date.now() - 600_000)
+  const billHistory = await f.request('/api/plinth/audit/export.csv?kind=financial&job_id=' + c.job.id, { cookie: f.owner })
+  assert.equal(billHistory.status, 200); const billEvents = await billHistory.text(); assert.match(billEvents, /cost\.bills\.recode/); assert.ok(!billEvents.includes('Synthetic Lumber'))
+
   // Search by kind, actor, job and text; each event names who, through what, and the version and digest before and after.
   const issue = (await search('?kind=financial&action=invoices.issue&job_id=' + job.id))[0]
   assert.equal(issue.actor_name, 'Builder'); assert.equal(issue.actor_role, 'owner'); assert.equal(issue.source, 'session'); assert.equal(issue.subject_id, invoice)
@@ -50,7 +61,7 @@ test('ROLE-005 — role, invoice, send, export and import events are searchable 
   const exported = await f.request('/api/plinth/audit/export.csv?kind=financial', { cookie: office }), text = await exported.text()
   assert.equal(exported.status, 200); assert.match(text, /invoices\.issue/); assert.ok(!/audit-client@example\.com|Audit Street|base64|token|password|secret/i.test(text), 'The export carries references, never content or secrets')
   assert.equal((await f.request('/api/plinth/audit/export.json?job_id=' + job.id, { cookie: f.owner })).status, 200)
-  assert.equal((await search('?kind=export&action=audit.export')).length, 2, 'Exporting the history is recorded')
+  assert.equal((await search('?kind=export&action=audit.export')).length, 3, 'Exporting the history is recorded')
 
   // An import is an event, and a held imported job survives an undo.
   const preview = (await api('/imports/preview', { method: 'POST', body: { csv } })).value

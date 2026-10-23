@@ -7,7 +7,7 @@ import { roleOf } from './role-store'
 /** A project manager is an operator-auth administrator narrowed to assigned jobs and an owner-set PO approval limit (USD cents, inclusive).
  * ROLE-002: an estimator, superintendent or crew member is the same narrowing with a different preset; their PO limit is always zero. */
 export interface TeamGrant { role: TeamRole | 'custom'; /** ROLE-006: a custom role names the operator-auth role it rides on and its definition. */ base?: TeamRole | 'admin'; role_id?: string; job_ids: string[]; po_limit_cents: number; updated_by: Stamp }
-const presets: TeamRole[] = ['project_manager', 'estimator', 'superintendent', 'crew']
+const presets: TeamRole[] = ['project_manager', 'estimator', 'superintendent', 'crew', 'bookkeeper', 'reader']
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
 /** Read on every request, so a role or assignment change applies on that person's next request. */
 export async function teamGrant(db: D1Database, operatorId: string): Promise<{ version: number; grant: TeamGrant } | null> {
@@ -29,7 +29,7 @@ export async function teamResponse(request: Request, db: D1Database, actor: Acto
  need(person?.role === 'admin', 'Invite the person as an administrator under People & access first', 409, 'not_admin')
  const previous = await teamGrant(db, id)
  need(input.expected_version === (previous?.version ?? 0), 'Their role changed; reload before saving', 409, 'stale_version')
- need(input.role === 'admin' || input.role === 'custom' || presets.includes(input.role as TeamRole), 'role must be admin, project_manager, estimator, superintendent, crew or custom')
+ need(input.role === 'admin' || input.role === 'custom' || presets.includes(input.role as TeamRole), 'role must be admin, project_manager, estimator, superintendent, crew, bookkeeper, reader or custom')
  const custom = input.role === 'custom' ? await roleOf(db, text(input.role_id, 'role_id', 100)) : null; need(input.role !== 'custom' || custom, 'Choose an existing custom role', 404, 'not_found')
  const base = custom ? presetRoles[custom.role.copy_of].base : undefined
  const audit = (value: string) => db.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'plinth.role',?,?)").bind(crypto.randomUUID(), actor.id, value, Date.now())

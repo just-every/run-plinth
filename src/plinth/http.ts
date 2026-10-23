@@ -84,6 +84,7 @@ async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import(
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
  job=withoutCosts(job,actor)
+ if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
  if(actor.permissions)return permissionView(display(job,{...actor,role:'admin',permissions:undefined}),actor)
  if(isTeamRole(actor.role)&&actor.role!=='project_manager')return roleJobView(job,actor)
  if(actor.role!=='member')return {...job,warranties:actor.role==='agent'?warrantyAgentProjection(job):job.warranties,portal_submissions:actor.role==='agent'?undefined:job.portal_submissions,...(actor.role==='agent'?{bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('bid.award')&&!job.warranties?.cases.some(c=>c.service&&c.id===a.subject_id))}:{}),invoices:invoiceProjection(job,actor),invoice_deposit_liability_cents:depositLiability(job),subcontracts:job.subcontracts?.map(sub=>({...sub,retainage_balance:supplierRetainageBalance(sub)})),retainage_balance:currentRetainageBalance(job),selections:selectionProjection(job,false)}

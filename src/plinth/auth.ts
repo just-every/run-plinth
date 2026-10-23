@@ -49,7 +49,7 @@ export function requireProgress(actor:Actor){need(actor.role==='superintendent'|
 /** Superintendents write daily logs and capture punch observations; crew read them. */
 export function requireFieldLog(actor:Actor,allowAgent=false){need(actor.role==='superintendent'||actor.role==='project_manager'||actor.role==='owner'||actor.role==='admin'||allowAgent&&actor.role==='agent','Field log access required',403,'forbidden')}
 /** Estimator, superintendent and crew are Plinth role-table presets on an operator-auth administrator, like a project manager. */
-export const isTeamRole=(role:string):role is TeamRole=>role==='project_manager'||role==='estimator'||role==='superintendent'||role==='crew'
+export const isTeamRole=(role:string):role is TeamRole=>role==='project_manager'||role==='estimator'||role==='superintendent'||role==='crew'||role==='bookkeeper'||role==='reader'
 export const isFieldRole=(actor:Actor)=>actor.role==='superintendent'||actor.role==='crew'
 export function visible(actor:Actor,job:Job){need(!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id),'Job not found',404,'not_found');need(actor.role!=='member'||(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'Job not found',404,'not_found')}
 export function actorPredicate(actor:Actor):{sql:string;params:unknown[]} {

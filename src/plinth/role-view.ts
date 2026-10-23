@@ -12,6 +12,7 @@ const scheduleKeys = (job: Job) => Object.keys(job).filter(key => key.startsWith
 const empty = { quotes: [], schedules: [], diary: [], variations: [], orders: [], claims: [], approvals: [] }
 export function roleJobView(job: Job, actor: Actor): Job {
  const identity = { id: job.id, version: job.version, name: job.name, address: job.address, status: job.status, created_by: job.created_by, ...(job.time_zone ? { time_zone: job.time_zone } : {}), ...(job.currency ? { currency: job.currency } : {}) }
+ if (actor.role === 'bookkeeper' || actor.role === 'reader') return { ...empty, ...identity, client_email: '' } as Job
  if (actor.role === 'estimator') return { ...empty, ...identity, client_email: job.client_email, ...(job.client_name ? { client_name: job.client_name } : {}), quotes: job.quotes, ...keep(job, ['takeoff', 'products', 'bids', 'bid_comparisons', 'bid_cost_adjustments']) } as Job
  const crew = actor.role === 'crew'
  const materials = job.orders.filter(order => order.status === 'issued').map(order => ({ id: order.id, supplier: order.supplier, description: order.description, promised_on: order.promised_on ?? null, received: order.receipts.length > 0 })).sort((a, b) => (a.promised_on ?? '9999').localeCompare(b.promised_on ?? '9999'))
