@@ -1,4 +1,5 @@
 import { need, type Actor, type TeamRole } from './model'
+import { enforce } from './permissions'
 
 /**
  * ROLE-002: the doors an estimator, superintendent or crew member may use. Everything not listed is refused
@@ -30,7 +31,8 @@ const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
  crew: common,
 }
 export function roleGate(actor: Actor, request: Request) {
- if (actor.role === 'project_manager') return
+ if (actor.permissions) enforce(actor, request)
+ if (!(actor.role in rules)) return
  const path = new URL(request.url).pathname, prefix = '/api/plinth/'
  const allowed = path.startsWith(prefix) && rules[actor.role as keyof typeof rules]?.some(([method, pattern]) => method === request.method && pattern.test(path.slice(prefix.length).replace(/\/+$/, '')))
  need(allowed, 'This role does not include that route', 403, 'forbidden')

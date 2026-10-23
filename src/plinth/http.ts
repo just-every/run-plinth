@@ -47,7 +47,8 @@ import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { auditExport, auditResponse } from './audit-http'
 import { holdsResponse } from './holds'
 import { authenticated, authorize, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
-import { roleJobView } from './role-view'
+import { permissionView, roleJobView } from './role-view'
+import { rolesResponse } from './roles'
 import { teamResponse } from './team'
 import { emptyJob, DomainError, need, object, recordApproval, type Actor, type Input, type Job } from './model'
 import { insertJob, jobOf, jobs, readClock, saveJob, transaction } from './store'
@@ -77,7 +78,8 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 /** Each job with its client's name from People & access, once they are invited. */
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
-function display(job:Job,actor:Actor) {
+function display(job:Job,actor:Actor):any {
+ if(actor.permissions)return permissionView(display(job,{...actor,role:'admin',permissions:undefined}),actor)
  if(isTeamRole(actor.role)&&actor.role!=='project_manager')return roleJobView(job,actor)
  if(actor.role!=='member')return {...job,warranties:actor.role==='agent'?warrantyAgentProjection(job):job.warranties,portal_submissions:actor.role==='agent'?undefined:job.portal_submissions,...(actor.role==='agent'?{bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('bid.award')&&!job.warranties?.cases.some(c=>c.service&&c.id===a.subject_id))}:{}),invoices:invoiceProjection(job,actor),invoice_deposit_liability_cents:depositLiability(job),subcontracts:job.subcontracts?.map(sub=>({...sub,retainage_balance:supplierRetainageBalance(sub)})),retainage_balance:currentRetainageBalance(job),selections:selectionProjection(job,false)}
  const claims=job.claims.filter(c=>c.status!=='draft').map(c=>{const {commitments_cents,received_cents,outstanding_cents,orders,...reconciliation}=c.reconciliation;const {export:artifact,...claim}=c;return {...claim,sov:undefined,reconciliation}})
@@ -94,6 +96,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const team=await teamResponse(request,env.DB,actor,parts,body);if(team)return team
  const history=await auditResponse(request,env.DB,actor,parts);if(history)return history
  const holds=await holdsResponse(request,env.DB,actor,parts,body);if(holds)return holds
+ const roles=await rolesResponse(request,env.DB,actor,parts,body);if(roles)return roles
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
  const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
@@ -104,7 +107,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const resource=await resourceResponse(request,env.DB,actor,parts,body);if(resource)return resource
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
- if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
+ if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}

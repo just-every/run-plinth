@@ -21,10 +21,10 @@ import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
 
 export function Workspace() {
-  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
+  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
   const create = useRef<HTMLElement>(null)
   const [totals, setTotals] = useState<CurrencyTotal[]>([])
-  async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setTotals(result.currency_totals ?? []); setRole(result.role); setReady(true) }
+  async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setTotals(result.currency_totals ?? []); setRole(result.role); setRoleName(result.role_name ?? ''); setReady(true) }
   useEffect(() => { const job = new URLSearchParams(window.location.search).get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
   useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
@@ -34,7 +34,7 @@ export function Workspace() {
   const words = query.trim().toLowerCase(), shown = words ? jobs.filter(j => [j.name, j.client_email, j.address].join(' ').toLowerCase().includes(words)) : jobs
   if (!ready) return <div className="workspace is-loading">{error ? <p role="alert" className="error">{error}</p> : <p role="status">Opening your workspace…</p>}</div>
   return <div className="workspace">
-    <Rail view={view} role={role} me={me} jobs={jobs} selected={selected} open={menu} onView={go} onJob={open} onClose={() => setMenu(false)} />
+    <Rail view={view} role={role} roleName={roleName} me={me} jobs={jobs} selected={selected} open={menu} onView={go} onJob={open} onClose={() => setMenu(false)} />
     {menu && <div className="scrim" onClick={() => setMenu(false)} />}
     <div className="main-col">
       <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />

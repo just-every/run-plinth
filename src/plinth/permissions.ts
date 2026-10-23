@@ -1,0 +1,46 @@
+import { holds, type Action, type Feature } from './role-model'
+import { need, type Actor } from './model'
+
+/**
+ * ROLE-006: every internal route resolves to one feature area and action, and a custom role is checked against its switches
+ * before any door runs. A route with no entry answers 403, so a door added later stays closed to custom roles until it is named here.
+ * A switch can only narrow what the copied preset's doors already allow; it never opens a door the preset keeps shut.
+ */
+export interface Requirement { feature: Feature; action: Action; financial?: boolean }
+const feature: Record<string, Feature> = {
+ quotes: 'estimates', takeoff: 'estimates', 'takeoff-estimate': 'estimates', 'takeoff-files': 'estimates', pricing: 'estimates', 'estimate-template': 'estimates', 'pricing-rates': 'estimates', 'estimate-catalog': 'estimates', bids: 'estimates', 'bid-comparisons': 'estimates', products: 'estimates', 'product-images': 'estimates',
+ selections: 'selections', 'selection-delegations': 'selections', 'decision-files': 'selections',
+ variations: 'changes', 'variation-pricing': 'changes', 'allowance-changes': 'changes',
+ orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
+ schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
+ diary: 'logs',
+ rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
+ invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
+ reports: 'reports', audit: 'reports', holds: 'reports',
+ company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
+}
+/** Verbs that decide, issue, send or publish rather than edit. */
+const approving = new Set(['accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
+const common = [/^jobs$/, /^jobs\/[^/]+$/, /^todos(?:\/.*)?$/, /^jobs\/[^/]+\/todos(?:\/.*)?$/]
+const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
+export function requirement(method: string, relative: string): Requirement | 'common' | null {
+ if (method === 'GET' && common.some(rule => rule.test(relative)) || common.slice(2).some(rule => rule.test(relative))) return 'common'
+ const parts = relative.split('/').filter(Boolean), job = parts[0] === 'jobs' && parts[1]
+ if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
+ const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = feature[category]
+ if (!area) return null
+ const verbs = rest.slice(1).filter(part => !isId(part)), verb = verbs.at(-1) ?? ''
+ const financial = /cost-codes\.(?:json|csv)$/.test(relative) || area === 'estimates' && ['pricing-rates', 'pricing'].includes(category) && method !== 'GET'
+ const collection = !verb && method === 'POST' && (!rest.slice(1).some(isId) || !job && category === 'bids' && rest.length === 2)
+ const action: Action = method === 'GET' ? 'view' : method === 'DELETE' ? 'delete' : verb === 'preview' || verb === 'plan-preview' ? 'view' : approving.has(verb) ? 'approve' : collection ? 'create' : 'edit'
+ return { feature: area, action, ...(financial ? { financial: true } : {}) }
+}
+/** Custom roles only; presets keep their own door lists. */
+export function enforce(actor: Actor, request: Request) {
+ const prefix = '/api/plinth/', path = new URL(request.url).pathname
+ const required = path.startsWith(prefix) ? requirement(request.method, path.slice(prefix.length).replace(/\/+$/, '')) : null
+ need(required, 'This role does not include that route', 403, 'forbidden')
+ if (required === 'common') return
+ need(holds({ permissions: actor.permissions!.matrix }, required.feature, required.action), `${actor.permissions!.name} does not allow ${required.action} for ${required.feature}`, 403, 'forbidden')
+ need(!required.financial || actor.permissions!.financial, `${actor.permissions!.name} does not include financial visibility`, 403, 'forbidden')
+}

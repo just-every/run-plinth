@@ -269,3 +269,76 @@ test('ROLE-002 — estimator, superintendent and crew work assigned jobs; margin
   assert.deepEqual(audited.results.map(a => a.value), [`${people.superintendent.id}:superintendent:1`, `${people.superintendent.id}:crew:2`, `${people.superintendent.id}:admin`])
  } finally { await f.close() }
 })
+
+test('ROLE-006 — custom roles copied from presets resolve one permission on every route, view, export and approval limit on the next request; nobody grants a permission they lack', async () => {
+ const f = await createFixture()
+ try {
+  const people = {}
+  for (const [key, name] of [['lead', 'Lee Carpenter'], ['office', 'Olive Manager'], ['junior', 'Jun Admin']]) people[key] = { cookie: await f.invite(`${key}@example.com`, name, 'admin'), email: `${key}@example.com` }
+  const api = (path, { method = 'GET', body, cookie = f.owner } = {}) => f.json('/api/plinth' + path, { method, cookie, ...(body ? { body } : {}) })
+  for (const key of Object.keys(people)) people[key].id = (await api('/team')).value.team.find(m => m.email === people[key].email).id
+  let job = (await api('/jobs', { method: 'POST', body: { name: 'Roles Street build', client_email: 'roles-client@example.com', address: '5 Roles Street' } })).value.job
+  const act = async (path, body = {}, cookie = f.owner) => { const r = await api(`/jobs/${job.id}${path}`, { method: 'POST', cookie, body: { expected_version: job.version, ...body } }); if (r.status === 200) job = (await api(`/jobs/${job.id}`)).value.job; return r }
+  assert.equal((await act('/quotes', { lines: [{ id: 'framing', description: 'Framing', cost_code: '06-100', phase: 'Framing', category: 'labor', quantity: '1', unit: 'job', unit_cents: 1000000, cost_unit_cents: 600000 }] })).status, 200)
+  assert.equal((await act(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed', evidence: 'Signed contract', schedule_choice: { kind: 'none', reason: 'Planned later' } })).status, 200)
+  assert.ok(job.budgets?.length, 'The accepted estimate froze a budget')
+  const assign = (key, body, expected_version = 0) => api(`/team/${people[key].id}`, { method: 'PUT', body: { expected_version, ...body } })
+
+  // The owner copies two presets; the owner role and the presets themselves stay fixed.
+  let r = await api('/roles'); assert.deepEqual(r.value.presets.map(p => p.id), ['owner', 'administrator', 'project_manager', 'estimator', 'superintendent', 'crew'])
+  r = await api('/roles', { method: 'POST', body: { copy_of: 'superintendent', name: 'Lead Carpenter – no financials', permissions: { budgets: { view: false } }, financial_visible: false } }); assert.equal(r.status, 201, JSON.stringify(r.value)); let carpenter = r.value.role
+  assert.equal(carpenter.permissions.logs.create, true, 'The copy keeps the superintendent defaults'); assert.equal(carpenter.permissions.budgets.view, false)
+  r = await api('/roles', { method: 'POST', body: { copy_of: 'project_manager', name: 'Office Manager', permissions: { orders: { approve: true } }, po_limit_cents: 500_000 } }); assert.equal(r.status, 201, JSON.stringify(r.value)); let manager = r.value.role
+  r = await api('/roles', { method: 'POST', body: { copy_of: 'administrator', name: 'Junior Admin', permissions: { invoices: { approve: false } } } }); assert.equal(r.status, 201); const junior = r.value.role
+  assert.equal((await api('/roles', { method: 'POST', body: { copy_of: 'crew', name: 'Lead Carpenter – no financials' } })).status, 409, 'Role names are unique')
+  assert.equal((await api('/roles', { method: 'POST', body: { copy_of: 'bookkeeper', name: 'Bookkeeper copy' } })).status, 400)
+  for (const id of ['owner', 'superintendent']) { assert.equal((await api(`/roles/${id}`, { method: 'PUT', body: { expected_version: 1, name: 'x' } })).status, 403); assert.equal((await api(`/roles/${id}`, { method: 'DELETE', body: { expected_version: 1 } })).status, 403) }
+  assert.equal((await assign('lead', { role: 'custom', role_id: carpenter.id, job_ids: [job.id] })).status, 200)
+  // A ROLE-001 project manager moved to a custom role uses its permissions on the next request.
+  assert.equal((await assign('office', { role: 'project_manager', job_ids: [job.id], po_limit_cents: 100_000 })).status, 200)
+  const probe = (await act('/orders', { supplier: 'Champlain Lumber', description: 'PO probe', amount_cents: 400_000 }, people.office.cookie)).value.record.id
+  assert.equal((await act(`/orders/${probe}/issue`, {}, people.office.cookie)).status, 403, 'As a project manager the $1,000 limit refuses a $4,000 PO')
+  assert.equal((await assign('office', { role: 'custom', role_id: manager.id, job_ids: [job.id] }, 1)).status, 200)
+  assert.equal((await act(`/orders/${probe}/issue`, {}, people.office.cookie)).status, 200, 'The next request uses the custom role limit')
+  assert.equal((await assign('junior', { role: 'custom', role_id: junior.id })).status, 200)
+  assert.equal((await api('/roles', { method: 'POST', cookie: people.lead.cookie, body: { copy_of: 'crew', name: 'Nope' } })).status, 403)
+  assert.equal((await api('/team')).value.team.find(m => m.email === 'lead@example.com').role_name, 'Lead Carpenter – no financials')
+
+  // Lead Carpenter: budgets, cost and margins are absent from the job and every export; field routes follow the switches.
+  const lead = people.lead.cookie, view = async cookie => (await api(`/jobs/${job.id}`, { cookie })).value.job
+  let seen = await view(lead); assert.equal(seen.budgets, undefined); assert.deepEqual(seen.quotes, []); assert.deepEqual(seen.approvals, []); assert.equal(seen.client_email, ''); assert.equal((await api('/jobs', { cookie: lead })).value.currency_totals, undefined)
+  assert.ok(!JSON.stringify(seen).includes('cost_unit_cents') && !JSON.stringify(seen).includes('600000'), 'No cost or margin anywhere in the job')
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/quotes/${job.quotes[0].id}/cost-codes.csv`, { cookie: lead })).status, 403, 'Cost exports are refused')
+  assert.equal((await api(`/jobs/${job.id}/orders`, { method: 'POST', cookie: lead, body: { expected_version: job.version, supplier: 'x', description: 'x', amount_cents: 100 } })).status, 403)
+  assert.equal((await api(`/jobs/${job.id}/schedules`, { method: 'POST', cookie: lead, body: { expected_version: job.version, trade: 'Framing', description: 'x', start: '2026-11-06T08:00:00Z', end: '2026-11-06T16:00:00Z' } })).status, 403)
+  assert.equal((await api(`/jobs/${job.id}/diary`, { method: 'POST', cookie: lead, body: { expected_version: job.version, note: 'Framing started' } })).value.record.status, 'draft')
+  job = await view(f.owner)
+
+  // Office Manager: sees budgets and cost; a $4,000 PO approves, a $6,000 PO is refused without a write.
+  const office = people.office.cookie; seen = await view(office); assert.ok(seen.budgets.length); assert.equal(seen.quotes[0].lines[0].cost_unit_cents, 600000)
+  assert.equal((await f.request(`/api/plinth/jobs/${job.id}/quotes/${job.quotes[0].id}/cost-codes.csv`, { cookie: office })).status, 200)
+  const order = async amount => (await act('/orders', { supplier: 'Champlain Lumber', description: `PO ${amount}`, amount_cents: amount }, office)).value.record.id
+  const small = await order(400_000), large = await order(600_000)
+  assert.equal((await act(`/orders/${small}/issue`, {}, office)).status, 200, 'A $4,000 PO is within the $5,000 limit')
+  const held = job.version; r = await act(`/orders/${large}/issue`, {}, office); assert.equal(r.status, 403); assert.equal(r.value.error, 'over_limit'); assert.equal(job.version, held, 'The over-limit PO writes nothing')
+  assert.equal(job.orders.find(o => o.id === small).issued_by.role, 'project_manager')
+
+  // Turning budget view on, and financial visibility, applies on the next request; the audit history names each change.
+  assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, permissions: { budgets: { view: true } }, financial_visible: true } })).status, 200)
+  seen = await view(lead); assert.ok(seen.budgets.length, 'The next request shows the budget')
+  assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, name: 'stale' } })).status, 409)
+  assert.equal((await api(`/roles/${manager.id}`, { method: 'PUT', body: { expected_version: manager.version, permissions: { orders: { approve: false } } } })).status, 200)
+  const gone = job.version; r = await act(`/orders/${large}/issue`, {}, f.owner); assert.equal(r.status, 200, 'The owner still approves above the limit'); assert.equal((await act('/orders', { supplier: 'x', description: 'x', amount_cents: 100 }, office)).status, 200, 'Creating is still allowed')
+  r = await act(`/orders/${(await order(100))}/issue`, {}, office); assert.equal(r.status, 403, 'With approve switched off the Office Manager no longer issues POs'); assert.ok(job.version > gone)
+  const permissionEvents = (await api('/audit?kind=permission')).value.events.map(e => e.action)
+  for (const action of ['roles.create', 'roles.update', 'team.update']) assert.ok(permissionEvents.includes(action), action + ' is audited')
+
+  // An administrator cannot grant what they lack, and cannot do what their role switches off.
+  const jr = people.junior.cookie
+  r = await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'project_manager', name: 'Sneaky Manager' } }); assert.equal(r.status, 403); assert.equal(r.value.error, 'escalation'); assert.match(r.value.message, /invoices approve/)
+  assert.equal((await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'administrator', name: 'Another Junior Admin', permissions: { invoices: { approve: false } } } })).status, 201, 'Narrower copies are allowed')
+  assert.equal((await api(`/jobs/${job.id}/invoices/none/issue`, { method: 'POST', cookie: jr, body: { expected_version: job.version } })).status, 403, 'The Junior Admin cannot approve invoices')
+  assert.equal((await api(`/jobs/${job.id}/orders`, { method: 'POST', cookie: jr, body: { expected_version: job.version, supplier: 'x', description: 'x', amount_cents: 100 } })).status, 200, 'The same role still creates POs')
+  assert.equal((await api(`/roles/${carpenter.id}`, { method: 'DELETE', body: { expected_version: carpenter.version + 1 } })).status, 409, 'A role in use is not deleted')
+ } finally { await f.close() }
+})

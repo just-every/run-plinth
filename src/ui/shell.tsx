@@ -6,10 +6,10 @@ export type View = 'jobs' | 'imports' | 'people' | 'audit' | 'customers' | 'vend
 export type Me = { displayName: string; email: string; role: string }
 const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew', client: 'Client', member: 'Client' }
 
-type RailProps = { view: View; role: string; me?: Me; jobs: { id: string; name: string }[]; selected: string; open: boolean; onView: (view: View) => void; onJob: (id: string) => void; onClose: () => void }
+type RailProps = { view: View; role: string; roleName?: string; me?: Me; jobs: { id: string; name: string }[]; selected: string; open: boolean; onView: (view: View) => void; onJob: (id: string) => void; onClose: () => void }
 
 /** The left rail: the mark, the workspace's real places, the job switcher and who is signed in. Below 900px it is a drawer. */
-export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onClose }: RailProps) {
+export function Rail({ view, role, roleName, me, jobs, selected, open, onView, onJob, onClose }: RailProps) {
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
   const item = (to: View, icon: IconName, label: string, badge?: number) => <li><button aria-current={view === to && (to !== 'jobs' || !selected) ? 'page' : undefined} className={view === to ? 'is-active' : undefined} onClick={() => onView(to)}><Icon name={icon} />{label}{badge !== undefined && <span className="rail-count">{badge}</span>}</button></li>
   return <aside className={`rail${open ? ' is-open' : ''}`} aria-label="Workspace">
@@ -30,7 +30,7 @@ export function Rail({ view, role, me, jobs, selected, open, onView, onJob, onCl
       <li><a href="/auth/settings/identity"><Icon name="account" />Account</a></li>
     </ul>
     {jobs.length > 0 && <nav className="recent" aria-label="Recent jobs"><p>Recent jobs</p><ul>{jobs.slice(0, 8).map(job => <li key={job.id}><button aria-current={selected === job.id ? 'page' : undefined} onClick={() => onJob(job.id)}>{job.name}</button></li>)}</ul></nav>}
-    {me && <div className="profile"><span className="avatar" aria-hidden="true">{initials(me.displayName || me.email)}</span><div><p>{me.displayName || me.email}</p><p className="muted">{roles[role] ?? role}</p></div></div>}
+    {me && <div className="profile"><span className="avatar" aria-hidden="true">{initials(me.displayName || me.email)}</span><div><p>{me.displayName || me.email}</p><p className="muted">{roleName || (roles[role] ?? role)}</p></div></div>}
     <button className="signout" onClick={async () => { await api('/auth/signout', {}); window.location.assign('/signin') }}><Icon name="signout" />Sign out</button>
   </aside>
 }

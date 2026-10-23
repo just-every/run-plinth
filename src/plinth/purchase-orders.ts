@@ -37,7 +37,7 @@ export function orderAction(job: Job, actor: Actor, id: string, action: string, 
    need(actor.role !== 'agent', 'Agents prepare drafts; a person must approve', 403, 'human_required')
    // The reviewer restates the budget and date impact; a different figure means they reviewed something else.
    need(cents(input.budget_impact_cents, 'budget_impact_cents', true) === pending.budget_impact_cents && input.date_impact_days === pending.date_impact_days, 'Review the budget and date impact shown on the amendment', 409, 'impact_unreviewed', { budget_impact_cents: pending.budget_impact_cents, date_impact_days: pending.date_impact_days })
-   need(actor.role !== 'project_manager' || pending.proposed.amount_cents <= actor.team!.po_limit_cents, 'This amendment is above your approval limit; ask the owner or an administrator', 403, 'over_limit')
+   need(!actor.team || pending.proposed.amount_cents <= actor.team.po_limit_cents, 'This amendment is above your approval limit; ask the owner or an administrator', 403, 'over_limit')
    if (row.source) poSource(job, { source: row.source }, pending.proposed.lines, row.id)
    recordApproval(job, actor, 'purchase_order.amendment', { id: pending.id, prepared_by: pending.prepared_by, revision: pending.revision }, pending)
    pending.status = 'approved'; pending.approved_by = stamp(actor); row.lines = pending.proposed.lines; row.amount_cents = pending.proposed.amount_cents
