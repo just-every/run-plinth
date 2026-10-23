@@ -29,7 +29,7 @@ try{
  await page.getByText('Office Manager · copy of Project manager',{exact:false}).click()
  const office=page.locator('details',{hasText:'Office Manager · copy of Project manager'});await office.getByLabel('Purchase order approval limit',{exact:false}).fill('5000.00');await office.getByRole('button',{name:'Save role',exact:true}).click();await expect(page.getByText('Saved.',{exact:false}).first()).toBeVisible()
  await page.getByText('Lead Carpenter – no financials · copy of Superintendent',{exact:false}).click()
- const assign=async(person,role)=>{await page.getByLabel('Person',{exact:true}).selectOption({label:person});await page.getByLabel('Role',{exact:true}).selectOption({label:role});await page.getByLabel('Assigned jobs').selectOption({label:job.name});await page.getByRole('button',{name:'Save role',exact:true}).first().click()}
+ const assign=async(person,role)=>{const form=page.locator('form',{has:page.locator('select[name="person"]')});await form.locator('select[name="person"]').selectOption({label:person});await form.locator('select[name="role"]').selectOption({label:role});await form.locator('select[name="jobs"]').selectOption({label:job.name});await form.getByRole('button',{name:'Save role',exact:true}).click()}
  await assign('Lee Carpenter','Lead Carpenter – no financials (custom)');await expect(page.getByText('Lead Carpenter – no financials · custom role · 1 job(s)',{exact:true})).toBeVisible()
  await assign('Olive Manager','Office Manager (custom)');await expect(page.getByText('Office Manager · custom role · 1 job(s)',{exact:true})).toBeVisible()
  await capture(page,'owner-custom-roles',async()=>{await expect(page.getByRole('heading',{name:'Custom roles',exact:true})).toBeVisible()})
