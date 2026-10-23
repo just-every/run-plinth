@@ -34,7 +34,7 @@ try{
  // At 390 pixels: the daily plan, the current sheet, a checklist item, progress and tomorrow's dependencies with the office forecast.
  await sup.setViewportSize({width:390,height:900});await sup.goto(base+`/app?job=${job.id}`)
  await expect(sup.getByRole('heading',{name:'My job day',exact:true})).toBeVisible()
- await expect(sup.getByText('Site contacts',{exact:true})).toBeVisible();await expect(sup.getByText('sam',{exact:false}).first()).toBeVisible()
+ await expect(sup.getByText('Site contacts',{exact:true})).toBeVisible();await expect(sup.getByRole('link',{name:/synthetic-plinth-super-/})).toBeVisible();await expect(sup.getByText('Builder · ',{exact:false})).toBeVisible()
  await expect(sup.getByText('S1 Framing plan · revision 1 · page 1',{exact:false})).toBeVisible();await expect(sup.getByRole('link',{name:'Download current original'})).toBeVisible()
  await expect(sup.getByText('Waiting on Frame addition walls (not started)',{exact:true}).first()).toBeVisible();await expect(sup.getByText('Inspection: Rough framing inspection (requested)',{exact:true}).first()).toBeVisible()
  await expect(sup.getByText('Champlain Lumber',{exact:true})).toBeVisible();await expect(sup.getByText(`Promised ${day(1)}`,{exact:true})).toBeVisible()
