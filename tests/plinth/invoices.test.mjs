@@ -302,6 +302,11 @@ test('BILL-004 — posted mixed costs bill once with fixed fees, exclusions, a c
   const shown=(await c.api(`/jobs/${c.job.id}`,undefined,client)).value.job
   assert.equal(JSON.stringify(shown).includes('cost_billing'),false);assert.equal(JSON.stringify(shown).includes('hour_cents'),false)
   assert.equal((await c.api(`/jobs/${c.job.id}/costs/sources`,undefined,client)).status,403)
+  const manager=await f.invite('synthetic-plinth-billing-manager@example.com','Assigned manager','admin')
+  const team=(await c.api('/team')).value.team,person=team.find(p=>p.email==='synthetic-plinth-billing-manager@example.com')
+  const assigned=await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[c.job.id],po_limit_cents:0}});assert.equal(assigned.status,200)
+  assert.equal((await c.act('/invoices',{...input,cost_billing:nextConfig},manager)).status,403)
+  for(const path of [`/jobs/${c.job.id}`,`/jobs/${c.job.id}/invoices/${invoice.id}/document.json`]){const response=await c.api(path,undefined,manager);assert.equal(response.status,200);assert.equal(JSON.stringify(response.value).includes('hour_cents'),false,'Actual pay rates cannot escape through serialized approval fingerprints');assert.equal(JSON.stringify(response.value).includes('cost_billing'),false)}
   const actual=(await c.ledger()).totals.posted_actual_cents;assert.equal(actual,60400,'Billing consumes no actual cost and never changes the source ledger')
  }finally{await f.close()}
 })
