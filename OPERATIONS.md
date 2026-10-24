@@ -81,3 +81,5 @@ Assisted hosting offers RER mail, Resend, SendGrid and Cloudflare Email Sending;
 enter the chosen provider's verified sender and private key, and the Cloudflare
 account identifier when applicable. Local development suppresses external mail.
 These declarations and local provider-edge checks do not prove live delivery.
+
+Hosted deployment reads MAIL_FROM from the owner’s private deployment input and accepts only a verified sender. MAIL_PROVIDER selects Resend by default; MAIL_RELAY_URL is required for managed mail, and MAIL_ACCOUNT_ID is required for Cloudflare mail. The setup manifest labels every required private field. The supported targets are Workers and container hosting.

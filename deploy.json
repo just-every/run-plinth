@@ -13,8 +13,7 @@
   "originVar": "AUTH_ORIGIN",
   "vars": {
     "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "resend",
-    "MAIL_FROM": "auth@example.invalid"
+    "MAIL_PROVIDER": "resend"
   },
   "secrets": [
     {
@@ -41,10 +40,20 @@
     {
       "binding": "MAIL_API_KEY",
       "environment": "MAIL_API_KEY"
+    },
+    {
+      "binding": "MAIL_FROM",
+      "environment": "MAIL_FROM"
     }
   ],
   "platforms": [
-    "cloudflare",
+    "workers",
     "container"
+  ],
+  "publicSettings": [
+    "MAIL_PROVIDER",
+    "MAIL_FROM",
+    "MAIL_RELAY_URL",
+    "MAIL_ACCOUNT_ID"
   ]
 }

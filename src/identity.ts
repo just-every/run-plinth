@@ -11,7 +11,7 @@ export const identity: EditionIdentity = {
   tagline: 'From accepted quote to a reconciled progress-claim export.',
   signInPath: '/signin',
   // The run site `rer deploy --site` publishes (deploy-site.json).
-  runSite: 'https://github.com/just-every/run-plinth',
+  runSite: 'https://run-plinth.com',
   // An installed instance serves the Lobby at /.
   installedHome: 'lobby',
   theme: '/rer-theme.css',

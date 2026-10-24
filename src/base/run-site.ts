@@ -101,10 +101,12 @@ const RUN = 'body{--art:max(20vh,150px)}main{max-width:1360px;margin:0 auto;padd
 const COPY_SCRIPT = "document.addEventListener('click',async event=>{const button=event.target.closest('.copy');if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copy);const label=button.querySelector('span');label.textContent='Copied';setTimeout(()=>{label.textContent='Copy'},1600)}catch{}})"
 const ARROW = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>'
 
-export function document(identity: EditionIdentity, title: string, description: string, style: string, body: string, script = ''): string {
+export interface HomepageHeader { html: string; styles: string[] }
+
+export function document(identity: EditionIdentity, title: string, description: string, style: string, body: string, script = '', styles: string[] = []): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><meta name="description" content="${escape(description)}">`
     + `<link rel="icon" href="${escape(identity.mark)}">${identity.fonts ? `<link rel="stylesheet" href="${escape(identity.fonts)}">` : ''}<link rel="stylesheet" href="${escape(identity.theme)}"><style>${identity.accentColor ? `:root{--rer-brand-accent:${identity.accentColor};--rer-brand-accent-text:${ink(identity.accentColor)}}` : ''}${BASE}${style}</style></head>`
-    + `<body>${identity.band ? `<div class="art" aria-hidden="true"><img src="${escape(identity.band)}" alt=""></div>` : ''}${body}${script ? `<script>${script}</script>` : ''}</body></html>`
+    + `${styles.map(href => `<link rel="stylesheet" href="${escape(href)}">`).join('')}<body>${identity.band ? `<div class="art" aria-hidden="true"><img src="${escape(identity.band)}" alt=""></div>` : ''}${body}${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 /** Docs, Contract and Source: Docs when the site has /docs, Contract when the seed has a CONTRACT.md. */
 export function siteLinks(run: RunData, contract: SeedContract | undefined, current?: 'contract'): string {
