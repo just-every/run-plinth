@@ -65,3 +65,12 @@ Late bill or approved time/expense/equipment costs retain their original date an
 
 
 Native accountant review records the signed-in account and time, without professional certification. The close is an owner-recorded fact. No automatic close or funds movement occurs. Future accounting connectors inherit explicit ledger authority under ROLE-004.
+
+
+## Cost billing
+
+In Billing, current cost administrators select approved posted sources, review permanent exclusions, agreement fees and accepted sales tax, then prepare and issue the exact reviewed batch. Supporting originals remain behind the existing cost-access doors. A preview writes no records. Any edited selection requires a fresh preview; preparation can name the exact `cost_billing_review` returned by that preview, and issue always rechecks current sources and authority.
+
+Native cost billing uses posted signed actual cents, including recorded supplier tax, as its cost base. Disjoint contractual fee categories map cost codes to basis-point fees, rounded half-up per category and accepted tax treatment; legacy zero-tax fixed fees still round once on net batch cost. The accepted quote retains the human-reviewed sales-tax rate and taxable cost-code mapping used for costs and fees, with tax rounded half-up per source or fee line. A cumulative gross cap includes sales tax; a cap reduction carries a proportional half-up share of batch tax. A standalone net credit must link an originally billed vendor source, cannot exceed cumulative billed value and reopens that much cap capacity. Later issues retain earlier invoice links and never change actual costs or issued originals. Only current cost administrators select, preview, prepare and issue; existing office-only supporting custody remains unchanged. BILL-005 inherits broader corrections, refunds and write-offs; BILL-006 retains reconciliation and collections.
+
+The native job invoice door provides `GET /api/plinth/jobs/<job-id>/invoices/cost-sources` and `POST /api/plinth/jobs/<job-id>/invoices/preview`. Preview takes the current `expected_version` and a `cost_billing` object: `contract_reference`, `fee_bps` (the legacy fallback), `cap_cents`, `entry_ids`, `excluded_entry_ids`, and optional `fee_categories` containing `name`, disjoint `cost_codes` and `fee_bps`. The source selections must be distinct. Once an invoice issues, agreement reference, fee definitions and cap stay fixed. A negative cost issue is a documented linked credit, never a refund or movement of funds.

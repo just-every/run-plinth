@@ -54,11 +54,11 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   const sources = invoiceSources(job, source_application_id)
   need(!source_application_id || !invoiceRows(job).some(i => i.source_application_id === source_application_id && i.status === 'issued'), 'This application already has an issued invoice', 409, 'invoice_duplicate')
   if(input.kind==='cost_plus'){
-   need([sources.contract.quote,...sources.contract.variations].every(s=>Number(s.pricing.tax.rate.percent)===0),'Cost billing currently requires reviewed zero sales tax; taxable cost billing is not implemented',409,'cost_billing_tax')
    sources.cost_billing=costBilling(job,input.cost_billing)
+   need(input.cost_billing_review===undefined||input.cost_billing_review===JSON.stringify(sources.cost_billing),'Cost billing review changed; preview again',409,'cost_billing_stale')
   }
   const amount_cents = input.kind === 'deposit' ? cents(input.amount_cents) : input.kind==='cost_plus'?sources.cost_billing!.total_cents:sources.application!.current_cents
-  need(amount_cents > 0, 'An invoice needs a positive gross amount')
+  need(input.kind==='cost_plus'?amount_cents!==0:amount_cents>0, 'An invoice needs a nonzero cost adjustment or positive gross amount')
   if (input.kind === 'milestone' && input.amount_cents !== undefined) need(input.amount_cents === amount_cents, 'Milestone amount comes from its issued application')
   const record: Invoice = { id: crypto.randomUUID(), kind: input.kind, status: 'draft', description: text(input.description, 'description', 2000), due_on: date(input.due_on, 'due_on'), terms: text(input.terms, 'terms', 4000), recipient_email, amount_cents, ...(source_application_id ? { source_application_id } : {}), prepared_by: stamp(actor), source_digest: invoiceDigest(sources), sources, lines: [], receipts: [], deposit_applications: [] }
   record.lines = invoiceLines(job, record, sources)
@@ -93,7 +93,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   need(counter && Number.isSafeInteger(counter.next_number) && counter.next_number > 0 && counter.next_number < 1_000_000_000_000, 'Invoice numbering is unavailable', 409, 'invoice_sequence')
   writes.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_invoice_sequence WHERE id=1 AND next_number=?) THEN 1 ELSE 0 END').bind(counter.next_number), db.prepare('UPDATE pl_invoice_sequence SET next_number=next_number+1 WHERE id=1 AND next_number=?').bind(counter.next_number))
   const number = `INV-${String(counter.next_number).padStart(6, '0')}`, withheld_cents = sources.application?.retainage?.current_withheld_cents ?? 0
-  const payable_cents = sources.retainage?.current.current_net_cents ?? sum([row.amount_cents, -withheld_cents]); need(payable_cents >= 0, 'Withholding cannot exceed the invoice gross', 409, 'invoice_balance')
+  const payable_cents = sources.retainage?.current.current_net_cents ?? sum([row.amount_cents, -withheld_cents]); need(row.kind==='cost_plus'||payable_cents >= 0, 'Withholding cannot exceed the invoice gross', 409, 'invoice_balance')
   row.issued = structuredClone({ ...(sources.cost_billing?{adjusts_invoice_numbers:sources.cost_billing.prior_invoice_ids.map(id=>find(invoiceRows(job),id).number!)}:{}), format: 'plinth-invoice-v1', number, issued_by: stamp(actor), job_id: job.id, job_name: job.name, job_address: job.address, time_zone: job.time_zone ?? 'UTC', currency: 'USD', kind: row.kind, description: row.description, due_on: row.due_on, terms: row.terms, recipient_email: row.recipient_email, ...(row.source_application_id ? { source_application_id: row.source_application_id } : {}), gross_cents: row.amount_cents, withheld_cents, payable_cents, earned_revenue_cents: row.kind === 'deposit' ? 0 : sum(lines.map(l => l.subtotal_cents)), subtotal_cents: sum(lines.map(l => l.subtotal_cents)), tax_cents: sum(lines.map(l => l.tax_cents)), lines, sources })
   need(sum(lines.map(l => l.gross_cents)) === row.amount_cents, 'Invoice lines do not reconcile', 409, 'invoice_balance')
   row.number = number; row.status = 'issued'; recordApproval(job, actor, 'invoice.issue', row, row.issued)

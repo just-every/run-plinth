@@ -261,7 +261,7 @@ test('BILL-006 — one recorded bank remittance pays multiple milestones, retain
  } finally {await f.close()}
 })
 
-test('BILL-004 — posted mixed costs bill once with fixed fees, exclusions, a cap and immutable linked later adjustments',async()=>{
+test('BILL-004 — approved actuals bill once with reviewed tax, fee categories, caps and immutable linked credits and late time',async()=>{
  const f=await createFixture();try{
   const {costFixture,original}=await import('./cost-support.mjs'),c=await costFixture(f)
   const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()
@@ -309,4 +309,40 @@ test('BILL-004 — posted mixed costs bill once with fixed fees, exclusions, a c
   for(const path of [`/jobs/${c.job.id}`,`/jobs/${c.job.id}/invoices/${invoice.id}/document.json`]){const response=await c.api(path,undefined,manager);assert.equal(response.status,200);assert.equal(JSON.stringify(response.value).includes('hour_cents'),false,'Actual pay rates cannot escape through serialized approval fingerprints');assert.equal(JSON.stringify(response.value).includes('cost_billing'),false)}
   const actual=(await c.ledger()).totals.posted_actual_cents;assert.equal(actual,60400,'Billing consumes no actual cost and never changes the source ledger')
  }finally{await f.close()}
+ const taxable=await createFixture();try{
+  const {costFixture}=await import('./cost-support.mjs'),c=await costFixture(taxable,{taxPercent:'10'})
+  const bill=(await c.ok('/costs/bills',c.bill())).record;await c.ok(`/costs/bills/${bill.id}/review`,{reason:'Reviewed source matches'});await c.ok(`/costs/bills/${bill.id}/post`)
+  const entries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.source_kind)
+  const config={contract_reference:'synthetic-plinth-taxable-agreement',fee_bps:0,fee_categories:[{name:'Material handling',cost_codes:['06-100'],fee_bps:2000},{name:'Labor administration',cost_codes:['01-100'],fee_bps:500}],cap_cents:57000,entry_ids:entries.map(e=>e.id),excluded_entry_ids:[]}
+  const input={kind:'cost_plus',description:'Taxable actuals under reviewed agreement',recipient_email:'synthetic-plinth-client@example.com',due_on:'2026-11-23',terms:'Human-reviewed tax and fee categories',cost_billing:config}
+  const available=await c.api(`/jobs/${c.job.id}/invoices/cost-sources`);assert.equal(available.status,200);assert.equal(available.value.entries.length,2);assert.ok(available.value.entries.every(e=>e.reference&&e.document_checksum));assert.equal(JSON.stringify(available.value).includes('base64'),false)
+  const forbidden=await taxable.invite('synthetic-plinth-client@example.com');assert.equal((await c.api(`/jobs/${c.job.id}/invoices/cost-sources`,undefined,forbidden)).status,403);assert.equal((await c.act('/invoices/preview',{cost_billing:config},forbidden)).status,403)
+  const before=await c.read(),preview=await c.ok('/invoices/preview',{cost_billing:config});assert.deepEqual(await c.read(),before,'Preview has no persistence effects')
+  assert.equal(preview.preview.cost_cents,43000);assert.equal(preview.preview.fee_cents,7100);assert.equal(preview.preview.tax_cents,5010);assert.equal(preview.preview.total_cents,55110)
+  assert.equal(preview.preview.tax.rate.reference,'synthetic-plinth-rate-1');assert.equal(preview.preview.tax.rate.percent,'10')
+  assert.equal((await c.act('/invoices',{...input,cost_billing_review:'outdated preview'})).status,409)
+  const first=(await c.ok('/invoices',{...input,cost_billing_review:JSON.stringify(preview.preview)})).record;assert.deepEqual(first.lines,preview.lines)
+  const office=await taxable.invite('synthetic-plinth-reviewer@example.com','Billing reviewer','admin'),person=(await c.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-reviewer@example.com')
+  assert.equal((await taxable.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:taxable.owner,body:{expected_version:0,role:'project_manager',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
+  assert.equal((await c.act(`/invoices/${first.id}/issue`,{},office)).status,403,'Issue rechecks current cost authority after reassignment')
+  await c.ok(`/invoices/${first.id}/issue`)
+  const frozen=structuredClone((await c.read()).invoices.find(i=>i.id===first.id).issued),actualBefore=(await c.ledger()).totals.posted_actual_cents
+  const credit=(await c.ok('/costs/bills',{...c.bill('synthetic-plinth-taxable-credit'),kind:'credit',credit_of:bill.id,lines:[{cost_code:'06-100',description:'Returned taxable material',subtotal_cents:1000,taxable:true,matches:[{order_id:c.order.id,receipt_id:c.receipts[0].id,cost_code:'06-100',amount_cents:1000}]}]})).record
+  await c.ok(`/costs/bills/${credit.id}/post`)
+  const creditEntries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.source_id===credit.id),creditConfig={...config,entry_ids:creditEntries.map(e=>e.id)}
+  const changed=await c.act('/invoices',{...input,cost_billing:{...creditConfig,fee_categories:[{name:'Changed fee',cost_codes:['06-100','01-100'],fee_bps:1}]}});assert.equal(changed.status,409)
+  const adjustment=(await c.ok('/invoices',{...input,description:'Standalone linked vendor credit',cost_billing:creditConfig})).record
+  assert.equal(adjustment.amount_cents,-1452);assert.equal(adjustment.sources.cost_billing.tax_cents,-132);assert.equal(adjustment.sources.cost_billing.supporting_sources[0].detail.credit_of,bill.id)
+  await c.ok(`/invoices/${adjustment.id}/issue`)
+  assert.deepEqual((await c.read()).invoices.find(i=>i.id===adjustment.id).issued.adjusts_invoice_numbers,[frozen.number])
+  assert.equal((await c.act('/invoices',{...input,cost_billing:creditConfig})).status,409,'Credit sources cannot issue twice')
+  const late=(await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-taxable-late-time',dated_on:'2026-10-24',period:'2026-10',cost_code:'01-100',employee_reference:'synthetic-plinth-worker',minutes:60,hour_cents:3000,burden_bps:2000})).record;await c.ok(`/costs/sources/${late.id}/approve`)
+  const lateEntries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.source_id===late.id),next=(await c.ok('/invoices',{...input,cost_billing:{...config,entry_ids:lateEntries.map(e=>e.id)}})).record
+  assert.equal(next.amount_cents,3342);assert.equal(next.sources.cost_billing.cap_reduction_cents,816);assert.equal(next.lines.reduce((n,l)=>n+l.tax_cents,0),304)
+  await c.ok(`/invoices/${next.id}/issue`);await c.read()
+  assert.equal(c.job.invoices.filter(i=>i.issued).reduce((n,i)=>n+i.issued.gross_cents,0),57000)
+  assert.deepEqual(c.job.invoices.find(i=>i.id===first.id).issued,frozen)
+  assert.equal((await c.ledger()).totals.posted_actual_cents,actualBefore-1100+3600,'Credits and late time alone change actual costs')
+ }finally{await taxable.close()}
+
 })
