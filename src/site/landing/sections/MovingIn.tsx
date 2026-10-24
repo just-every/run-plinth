@@ -1,6 +1,8 @@
 // 13 · The move from Buildertrend on Fri Oct 9: the migration report (the record
 // counts sum to 16,175), Job 2214's opening balances, and the one-line start.
-import { Copy, Done, Icon, Section, START, Segs, Tick } from '../parts'
+import { ALTERNATIVE, Copy, Done, Icon, Section, START, Segs, Tick } from '../parts'
+
+const words = (line: string) => line.split(' ').map((word, i) => <span key={i}>{i ? ' ' : ''}<span className="word">{word}</span></span>)
 
 const records = [
   ['Jobs', '8', '8 live'],
@@ -45,7 +47,7 @@ export function MovingIn() {
       <Copy eyebrow="Moving in · Fri Oct 9" title={<>Eight live jobs, <br />out of Buildertrend.</>}>Plinth reads the Buildertrend exports, attaches what has no home and flags what it could not read. Every balance opens where it left off.</Copy>
       <div className="terminal" role="group" aria-label="Start Plinth on your computer">
         <p className="term-dots" aria-hidden="true"><i /><i /><i /></p>
-        <pre><code><span className="prompt" aria-hidden="true">$ </span>{START.split(' ').map((word, i) => <span key={i}>{i ? ' ' : ''}<span className="word">{word}</span></span>)}{'\n'}<span className="comment"># clones, installs and starts Plinth on your computer</span></code></pre>
+        <pre><code><span className="prompt" aria-hidden="true">$ </span>{words(START)}{'\n'}<span className="comment">{words('# installs rer, then gets and starts Plinth on your computer')}</span>{'\n'}<span className="comment">{words(`# Already have Node 22 or later? ${ALTERNATIVE}`)}</span></code></pre>
       </div>
     </div>
   </Section>

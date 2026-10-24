@@ -4,7 +4,9 @@ import type { ReactNode } from 'react'
 
 export const SOURCE = 'https://github.com/just-every/run-plinth'
 export const DEMO = 'https://demo.run-plinth.com/'
-export const START = 'npx -y @runeditrun/rer dev just-every/run-plinth'
+// The one start line every Run Edit Run page shows, and the alternative for people who already have Node.
+export const START = 'curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-plinth'
+export const ALTERNATIVE = 'npx -y @runeditrun/rer dev just-every/run-plinth'
 
 export function Section({ id, tone = 'white', className = '', children }: { id: string; tone?: 'white' | 'sea' | 'ox'; className?: string; children: ReactNode }) {
   return <section id={id} className={`band band-${tone} ${className}`}><div className="wrap">{children}</div></section>
