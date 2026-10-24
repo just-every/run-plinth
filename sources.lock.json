@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "parent": null,
   "edition": "just-every/run-plinth",
-  "manifest": "f9e990571554bae36b4816f42f3b08f38954b2df0059ce98965a2870d78a5c62",
+  "manifest": "c54020915d100627e35a404deeb9feab33ff0a21687d8114aa97a92ce82ec74c",
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
@@ -47,6 +47,10 @@
       "source": {
         "kind": "local",
         "paths": [
+          "scripts/delivery/base/capabilities.mjs",
+          "scripts/delivery/base/generators/validation.mjs",
+          "scripts/delivery/base/payloads.mjs",
+          "scripts/delivery/base/sql-statements.mjs",
           "scripts/delivery/base/setup-manifest.mjs"
         ],
         "origin": {
@@ -54,10 +58,30 @@
           "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
           "path": "modules/delivery-producer",
           "paths": [
+            "capabilities.mjs",
+            "generators/validation.mjs",
+            "payloads.mjs",
+            "sql-statements.mjs",
             "setup-manifest.mjs"
           ]
         },
         "mappings": [
+          {
+            "path": "scripts/delivery/base/capabilities.mjs",
+            "originPath": "capabilities.mjs"
+          },
+          {
+            "path": "scripts/delivery/base/generators/validation.mjs",
+            "originPath": "generators/validation.mjs"
+          },
+          {
+            "path": "scripts/delivery/base/payloads.mjs",
+            "originPath": "payloads.mjs"
+          },
+          {
+            "path": "scripts/delivery/base/sql-statements.mjs",
+            "originPath": "sql-statements.mjs"
+          },
           {
             "path": "scripts/delivery/base/setup-manifest.mjs",
             "originPath": "setup-manifest.mjs"
@@ -65,9 +89,9 @@
         ]
       },
       "baseline": {
-        "key": "7618b846a28bae8588d9acdf52dc5be6ebcb306dd388eb9f63f2e2ea9f0fac06",
-        "digest": "897fb49529818a12eb462a3c54f2a43c9b73daa024970b71a4aaadbc59004ef5",
-        "sha256": "d575a1ce013799b3bbe0daf71c05d84b93408bdbd97320dd81e8996e181420f1"
+        "key": "9d98d27647feca98e147cd971e7a60adaca066ba9992866090507ab9b9a287b9",
+        "digest": "da94e65db4c12ea9b968501af0f9e382b674cfaf44bf04de65c9391e0fdcd00a",
+        "sha256": "948eccb855f59f3f4f3d9df1524e4713ddf72aa6067fa977bdfb953f79aa5d35"
       }
     }
   ],
@@ -105,7 +129,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "cd8a8abb8e64d75c933eabf9cccda4de471cbedcb0c08ee1671b70950f39f8ce",
+      "sha256": "3914057c863751e04ea617202c3bafe1eb885dc96428e68d00d99be44540893e",
       "executable": false
     },
     "composition.lock.json": {
@@ -185,7 +209,7 @@
       "executable": false
     },
     "edition.json": {
-      "sha256": "f9e990571554bae36b4816f42f3b08f38954b2df0059ce98965a2870d78a5c62",
+      "sha256": "c54020915d100627e35a404deeb9feab33ff0a21687d8114aa97a92ce82ec74c",
       "executable": false
     },
     "LICENSE": {
@@ -641,7 +665,7 @@
       "executable": false
     },
     "scripts/delivery/base/capabilities.mjs": {
-      "sha256": "5e4db1f4428f107c91b51be3c9c18e7757d7e23574dd977a872f6944abd32a1d",
+      "sha256": "c09cbfd74f1497b038676e1f886eb8f7b05dc67741dd7ed08ac348ef92a11934",
       "executable": false
     },
     "scripts/delivery/base/cli.mjs": {
@@ -669,7 +693,7 @@
       "executable": false
     },
     "scripts/delivery/base/generators/validation.mjs": {
-      "sha256": "ec5e0cdd38e4143530fd1366930b9e8e0e081a0729687926ed13a256834519a9",
+      "sha256": "0e6c8a729c0f5f09d7c7335c2e4362b05d994c4f6f2923b129b22107aa78f78c",
       "executable": false
     },
     "scripts/delivery/base/mail.mjs": {
@@ -697,7 +721,7 @@
       "executable": false
     },
     "scripts/delivery/base/payloads.mjs": {
-      "sha256": "da3a9d09860c33bdd0b287bca9abc6210b12d13439e569d178a5b31fec563ee5",
+      "sha256": "331ff7d7cd4223b42dfb30552d5eb16e9df2789a094cf30dbd86b4ef67027357",
       "executable": false
     },
     "scripts/delivery/base/schema/business-field-inputs.mjs": {
@@ -733,7 +757,7 @@
       "executable": false
     },
     "scripts/delivery/base/sql-statements.mjs": {
-      "sha256": "8819f7f91b7781905796ea35b01dd1a55e08ed3893ff6d8aafaf03d2f35c1c9a",
+      "sha256": "afc15f607f3afc9a954aa024aaae5a0c76917ed1b7c84d425a525f2ebc370c93",
       "executable": false
     },
     "scripts/edition-authoring/adopt.mjs": {

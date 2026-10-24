@@ -167,17 +167,6 @@
       }
     },
     {
-      "path": "scripts/delivery/base/capabilities.mjs",
-      "originPath": "modules/delivery-producer/capabilities.mjs",
-      "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-      "files": {
-        "scripts/delivery/base/capabilities.mjs": "5e4db1f4428f107c91b51be3c9c18e7757d7e23574dd977a872f6944abd32a1d"
-      },
-      "modes": {
-        "scripts/delivery/base/capabilities.mjs": "100644"
-      }
-    },
-    {
       "path": "scripts/delivery/base/cli.mjs",
       "originPath": "modules/delivery-producer/cli.mjs",
       "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
@@ -244,17 +233,6 @@
       }
     },
     {
-      "path": "scripts/delivery/base/generators/validation.mjs",
-      "originPath": "modules/delivery-producer/generators/validation.mjs",
-      "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-      "files": {
-        "scripts/delivery/base/generators/validation.mjs": "ec5e0cdd38e4143530fd1366930b9e8e0e081a0729687926ed13a256834519a9"
-      },
-      "modes": {
-        "scripts/delivery/base/generators/validation.mjs": "100644"
-      }
-    },
-    {
       "path": "scripts/delivery/base/mail.mjs",
       "originPath": "modules/delivery-producer/mail.mjs",
       "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
@@ -310,17 +288,6 @@
       }
     },
     {
-      "path": "scripts/delivery/base/payloads.mjs",
-      "originPath": "modules/delivery-producer/payloads.mjs",
-      "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-      "files": {
-        "scripts/delivery/base/payloads.mjs": "da3a9d09860c33bdd0b287bca9abc6210b12d13439e569d178a5b31fec563ee5"
-      },
-      "modes": {
-        "scripts/delivery/base/payloads.mjs": "100644"
-      }
-    },
-    {
       "path": "scripts/delivery/base/schema",
       "originPath": "schema",
       "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
@@ -359,17 +326,6 @@
       },
       "modes": {
         "scripts/delivery/base/spec.mjs": "100644"
-      }
-    },
-    {
-      "path": "scripts/delivery/base/sql-statements.mjs",
-      "originPath": "modules/delivery-producer/sql-statements.mjs",
-      "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-      "files": {
-        "scripts/delivery/base/sql-statements.mjs": "8819f7f91b7781905796ea35b01dd1a55e08ed3893ff6d8aafaf03d2f35c1c9a"
-      },
-      "modes": {
-        "scripts/delivery/base/sql-statements.mjs": "100644"
       }
     },
     {
