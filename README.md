@@ -51,8 +51,8 @@ The owner can permanently erase a job in **History → Erase this job**. This al
 
 Use the RunEditRun account for fleet work. Your own fork can use your own account. The shared owner-account deploy kit provisions the Worker and D1, applies every migration and checks health and assets:
 
-1. Run `rer setup` with your actual owner email. Configure a verified Resend sender in `deploy.json` (`MAIL_FROM`); the default example address must be replaced. Other Base mail providers require their corresponding configuration.
-2. Supply `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `OWNER_EMAIL`, `SESSION_SECRET`, `SETUP_TOKEN` and `MAIL_API_KEY` through your private shell environment or secret manager. Use strong, distinct generated secrets. Never commit them or pass their values as command arguments.
+1. Run `rer setup` with your actual owner email. Choose a hosted mail provider with `MAIL_PROVIDER` and supply a verified sender through the required `MAIL_FROM` deployment input. Managed RER mail also needs `MAIL_RELAY_URL`; Cloudflare Email Sending needs `MAIL_ACCOUNT_ID`. Each hosted provider needs its private `MAIL_API_KEY`.
+2. Supply `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `OWNER_EMAIL`, `SESSION_SECRET`, `INSTALLATION_KEY`, `SETUP_TOKEN` and `MAIL_API_KEY` through your private shell environment or secret manager. Use strong, distinct generated secrets. Never commit them or pass their values as command arguments.
 3. Commit your configuration change. Run `rer deploy --dry-run` to build and validate without contacting a provider, then `rer deploy`. Open the printed deployed URL and use an email sign-in link. The production app has no local dev identity or outbox. No custom domain is required.
 
 Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, local D1 `foundation` and package `@construction/plinth` are stable identifiers; do not rename them during an update. Hosted mail delivery and deployment need your account credentials and are not exercised by this first-release seed build.
@@ -61,7 +61,7 @@ Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, l
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.79**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.80**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
 
 ## Run site and guides
 
