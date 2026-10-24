@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cf86da15be70f7c1b04fea11bbba96ffd5d3e9d62ff158a71e2443dd3631b2ae",
+      "sha256": "dcae5f532de6f77387f3b16a2c5b0bb746f7a994b8c90026fd692cdb050f2961",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c50628ade9be799ff25eee65be235783fb18e9d058e41a069bfd6371e6f86ffd",
+      "sha256": "9fecea1a582bea6e893029f00926170ac0a342c0c4bf4266d5a52df6dddad014",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/FIELD-TIME.md": {
-      "sha256": "351520bf4e3ca0965f7a1bd884c3724ba7c42936c51b470ad2685532387fa9a1",
+      "sha256": "10b1bdabba76ac1d5362f53e72a8553774f9a9ea7b000734c36da4dbcf3a14fe",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -4065,7 +4065,7 @@
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
-      "sha256": "dcfd919fd92a7d7098c2f0c4fc7c66939be8a847cb281a4e6fb5df0c708bacb1",
+      "sha256": "f9b677ac1aeda1fbe7ae766c87a55fd140f2d11f1a586a9a1abc6f4b200d3731",
       "executable": false
     },
     "tests/plinth/cost-ledger.test.mjs": {
@@ -4105,7 +4105,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "5020c31ef18500f7bf7adbe915193e3c9310ccc694cc27424dceb835d155c34c",
+      "sha256": "2c06bed15eda82b53ffb4fce4b5e88e3782f3dc7d573be3a6ebbea5699b56fe7",
       "executable": false
     },
     "tests/plinth/pricing.test.mjs": {
