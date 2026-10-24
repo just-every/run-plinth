@@ -33,7 +33,7 @@ export async function auditResponse(request: Request, db: D1Database, actor: Act
  if (parts[1] === 'export.json') return new Response(JSON.stringify({ format: 'plinth-audit-v1', count: events.length, events }), { headers: { ...headers, 'content-type': 'application/json', 'content-disposition': 'attachment; filename=plinth-audit.json' } })
  return new Response([columns.join(','), ...events.map(e => columns.map(c => cell((e as unknown as Record<string, unknown>)[c])).join(','))].join('\r\n') + '\r\n', { headers: { ...headers, 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename=plinth-audit.csv' } })
 }
-const exportPath = /\/(?:export\.(?:json|csv)|document\.(?:json|html|csv)|application\.(?:json|csv|html)|cost-codes\.(?:json|csv)|packet|originals|report)$/
+const exportPath = /\/(?:export\.(?:json|csv)|payroll\.csv|document\.(?:json|html|csv)|application\.(?:json|csv|html)|cost-codes\.(?:json|csv)|packet|originals|report)$/
 /** A successful export read is itself an event; reports and imports already record their own writes. */
 export async function auditExport(request: Request, db: D1Database, actor: Actor | undefined, status: number) {
  const path = new URL(request.url).pathname

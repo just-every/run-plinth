@@ -18,10 +18,10 @@ export const presets: Record<Preset, { name: string; base: 'admin' | 'project_ma
  administrator: { name: 'Administrator', base: 'admin', permissions: matrix(all), financial_visible: true, po_limit_cents: null },
  project_manager: { name: 'Project manager', base: 'project_manager', permissions: matrix({ ...all, company: 'v', reports: 'vc', bills: 'v' }), financial_visible: true, po_limit_cents: 0 },
  estimator: { name: 'Estimator', base: 'estimator', permissions: matrix({ leads: 'vce', estimates: 'vce', documents: 'v' }), financial_visible: true, po_limit_cents: 0 },
- superintendent: { name: 'Superintendent', base: 'superintendent', permissions: matrix({ schedule: 've', logs: 'vc', documents: 'vc' }), financial_visible: false, po_limit_cents: 0 },
+ superintendent: { name: 'Superintendent', base: 'superintendent', permissions: matrix({ schedule: 've', logs: 'vc', documents: 'vc', time: 'vce' }), financial_visible: false, po_limit_cents: 0 },
  bookkeeper: { name: 'Bookkeeper', base: 'bookkeeper', permissions: matrix({ budgets: 'v', bills: 'vce', reports: 'vcea' }), financial_visible: true, po_limit_cents: 0 },
  reader: { name: 'Reader', base: 'reader', permissions: matrix({ reports: 'v' }), financial_visible: true, po_limit_cents: 0 },
- crew: { name: 'Crew', base: 'crew', permissions: matrix({ schedule: 'v', logs: 'v', documents: 'v' }), financial_visible: false, po_limit_cents: 0 },
+ crew: { name: 'Crew', base: 'crew', permissions: matrix({ schedule: 'v', logs: 'v', documents: 'v', time: 'vce' }), financial_visible: false, po_limit_cents: 0 },
 }
 export const holds = (role: { permissions: Matrix }, feature: Feature, action: Action) => role.permissions[feature][action]
 /** Validate a role's switches; unknown features or actions are refused rather than ignored. */

@@ -37,3 +37,72 @@ test('COST-003 — approved time, burden CSV, equipment and employee originals r
   assert.equal(timeSources.find(s=>s.id===time.id).payroll_replaced_cents,28800);assert.equal(timeSources.find(s=>s.id===expense.id).reimbursed.reference,'synthetic-plinth-reimbursement-check-1')
  }finally{await f.close()}
 })
+
+test('FIELD-002 — corrected crew time split by job and code posts exact approved labor and burden once, with private pay and payroll exports',async()=>{
+ const f=await createFixture();try{
+  const first=await costFixture(f),second=await costFixture(f)
+  const worker=await f.invite('synthetic-plinth-worker-1@example.com','Synthetic carpenter','admin'),other=await f.invite('synthetic-plinth-worker-2@example.com','Synthetic second worker','admin'),admin=await f.invite('synthetic-plinth-supervisor@example.com','Synthetic supervisor','admin')
+  const team=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team,person=team.find(p=>p.email==='synthetic-plinth-worker-1@example.com'),otherPerson=team.find(p=>p.email==='synthetic-plinth-worker-2@example.com')
+  for(const p of [person,otherPerson]){const r=await f.json('/api/plinth/team/'+p.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'crew',job_ids:[first.job.id,second.job.id],po_limit_cents:0}});assert.equal(r.status,200,JSON.stringify(r.value))}
+  const api=async(c,path='',body,cookie=f.owner)=>{const current=(await f.json(`/api/plinth/jobs/${c.job.id}`,{cookie:f.owner})).value.job;return f.json(`/api/plinth/jobs/${c.job.id}/time`+path,{cookie,...(body===undefined?{}:{method:'POST',body:{expected_version:current.version,...body}})})}
+  const rate={employee_id:person.id,hour_cents:3000,burden_bps:2000,overtime_bps:15000,human_reviewed:true,reference:'synthetic-plinth-reviewed-rate-1'}
+  for(const c of [first,second])assert.equal((await api(c,'/rates',rate)).status,200)
+  const entry={dated_on:'2026-10-23',cost_code:'01-100',activity:'Frame the kitchen',minutes:300,break_minutes:30,classification:'regular',reason:'Worker recorded the morning'}
+  let r=await api(first,'',entry,worker);assert.equal(r.status,200,JSON.stringify(r.value));const morning=r.value.record.id
+  r=await api(first,`/${morning}/correct`,{...entry,minutes:270,reason:'Corrected end time after reviewing the day'},worker);assert.equal(r.status,200);assert.equal(r.value.record.revisions.length,2)
+  r=await api(second,'',{...entry,cost_code:'06-100',minutes:120,break_minutes:0,classification:'overtime',reason:'Reviewed overtime allocation at the second job'},worker);assert.equal(r.status,200);const afternoon=r.value.record.id
+  assert.equal((await first.ledger()).totals.posted_actual_cents,0)
+  assert.equal((await api(first,`/${morning}/approve`,{},worker)).status,403)
+  assert.equal((await api(first,'/rates',rate,other)).status,403)
+  assert.equal((await api(first,'/payroll.csv',undefined,other)).status,403)
+  assert.deepEqual((await api(first,'',undefined,other)).value.entries,[])
+  assert.equal((await api(first,`/${morning}/correct`,entry,other)).status,404)
+  for(const [c,id,base,burden] of [[first,morning,12000,2400],[second,afternoon,9000,1800]]){
+   r=await api(c,`/${id}/approve`,{},admin);assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.record.approval.base_cents,base);assert.equal(r.value.record.approval.burden_cents,burden)
+   assert.equal((await c.ledger()).totals.posted_actual_cents,base+burden)
+   assert.equal((await api(c,`/${id}/approve`,{},admin)).status,409)
+   assert.equal((await api(c,`/${id}/correct`,entry,worker)).status,409)
+   const csv=await f.request(`/api/plinth/jobs/${c.job.id}/time/payroll.csv`,{cookie:f.owner});assert.equal(csv.status,200);const bytes=await csv.text();assert.ok(bytes.includes(`"${base}","${burden}"`));assert.ok(bytes.includes(id));assert.ok(bytes.includes(c.job.id))
+   const own=(await api(c,'',undefined,worker)).value;assert.equal(own.entries.length,1);assert.ok(own.entries[0].approval.by);assert.ok(!JSON.stringify(own).includes('hour_cents'));assert.ok(!JSON.stringify(own).includes('burden_cents'))
+   const generic=await f.json('/api/plinth/jobs/'+c.job.id,{cookie:f.owner});assert.ok(!('field_time' in generic.value.job))
+  }
+  const audit=(await f.json('/api/plinth/audit?action=time.export',{cookie:f.owner})).value.events;assert.equal(audit.length,2,'Payroll downloads are audited without pay values')
+  const held=(await api(first)).value.version
+  assert.equal((await api(first,'',{...entry,expected_version:held-1},worker)).status,409)
+  assert.equal((await api(first)).value.version,held)
+  let role=await f.json('/api/plinth/roles',{method:'POST',cookie:f.owner,body:{copy_of:'crew',name:'Synthetic time role',permissions:{time:{view:true,create:true,edit:true}}}});assert.equal(role.status,201);const roleId=role.value.role.id
+  let grantNow=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.id===person.id)
+  assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:grantNow.version,role:'custom',role_id:roleId,job_ids:[first.job.id,second.job.id]}})).status,200)
+  assert.equal((await api(first,'',undefined,worker)).status,200)
+  let currentRole=role.value.role
+  role=await f.json('/api/plinth/roles/'+roleId,{method:'PUT',cookie:f.owner,body:{expected_version:currentRole.version,permissions:{time:{view:false}}}});assert.equal(role.status,200)
+  assert.equal((await api(first,'',undefined,worker)).status,403,'Time visibility revocation applies on the next request')
+  const agent=await f.agent();assert.equal((await f.request(`/api/plinth/jobs/${first.job.id}/time`,{token:agent})).status,403)
+  const grant=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.id===person.id)
+  assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:grant.version,role:'crew',job_ids:[second.job.id],po_limit_cents:0}})).status,200)
+  assert.equal((await api(first,'',undefined,worker)).status,404,'Assignment revocation applies to the next time read')
+ }finally{await f.close()}
+})
+
+test('FIELD-002 — explicit worker consent gates geofence reminders; arrival and departure never create time or retain worker coordinates',async()=>{
+ const f=await createFixture();try{
+  const c=await costFixture(f),worker=await f.invite('synthetic-plinth-location-1@example.com','Synthetic field worker','admin'),other=await f.invite('synthetic-plinth-location-2@example.com','Synthetic nonconsenting worker','admin')
+  const team=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team
+  for(const p of team.filter(p=>p.email.startsWith('synthetic-plinth-location-'))){assert.equal((await f.json('/api/plinth/team/'+p.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'crew',job_ids:[c.job.id],po_limit_cents:0}})).status,200)}
+  const api=async(path,body,cookie=worker)=>{const current=(await f.json('/api/plinth/jobs/'+c.job.id,{cookie:f.owner})).value.job;return f.json(`/api/plinth/jobs/${c.job.id}/time`+path,{cookie,...(body===undefined?{}:{method:'POST',body:{expected_version:current.version,...body}})})}
+  assert.equal((await api('/site',{latitude:44,longitude:-73,radius_meters:100,label:'Synthetic job site'},f.owner)).status,200)
+  const before=(await api('')).value.version
+  assert.equal((await api('/location',{latitude:44.0001,longitude:-73.0001},other)).status,403)
+  assert.equal((await api('')).value.version,before,'A refused nonconsenting event writes nothing')
+  assert.equal((await api('/consent',{consent:true})).status,200)
+  let r=await api('/location',{latitude:44.0001,longitude:-73.0001});assert.equal(r.status,200);assert.equal(r.value.record.reminder.kind,'clock_in')
+  r=await api('/location',{latitude:44.0001,longitude:-73.0001});assert.equal(r.value.record.reminder,null,'No repeated arrival while still inside')
+  r=await api('/location',{latitude:44.1,longitude:-73.1});assert.equal(r.value.record.reminder.kind,'clock_out')
+  const own=(await api('')).value;assert.deepEqual(own.entries,[]);assert.ok(!JSON.stringify(own).includes('44.0001'));assert.ok(!JSON.stringify(own).includes('latitude'))
+  // Private archive custody contains only the site coordinates, consent and last reminder, never worker positions.
+  const stored=await f.db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(c.job.id).first();assert.ok(!stored.data.includes('44.0001'));assert.ok(!stored.data.includes('44.1'));assert.equal(JSON.parse(stored.data).cost_records.sources.length,0)
+  assert.equal((await api('/consent',{consent:false})).status,200)
+  r=await api('');assert.equal(r.value.location_choice.consent,false);assert.ok(!r.value.location_choice.reminder)
+  assert.equal((await api('/location',{latitude:44.0001,longitude:-73.0001})).status,403)
+ }finally{await f.close()}
+})

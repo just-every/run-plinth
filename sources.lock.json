@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f52397ad9b3c68b83e803ef7e1b9a1dadd33116dc8e8d1360f858f4782e7350d",
+      "sha256": "cf86da15be70f7c1b04fea11bbba96ffd5d3e9d62ff158a71e2443dd3631b2ae",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "08bcb236d3f8d6d6d64eff8744e90092bc8fb95fda2fe2828501cc22152d9f43",
+      "sha256": "c50628ade9be799ff25eee65be235783fb18e9d058e41a069bfd6371e6f86ffd",
       "executable": false
     },
     "DEMO.md": {
@@ -161,11 +161,15 @@
       "executable": false
     },
     "docs/COMMANDS.md": {
-      "sha256": "093f082779d44d2c99c92fd6e43e9ca95853f8f7b42d73548029445d9fa9f705",
+      "sha256": "eba3fed3285cb91bbba2bc8a3e543f74a98ed36517c448703b8ed25cc5205cb9",
       "executable": false
     },
     "docs/COSTS.md": {
       "sha256": "eef7bdd4e90499e3d91f8077cc84bc67faa3a956e0dfec3b7fe69fb1825a8c20",
+      "executable": false
+    },
+    "docs/FIELD-TIME.md": {
+      "sha256": "351520bf4e3ca0965f7a1bd884c3724ba7c42936c51b470ad2685532387fa9a1",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -2733,7 +2737,7 @@
       "executable": false
     },
     "src/plinth/audit-http.ts": {
-      "sha256": "f499214fd8d7277caa00ddc279d9b954bbe101ac7fe0b5c04b5e7d5ef73ca25f",
+      "sha256": "cafa241a078c71b253d16998b99a802351a9f7844b1ddc1a68c39678d1ef4b6a",
       "executable": false
     },
     "src/plinth/audit.ts": {
@@ -2853,7 +2857,7 @@
       "executable": false
     },
     "src/plinth/cost-http.ts": {
-      "sha256": "c0ac93d32b15d412c5bbcc34030a884d9c831743e2880000c0390974755b7926",
+      "sha256": "ddf22bfedbf293cf9ef1ca9d38b95f78480fd3e88a5f146c1ec886aebfc430ee",
       "executable": false
     },
     "src/plinth/cost-labor.ts": {
@@ -2924,6 +2928,18 @@
       "sha256": "3558eaeb3e1186f7be0476098c902f0e613edee565e7c9034bee884e3b0ea15d",
       "executable": false
     },
+    "src/plinth/field-geofence.ts": {
+      "sha256": "8ed18fafb5386fea68be5e119a54c957f7917d7cab1b948a11854d5fb70c7952",
+      "executable": false
+    },
+    "src/plinth/field-time-model.ts": {
+      "sha256": "952a2567813bd370e6e30b8a288ad144ecd00a4e5ac2232e13d718893735c2f9",
+      "executable": false
+    },
+    "src/plinth/field-time.ts": {
+      "sha256": "f540d8e96609e6f073b79a1d58cb167f2de81fa9feeb6a0b98066ae0968d151a",
+      "executable": false
+    },
     "src/plinth/handover-actions.ts": {
       "sha256": "d13ed059ae66e8ae6c33fa5da2550c5df0188392501480d453bd93763ac2e308",
       "executable": false
@@ -2941,7 +2957,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "a6b36581c8a37d39fe4dc84d1ae809a4304b6d94be1f0d9fe9e102376831b02e",
+      "sha256": "aec39883b99851c62b004a675837d28417493841da27ced66f59097deceeb597",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3005,7 +3021,7 @@
       "executable": false
     },
     "src/plinth/model.ts": {
-      "sha256": "6f1dc20c7b96d9cfede8cf5d1b7e56e7a4aad2e04890ce3916c4bce2f44e0078",
+      "sha256": "1a82caff877854441400c80c9b2ec96525b1b734e2a9031cddfa5fec0749a7fb",
       "executable": false
     },
     "src/plinth/operations.ts": {
@@ -3013,7 +3029,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "727b3ea3f6954a7f0b2cd23b373786c5e51b349b846a7aad89ca9cdf118b9e58",
+      "sha256": "57d6c9ffb0984dacc5253c74edda44879449a9ec2cd9538bbc47a2195826c033",
       "executable": false
     },
     "src/plinth/portal-features.ts": {
@@ -3129,11 +3145,11 @@
       "executable": false
     },
     "src/plinth/role-gate.ts": {
-      "sha256": "70d910ff17245f1420870df71d5a97cb652b233dc606c0affaed84bb1b091303",
+      "sha256": "5aeb6d5ab561ec607ec52d0fb4ce6a82f94ece8fd24febad32350af433908a52",
       "executable": false
     },
     "src/plinth/role-model.ts": {
-      "sha256": "1f7fbf8e791150c679951487f0cfb3151102306c25e7085a7433fe2c78ddb1b4",
+      "sha256": "6c9094dfdf8177ebbc71db57197db49b1c953da389934c521ead098c5f54533a",
       "executable": false
     },
     "src/plinth/role-store.ts": {
@@ -3952,6 +3968,10 @@
       "sha256": "29ddab6cd85853f236c5272f6707a62e9f0a44600ffc63c763d9e40e453ac723",
       "executable": false
     },
+    "tests/journeys/field-time.mjs": {
+      "sha256": "65aa2a4a02acae128844e85b4b4e465b24b35b9f145afc115fd61174a85b562c",
+      "executable": false
+    },
     "tests/journeys/handover.mjs": {
       "sha256": "5b9a7a28183af243ccd0ce9b0ee7aed9f1115b81008e529d33e036332f1cce93",
       "executable": false
@@ -4045,7 +4065,7 @@
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
-      "sha256": "c4e754a605b5f352629e961e8dca4cb7b4ccc3a2c2b48fcefcc2fc1095c4dcae",
+      "sha256": "b473a321c7385b6b5e0c30c1b1218edd2c23e4669e400867501d4d7822f88987",
       "executable": false
     },
     "tests/plinth/cost-ledger.test.mjs": {
@@ -4101,7 +4121,7 @@
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {
-      "sha256": "3657f33e4fe8eaa30935302d9e71c2371fd532241ccb08a60d97a4b0ae9b64b5",
+      "sha256": "f759092b1e8b51567e9aba8ca01a9800038e2b4afd2cc936048a05725dffe11a",
       "executable": false
     },
     "tests/plinth/schedule-baselines.test.mjs": {
