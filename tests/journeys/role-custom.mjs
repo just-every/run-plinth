@@ -52,7 +52,8 @@ try{
  await officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true}).click();await expect(officePage.getByRole('link',{name:'Download scoped PDF'})).toBeVisible()
  for(const format of ['CSV','PDF']){const path=await officePage.getByRole('link',{name:'Download scoped '+format}).getAttribute('href'),download=await contexts[2].request.get(base+path);assert.equal(download.status(),200)}
  await capture(officePage,'scoped-report',async()=>{await expect(officePage.getByRole('region',{name:'Saved view results'})).toBeVisible()})
- await officePage.setViewportSize({width:390,height:1000});const menu=officePage.getByRole('button',{name:'Open menu',exact:true});await menu.focus();assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').visibility),'visible','Icon tooltip appears on keyboard focus')
+ await officePage.setViewportSize({width:390,height:1000});const menu=officePage.getByRole('button',{name:'Open menu',exact:true});await officePage.keyboard.press('Tab');await menu.focus();assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').visibility),'visible','Icon tooltip appears on keyboard focus')
+ await officePage.screenshot({path:`${shots}/ROLE-006-icon-tooltip-390.png`,fullPage:true,animations:'disabled'})
  const officeRole=(await call('get','/roles')).value.roles.find(r=>r.name==='Office Manager')
  const hidden=await call('put','/roles/'+officeRole.id,{expected_version:officeRole.version,financial_visible:false});assert.equal(hidden.status,200)
  await officePage.reload();await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click();await expect(officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true})).toHaveCount(0)
