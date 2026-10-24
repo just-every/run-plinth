@@ -18,6 +18,20 @@
           "scripts/build-deployment-spec.mjs",
           "packaging.json",
           "rer-setup.json"
+        ],
+        "origin": {
+          "repository": "https://github.com/runeditrun/base",
+          "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
+          "path": "foundation/runtime",
+          "paths": [
+            "run-site.ts"
+          ]
+        },
+        "mappings": [
+          {
+            "path": "src/base/run-site.ts",
+            "originPath": "run-site.ts"
+          }
         ]
       }
     },
@@ -41,30 +55,6 @@
           {
             "path": "scripts/delivery/base/setup-manifest.mjs",
             "originPath": "setup-manifest.mjs"
-          }
-        ]
-      }
-    },
-    {
-      "id": "runeditrun/run-site-adaptation",
-      "role": "module",
-      "source": {
-        "kind": "local",
-        "paths": [
-          "src/base/run-site.ts"
-        ],
-        "origin": {
-          "repository": "https://github.com/runeditrun/base",
-          "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-          "path": "foundation/runtime",
-          "paths": [
-            "run-site.ts"
-          ]
-        },
-        "mappings": [
-          {
-            "path": "src/base/run-site.ts",
-            "originPath": "run-site.ts"
           }
         ]
       }
