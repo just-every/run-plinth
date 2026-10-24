@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "previousVersion": null,
-  "publicReleaseNotes": "Prepare Plinth for hosted installation with a digest-bound setup manifest, a deployment specification, Managed mail and retained source provenance. Native release publication follows the required runtime update.",
+  "publicReleaseNotes": "Prepare Plinth for hosted installation on rer 0.2.80 with a digest-bound setup manifest, a deployment specification, Managed mail and retained source provenance. Native release publication remains a separate round.",
   "migrations": [
     "migrations/core/0001_owner.sql",
     "migrations/core/0002_outbox.sql",
