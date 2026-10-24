@@ -54,8 +54,11 @@ try{
  await capture(officePage,'scoped-report',async()=>{await expect(officePage.getByRole('region',{name:'Saved view results'})).toBeVisible()})
  await officePage.setViewportSize({width:390,height:1000});const menu=officePage.getByRole('button',{name:'Open menu',exact:true});await officePage.keyboard.press('Tab');await menu.focus();assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').visibility),'visible','Icon tooltip appears on keyboard focus')
  await officePage.screenshot({path:`${shots}/ROLE-006-icon-tooltip-390.png`,fullPage:true,animations:'disabled'})
+ const mailOrder=(await act('/orders',{supplier:'Office supplier contact',description:'Permission-controlled order',vendor_email:emails[1],amount_cents:10000})).value.record.id
+ assert.equal((await act(`/orders/${mailOrder}/issue`)).status,200)
  const officeRole=(await call('get','/roles')).value.roles.find(r=>r.name==='Office Manager')
  const hidden=await call('put','/roles/'+officeRole.id,{expected_version:officeRole.version,financial_visible:false});assert.equal(hidden.status,200)
+ const beforeMail=job.version;assert.equal((await act(`/orders/${mailOrder}/send`)).status,403);assert.equal(job.version,beforeMail,'A held recipient prevents a send without writes');assert.equal(job.orders.find(order=>order.id===mailOrder).delivery.status,'prepared')
  await officePage.reload();await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click();await expect(officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true})).toHaveCount(0)
  await capture(officePage,'financial-report-revoked',async()=>{await expect(officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true})).toHaveCount(0);await expect(officePage.locator('.job-grid').getByText('Contract',{exact:true})).toHaveCount(0)})
  await officePage.goto(base+`/app?job=${job.id}`);await capture(officePage,'financial-job-revoked',async()=>{await expect(officePage.getByText('Contract $',{exact:false})).toHaveCount(0);await expect(officePage.getByText('Active job',{exact:true})).toBeVisible()})

@@ -317,7 +317,7 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   // Office Manager: sees budgets and cost; a $4,000 PO approves, a $6,000 PO is refused without a write.
   const office = people.office.cookie; seen = await view(office); assert.ok(seen.budgets.length); assert.equal(seen.quotes[0].lines[0].cost_unit_cents, 600000)
   assert.equal((await f.request(`/api/plinth/jobs/${job.id}/quotes/${job.quotes[0].id}/cost-codes.csv`, { cookie: office })).status, 200)
-  const order = async amount => (await act('/orders', { supplier: 'Champlain Lumber', description: `PO ${amount}`, amount_cents: amount }, office)).value.record.id
+  const order = async amount => (await act('/orders', { supplier: 'Champlain Lumber', vendor_email: people.junior.email, description: `PO ${amount}`, amount_cents: amount }, office)).value.record.id
   const small = await order(400_000), large = await order(600_000)
   assert.equal((await act(`/orders/${small}/issue`, {}, office)).status, 200, 'A $4,000 PO is within the $5,000 limit')
   const held = job.version; r = await act(`/orders/${large}/issue`, {}, office); assert.equal(r.status, 403); assert.equal(r.value.error, 'over_limit'); assert.equal(job.version, held, 'The over-limit PO writes nothing')
@@ -417,6 +417,15 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true })).status, 403); assert.equal(f.messages.length, messageCount)
   assert.equal((await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, permissions: { invoices: { view: true } } } })).status, 200)
   assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true })).status, 200); assert.equal(f.messages.length, messageCount + 1); assert.equal(f.messages.at(-1).to[0], people.junior.email)
+  juniorRole = (await api('/roles')).value.roles.find(role => role.id === junior.id)
+  r = await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, financial_visible: false } }); assert.equal(r.status, 200); juniorRole = r.value.role
+  messageCount = f.messages.length
+  assert.equal((await act(`/orders/${small}/send`)).status, 403, 'A financial restriction also holds purchase-order mail'); assert.equal(f.messages.length, messageCount)
+  r = await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, financial_visible: true, permissions: { orders: { view: false } } } }); assert.equal(r.status, 200); juniorRole = r.value.role
+  assert.equal((await act(`/orders/${small}/send`)).status, 403); assert.equal(f.messages.length, messageCount)
+  assert.equal((await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, permissions: { orders: { view: true } } } })).status, 200)
+  assert.equal((await act(`/orders/${small}/send`, {}, office)).status, 403, 'A sender whose approval was revoked cannot send the order'); assert.equal(f.messages.length, messageCount)
+  assert.equal((await act(`/orders/${small}/send`)).status, 200); assert.equal(f.messages.length, messageCount + 1); assert.equal(f.messages.at(-1).to[0], people.junior.email)
   assert.equal((await api(`/jobs/${job.id}/orders`, { method: 'POST', cookie: jr, body: { expected_version: job.version, supplier: 'x', description: 'x', amount_cents: 100 } })).status, 200, 'The same role still creates POs')
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'DELETE', body: { expected_version: carpenter.version + 1 } })).status, 409, 'A role in use is not deleted')
  } finally { await f.close() }
