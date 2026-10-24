@@ -44,11 +44,11 @@ try{
  await capture(leadPage,'hidden-search',async()=>{await expect(leadPage.getByRole('heading',{name:'No jobs match “Framing”'})).toBeVisible()})
  await officePage.goto(base+'/app');await officePage.getByRole('searchbox',{name:'Search jobs'}).fill('Framing')
  await expect(officePage.locator('.job-grid .job-name',{hasText:job.name})).toBeVisible()
- await capture(officePage,'authorized-search')
+ await capture(officePage,'authorized-search',async()=>{const clear=officePage.getByRole('button',{name:'Clear search',exact:true});await clear.hover();await expect.poll(()=>clear.evaluate(el=>getComputedStyle(el,'::after').visibility)).toBe('visible');await officePage.keyboard.press('Tab');await clear.focus();assert.equal(await clear.evaluate(el=>getComputedStyle(el,'::after').visibility),'visible','Search tooltip appears on keyboard focus')})
  // Existing Reports controls open the exact scoped CSV and PDF, and revocation removes a financial saved view.
  const reportSpec={expected_version:0,name:'Assigned job contract',sharing:'shared',scope:{record_scope:'job',record_ids:[job.id]},filters:[],selected_columns:['native.stage','native.contract']}
  const saved=await call('post','/reports/views',reportSpec);assert.equal(saved.status,201)
- await officePage.getByRole('searchbox',{name:'Search jobs'}).fill('');await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click()
+ await officePage.reload();await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click()
  await officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true}).click();await expect(officePage.getByRole('link',{name:'Download scoped PDF'})).toBeVisible()
  for(const format of ['CSV','PDF']){const path=await officePage.getByRole('link',{name:'Download scoped '+format}).getAttribute('href'),download=await contexts[2].request.get(base+path);assert.equal(download.status(),200)}
  await capture(officePage,'scoped-report',async()=>{await expect(officePage.getByRole('region',{name:'Saved view results'})).toBeVisible()})

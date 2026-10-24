@@ -38,7 +38,11 @@
 .workspace .menu-button, .workspace .topbar-lockup { display: none; }
 .workspace .search { position: relative; flex: 0 1 515px; display: flex; align-items: center; }
 .workspace .search .icon { position: absolute; left: 12px; width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
-.workspace .search input { min-height: 38px; padding-left: 40px; background: var(--line-soft); border-color: var(--line); }
+.workspace .search input { min-height: 38px; padding-left: 40px; padding-right: 44px; background: var(--line-soft); border-color: var(--line); }
+.workspace .search .search-clear { position: absolute; right: 2px; width: 34px; height: 34px; }
+.workspace .search .search-clear:hover { border-color: transparent; }
+.workspace .search .search-clear .icon { position: static; pointer-events: auto; }
+.workspace .search-clear[data-tip]::after { left: auto; right: 0; }
 .workspace .today { margin-left: auto; color: var(--muted); font-size: 14px; white-space: nowrap; }
 .workspace .new-job { flex: none; }
 .workspace .new-job .icon { width: 18px; height: 18px; stroke-width: 2.2; }

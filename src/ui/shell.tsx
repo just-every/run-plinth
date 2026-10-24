@@ -39,7 +39,7 @@ export function TopBar({ query, onQuery, onMenu, onNew, manager }: { query: stri
   return <header className="topbar">
     <button className="icon-button menu-button" aria-label="Open menu" data-tip="Open menu" onClick={onMenu}><Icon name="menu" /></button>
     <a className="lockup topbar-lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span>Plinth</span></a>
-    <label className="search"><Icon name="search" /><span className="visually-hidden">Search jobs</span><input type="search" value={query} onChange={e => onQuery(e.target.value)} placeholder="Search jobs, clients or addresses" /></label>
+    <div className="search"><Icon name="search" /><label className="visually-hidden" htmlFor="job-search">Search jobs</label><input id="job-search" role="searchbox" type="text" value={query} onChange={e => onQuery(e.target.value)} placeholder="Search job records" />{query && <button type="button" className="icon-button search-clear" aria-label="Clear search" data-tip="Clear search" onClick={() => onQuery('')}><Icon name="close" /></button>}</div>
     <p className="today">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).replace(',', '')}</p>
     {manager && <button className="primary new-job" onClick={onNew}><Icon name="plus" />New job</button>}
   </header>
