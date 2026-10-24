@@ -87,7 +87,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "76637d399be21b3de8f06187f715e272aa379a39c486be68142bd8094a318785",
+      "sha256": "7658bef758fadb2261b63036356bc46594fa85a156f5e997644d7b281c35e849",
       "executable": false
     },
     "composition.lock.json": {
@@ -599,11 +599,11 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "0781d5d5410a6be8564348eb4bf01222e6541e0a40d6d7ca08e59224215bcaac",
+      "sha256": "012705b559560cfd9e8e934a5aa794f6b662895ae61676ab81a40cf8e6820db8",
       "executable": false
     },
     "rer-setup.json": {
-      "sha256": "064729dfd1e97552f09153c0342633937370bc4bbfa76327773427800e7125f1",
+      "sha256": "98fc505a2c43732358e88a9b3dd5fe5713c4090503a813693dfca49555b32a4e",
       "executable": false
     },
     "RUN-LOCALLY.md": {

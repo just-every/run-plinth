@@ -13,6 +13,138 @@
       }
     },
     {
+      "path": "migrations/core/0002_outbox.sql",
+      "originPath": "default-seed/migrations/core/0004_development_outbox.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0002_outbox.sql": "45d6b03eadfe1e91737763ae85cdff74e7216f859869e34431550bba48294996"
+      },
+      "modes": {
+        "migrations/core/0002_outbox.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0003_portability.sql",
+      "originPath": "default-seed/migrations/core/0005_portability.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0003_portability.sql": "c7db9042f6d5c571e10297c02df858ad2f3466beb4fa85649fee407cc228747b"
+      },
+      "modes": {
+        "migrations/core/0003_portability.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0004_first_run.sql",
+      "originPath": "default-seed/migrations/core/0006_first_run.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0004_first_run.sql": "aef92de36233195e5a03cce67b192c5c0c38033b695f7ebce6062fc89152c2a9"
+      },
+      "modes": {
+        "migrations/core/0004_first_run.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0005_identity_providers.sql",
+      "originPath": "default-seed/migrations/core/0008_identity_providers.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0005_identity_providers.sql": "f879fb86b079e591dfe4a8513752a8e0394e252b940aa35d3f7430f27b7382c6"
+      },
+      "modes": {
+        "migrations/core/0005_identity_providers.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0006_provider_control.sql",
+      "originPath": "default-seed/scripts/base-cli/modules/operator-auth/accounts/schema/provider-control.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0006_provider_control.sql": "f19cc7a792538a8ff36d87760a3cad58fccab0316984488d1834af14fbf37cfe"
+      },
+      "modes": {
+        "migrations/core/0006_provider_control.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0007_dependencies.sql",
+      "originPath": "default-seed/migrations/core/0011_dependencies.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0007_dependencies.sql": "3481d8aef870a9eda153a1617e99bb71a408e61a25dea92bb132efa7dd1c2526"
+      },
+      "modes": {
+        "migrations/core/0007_dependencies.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0008_owner_claim.sql",
+      "originPath": "default-seed/migrations/core/0012_owner_claim.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0008_owner_claim.sql": "c3ffe653727bb4867b064dc2489df5013613f08f4b5998d2fe2b6a8485cdb815"
+      },
+      "modes": {
+        "migrations/core/0008_owner_claim.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0009_idp_owner.sql",
+      "originPath": "default-seed/migrations/core/0013_idp_owner.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0009_idp_owner.sql": "a870102648a2226b18a2fe8168d096389b698af88333d112fa8137e582fc2b33"
+      },
+      "modes": {
+        "migrations/core/0009_idp_owner.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0010_provider_pins.sql",
+      "originPath": "default-seed/migrations/core/0014_provider_pins.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0010_provider_pins.sql": "f0cfb6b3740869fd098ee449efb25807f8b1ef51c353fd07bafeb00ce38aeb63"
+      },
+      "modes": {
+        "migrations/core/0010_provider_pins.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0011_dependency_setup.sql",
+      "originPath": "default-seed/migrations/core/0015_dependency_setup.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0011_dependency_setup.sql": "7b36f7e1fb0991fe3e808613d911393bbad3386ead06427082c69a48c5738108"
+      },
+      "modes": {
+        "migrations/core/0011_dependency_setup.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0012_dependency_approval.sql",
+      "originPath": "default-seed/migrations/core/0016_dependency_approval.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0012_dependency_approval.sql": "7d3742369189b69ea28bdc000097f150f83221c6474f7e177c7b5590691b67e9"
+      },
+      "modes": {
+        "migrations/core/0012_dependency_approval.sql": "100644"
+      }
+    },
+    {
+      "path": "migrations/core/0013_erasure.sql",
+      "originPath": "default-seed/scripts/base-cli/modules/erasure/schema/erasure.sql",
+      "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",
+      "files": {
+        "migrations/core/0013_erasure.sql": "44fd4fac1aee4fda0d1d580373cbed9ef3da837e0186e7fe2130fb68dfceadbe"
+      },
+      "modes": {
+        "migrations/core/0013_erasure.sql": "100644"
+      }
+    },
+    {
       "path": "scripts/delivery/base/artifact.mjs",
       "originPath": "modules/delivery-producer/artifact.mjs",
       "revision": "4280971d7c0295b8a88c3e1179048efcbbe14f30",

@@ -84,8 +84,12 @@
       "label": "Mail provider",
       "kind": "select",
       "required": true,
-      "default": "rer",
+      "default": "development",
       "options": [
+        {
+          "value": "development",
+          "label": "Local development (no email)"
+        },
         {
           "value": "rer",
           "label": "RER managed mail"
@@ -103,7 +107,8 @@
           "label": "Cloudflare Email Sending"
         }
       ],
-      "group": "mail"
+      "group": "mail",
+      "help": "Local development sends no external email. Hosted installations must choose and configure RER mail or a direct provider."
     },
     {
       "name": "MAIL_FROM",
