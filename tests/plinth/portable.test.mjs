@@ -131,6 +131,16 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     const nativeInput={period:'2026-10',opening_cash_cents:200000,months:3},nativePreview=(await c.api(`/jobs/${c.job.id}/costs/period-preview?period=2026-10&opening_cash_cents=200000&months=3`,undefined,accountant)).value
     const review=await c.act('/costs/period-reviews',{...nativeInput,confirm:true,digest:nativePreview.digest,reference:'synthetic-plinth-archive-native-review'},accountant);assert.equal(review.status,200);await c.read()
     await c.ok('/costs/periods',{...nativeInput,native_review_id:review.value.record.id})
+    const fieldWorker=await f.invite('synthetic-plinth-archive-field@example.com','Archive field worker','admin')
+    const fieldPerson=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.email==='synthetic-plinth-archive-field@example.com')
+    assert.equal((await f.json('/api/plinth/team/'+fieldPerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'crew',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
+    const field=async(path,body,cookie=f.owner)=>{const current=(await f.json(`/api/plinth/jobs/${c.job.id}`,{cookie:f.owner})).value.job;const r=await f.json(`/api/plinth/jobs/${c.job.id}/time`+path,{method:'POST',cookie,body:{expected_version:current.version,...body}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value}
+    await field('/site',{latitude:44,longitude:-73,radius_meters:100,label:'Archive site'})
+    await field('/consent',{consent:true},fieldWorker)
+    await field('/location',{latitude:44.000123,longitude:-73.000123},fieldWorker)
+    await field('/location',{latitude:44.123456,longitude:-73.123456},fieldWorker)
+    const archivedField=(await f.json(`/api/plinth/jobs/${c.job.id}/time`,{cookie:fieldWorker})).value
+    assert.equal(archivedField.location_choice.inside,false);assert.equal(archivedField.location_choice.reminder.kind,'clock_out')
     const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -138,9 +148,16 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     succeeds(command(destination,'import','--input',before,'--yes'))
     succeeds(command(destination,'export','--output',roundtrip))
     const original=await archive(before), restored=await archive(roundtrip)
+    const rows = records => records.filter(r=>r.kind==='part').flatMap(r=>r.items)
+    for(const exported of [original,restored]){
+      const bytes=JSON.stringify(exported)
+      for(const coordinate of ['44.000123','73.000123','44.123456','73.123456'])assert.ok(!bytes.includes(coordinate),'FIELD-002 worker coordinates are absent from every CLI archive record')
+      const field=JSON.parse(rows(exported).find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).field_time
+      assert.deepEqual(field.location_choices,[archivedField.location_choice],'FIELD-002 retains only explicit consent and the latest inside state and reminder')
+      assert.deepEqual(Object.keys(field.location_choices[0]).sort(),['by','consent','employee_id','inside','reminder'])
+    }
     const receiver=await createFixture({persistTo:destination,ownerCookie:cookie})
     try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
-    const rows = records => records.filter(r=>r.kind==='part').flatMap(r=>r.items)
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority

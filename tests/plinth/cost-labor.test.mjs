@@ -63,9 +63,17 @@ test('FIELD-002 — corrected crew time split by job and code posts exact approv
    assert.equal((await api(c,`/${id}/approve`,{},admin)).status,409)
    assert.equal((await api(c,`/${id}/correct`,entry,worker)).status,409)
    const csv=await f.request(`/api/plinth/jobs/${c.job.id}/time/payroll.csv`,{cookie:f.owner});assert.equal(csv.status,200);const bytes=await csv.text();assert.ok(bytes.includes(`"${base}","${burden}"`));assert.ok(bytes.includes(id));assert.ok(bytes.includes(c.job.id))
-   const own=(await api(c,'',undefined,worker)).value;assert.equal(own.entries.length,1);assert.ok(own.entries[0].approval.by);assert.ok(!JSON.stringify(own).includes('hour_cents'));assert.ok(!JSON.stringify(own).includes('burden_cents'))
+   const own=(await api(c,'',undefined,worker)).value;assert.equal(own.entries.length,1);assert.ok(own.entries[0].approval.by);assert.ok(!JSON.stringify(own).includes('hour_cents'));assert.ok(!JSON.stringify(own).includes('burden_cents'));for(const key of ['rates','hour_cents','burden_bps','overtime_bps','amount_cents','base_cents','gross_cents','burden_cents','rate_reference'])assert.ok(!JSON.stringify(own).includes(JSON.stringify(key)),'Worker read excludes '+key)
    const generic=await f.json('/api/plinth/jobs/'+c.job.id,{cookie:f.owner});assert.ok(!('field_time' in generic.value.job))
   }
+  r=await api(first,'',{...entry,employee_id:person.id});assert.equal(r.status,200);const prepared=r.value.record.id
+  const beforeRefusal=(await api(first)).value.version
+  r=await api(first,`/${prepared}/approve`,{});assert.equal(r.status,403);assert.equal(r.value.error,'time_separation','An office preparer cannot approve their own preparation')
+  assert.equal((await api(first)).value.version,beforeRefusal)
+  r=await api(first,`/${prepared}/correct`,{...entry,minutes:260,reason:'Supervisor corrected the elapsed minutes'},admin);assert.equal(r.status,200)
+  const correctedVersion=r.value.version
+  r=await api(first,`/${prepared}/approve`,{},admin);assert.equal(r.status,403);assert.equal(r.value.error,'time_separation','An office corrector cannot approve the corrected entry')
+  assert.equal((await api(first)).value.version,correctedVersion);assert.equal((await first.ledger()).totals.posted_actual_cents,14400,'Refused approvals post no cost')
   const audit=(await f.json('/api/plinth/audit?action=time.export',{cookie:f.owner})).value.events;assert.equal(audit.length,2,'Payroll downloads are audited without pay values')
   const held=(await api(first)).value.version
   assert.equal((await api(first,'',{...entry,expected_version:held-1},worker)).status,409)
@@ -103,7 +111,12 @@ test('FIELD-002 — explicit worker consent gates geofence reminders; arrival an
   const stored=await f.db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(c.job.id).first();assert.ok(!stored.data.includes('44.0001'));assert.ok(!stored.data.includes('44.1'));assert.equal(JSON.parse(stored.data).cost_records.sources.length,0)
   assert.equal((await api('/consent',{consent:false})).status,200)
   r=await api('');assert.equal(r.value.location_choice.consent,false);assert.ok(!r.value.location_choice.reminder)
-  assert.equal((await api('/location',{latitude:44.0001,longitude:-73.0001})).status,403)
+  const revokedVersion=r.value.version
+  const refused=await f.request(`/api/plinth/jobs/${c.job.id}/time/location`,{method:'POST',cookie:worker,body:{latitude:44.987654,longitude:-73.987654},headers:{'content-type':['text','plain'].join('/')}})
+  assert.equal(refused.status,403,'Revoked consent refuses location before body parsing or coordinate validation')
+  assert.equal((await api('')).value.version,revokedVersion)
+  const revoked=JSON.parse((await f.db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(c.job.id).first()).data).field_time.location_choices[0]
+  assert.equal(revoked.consent,false);assert.ok(!('inside' in revoked));assert.ok(!('reminder' in revoked))
   const consentEvents=(await f.json('/api/plinth/audit?action=time.location_consent',{cookie:f.owner})).value.events
   assert.deepEqual(consentEvents.map(e=>e.detail.consent),[false,true],'The same committed audit records distinguish explicit opt-in and revocation')
   assert.ok(consentEvents.every(e=>!JSON.stringify(e).includes('latitude')))

@@ -13,7 +13,7 @@ All routes below require a current human session and an assigned job for a crew 
 
 ## Optional site reminders
 
-The following conservative policy is adopted pending ct approval. Only the owner configures a site using `POST /api/plinth/jobs/:job/time/site` with a visible `label`, site `latitude`, `longitude` and `radius_meters`. The owner can disable it with `enabled: false`.
+The following policy was approved by ct on 24 October 2026 at 21:12Z. Only the owner configures a site using `POST /api/plinth/jobs/:job/time/site` with a visible `label`, site `latitude`, `longitude` and `radius_meters`. The owner can disable it with `enabled: false`.
 
 The worker explicitly opts in with `POST /api/plinth/jobs/:job/time/consent` and `consent: true`, or revokes with `consent: false`. Consent changes are audited. Revocation clears the latest inside status and reminder. A site configuration change also clears those states.
 
