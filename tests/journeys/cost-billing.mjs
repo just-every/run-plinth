@@ -23,7 +23,10 @@ try{
  const id=result.record.id
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1100});await page.goto(base+`/app?job=${c.job.id}&tab=Billing`)
-  for(const control of await page.locator('button.icon-button:visible').all()){
+  await page.getByRole('heading',{name:'Invoices and deposits',exact:true}).waitFor()
+  const controls=page.locator('button.icon-button:visible')
+  if(width===390)assert.ok(await controls.count()>0,'Phone navigation has a visible icon control')
+  for(const control of await controls.all()){
    assert.ok((await control.getAttribute('data-tip'))?.split(' ').length>=2,'Visible icon control has a short tooltip')
    await page.keyboard.press('Tab');await control.focus();await expect.poll(()=>control.evaluate(el=>getComputedStyle(el,'::after').visibility)).toBe('visible')
    await page.screenshot({path:`${shots}/BILL-004-tooltip-${width}.png`,animations:'disabled'});await control.blur()
