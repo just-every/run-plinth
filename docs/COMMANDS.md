@@ -127,3 +127,18 @@ The client reads `GET /api/plinth/jobs/:job/selections/:selection/delegations` f
 The named delegate signs in normally and reads `GET /api/plinth/selection-delegations` or `/api/plinth/selection-delegations/:job/:delegation`. Only their own exact revision's client-visible terms, delegating statement and, after use, signature are returned. `POST .../:job/:delegation/sign` takes the current `expected_version`, exact `revision_id`, `option_id`, an affirmative `statement` and `confirm: true`. Every request rechecks both identities, current client and customer grants, company exclusion, feature availability and the exact revision. A new revision or substitute, dispute, withdrawal, disabled selections or lost signing authority voids an unused grant. Re-enabling access does not revive a voided grant. Concurrent client/delegate signatures commit one immutable choice.
 
 Any assigned client revokes an unused grant at `POST /api/plinth/jobs/:job/selections/:selection/delegations/:delegation/revoke` with `expected_version` and a reason. Revoking after use is refused and retains the signature; clients use the existing dispute door. The delegation, revocation and signature provenance appear in office and assigned-client History, survive private archive restore, and disappear on job erasure. A delegated choice alone changes no finances; allowance variations still require assigned-client approval. No comment, dispute, withdrawal, variation or other signature authority passes to the delegate.
+
+
+## Source-backed cost billing (BILL-004, partial)
+
+An office administrator with existing cost access can prepare a cost-plus draft through `POST /api/plinth/jobs/:job/invoices`. Send the current `expected_version`, `kind: "cost_plus"`, the normal description, authorized recipient email, due date and terms, plus `cost_billing` containing:
+
+- `contract_reference`: the reviewed signed agreement reference.
+- `entry_ids`: posted actual-cost entry ids selected from the existing job cost ledger. Draft costs cannot be billed.
+- `fee_bps`: the fixed contractual fee, in basis points. The net selected cost times this rate rounds half-up once to integer cents.
+- `cap_cents`: the cumulative gross cap; the draft separately shows any reduction needed to stay within it and the accepted contract total still limits issue.
+- `excluded_entry_ids`: posted costs excluded by the agreement. Once recorded on an issued invoice, these sources cannot be selected on a later issue.
+
+The returned draft is the preview; its `sources.cost_billing` includes source entries, supporting time details and original receipt checksums, fee, cap reduction and prior invoice links. Supporting records remain under existing office cost custody; clients receive invoice selling lines without private time details or receipt snapshots. Current preparation requires a reviewed zero sales tax agreement. Taxable pricing, category-specific fees, standalone net credits and the cost selection form remain unfinished.
+
+Approve the draft through the existing Billing record or `POST /api/plinth/jobs/:job/invoices/:invoice/issue` with a fresh `expected_version`. Issue rechecks current sources and earlier allocations atomically. A competing draft cannot rebill a source. The issued reference, fee and cap are fixed for later batches. A later positive net batch can combine approved late time and a posted vendor credit; it links the earlier issues without changing their originals. Download the issued original using the existing invoice document commands. Cost billing and progress applications cannot share earned billing on the same job. No mail or funds move as a consequence of prepare or issue.

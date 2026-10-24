@@ -1,3 +1,4 @@
+import { costBilling, costBillingAccess, refreshCostBilling } from './cost-billing'
 import { requireJobManager } from './auth'
 import { clientAccess } from './job-customers'
 import { cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
@@ -43,7 +44,8 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
  if (!id) {
   requireJobManager(actor, true)
   need(!action || action === 'prepare', 'Unknown invoice action', 404, 'not_found')
-  need(input.kind === 'deposit' || input.kind === 'milestone', 'Choose deposit or milestone')
+  need(input.kind === 'deposit' || input.kind === 'milestone' || input.kind === 'cost_plus', 'Choose deposit, milestone or cost_plus')
+  if(input.kind==='cost_plus')costBillingAccess(actor)
   const recipient_email = text(input.recipient_email, 'recipient_email', 254).toLowerCase()
   need(await clientAccess(db, job, recipient_email), 'Choose the original client or a currently authorized billing contact', 403, 'recipient')
   need(input.source_retainage_release_id === undefined, 'Retainage releases adjust the original milestone ledger and cannot be invoiced twice')
@@ -51,7 +53,11 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   const source_application_id = input.kind === 'milestone' ? text(input.source_application_id, 'source_application_id', 100) : undefined
   const sources = invoiceSources(job, source_application_id)
   need(!source_application_id || !invoiceRows(job).some(i => i.source_application_id === source_application_id && i.status === 'issued'), 'This application already has an issued invoice', 409, 'invoice_duplicate')
-  const amount_cents = input.kind === 'deposit' ? cents(input.amount_cents) : sources.application!.current_cents
+  if(input.kind==='cost_plus'){
+   need([sources.contract.quote,...sources.contract.variations].every(s=>Number(s.pricing.tax.rate.percent)===0),'Cost billing currently requires reviewed zero sales tax; taxable cost billing is not implemented',409,'cost_billing_tax')
+   sources.cost_billing=costBilling(job,input.cost_billing)
+  }
+  const amount_cents = input.kind === 'deposit' ? cents(input.amount_cents) : input.kind==='cost_plus'?sources.cost_billing!.total_cents:sources.application!.current_cents
   need(amount_cents > 0, 'An invoice needs a positive gross amount')
   if (input.kind === 'milestone' && input.amount_cents !== undefined) need(input.amount_cents === amount_cents, 'Milestone amount comes from its issued application')
   const record: Invoice = { id: crypto.randomUUID(), kind: input.kind, status: 'draft', description: text(input.description, 'description', 2000), due_on: date(input.due_on, 'due_on'), terms: text(input.terms, 'terms', 4000), recipient_email, amount_cents, ...(source_application_id ? { source_application_id } : {}), prepared_by: stamp(actor), source_digest: invoiceDigest(sources), sources, lines: [], receipts: [], deposit_applications: [] }
@@ -72,12 +78,15 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
  if (action === 'issue') {
   need(row.status === 'draft' && !row.issued, 'Each invoice issues once', 409, 'invoice_state')
   need(await clientAccess(db, job, row.recipient_email), 'The invoice recipient is no longer authorized', 403, 'recipient')
+  if(row.kind==='cost_plus')costBillingAccess(actor)
   const sources = invoiceSources(job, row.source_application_id)
+  if(row.kind==='cost_plus')sources.cost_billing=refreshCostBilling(job,row)
   need(invoiceDigest(sources) === row.source_digest, 'Approval sources changed; prepare a fresh invoice', 409, 'invoice_stale')
   need(!row.source_application_id || !invoiceRows(job).some(i => i.id !== row.id && i.issued && i.source_application_id === row.source_application_id), 'This application already has an issued invoice', 409, 'invoice_duplicate')
   const lines = invoiceLines(job, row, sources)
   need(JSON.stringify(lines) === JSON.stringify(row.lines), 'Earlier invoice allocations changed; prepare a fresh invoice', 409, 'invoice_stale')
-  const billed = sum(invoiceRows(job).filter(i => i.kind === 'milestone' && i.source_application_id && i.issued).map(i => i.issued!.gross_cents))
+  need(row.kind!=='milestone'||!invoiceRows(job).some(i=>i.kind==='cost_plus'&&i.issued),'Cost billing cannot share earned sources with milestone invoices',409,'cost_billing_mode')
+  const billed = sum(invoiceRows(job).filter(i => i.kind !== 'deposit' && i.issued).map(i => i.issued!.gross_cents))
   const deposits = sum(invoiceRows(job).filter(i => i.kind === 'deposit' && i.issued).map(i => i.issued!.gross_cents))
   need(row.kind === 'deposit' ? sum([deposits, row.amount_cents]) <= sources.current_budget.contract_cents : sum([billed, row.amount_cents]) <= sources.current_budget.contract_cents, 'Invoice exceeds the approved contract ', 409, 'invoice_balance')
   const counter = await db.prepare('SELECT next_number FROM pl_invoice_sequence WHERE id=1').first<{ next_number: number }>()
@@ -85,7 +94,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   writes.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_invoice_sequence WHERE id=1 AND next_number=?) THEN 1 ELSE 0 END').bind(counter.next_number), db.prepare('UPDATE pl_invoice_sequence SET next_number=next_number+1 WHERE id=1 AND next_number=?').bind(counter.next_number))
   const number = `INV-${String(counter.next_number).padStart(6, '0')}`, withheld_cents = sources.application?.retainage?.current_withheld_cents ?? 0
   const payable_cents = sources.retainage?.current.current_net_cents ?? sum([row.amount_cents, -withheld_cents]); need(payable_cents >= 0, 'Withholding cannot exceed the invoice gross', 409, 'invoice_balance')
-  row.issued = structuredClone({ format: 'plinth-invoice-v1', number, issued_by: stamp(actor), job_id: job.id, job_name: job.name, job_address: job.address, time_zone: job.time_zone ?? 'UTC', currency: 'USD', kind: row.kind, description: row.description, due_on: row.due_on, terms: row.terms, recipient_email: row.recipient_email, ...(row.source_application_id ? { source_application_id: row.source_application_id } : {}), gross_cents: row.amount_cents, withheld_cents, payable_cents, earned_revenue_cents: row.kind === 'deposit' ? 0 : sum(lines.map(l => l.subtotal_cents)), subtotal_cents: sum(lines.map(l => l.subtotal_cents)), tax_cents: sum(lines.map(l => l.tax_cents)), lines, sources })
+  row.issued = structuredClone({ ...(sources.cost_billing?{adjusts_invoice_numbers:sources.cost_billing.prior_invoice_ids.map(id=>find(invoiceRows(job),id).number!)}:{}), format: 'plinth-invoice-v1', number, issued_by: stamp(actor), job_id: job.id, job_name: job.name, job_address: job.address, time_zone: job.time_zone ?? 'UTC', currency: 'USD', kind: row.kind, description: row.description, due_on: row.due_on, terms: row.terms, recipient_email: row.recipient_email, ...(row.source_application_id ? { source_application_id: row.source_application_id } : {}), gross_cents: row.amount_cents, withheld_cents, payable_cents, earned_revenue_cents: row.kind === 'deposit' ? 0 : sum(lines.map(l => l.subtotal_cents)), subtotal_cents: sum(lines.map(l => l.subtotal_cents)), tax_cents: sum(lines.map(l => l.tax_cents)), lines, sources })
   need(sum(lines.map(l => l.gross_cents)) === row.amount_cents, 'Invoice lines do not reconcile', 409, 'invoice_balance')
   row.number = number; row.status = 'issued'; recordApproval(job, actor, 'invoice.issue', row, row.issued)
  } else {
@@ -137,5 +146,5 @@ const usd = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency
 /** The printable original reads the frozen issue only, never the current receipt/allocation ledger. */
 export function invoiceDocument(invoice: Invoice, _job?: Job): string {
  const s = invoice.issued; need(s, 'Issue the invoice before downloading its original', 409, 'invoice_state')
- return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(s.number)}</title><style>body{font:16px system-ui;margin:24px;color:#172b36}main{max-width:100%;overflow:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:10px;border-bottom:1px solid #bbb}@media print{body{margin:0}}</style><h1>Invoice ${escape(s.number)}</h1><h2>${escape(s.job_name)}</h2><p>${escape(s.job_address)}</p><p>${escape(s.description)} · ${escape(s.kind)} · USD</p><p>Bill to ${escape(s.recipient_email)}<br>Due ${escape(s.due_on)} inclusive in ${escape(s.time_zone)}<br>Terms: ${escape(s.terms)}</p><main><table><tr><th>Description</th><th>Before tax</th><th>Tax</th><th>Total</th></tr>${s.lines.map(l => `<tr><td>${escape(l.description)}</td><td>${usd(l.subtotal_cents)}</td><td>${usd(l.tax_cents)}</td><td>${usd(l.gross_cents)}</td></tr>`).join('')}</table></main><p>Gross ${usd(s.gross_cents)} · Withheld ${usd(s.withheld_cents)} · Original payable ${usd(s.payable_cents)}</p><p>${s.kind === 'deposit' ? 'Deposit liability arises only from recorded receipts; this request earns no revenue.' : 'Gross includes the source application’s reviewed tax; withholding does not change gross earned value.'}</p><p>${escape(s.sources.tax_verification)}. This commercial invoice does not certify work completion, legal tax treatment, receipt or movement of funds. Current receipts and deposit allocations are a separate ledger.</p><p>Issued by ${escape(s.issued_by.name)} at ${escape(s.issued_by.at)}</p></html>`
+ return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(s.number)}</title><style>body{font:16px system-ui;margin:24px;color:#172b36}main{max-width:100%;overflow:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:10px;border-bottom:1px solid #bbb}@media print{body{margin:0}}</style><h1>Invoice ${escape(s.number)}</h1><h2>${escape(s.job_name)}</h2><p>${escape(s.job_address)}</p><p>${escape(s.description)} · ${escape(s.kind)} · USD</p><p>Bill to ${escape(s.recipient_email)}<br>Due ${escape(s.due_on)} inclusive in ${escape(s.time_zone)}<br>Terms: ${escape(s.terms)}</p><main><table><tr><th>Description</th><th>Before tax</th><th>Tax</th><th>Total</th></tr>${s.lines.map(l => `<tr><td>${escape(l.description)}</td><td>${usd(l.subtotal_cents)}</td><td>${usd(l.tax_cents)}</td><td>${usd(l.gross_cents)}</td></tr>`).join('')}</table></main>${s.adjusts_invoice_numbers?.length?`<p>Adjustment following ${s.adjusts_invoice_numbers.map(escape).join(', ')}. Earlier issued invoices remain unchanged.</p>`:''}<p>Gross ${usd(s.gross_cents)} · Withheld ${usd(s.withheld_cents)} · Original payable ${usd(s.payable_cents)}</p><p>${s.kind === 'deposit' ? 'Deposit liability arises only from recorded receipts; this request earns no revenue.' : 'Gross includes reviewed source amounts; withholding does not change gross earned value.'}</p><p>${escape(s.sources.tax_verification)}. This commercial invoice does not certify work completion, legal tax treatment, receipt or movement of funds. Current receipts and deposit allocations are a separate ledger.</p><p>Issued by ${escape(s.issued_by.name)} at ${escape(s.issued_by.at)}</p></html>`
 }

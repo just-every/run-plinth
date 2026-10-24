@@ -8,6 +8,7 @@ export interface InvoiceTaxLine {
  reviewed_source_gross_cents: number; reviewed_source_tax_cents: number
 }
 export interface InvoiceSources {
+ cost_billing?: import('./cost-billing').CostBilling
  contract: SovSources; original_budget: BudgetRevision; current_budget: BudgetRevision
  allowance_changes: NonNullable<Job['variations'][number]['allowance_change']>[]
  application?: SovApplication
@@ -16,9 +17,10 @@ export interface InvoiceSources {
  cost_uncertainty: string
 }
 export interface InvoiceSnapshot {
+ adjusts_invoice_numbers?: string[]
  format: 'plinth-invoice-v1'; number: string; issued_by: Stamp
  job_id: string; job_name: string; job_address: string; time_zone: string; currency: 'USD'
- kind: 'deposit' | 'milestone'; description: string; due_on: string; terms: string; recipient_email: string
+ kind: 'deposit' | 'milestone' | 'cost_plus'; description: string; due_on: string; terms: string; recipient_email: string
  source_application_id?: string; gross_cents: number; withheld_cents: number; payable_cents: number
  earned_revenue_cents: number; subtotal_cents: number; tax_cents: number; lines: InvoiceTaxLine[]; sources: InvoiceSources
 }
@@ -37,7 +39,7 @@ export interface InvoiceBalance {
  deposit_applied_cents: number; received_cents: number; due_cents: number
 }
 export interface Invoice {
- id: string; kind: 'deposit' | 'milestone'; status: 'draft' | 'issued'; description: string
+ id: string; kind: 'deposit' | 'milestone' | 'cost_plus'; status: 'draft' | 'issued'; description: string
  due_on: string; terms: string; recipient_email: string; amount_cents: number; source_application_id?: string
  prepared_by: Stamp; source_digest: string; sources: InvoiceSources; lines: InvoiceTaxLine[]
  balance?: InvoiceBalance

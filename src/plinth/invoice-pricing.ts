@@ -1,3 +1,4 @@
+import { costBillingLines } from './cost-billing'
 import { cents, find, need, sum, type Job } from './model'
 import { calculatePricing, type PricingSnapshot } from './pricing-model'
 import { retainageSnapshot } from './retainage'
@@ -38,6 +39,7 @@ export function invoiceSources(job: Job, source_application_id?: string): Invoic
 }
 /** Deposits disclose a quote-tax share and earn no revenue; milestones allocate earned source tax separately. */
 export function invoiceLines(job: Job, row: Pick<Invoice, 'id' | 'kind' | 'amount_cents' | 'source_application_id'>, sources: InvoiceSources): InvoiceTaxLine[] {
+ if(row.kind==='cost_plus')return costBillingLines(sources.cost_billing!)
  const quote = sources.contract.quote, taxes = sourceTax(quote.pricing)
  if (row.kind === 'deposit') {
   const gross = sources.current_budget.contract_cents, tax = sum([quote.pricing.tax.tax_cents, ...sources.contract.variations.map(v=>v.pricing.tax.tax_cents * (v.amount_cents < 0 ? -1 : 1))])

@@ -260,3 +260,48 @@ test('BILL-006 — one recorded bank remittance pays multiple milestones, retain
   assert.equal(f.messages.filter(m=>m.subject?.includes('Receipt')).length,0,'Recording or returning funds never sends a receipt or contacts the client')
  } finally {await f.close()}
 })
+
+test('BILL-004 — posted mixed costs bill once with fixed fees, exclusions, a cap and immutable linked later adjustments',async()=>{
+ const f=await createFixture();try{
+  const {costFixture,original}=await import('./cost-support.mjs'),c=await costFixture(f)
+  const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()
+  const source=async(kind,reference,extra={})=>{const r=await c.ok('/costs/sources',{kind,reference,dated_on:'2026-10-24',period:'2026-10',cost_code:'01-100',employee_reference:'synthetic-plinth-worker-1',equipment_reference:'synthetic-plinth-lift-1',minutes:60,hour_cents:3000,burden_bps:2000,...extra});await c.ok(`/costs/sources/${r.record.id}/approve`);return r.record}
+  await source('time','synthetic-plinth-bill-time-1');await source('equipment','synthetic-plinth-bill-equipment-1');await source('expense','synthetic-plinth-bill-expense-1',{amount_cents:500,document:original})
+  const b=await c.ok('/costs/bills',c.bill());await c.ok(`/costs/bills/${b.record.id}/review`,{reason:'Reviewed receipt coding discrepancy against original'});await c.ok(`/costs/bills/${b.record.id}/post`)
+  const unapproved=await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-unapproved-time',dated_on:'2026-10-24',period:'2026-10',cost_code:'01-100',employee_reference:'synthetic-plinth-worker-1',minutes:60,hour_cents:3000})
+  const entries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.id&&e.source_kind),excluded=entries.find(e=>e.source_kind==='expense')
+  const config={contract_reference:'synthetic-plinth-signed-cost-plus-contract-1',fee_bps:1000,cap_cents:60000,entry_ids:entries.filter(e=>e.id!==excluded.id).map(e=>e.id),excluded_entry_ids:[excluded.id]}
+  const input={kind:'cost_plus',description:'Approved actual costs and contractual fee',recipient_email:'synthetic-plinth-client@example.com',due_on:'2026-11-23',terms:'Reviewed zero sales tax; fee and cap per signed cost-plus contract',cost_billing:config}
+  const unchanged=async(path,body,status)=>{const before=await c.read(),r=await c.act(path,body);assert.equal(r.status,status,JSON.stringify(r.value));assert.deepEqual(await c.read(),before)}
+  await unchanged('/invoices',{...input,cost_billing:{...config,entry_ids:[unapproved.record.id]}},404)
+  await unchanged('/invoices',{...input,cost_billing:{...config,entry_ids:[...config.entry_ids,config.entry_ids[0]]}},400)
+  for(const [cookie,token] of [[client,undefined],[undefined,agent]])assert.equal((await c.act('/invoices',input,cookie,token)).status,403)
+  const invoice=(await c.ok('/invoices',input)).record
+  assert.ok(invoice.sources.cost_billing.supporting_sources.some(s=>s.document_checksum));assert.ok(invoice.sources.cost_billing.supporting_sources.some(s=>s.detail?.minutes===60));assert.equal(invoice.sources.cost_billing.cost_cents,50200);assert.equal(invoice.amount_cents,55220);assert.equal(invoice.sources.cost_billing.fee_cents,5020)
+  const competing=(await c.ok('/invoices',{...input,description:'Competing draft must not reserve the same costs twice'})).record
+  await c.ok(`/invoices/${invoice.id}/issue`);await unchanged(`/invoices/${competing.id}/issue`,{},409);await unchanged(`/invoices/${invoice.id}/issue`,{},409)
+  const first=(await c.read()).invoices.find(i=>i.id===invoice.id),frozen=structuredClone(first.issued)
+  assert.equal(frozen.gross_cents,55220);assert.equal(frozen.earned_revenue_cents,55220)
+  const originalResponse=await f.request(`/api/plinth/jobs/${c.job.id}/invoices/${invoice.id}/document.html`,{cookie:f.owner}),html=await originalResponse.text();assert.equal(originalResponse.status,200)
+  await unchanged('/invoices',input,409)
+  await unchanged('/invoices',{...input,cost_billing:{...config,entry_ids:[excluded.id],excluded_entry_ids:[]}},409)
+  const creditInput={...c.bill('synthetic-plinth-credit-1'),kind:'credit',credit_of:b.record.id,lines:[{cost_code:'06-100',description:'Returned material credit',subtotal_cents:1000,taxable:true,matches:[{order_id:c.order.id,receipt_id:c.receipts[0].id,cost_code:'06-100',amount_cents:1000}]}]}
+  const credit=(await c.ok('/costs/bills',creditInput)).record;await c.ok(`/costs/bills/${credit.id}/post`)
+  const late=await source('time','synthetic-plinth-late-time-1',{minutes:180})
+  const newEntries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.source_id===late.id||e.source_id===credit.id)
+  const nextConfig={...config,entry_ids:newEntries.map(e=>e.id)}
+  await unchanged('/invoices',{...input,cost_billing:{...nextConfig,fee_bps:2000}},409)
+  const next=(await c.ok('/invoices',{...input,description:'Late time less vendor credit; linked adjustment',cost_billing:nextConfig})).record
+  assert.deepEqual(next.sources.cost_billing.prior_invoice_ids,[invoice.id]);assert.equal(next.sources.cost_billing.cost_cents,9700)
+  assert.equal(next.sources.cost_billing.fee_cents,970);assert.equal(next.sources.cost_billing.cap_reduction_cents,5890);assert.equal(next.amount_cents,4780)
+  const version=c.job.version,races=await Promise.all([1,2].map(()=>c.act(`/invoices/${next.id}/issue`,{expected_version:version})))
+  assert.deepEqual(races.map(r=>r.status).sort(),[200,409]);await c.read()
+  assert.deepEqual(c.job.invoices.find(i=>i.id===next.id).issued.adjusts_invoice_numbers,[frozen.number]);assert.deepEqual(c.job.invoices.find(i=>i.id===invoice.id).issued,frozen)
+  assert.equal(await (await f.request(`/api/plinth/jobs/${c.job.id}/invoices/${invoice.id}/document.html`,{cookie:f.owner})).text(),html)
+  assert.equal(c.job.invoices.filter(i=>i.issued).reduce((n,i)=>n+i.issued.gross_cents,0),60000)
+  const shown=(await c.api(`/jobs/${c.job.id}`,undefined,client)).value.job
+  assert.equal(JSON.stringify(shown).includes('cost_billing'),false);assert.equal(JSON.stringify(shown).includes('hour_cents'),false)
+  assert.equal((await c.api(`/jobs/${c.job.id}/costs/sources`,undefined,client)).status,403)
+  const actual=(await c.ledger()).totals.posted_actual_cents;assert.equal(actual,60400,'Billing consumes no actual cost and never changes the source ledger')
+ }finally{await f.close()}
+})
