@@ -23,6 +23,11 @@ try{
  const id=result.record.id
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1100});await page.goto(base+`/app?job=${c.job.id}&tab=Billing`)
+  for(const control of await page.locator('button.icon-button:visible').all()){
+   assert.ok((await control.getAttribute('data-tip'))?.split(' ').length>=2,'Visible icon control has a short tooltip')
+   await page.keyboard.press('Tab');await control.focus();await expect.poll(()=>control.evaluate(el=>getComputedStyle(el,'::after').visibility)).toBe('visible')
+   await page.screenshot({path:`${shots}/BILL-004-tooltip-${width}.png`,animations:'disabled'});await control.blur()
+  }
   const record=page.locator('#invoice-'+id);await record.locator('summary').first().click()
   if(width===1440){await record.getByRole('button',{name:'Approve and issue invoice',exact:true}).click();await record.getByRole('link',{name:'Open original invoice',exact:true}).waitFor()}
   await expect(record.getByRole('link',{name:'Open original invoice',exact:true})).toBeVisible()
