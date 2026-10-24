@@ -29,7 +29,7 @@ export function Jobs({ jobs, totals, all, query, manager, role, create, onOpen, 
           <strong className="job-name">{job.name}</strong>
           <span className="muted">{job.address || 'Site address not entered'}</span>
           {job.client_email && <span className="muted">{job.client_email}</span>}
-          <dl className="job-facts">{(!limited(role) || role === 'estimator') && <div><dt>{job.status === 'active' && !limited(role) ? 'Contract' : 'Latest quote'}</dt><dd>{money(job.status === 'active' && !limited(role) ? contractTotal(job) : job.quotes.at(-1)?.total_cents, job.currency)}</dd></div>}<div><dt>Next booking</dt><dd>{next ? `${day(next.start)} · ${next.trade}` : 'None booked'}</dd></div></dl>
+          <dl className="job-facts">{job.quotes.length > 0 && (!limited(role) || role === 'estimator') && <div><dt>{job.status === 'active' && !limited(role) ? 'Contract' : 'Latest quote'}</dt><dd>{money(job.status === 'active' && !limited(role) ? contractTotal(job) : job.quotes.at(-1)?.total_cents, job.currency)}</dd></div>}<div><dt>Next booking</dt><dd>{next ? `${day(next.start)} · ${next.trade}` : 'None booked'}</dd></div></dl>
           {times.length > 0 && <span className="span-track" aria-label={`Booked ${day(first)} to ${day(last)}`}><span style={{ left: '0%', width: '100%' }} /><i style={{ left: `${Math.min(100, Math.max(0, (now - first) / (last - first || 1) * 100))}%` }} /></span>}
           <span className="open-job">Open job <Icon name="chevron" /></span>
         </button></li>
