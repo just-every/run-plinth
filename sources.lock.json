@@ -2937,7 +2937,7 @@
       "executable": false
     },
     "src/plinth/field-time.ts": {
-      "sha256": "f540d8e96609e6f073b79a1d58cb167f2de81fa9feeb6a0b98066ae0968d151a",
+      "sha256": "e93bc5d0c02d89fae3a0ffefddd18da8f5dfe54b4d6d6c32f76a3c184d9b8702",
       "executable": false
     },
     "src/plinth/handover-actions.ts": {
@@ -4065,7 +4065,7 @@
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
-      "sha256": "b473a321c7385b6b5e0c30c1b1218edd2c23e4669e400867501d4d7822f88987",
+      "sha256": "dcfd919fd92a7d7098c2f0c4fc7c66939be8a847cb281a4e6fb5df0c708bacb1",
       "executable": false
     },
     "tests/plinth/cost-ledger.test.mjs": {

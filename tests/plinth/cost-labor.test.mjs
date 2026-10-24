@@ -104,5 +104,8 @@ test('FIELD-002 — explicit worker consent gates geofence reminders; arrival an
   assert.equal((await api('/consent',{consent:false})).status,200)
   r=await api('');assert.equal(r.value.location_choice.consent,false);assert.ok(!r.value.location_choice.reminder)
   assert.equal((await api('/location',{latitude:44.0001,longitude:-73.0001})).status,403)
+  const consentEvents=(await f.json('/api/plinth/audit?action=time.location_consent',{cookie:f.owner})).value.events
+  assert.deepEqual(consentEvents.map(e=>e.detail.consent),[false,true],'The same committed audit records distinguish explicit opt-in and revocation')
+  assert.ok(consentEvents.every(e=>!JSON.stringify(e).includes('latitude')))
  }finally{await f.close()}
 })

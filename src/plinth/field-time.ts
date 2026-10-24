@@ -1,3 +1,4 @@
+import { auditStatement } from './audit'
 import { geofenceAction } from './field-geofence'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize } from './auth'
@@ -38,9 +39,10 @@ export async function fieldTimeResponse(request:Request,original:Bindings):Promi
  const reader=request.body?.getReader();need(reader,'JSON body required');let raw='',size=0;const decoder=new TextDecoder();for(;;){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.length;if(size>20000){await reader.cancel();throw new DomainError('body_size','Time request too large',413)}raw+=decoder.decode(chunk.value,{stream:true})}raw+=decoder.decode()
  let input:Input;try{input=object(JSON.parse(raw))}catch{throw new DomainError('invalid_json','Invalid JSON')}
  need(input.expected_version===previous.version,'Job changed; reload before writing time',409,'stale_version')
- const job=structuredClone(previous),next=state(job);let record:unknown
+ const job=structuredClone(previous),next=state(job),writes:D1PreparedStatement[]=[];let record:unknown
  if(['site','consent','location'].includes(m[2]??'')&&!m[3]){
   record=geofenceAction(job,actor,input,m[2]!)
+  if(m[2]==='consent')writes.push(auditStatement(env.DB,actor,{kind:'permission',action:'time.location_consent',job_id:job.id,subject_kind:'employee',subject_id:actor.id,detail:{consent:input.consent}}))
  }else if(m[2]==='rates'&&!m[3]){
   need(actor.role==='owner','Only the owner configures reviewed pay rates',403,'forbidden')
   const employee_id=text(input.employee_id,'Employee',200);await employee(env.DB,job,employee_id)
@@ -68,7 +70,7 @@ export async function fieldTimeResponse(request:Request,original:Bindings):Promi
    record=projected(row,actor)
   }else throw new DomainError('not_found','Time action not found',404)
  }
- await saveJob(env.DB,actor,previous,job,[],clock)
+ await saveJob(env.DB,actor,previous,job,writes,clock)
  return json({version:job.version,record})
 }
 async function employee(db:D1Database,job:Job,id:string){
