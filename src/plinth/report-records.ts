@@ -58,7 +58,7 @@ export function reportColumns(definitions: ReportFieldDefinition[], scope: Repor
   if (column.id.startsWith('portfolio.')) {
    if (column.id === 'portfolio.slippage') return canView(actor,'schedule')
    if (column.id === 'portfolio.as_of') return true
-   if (column.id === 'portfolio.open_decisions') return canView(actor,'selections') && canView(actor,'changes') && canView(actor,'documents')
+   if (column.id === 'portfolio.open_decisions') return hasFinancial(actor) && canView(actor,'selections') && canView(actor,'changes') && canView(actor,'documents')
    if (!hasFinancial(actor) || !(['budgets','estimates','changes','bills','orders','invoices'] as Feature[]).every(feature=>canView(actor,feature))) return false
   }
   if (column.type === 'money' && !hasFinancial(actor)) return false

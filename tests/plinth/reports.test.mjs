@@ -139,5 +139,7 @@ test('RPT-001 — current portfolio reconciles three jobs to code sources, scope
   assert.equal((await api('/team/'+person.id,{method:'PUT',body:{expected_version:2,role:'custom',role_id:role.id,job_ids:[]}})).status,200)
   assert.equal((await api('/reports/views/'+id,{cookie:manager})).status,404)
   assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id,{cookie:manager})).status,403)
+  assert.ok(!(await api('/reports/records?record_scope=job',{cookie:manager})).value.columns.some(c=>c.id==='portfolio.open_decisions'),'Hidden financial decision counts are unavailable before filtering')
+  assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],filters:[{column_id:'portfolio.open_decisions',operator:'gt',value:0}]}})).status,400,'A hidden decision count cannot influence query membership')
  }finally{await f.close()}
 })
