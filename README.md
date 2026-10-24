@@ -22,7 +22,7 @@ For an installation using your real mailbox, run `npx -y @runeditrun/rer install
 ## Take a job through the first release
 
 1. In **Jobs**, create a job with the client's email and site address. Open **Quote**, enter scope and total, then prepare the revision. Record the actual client acceptance method and reference. The accepted quote stays fixed.
-2. In **Schedule**, book a subcontractor with start and end times; the chart shows every booking against today. The same trade cannot overlap another booking, even on another job. In **Daily logs**, publish notes and PNG/JPEG photos (up to 2 MB each).
+2. In **Schedule**, book a subcontractor with start and end times; the chart shows every booking against today. The same trade cannot overlap another booking, even on another job. In **Daily logs**, publish notes and PNG or JPEG photos (up to 2 MB each).
 3. In **People & access**, invite the job's client as **Client**. Prepare a change order in **Changes**. The client follows their invitation, opens their job and approves that exact amount and scope. A manager cannot approve on the client's behalf. For a local walkthrough, use `client@dev.localhost` on the job and run `rer dev --as client` to obtain a separate local client sign-in. Run `rer dev --as owner` to return to the builder.
 4. In **Purchasing**, prepare and issue a PO. Send the approved details to the supplier through your usual channel, then record delivery references and received value. This records a commitment; it does not send an order or pay anyone.
 5. In **Billing**, enter the work billed to date. Review the accepted quote, approved change orders, earlier pay apps and supplier totals. Approve, record the export, then download CSV and the full JSON reconciliation. Re-downloads keep the same approved record. Amounts include sales tax if your quote does; Plinth does not calculate tax or issue invoices. Exports are in USD.
@@ -43,7 +43,7 @@ rer setup
 rer dev
 ```
 
-Archives contain jobs, approvals, diary photo bytes, import source custody and journals, and durable account metadata. Sessions, credentials, private settings and local outbox messages are excluded; set up the destination's owner and mail configuration again. A restore requires an empty destination. Protect archives as confidential building/client records. `rer reset --yes` destroys local state and settings; export first if you intend to keep them.
+Archives contain jobs, approvals, diary photo bytes, import source custody and journals, and durable account metadata. Sessions, credentials, private settings and local outbox messages are excluded; set up the destination's owner and mail configuration again. A restore requires an empty destination. Protect archives as confidential building and client records. `rer reset --yes` destroys local state and settings; export first if you intend to keep them.
 
 The owner can permanently erase a job in **History → Erase this job**. This also retires its import custody and photo bytes. Keep an archive made **after** erasure as the later journal. Copy that later archive into the destination checkout as private `after-erasure.rer` (the pinned CLI requires a checkout-relative journal path). On a fresh destination, `rer import --input old.rer --journal after-erasure.rer --yes` refuses an old archive that predates the erasure. An offline old backup cannot know about erasure without that later journal; securely remove obsolete backups under your retention policy.
 

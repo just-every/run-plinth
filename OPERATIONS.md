@@ -41,11 +41,11 @@ kept in `.dev.vars` with mode 0600 and are not copied into build output.
 Local export creates a private archive with an integrity receipt and explicit
 exclusions. The foundation has no product-domain tables or background jobs; an
 edition's archive contains the supported domain tables and resources that its
-adapter declares. Owner/auth, outbox, bookkeeping, private settings and
+adapter declares. Owner and authentication, outbox, bookkeeping, private settings and
 transient runtime state are excluded. Import validates and restores atomically
 into an empty destination; confirmed reset preserves export archives. Run setup
 after restore to establish a fresh owner. Each first-party seed verifies local
-export/import/export equivalence across its supported resources. Remote transfer
+export, import and re-export equivalence across its supported resources. Remote transfer
 is available only when the adapter declares complete resource coverage.
 
 Preserve ambiguous state and applied migration history. Never place a remote
@@ -57,9 +57,9 @@ a forward migration and verified transition/recovery.
 `rer deploy --dry-run` validates the real owner-account
 deployment declaration and builds locally without provider requests. Real
 deployment requires privately supplied `CLOUDFLARE_ACCOUNT_ID` and
-`CLOUDFLARE_API_TOKEN`, the declared owner/session/setup secrets, and a real
+`CLOUDFLARE_API_TOKEN`, the declared owner, session and setup secrets, and a real
 verified mail sender in `deploy.json`. Follow the owner-account deploy-kit
-instructions under `scripts/base-cli/modules/deploy-kit`; account scope,
+instructions in the pinned rer package; account scope,
 resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
