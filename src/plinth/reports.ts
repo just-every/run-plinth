@@ -1,3 +1,6 @@
+import { costLedger } from './cost-ledger'
+import { jobs } from './store'
+import { reportXlsx } from './report-xlsx'
 import { need, object, text, type Actor, type Input } from './model'
 import { readClock, transaction } from './store'
 import { reportScope, type ReportRecordScope } from './report-field-model'
@@ -30,6 +33,15 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
   need(!actor.permissions||actor.permissions.financial||(input.type??previous?.type)!=='money','Money fields require financial visibility',403,'forbidden')
   const saved=await saveField(db,actor,input)
   return json({...saved,fields:saved.fields.filter(fieldVisible)},201)
+ }
+ if(parts.length===3&&parts[1]==='job-sources'&&method==='GET'){
+  const columns=reportColumns(visibleFields,'job',actor)
+  need(columns.some(c=>c.id==='portfolio.actual'),'Financial source records are unavailable',403,'forbidden')
+  const record=(await recordsFor('job')).find(r=>r.id===parts[2]);need(record,'Job not found',404,'not_found')
+  const job=(await jobs(db)).find(j=>j.id===record.id)!,ledger=costLedger(job)
+  const source={as_of:new Date().toISOString(),job_id:job.id,source_version:job.version,currency:ledger.currency,rows:ledger.rows,forecast:ledger.forecast?{id:ledger.forecast.id,as_of:ledger.forecast.as_of,codes:ledger.forecast.codes,stale:ledger.forecast.stale}:null,label:ledger.label}
+  await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{job_id:job.id,format:'json',source_version:job.version})])
+  return new Response(JSON.stringify(source,null,2),{headers:{...headers,'content-type':'application\u002fjson','content-disposition':'attachment; filename=portfolio-job-sources.json'}})
  }
  if(parts.length===2&&parts[1]==='records'&&method==='GET'){
   const scope=allowedScope(url.searchParams.get('record_scope'));return json({records:await recordsFor(scope),columns:reportColumns(visibleFields,scope,actor)})
@@ -70,10 +82,10 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
   const saved=all.find(r=>r.view.id===parts[2]);need(saved&&await canRead(saved.view),'View not found',404,'not_found')
   const columns=reportColumns(visibleFields,saved.view.scope.record_scope,actor), report=queryReport(await recordsFor(saved.view.scope.record_scope),columns,saved.view)
   if(parts.length===3||parts[3]==='run')return json({...saved,report})
-  need(parts[3]==='export.csv'||parts[3]==='export.pdf','Unknown report route',404,'not_found')
-  const pdf=parts[3]==='export.pdf',format=pdf?'pdf':'csv',content=pdf?reportPdf(report,saved.view.name):reportCsv(report)
+  need(parts[3]==='export.csv'||parts[3]==='export.pdf'||parts[3]==='export.xlsx','Unknown report route',404,'not_found')
+  const pdf=parts[3]==='export.pdf',xlsx=parts[3]==='export.xlsx',format=pdf?'pdf':xlsx?'xlsx':'csv',content=pdf?reportPdf(report,saved.view.name):xlsx?new Uint8Array(reportXlsx(report)).buffer:reportCsv(report)
   await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{view_id:saved.view.id,format,annotation:report.annotation,selected_columns:report.columns})])
-  return new Response(content,{headers:{...headers,'content-type':pdf?'application\u002fpdf':'text\u002fcsv; charset=utf-8','content-disposition':`attachment; filename=plinth-scoped-view.${format}`}})
+  return new Response(content,{headers:{...headers,'content-type':pdf?'application\u002fpdf':xlsx?'application\u002fvnd.openxmlformats-officedocument.spreadsheetml.sheet':'text\u002fcsv; charset=utf-8','content-disposition':`attachment; filename=plinth-scoped-view.${format}`}})
  }
  need(false,'Unknown report route',404,'not_found')
 }

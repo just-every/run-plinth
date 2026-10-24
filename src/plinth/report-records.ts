@@ -1,3 +1,4 @@
+import { portfolioColumns, portfolioValues } from './portfolio'
 import { scheduleVariance } from './schedule-baseline-model'
 import { jobs } from './store'
 import { currencyOf, need, type Actor, type Job } from './model'
@@ -38,7 +39,7 @@ export async function reportRecords(db: D1Database, actor: Actor, scope: ReportR
   return rows.map(row => { const r = JSON.parse(row.data) as Customer | Vendor; return attach({ id:r.id, record_scope:scope, label:r.name, stage:r.kind, values:{ 'native.kind':r.kind } }) })
  }
  const all = (await jobs(db)).filter(j => actor.role !== 'project_manager' || actor.team?.job_ids.includes(j.id))
- if (scope === 'job') return all.map(j => attach({ id:j.id, job_id:j.id, record_scope:scope, label:j.name, currency:currencyOf(j), stage:j.status, values:{ 'native.stage':j.status, 'native.delayed':j.schedule_baselines?.length ? scheduleVariance(j).some(v => (v.forecast_finish_variance_minutes ?? 0) > 0) : null, 'native.contract':{ amount_cents:(j.quotes.find(q=>q.status==='accepted')?.total_cents ?? 0)+j.variations.filter(v=>v.status==='approved').reduce((n,v)=>n+v.amount_cents,0),currency:currencyOf(j) } } }))
+ if (scope === 'job') return all.map(j => attach({ id:j.id, job_id:j.id, record_scope:scope, label:j.name, currency:currencyOf(j), stage:j.status, values:{ ...portfolioValues(j), 'native.stage':j.status, 'native.delayed':j.schedule_baselines?.length ? scheduleVariance(j).some(v => (v.forecast_finish_variance_minutes ?? 0) > 0) : null, 'native.contract':{ amount_cents:(j.quotes.find(q=>q.status==='accepted')?.total_cents ?? 0)+j.variations.filter(v=>v.status==='approved').reduce((n,v)=>n+v.amount_cents,0),currency:currencyOf(j) } } }))
  return all.flatMap(j => [
   ...(canView(actor,'estimates') ? j.quotes : []).map(q=>({id:q.id,kind:'quote',label:`${j.name}: quote ${q.revision}`,stage:q.status,amount:q.total_cents})),
   ...(canView(actor,'orders') ? j.orders : []).map(o=>({id:o.id,kind:'order',label:`${j.name}: ${o.description}`,stage:o.status,amount:o.amount_cents})),
@@ -52,8 +53,14 @@ export async function reportRecords(db: D1Database, actor: Actor, scope: ReportR
 }
 export function reportColumns(definitions: ReportFieldDefinition[], scope: ReportRecordScope, actor?: Actor): ReportColumn[] {
  const native:ReportColumn[] = scope === 'job' ? [{id:'native.stage',name:'Job status',type:'text'},{id:'native.delayed',name:'Delayed against baseline',type:'boolean'},{id:'native.contract',name:'Contract',type:'money'}] : scope === 'financial' ? [{id:'native.kind',name:'Record kind',type:'text'},{id:'native.stage',name:'Record status',type:'text'},{id:'native.amount',name:'Amount',type:'money'}] : [{id:'native.kind',name:'Record kind',type:'text'}]
- const columns: ReportColumn[] = [...native,{id:'native.custom_stage',name:'Custom stage',type:'text'},...definitions.filter(d=>d.record_scope===scope)]
+ const columns: ReportColumn[] = [...native,...(scope==='job'?portfolioColumns:[]),{id:'native.custom_stage',name:'Custom stage',type:'text'},...definitions.filter(d=>d.record_scope===scope)]
  return columns.filter(column => {
+  if (column.id.startsWith('portfolio.')) {
+   if (column.id === 'portfolio.slippage') return canView(actor,'schedule')
+   if (column.id === 'portfolio.as_of') return true
+   if (column.id === 'portfolio.open_decisions') return canView(actor,'selections') && canView(actor,'changes') && canView(actor,'documents')
+   if (!hasFinancial(actor) || !(['budgets','estimates','changes','bills','orders','invoices'] as Feature[]).every(feature=>canView(actor,feature))) return false
+  }
   if (column.type === 'money' && !hasFinancial(actor)) return false
   if (column.id === 'native.contract') return canView(actor,'budgets') && canView(actor,'estimates') && canView(actor,'changes')
   if (column.id === 'native.delayed') return canView(actor,'schedule')
