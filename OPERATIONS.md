@@ -63,3 +63,21 @@ instructions under `scripts/base-cli/modules/deploy-kit`; account scope,
 resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
+
+## Hosted delivery package
+
+`packaging.json` declares Plinth's Cloudflare Worker, its existing DB migrations,
+setup manifest, recovery procedure and exact trusted build workflow. Run the
+real `pnpm run build` first, then `pnpm delivery:spec` to regenerate the committed
+import specification. `pnpm check:deployment-spec` checks freshness against the
+build and policy. Package with `node scripts/delivery/base/cli.mjs package
+--config packaging.json --output rer-package`; the output folder must be fresh.
+The artifact command is `node scripts/delivery/base/cli.mjs artifact --config packaging.json`.
+Generated packages and payloads stay outside source control.
+
+Hosted sign-in and invitations need a configured sender. Managed hosting assigns
+the RER mail provider, sender, HTTPS relay URL and private installation credential.
+Assisted hosting offers RER mail, Resend, SendGrid and Cloudflare Email Sending;
+enter the chosen provider's verified sender and private key, and the Cloudflare
+account identifier when applicable. Local development suppresses external mail.
+These declarations and local provider-edge checks do not prove live delivery.

@@ -28,7 +28,9 @@
     "deps": "rer install",
     "rer": "rer",
     "test:plinth": "node --test --test-concurrency=1 tests/plinth/*.test.mjs",
-    "test:site": "node --test tests/site.test.mjs"
+    "test:site": "node --test tests/site.test.mjs",
+    "delivery:spec": "node scripts/build-deployment-spec.mjs",
+    "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.41",

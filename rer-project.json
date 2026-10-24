@@ -3,5 +3,25 @@
   "projectId": "just-every/run-plinth",
   "name": "Plinth",
   "sourceRepository": "https://github.com/just-every/run-plinth",
-  "license": "MIT"
+  "license": "MIT",
+  "deployment": {
+    "target": "cloudflare-workers",
+    "artifactFile": "rer-worker-artifact.json"
+  },
+  "operations": {
+    "setup": "pnpm install --frozen-lockfile && pnpm exec rer install",
+    "build": "pnpm run build",
+    "verify": "pnpm run verify && pnpm exec rer check --profile first-party && pnpm check:deployment-spec",
+    "artifact": "node scripts/delivery/base/cli.mjs artifact --config packaging.json",
+    "recovery": "Follow OPERATIONS.md and docs/BACKUP-RESTORE.md: stop writes and scheduled work, retain the exact source and a private archive, restore with rer import into an empty installation, establish the receiving owner and mail settings, re-export and compare job records and photo bytes before routing traffic. Preserve every applied migration name and byte."
+  },
+  "verification": {
+    "migrationDirectories": [
+      "migrations/core"
+    ]
+  },
+  "setup": {
+    "path": "rer-setup.json",
+    "sha256": "064729dfd1e97552f09153c0342633937370bc4bbfa76327773427800e7125f1"
+  }
 }

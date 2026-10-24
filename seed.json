@@ -9,14 +9,7 @@
     "record": "Building job"
   },
   "description": "Contractor job records from accepted quote to reconciled progress claim export.",
-  "capabilities": [
-    {
-      "id": "http-dispatch",
-      "clauses": [
-        "HTTP-001"
-      ]
-    }
-  ],
+  "capabilities": [],
   "nonGoals": [
     "Statutory payment claims",
     "Accounting, payments and tax calculation",
@@ -79,5 +72,6 @@
       "operator-auth",
       "owner-claim"
     ]
-  }
+  },
+  "replaces": []
 }

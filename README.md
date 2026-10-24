@@ -61,7 +61,7 @@ Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, l
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.30**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.79**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
 
 ## Run site and guides
 
