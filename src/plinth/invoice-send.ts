@@ -7,6 +7,7 @@ import { find, need, recordApproval, stamp, type Actor, type Input, type Job } f
 import { invoiceRows, type InvoiceDelivery } from './invoice-model'
 import { jobOf, readClock, saveJob } from './store'
 import { checkWarrantySend, recipientGuards } from './warranty-store'
+import { deliveryPermissions } from './delivery-permissions'
 
 /** One durable attempt for each immutable invoice. No retry is implicit in any provider outcome. */
 export async function sendInvoice(env: Bindings, previous: Job, actor: Actor, id: string, input: Input, clock: number): Promise<Job> {
@@ -15,18 +16,19 @@ export async function sendInvoice(env: Bindings, previous: Job, actor: Actor, id
  const current = find(invoiceRows(previous), id)
  need(current.issued && current.status === 'issued', 'Issue the invoice before sending it', 409, 'invoice_state')
  need(!current.delivery, 'This invoice already has a reserved send attempt; inspect its outcome and contact the client separately', 409, 'invoice_send_reserved')
- const email = current.issued.recipient_email, guards = await recipientGuards(env.DB, previous, { kind: 'client', email })
- need(portalEnabled(previous,'client','billing')&&guards, 'The invoice recipient is no longer authorized', 403, 'recipient')
+ const email = current.issued.recipient_email, grants = await recipientGuards(env.DB, previous, { kind: 'client', email }), permissions = await deliveryPermissions(env.DB, previous, email, 'invoices', true)
+ need(portalEnabled(previous,'client','billing')&&grants&&permissions, 'The invoice recipient is no longer authorized', 403, 'recipient')
+ const guards = [...grants, ...permissions]
  const reserved = structuredClone(previous), row = find(invoiceRows(reserved), id)
  const delivery: InvoiceDelivery = { attempt_id: crypto.randomUUID(), status: 'unknown', label: 'Send reserved; provider outcome unknown. No automatic resend.', to: email, approved_by: stamp(actor) }
  row.delivery = delivery
  recordApproval(reserved, actor, 'invoice.send', row, { number: row.issued!.number, ...delivery })
  await saveJob(env.DB, actor, previous, reserved, guards, clock)
  try {
-  const latest = await jobOf(env.DB, actor, previous.id), eligible = await recipientGuards(env.DB, latest, { kind: 'client', email })
-  if (!eligible||!portalEnabled(latest,'client','billing')) { delivery.status = 'cancelled'; delivery.label = 'Recipient access changed; nothing was sent' }
+  const latest = await jobOf(env.DB, actor, previous.id), eligible = await recipientGuards(env.DB, latest, { kind: 'client', email }), currentPermissions = await deliveryPermissions(env.DB, latest, email, 'invoices', true)
+  if (!eligible||!currentPermissions||!portalEnabled(latest,'client','billing')) { delivery.status = 'cancelled'; delivery.label = 'Recipient access changed; nothing was sent' }
   else {
-   await checkWarrantySend(env.DB, latest, await readClock(env.DB), eligible, actor)
+   await checkWarrantySend(env.DB, latest, await readClock(env.DB), [...eligible, ...currentPermissions], actor)
    const sender = operatorMail(env)
    if (!sender || !env.MAIL_FROM) { delivery.status = 'unconfigured'; delivery.label = 'Mail is not configured; nothing was sent' }
    else {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createFixture } from './helpers.mjs'
 
-import { costFixture } from './cost-support.mjs'
+import { costFixture, costOriginal } from './cost-support.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
 
@@ -81,11 +81,15 @@ test('ROLE-005 — role, invoice, send, export and import events are searchable 
   await act('/diary', { note: 'Site log under hold' })
   r = await api(`/jobs/${job.id}`, { method: 'DELETE', body: { expected_version: job.version } }); assert.equal(r.status, 409); assert.equal(r.value.error, 'retention_hold'); assert.match(r.value.message, /Dispute notice received 23 October/); assert.match(r.value.message, /Builder/); assert.equal(r.value.details.holds[0].id, hold.id)
   assert.ok((await api(`/jobs/${job.id}`)).value.job, 'A refused erasure removes nothing'); assert.equal((await search('?action=jobs.erase_refused&job_id=' + job.id)).length, 1, 'The refusal is recorded')
+  const retainedInvoice = (await api(`/jobs/${job.id}/invoices/${invoice}/document.json`)).value.invoice
+  assert.equal(retainedInvoice.delivery.status, 'accepted', 'Held correspondence retains its exact provider outcome')
+  assert.equal(retainedInvoice.issued.description, deposit.description)
   assert.equal((await api(`/holds/${hold.id}/release`, { method: 'POST', cookie: office, body: { reason: 'x' } })).status, 403); assert.equal((await api(`/holds/${hold.id}/release`, { method: 'POST', body: {} })).status, 400)
   assert.equal((await api(`/holds/${hold.id}/release`, { method: 'POST', body: { reason: 'Dispute settled in writing' } })).status, 200); assert.equal((await api(`/holds/${hold.id}/release`, { method: 'POST', body: { reason: 'again' } })).status, 409)
   const before = (await search('?job_id=' + job.id)).length
   assert.equal((await api(`/jobs/${job.id}`, { method: 'DELETE', body: { expected_version: job.version } })).status, 200)
   assert.equal((await api(`/jobs/${job.id}`)).status, 404)
+  assert.equal((await api(`/jobs/${job.id}/invoices/${invoice}/document.json`)).status, 404, 'Released erasure removes correspondence and its commercial original')
   const kept = await search('?job_id=' + job.id); assert.equal(kept.length, before + 1); assert.equal(kept[0].action, 'jobs.erase'); assert.equal(kept[0].kind, 'erasure')
   const survivors = JSON.stringify(kept); for (const content of ['Audit Street kitchen', 'audit-client@example.com', 'Site log under hold', 'Signed contract deposit']) assert.ok(!survivors.includes(content), `${content} does not survive in the audit history`)
   assert.equal((await api('/holds?subject_id=' + job.id)).value.holds.length, 1)
@@ -98,5 +102,18 @@ test('ROLE-005 — role, invoice, send, export and import events are searchable 
   r = await api(`/vendors/${vendor.id}`, { method: 'DELETE', body: { expected_version: vendor.version } }); assert.equal(r.status, 409); assert.match(r.value.message, new RegExp(`retention until ${until}`))
   assert.equal((await api(`/holds/${retention.id}/release`, { method: 'POST', body: { reason: 'Retention period waived by the owner' } })).status, 200)
   assert.equal((await api(`/vendors/${vendor.id}`, { method: 'DELETE', body: { expected_version: vendor.version } })).status, 200)
+
+  // The same hold protects independently downloaded supplier originals, not only the job summary.
+  const originalPath = `/api/plinth/jobs/${c.job.id}/costs/bills/${bill.id}/original`
+  const billHold = (await placeAt('job', c.job.id)).value.hold
+  await c.read()
+  assert.equal((await api(`/jobs/${c.job.id}`, { method: 'DELETE', body: { expected_version: c.job.version } })).status, 409)
+  const heldOriginal = await f.request(originalPath, { cookie: f.owner })
+  assert.equal(heldOriginal.status, 200); assert.deepEqual(Buffer.from(await heldOriginal.arrayBuffer()), costOriginal)
+  assert.equal((await api(`/holds/${billHold.id}/release`, { method: 'POST', body: { reason: 'Original dispute resolved in writing' } })).status, 200)
+  assert.equal((await api(`/jobs/${c.job.id}`, { method: 'DELETE', body: { expected_version: c.job.version } })).status, 200)
+  assert.equal((await f.request(originalPath, { cookie: f.owner })).status, 404)
+  const retainedReferences = JSON.stringify(await search('?job_id=' + c.job.id))
+  assert.match(retainedReferences, /cost\.bills\.recode/); assert.ok(!retainedReferences.includes(costOriginal.toString()) && !retainedReferences.includes(bill.reference), 'Erasure leaves references without supplier content')
  } finally { await f.close() }
 })

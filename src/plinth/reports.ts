@@ -1,51 +1,79 @@
 import { need, object, text, type Actor, type Input } from './model'
 import { readClock, transaction } from './store'
-import { reportScope } from './report-field-model'
+import { reportScope, type ReportRecordScope } from './report-field-model'
 import { fieldConfig, reportAudit, saveField, saveValues } from './report-store'
-import { reportColumns, reportRecords } from './report-records'
+import { reportColumns, reportRecords, reportScopeAllowed, type FieldRecord } from './report-records'
 import { parseReportView, queryReport, reportCsv, type ReportView } from './report-query'
+import { reportPdf } from './report-pdf'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 export async function reportsResponse(request:Request,db:D1Database,actor:Actor,parts:string[],body:(r:Request)=>Promise<Input>):Promise<Response|null> {
  if(parts[0]!=='reports')return null
  need(['owner','admin','project_manager'].includes(actor.role),'Custom fields, queries and exports are office-only',403,'forbidden')
  const method=request.method, url=new URL(request.url), config=await fieldConfig(db)
- const visibleFields=actor.role==='project_manager'?config.fields.filter(f=>f.record_scope==='job'):config.fields
- if(parts.length===2&&parts[1]==='schema'&&method==='GET')return json({version:config.version,fields:visibleFields})
- if(parts.length===2&&parts[1]==='fields'&&method==='POST')return json(await saveField(db,actor,await body(request)),201)
- if(parts.length===2&&parts[1]==='records'&&method==='GET'){
-  const scope=reportScope(url.searchParams.get('record_scope'));return json({records:await reportRecords(db,actor,scope),columns:reportColumns(visibleFields,scope)})
+ need(!actor.permissions || actor.permissions.matrix.reports.view,'Reports are unavailable',403,'forbidden')
+ const scopes = (['job','customer','vendor','financial'] as ReportRecordScope[]).filter(scope=>reportScopeAllowed(actor,scope))
+ const fieldVisible=(field:typeof config.fields[number])=>scopes.includes(field.record_scope)&&reportColumns([field],field.record_scope,actor).some(column=>column.id===field.id)
+ const visibleFields=config.fields.filter(fieldVisible)
+ const allowedScope = (value: unknown) => { const scope=reportScope(value);need(scopes.includes(scope),'This report scope is unavailable',403,'forbidden');return scope }
+ const records=new Map<ReportRecordScope,Promise<FieldRecord[]>>()
+ const recordsFor=(scope:ReportRecordScope)=>{let found=records.get(scope);if(!found){found=reportRecords(db,actor,scope,config.fields);records.set(scope,found)}return found}
+ const office=actor.role==='owner'||actor.role==='admin'
+ const canCreate=!actor.permissions||actor.permissions.matrix.reports.create
+ const canEdit=!actor.permissions||actor.permissions.matrix.reports.edit
+ if(parts.length===2&&parts[1]==='schema'&&method==='GET')return json({version:config.version,fields:visibleFields,scopes,capabilities:{define_fields:office&&canCreate,share_views:office,create_views:canCreate,edit_values:canEdit,money_fields:!actor.permissions||actor.permissions.financial}})
+ if(parts.length===2&&parts[1]==='fields'&&method==='POST'){
+  need(office&&canCreate,'Only authorized owners and administrators define custom fields',403,'forbidden')
+  const input=await body(request),previous=config.fields.find(field=>field.id===input.id)
+  need(!previous||canEdit,'Editing field definitions is unavailable',403,'forbidden')
+  allowedScope(input.record_scope??previous?.record_scope)
+  need(!actor.permissions||actor.permissions.financial||(input.type??previous?.type)!=='money','Money fields require financial visibility',403,'forbidden')
+  const saved=await saveField(db,actor,input)
+  return json({...saved,fields:saved.fields.filter(fieldVisible)},201)
  }
- if(parts[1]==='values'&&parts.length===4){const scope=reportScope(parts[2]),id=text(parts[3],'record id',300)
+ if(parts.length===2&&parts[1]==='records'&&method==='GET'){
+  const scope=allowedScope(url.searchParams.get('record_scope'));return json({records:await recordsFor(scope),columns:reportColumns(visibleFields,scope,actor)})
+ }
+ if(parts[1]==='values'&&parts.length===4){const scope=allowedScope(parts[2]),id=text(parts[3],'record id',300)
   if(method==='PUT')return json({record:await saveValues(db,actor,scope,id,await body(request))})
-  if(method==='GET'){const record=(await reportRecords(db,actor,scope)).find(r=>r.id===id);need(record,'Record not found',404,'not_found');return json({record})}
+  if(method==='GET'){const record=(await recordsFor(scope)).find(r=>r.id===id);need(record,'Record not found',404,'not_found');return json({record})}
  }
  const all=(await db.prepare('SELECT id,version,data FROM pl_report_views ORDER BY rowid DESC').all<{id:string;version:number;data:string}>()).results.map(r=>({version:r.version,view:JSON.parse(r.data) as ReportView}))
- const canRead=(view:ReportView)=> (view.sharing==='shared'||view.created_by===actor.id)&&(actor.role!=='project_manager'||view.scope.record_scope==='job'&&(view.scope.record_ids===null||view.scope.record_ids.every(id=>actor.team!.job_ids.includes(id))))
- if(parts.length===2&&parts[1]==='views'&&method==='GET')return json({views:all.filter(r=>canRead(r.view))})
+ const canRead=async(view:ReportView)=> {
+  if(!(view.sharing==='shared'||view.created_by===actor.id)||!scopes.includes(view.scope.record_scope))return false
+  const columns=reportColumns(visibleFields,view.scope.record_scope,actor),ids=new Set(columns.map(column=>column.id))
+  if(!view.selected_columns.every(id=>ids.has(id))||!view.filters.every(filter=>ids.has(filter.column_id)))return false
+  if(view.scope.record_ids!==null){const available=new Set((await recordsFor(view.scope.record_scope)).map(record=>record.id));if(!view.scope.record_ids.every(id=>available.has(id)))return false}
+  return true
+ }
+ if(parts.length===2&&parts[1]==='views'&&method==='GET'){
+  const readable=await Promise.all(all.map(async row=>await canRead(row.view)?row:null))
+  return json({views:readable.filter(row=>row!==null)})
+ }
  if(parts.length===2&&parts[1]==='query'&&method==='POST'){
-  const input=await body(request),scope=reportScope(object(input.scope).record_scope),columns=reportColumns(visibleFields,scope),view=parseReportView(input,columns,actor.id)
-  return json({report:queryReport(await reportRecords(db,actor,scope),columns,view)})
+  const input=await body(request),scope=allowedScope(object(input.scope).record_scope),columns=reportColumns(visibleFields,scope,actor),view=parseReportView(input,columns,actor.id)
+  return json({report:queryReport(await recordsFor(scope),columns,view)})
  }
  if(parts[1]==='views'&&(parts.length===2&&method==='POST'||parts.length===3&&method==='PUT')){
   const clock=await readClock(db),input=await body(request),previous=parts.length===3?all.find(r=>r.view.id===parts[2]):undefined
-  if(parts.length===3)need(previous,'View not found',404,'not_found')
+  if(parts.length===3)need(previous&&await canRead(previous.view),'View not found',404,'not_found')
   need(!previous||previous.view.created_by===actor.id,'Only the view creator edits it',403,'forbidden')
   need(input.expected_version===(previous?.version??0),'View changed; reload',409,'stale_version')
-  const scope=reportScope(object(input.scope??previous?.view.scope).record_scope),columns=reportColumns(visibleFields,scope),view=parseReportView(input,columns,actor.id,previous?.view)
-  await reportRecords(db,actor,scope)
+  const scope=allowedScope(object(input.scope??previous?.view.scope).record_scope),columns=reportColumns(visibleFields,scope,actor),view=parseReportView(input,columns,actor.id,previous?.view)
+  queryReport(await recordsFor(scope),columns,view)
   need(actor.role!=='project_manager'||view.sharing==='personal','Only owners and administrators share views',403,'forbidden')
   const version=(previous?.version??0)+1
   await transaction(db,actor,null,[db.prepare('INSERT INTO pl_report_views(id,version,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,data=excluded.data').bind(view.id,version,JSON.stringify(view)),reportAudit(db,actor,'view',previous?.view,view)],clock)
   return json({view,version},previous?200:201)
  }
  if(parts[1]==='views'&&(parts.length===3||parts.length===4)&&method==='GET'){
-  const saved=all.find(r=>r.view.id===parts[2]);need(saved&&canRead(saved.view),'View not found',404,'not_found')
-  const columns=reportColumns(visibleFields,saved.view.scope.record_scope), report=queryReport(await reportRecords(db,actor,saved.view.scope.record_scope),columns,saved.view)
+  const saved=all.find(r=>r.view.id===parts[2]);need(saved&&await canRead(saved.view),'View not found',404,'not_found')
+  const columns=reportColumns(visibleFields,saved.view.scope.record_scope,actor), report=queryReport(await recordsFor(saved.view.scope.record_scope),columns,saved.view)
   if(parts.length===3||parts[3]==='run')return json({...saved,report})
-  need(parts[3]==='export.csv','Unknown report route',404,'not_found')
-  await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{view_id:saved.view.id,annotation:report.annotation})])
-  return new Response(reportCsv(report),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=plinth-scoped-view.csv'}})
+  need(parts[3]==='export.csv'||parts[3]==='export.pdf','Unknown report route',404,'not_found')
+  const pdf=parts[3]==='export.pdf',format=pdf?'pdf':'csv',content=pdf?reportPdf(report,saved.view.name):reportCsv(report)
+  await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{view_id:saved.view.id,format,annotation:report.annotation,selected_columns:report.columns})])
+  return new Response(content,{headers:{...headers,'content-type':pdf?'application/pdf':'text/csv; charset=utf-8','content-disposition':`attachment; filename=plinth-scoped-view.${format}`}})
  }
  need(false,'Unknown report route',404,'not_found')
 }

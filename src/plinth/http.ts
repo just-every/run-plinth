@@ -49,6 +49,7 @@ import { constraintAction, constraintFile, requireScheduleClearance } from './sc
 import { operatorAuth, runtimeBindings, type Bindings } from '../auth.server'
 import { auditExport, auditResponse } from './audit-http'
 import { holdsResponse } from './holds'
+import { searchJobs } from './search'
 import { siteContacts } from './site-contacts'
 import { authenticated, authorize, isFieldRole, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
 import { permissionView, roleJobView } from './role-view'
@@ -103,6 +104,12 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const history=await auditResponse(request,env.DB,actor,parts);if(history)return history
  const holds=await holdsResponse(request,env.DB,actor,parts,body);if(holds)return holds
  const roles=await rolesResponse(request,env.DB,actor,parts,body);if(roles)return roles
+ if(parts[0]==='search'&&parts.length===1&&method==='GET'){
+  need(actor.role!=='agent','A signed-in person searches jobs',403,'human_required')
+  const query=new URL(request.url).searchParams.get('q')?.trim()??'';need(query.length>0&&query.length<=200,'Enter up to 200 characters')
+  const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id))
+  return json({results:searchJobs((await named(env.DB,all.filter((_,i)=>allowed[i]))).map(job=>display(job,actor)),query)})
+ }
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
  const waiverWording=await templatesResponse(request,env.DB,actor,parts,body);if(waiverWording)return waiverWording
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup

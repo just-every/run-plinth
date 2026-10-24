@@ -280,7 +280,7 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   for (const key of Object.keys(people)) people[key].id = (await api('/team')).value.team.find(m => m.email === people[key].email).id
   let job = (await api('/jobs', { method: 'POST', body: { name: 'Roles Street build', client_email: 'roles-client@example.com', address: '5 Roles Street' } })).value.job
   const act = async (path, body = {}, cookie = f.owner) => { const r = await api(`/jobs/${job.id}${path}`, { method: 'POST', cookie, body: { expected_version: job.version, ...body } }); if (r.status === 200) job = (await api(`/jobs/${job.id}`)).value.job; return r }
-  assert.equal((await act('/quotes', { lines: [{ id: 'framing', description: 'Framing', cost_code: '06-100', phase: 'Framing', category: 'labor', quantity: '1', unit: 'job', unit_cents: 1000000, cost_unit_cents: 600000 }] })).status, 200)
+  assert.equal((await act('/quotes', { lines: [{ id: 'framing', description: 'Private framing estimate', cost_code: '06-100', phase: 'Framing', category: 'labor', quantity: '1', unit: 'job', unit_cents: 1000000, cost_unit_cents: 600000 }] })).status, 200)
   assert.equal((await act(`/quotes/${job.quotes[0].id}/accept`, { method: 'signed', evidence: 'Signed contract', schedule_choice: { kind: 'none', reason: 'Planned later' } })).status, 200)
   assert.ok(job.budgets?.length, 'The accepted estimate froze a budget')
   const assign = (key, body, expected_version = 0) => api(`/team/${people[key].id}`, { method: 'PUT', body: { expected_version, ...body } })
@@ -339,6 +339,44 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   await updateManager({ financial_visible: true })
   assert.equal((await costs('/forecasts')).status, 200)
 
+  // Search applies the same projection before matching, so private text cannot influence its results.
+  const other = await createActiveJob(f, 'Unassigned private renovation', 'synthetic-plinth-private@example.com')
+  assert.deepEqual((await api('/search?q=Unassigned', { cookie: office })).value.results, [])
+  assert.deepEqual((await api('/search?q=Private%20framing%20estimate', { cookie: lead })).value.results, [])
+  assert.deepEqual((await api('/search?q=Private%20framing%20estimate', { cookie: office })).value.results.map(result => result.id), [job.id])
+  assert.deepEqual((await api('/search?q=600000', { cookie: lead })).value.results, [])
+  assert.deepEqual((await api('/search?q=Roles', { cookie: lead })).value.results.map(result => result.id), [job.id])
+
+  // Saved reports, filters, direct values and both export formats re-evaluate current permissions.
+  const reportSpec = { expected_version: 0, name: 'Role scoped contract', sharing: 'shared', scope: { record_scope: 'job', record_ids: [job.id] }, filters: [], selected_columns: ['native.contract'] }
+  r = await api('/reports/views', { method: 'POST', body: reportSpec }); assert.equal(r.status, 201); const financialView = r.value.view
+  r = await api('/reports/views', { method: 'POST', body: { ...reportSpec, name: 'Role scoped status', selected_columns: ['native.stage'] } }); assert.equal(r.status, 201); const statusView = r.value.view
+  const field = async (name, type, version) => { const result = await api('/reports/fields', { method: 'POST', body: { expected_version: version, record_scope: 'job', name, type, required_at_stages: [] } }); assert.equal(result.status, 201); return result.value.fields.at(-1).id }
+  const moneyField = await field('Private margin', 'money', 0), noteField = await field('Permit note', 'text', 1)
+  assert.equal((await api(`/reports/values/job/${job.id}`, { method: 'PUT', body: { expected_version: 0, values: { [moneyField]: { amount_cents: 271828, currency: 'USD' }, [noteField]: 'Reviewed permit' } } })).status, 200)
+  await updateManager({ permissions: { budgets: { view: false }, reports: { edit: true } }, financial_visible: false })
+  for (const ending of ['', '/export.csv', '/export.pdf']) assert.equal((await f.request(`/api/plinth/reports/views/${financialView.id}${ending}`, { cookie: office })).status, 404)
+  assert.ok(!(await api('/reports/views', { cookie: office })).value.views.some(row => row.view.id === financialView.id))
+  r = await api('/reports/records?record_scope=job', { cookie: office }); assert.equal(r.status, 200)
+  assert.ok(r.value.records.every(record => !('native.contract' in record.values) && !(moneyField in record.values)))
+  assert.ok(!r.value.records.some(record => record.id === other.id)); assert.ok(!r.value.columns.some(column => column.id === 'native.contract'))
+  assert.equal((await api('/reports/query', { method: 'POST', cookie: office, body: { ...reportSpec, selected_columns: ['native.stage'], filters: [{ column_id: moneyField, operator: 'is_set' }] } })).status, 400)
+  r = await api(`/reports/values/job/${job.id}`, { method: 'PUT', cookie: office, body: { expected_version: 1, values: { [noteField]: 'Updated permit' } } }); assert.equal(r.status, 200); assert.equal(r.value.record.values[moneyField], undefined)
+  assert.equal((await api(`/reports/values/job/${job.id}`, { method: 'PUT', cookie: office, body: { expected_version: 2, values: { [moneyField]: null } } })).status, 403)
+  assert.equal((await api(`/reports/values/job/${job.id}`)).value.record.values[moneyField].amount_cents, 271828, 'A permitted edit preserves private values')
+  for (const format of ['csv', 'pdf']) {
+   const download = await f.request(`/api/plinth/reports/views/${statusView.id}/export.${format}`, { cookie: office }); assert.equal(download.status, 200)
+   let text
+   if (format === 'pdf') {
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs'), task = getDocument({ data: new Uint8Array(await download.arrayBuffer()), useSystemFonts: true }), pdf = await task.promise
+    try { text = (await Promise.all(Array.from({ length: pdf.numPages }, async (_, index) => (await (await pdf.getPage(index + 1)).getTextContent()).items.map(item => item.str).join(' ')))).join(' ').replace(/\s+/g, ' '); assert.match(text, /Role scoped status/); assert.match(text, /Record scope: job/); assert.match(text, /Matched records: 1/); assert.match(text, /Roles Street build/); assert.match(text, /Job status/); assert.match(text, /active/) } finally { await task.destroy() }
+   } else text = await download.text()
+   assert.ok(!text.includes('271828') && !text.includes(other.name) && !text.includes('native.contract')); assert.match(download.headers.get('content-type'), format === 'pdf' ? /application\/pdf/ : /text\/csv/)
+  }
+  await updateManager({ permissions: { budgets: { view: true } }, financial_visible: true })
+  assert.equal((await f.request(`/api/plinth/reports/views/${financialView.id}/export.pdf`, { cookie: office })).status, 200)
+  assert.equal((await f.request(`/api/plinth/reports/views/${statusView.id}/export.pdf`, { cookie: lead })).status, 403)
+
   // Turning budget view on, and financial visibility, applies on the next request; the audit history names each change.
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, permissions: { budgets: { view: true } }, financial_visible: true } })).status, 200)
   seen = await view(lead); assert.ok(seen.budgets.length, 'The next request shows the budget')
@@ -358,6 +396,27 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   r = await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'project_manager', name: 'Sneaky Manager' } }); assert.equal(r.status, 403); assert.equal(r.value.error, 'escalation'); assert.match(r.value.message, /You cannot grant/)
   assert.equal((await api('/roles', { method: 'POST', cookie: jr, body: { copy_of: 'administrator', name: 'Another Junior Admin', permissions: { invoices: { approve: false }, budgets: { view: false }, bills: { approve: false } } } })).status, 201, 'Narrower copies are allowed')
   assert.equal((await api(`/jobs/${job.id}/invoices/none/issue`, { method: 'POST', cookie: jr, body: { expected_version: job.version } })).status, 403, 'The Junior Admin cannot approve invoices')
+  // Both the sending person's approval and the recipient's current financial grant fence email delivery.
+  let noticeJob = (await api('/jobs', { method: 'POST', body: { name: 'Recipient permission renovation', client_email: people.junior.email, address: '44 Pine Street' } })).value.job
+  const notify = async (path, input = {}, cookie = f.owner) => { const result = await api(`/jobs/${noticeJob.id}${path}`, { method: 'POST', cookie, body: { expected_version: noticeJob.version, ...input } }); noticeJob = (await api(`/jobs/${noticeJob.id}`)).value.job; return result }
+  assert.equal((await notify('/quotes', { lines: [{ id: 'work', description: 'Reviewed work', cost_code: '06-100', phase: 'Framing', category: 'labor', quantity: '1', unit: 'job', unit_cents: 100000, cost_unit_cents: 60000 }] })).status, 200)
+  const rate = (await api('/pricing-rates')).value.rates[0], pricing = { basis: 'sell', as_of: '2026-10-23', rules: [], tax: { rate_id: rate.id, taxable_line_ids: ['work'] } }
+  r = await notify('/pricing/preview', pricing); assert.equal(r.status, 200); assert.equal((await notify('/pricing/apply', { ...pricing, digest: r.value.preview.digest })).status, 200)
+  assert.equal((await notify(`/quotes/${noticeJob.quotes.at(-1).id}/accept`, { method: 'signed', evidence: 'Synthetic accepted exact priced scope', schedule_choice: { kind: 'none', reason: 'Separately planned' } })).status, 200)
+  assert.equal((await notify('/sov')).status, 200)
+  r = await notify('/invoices', { kind: 'deposit', description: 'Private deposit request', amount_cents: 10000, recipient_email: people.junior.email, due_on: '2026-11-01', terms: 'Recorded terms' }); assert.equal(r.status, 200, JSON.stringify(r.value)); const noticeInvoice = r.value.record.id
+  assert.equal((await notify(`/invoices/${noticeInvoice}/issue`)).status, 200)
+  let messageCount = f.messages.length
+  assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true }, jr)).status, 403); assert.equal(f.messages.length, messageCount)
+  let juniorRole = (await api('/roles')).value.roles.find(role => role.id === junior.id)
+  r = await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, financial_visible: false } }); assert.equal(r.status, 200); juniorRole = r.value.role
+  for (const path of [`/jobs/${noticeJob.id}/invoices/${noticeInvoice}/document.json`, `/jobs/${job.id}/orders/${small}/document`]) assert.equal((await api(path, { cookie: jr })).status, 403, 'Direct pricing artifacts obey financial revocation')
+  assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true })).status, 403); assert.equal(f.messages.length, messageCount); assert.equal(noticeJob.invoices[0].delivery, undefined)
+  assert.deepEqual((await api(`/jobs/${job.id}`, { cookie: jr })).value.job.orders, [], 'A role without financial visibility receives no PO pricing')
+  r = await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, financial_visible: true, permissions: { invoices: { view: false } } } }); assert.equal(r.status, 200); juniorRole = r.value.role
+  assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true })).status, 403); assert.equal(f.messages.length, messageCount)
+  assert.equal((await api(`/roles/${junior.id}`, { method: 'PUT', body: { expected_version: juniorRole.version, permissions: { invoices: { view: true } } } })).status, 200)
+  assert.equal((await notify(`/invoices/${noticeInvoice}/send`, { confirm: true })).status, 200); assert.equal(f.messages.length, messageCount + 1); assert.equal(f.messages.at(-1).to[0], people.junior.email)
   assert.equal((await api(`/jobs/${job.id}/orders`, { method: 'POST', cookie: jr, body: { expected_version: job.version, supplier: 'x', description: 'x', amount_cents: 100 } })).status, 200, 'The same role still creates POs')
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'DELETE', body: { expected_version: carpenter.version + 1 } })).status, 409, 'A role in use is not deleted')
  } finally { await f.close() }

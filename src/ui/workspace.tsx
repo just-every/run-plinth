@@ -24,6 +24,7 @@ export function Workspace() {
   const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
   const create = useRef<HTMLElement>(null)
   const [totals, setTotals] = useState<CurrencyTotal[]>([])
+  const [matches, setMatches] = useState<Job[]>([])
   async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setTotals(result.currency_totals ?? []); setRole(result.role); setRoleName(result.role_name ?? ''); setReady(true) }
   useEffect(() => { const job = new URLSearchParams(window.location.search).get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
@@ -31,7 +32,14 @@ export function Workspace() {
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
   const go = (to: View) => { setView(to); setSelected(''); setMenu(false); if (to === 'jobs') refresh() }
   const open = (id: string) => { const url = new URL(window.location.href); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
-  const words = query.trim().toLowerCase(), shown = words ? jobs.filter(j => [j.name, j.client_email, j.address].join(' ').toLowerCase().includes(words)) : jobs
+  const words = query.trim()
+  useEffect(() => {
+    if (!words) return
+    let current = true
+    const timer = setTimeout(() => api('/search?q=' + encodeURIComponent(words)).then(result => { if (current) setMatches(result.results.map((result: { job: Job }) => result.job)) }).catch(e => { if (current) { setMatches([]); setError(e.message) } }), 200)
+    return () => { current = false; clearTimeout(timer) }
+  }, [words])
+  const shown = words ? matches : jobs
   if (!ready) return <div className="workspace is-loading">{error ? <p role="alert" className="error">{error}</p> : <p role="status">Opening your workspace…</p>}</div>
   return <div className="workspace">
     <Rail view={view} role={role} roleName={roleName} me={me} jobs={jobs} selected={selected} open={menu} onView={go} onJob={open} onClose={() => setMenu(false)} />

@@ -20,7 +20,7 @@ export function Jobs({ jobs, totals, all, query, manager, role, create, onOpen, 
     {manager && <NewJob create={create} onCreated={onCreated} onOpen={onOpen} />}
     {manager && totals.length > 0 && <CurrencyTotals totals={totals} />}
     {all === 0 ? <section className="card empty-state"><span className="empty-icon" aria-hidden="true"><Icon name="folder" /></span><h2>{manager ? 'Start with an agreed job' : 'No jobs shared yet'}</h2><p>{manager ? 'Create the job, prepare its quote, then record the client’s acceptance.' : 'Your builder must use your sign-in email as the client on the job.'}</p></section>
-      : jobs.length === 0 ? <section className="card empty-state"><h2>No jobs match “{query}”</h2><p>Search looks at job names, clients and addresses.</p></section>
+      : jobs.length === 0 ? <section className="card empty-state"><h2>No jobs match “{query}”</h2><p>Search covers the job details and records your current role can view.</p></section>
       : <ul className="job-grid" aria-label="Jobs">{jobs.map(job => {
         const times = job.schedules.filter(s => s.status === 'booked').flatMap(s => [Date.parse(s.start), Date.parse(s.end)]), first = Math.min(...times), last = Math.max(...times)
         const next = [...job.schedules].filter(s => s.status === 'booked' && Date.parse(s.end) >= now).sort((a, b) => a.start.localeCompare(b.start))[0], mine = limited(role) ? 0 : waiting(job, manager).filter(w => !w.onClient).length

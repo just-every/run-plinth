@@ -1,6 +1,5 @@
 import type { Actor, Job } from './model'
 import type { Feature } from './role-model'
-import { projectEstimateCosts } from './estimate-report'
 
 /**
  * ROLE-002: what a job shows an estimator, superintendent or crew member. The view is built from an allow-list, so a
@@ -38,6 +37,9 @@ export function permissionView(job: Job, actor: Actor): Job {
  if (!can('company')) drop('customer_id', 'property_id', 'client_contact_ids', 'portal_features', 'portal_policy', 'import_evidence')
  if (!can('leads') && !can('estimates') && !can('invoices')) { out.client_email = ''; drop('client_name') }
  drop('todos')
- if (!p.financial) { out.quotes = projectEstimateCosts(out.quotes); out.approvals = []; out.claims = (out.claims as Job['claims']).map(claim => ({ ...claim, sov: undefined })) }
+ if (!p.financial) {
+  out.quotes = []; out.variations = []; out.orders = []; out.claims = []; out.invoices = []; out.approvals = []
+  drop('selections', 'subcontracts', 'portal_submissions', 'remittances', 'retainage', 'retainage_balance', 'sov', 'invoice_deposit_liability_cents', 'bid_comparisons', 'bid_cost_adjustments', 'bid_comparison_awards')
+ }
  return out as unknown as Job
 }

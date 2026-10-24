@@ -11,6 +11,7 @@ const id = '[^/]+'
 const rule = (method: string, path: string): Rule => [method, new RegExp(`^${path}$`)]
 /** Own work for every internal preset: assigned jobs, published plans, photos, to-do items assigned to the person, and the punch list to read. */
 const common: Rule[] = [
+ rule('GET', 'search'),
  rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/forecast`),
  rule('GET', `jobs/${id}/takeoff-files/${id}`), rule('GET', `jobs/${id}/diary/${id}/attachments/${id}`),
  rule('GET', 'todos'), rule('GET', 'todos/preferences'), rule('POST', 'todos/preferences'), rule('GET', `jobs/${id}/todos`), rule('GET', `jobs/${id}/todos/${id}`), rule('POST', `jobs/${id}/todos/${id}/(?:complete|reopen|comment)`),

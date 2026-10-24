@@ -7,8 +7,8 @@ import { homedir, userInfo } from 'node:os'
 import { resolve, join } from 'node:path'
 import { createServer } from 'node:net'
 
-const name = process.argv[2]
-assert.ok(['punch','handover','bids','todos','bid-comparison','portal-rights','role-field','audit','role-custom','field-day'].includes(name), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights, role-field, audit, role-custom or field-day')
+const names = process.argv.slice(2), name = names.join('-')
+assert.ok(names.length && names.every(name => ['punch','handover','bids','todos','bid-comparison','portal-rights','role-field','audit','role-custom','field-day'].includes(name)), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights, role-field, audit, role-custom or field-day')
 assert.ok(!existsSync('.dev.vars') && !existsSync('.wrangler/state'), 'Use a fresh disposable checkout; this runner never resets an existing installation')
 const screenshotRoot = process.env.PLINTH_SCREENSHOTS_ROOT ?? join(homedir(), '.cache', 'plinth-journeys')
 await mkdir(screenshotRoot, {recursive:true})
@@ -40,9 +40,11 @@ try {
  const ready=await new Promise((resolve,reject)=>{bootstrap.once('error',reject);bootstrap.once('exit',code=>resolve(code))})
  assert.equal(ready,0,'The native setup browser uses the real HOME and completes')
  console.log('Fresh synthetic installation ready; private sign-in links withheld')
- const journey = spawn(process.execPath,[`tests/journeys/${name}.mjs`],{env,stdio:'inherit'})
- const result = await new Promise((resolve,reject)=>{journey.once('error',reject);journey.once('exit',code=>resolve(code))})
- assert.equal(result,0,'The installed public journey passes')
+ for (const name of names) {
+  const journey = spawn(process.execPath,[`tests/journeys/${name}.mjs`],{env,stdio:'inherit'})
+  const result = await new Promise((resolve,reject)=>{journey.once('error',reject);journey.once('exit',code=>resolve(code))})
+  assert.equal(result,0,'The installed public journey passes: '+name)
+ }
  console.log('PLINTH_SCREENSHOTS='+screenshots)
 } finally {
  signal('SIGTERM')

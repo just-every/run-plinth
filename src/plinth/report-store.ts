@@ -1,7 +1,7 @@
-import { DomainError, find, need, stamp, text, type Actor, type Input, type Job } from './model'
+import { DomainError, find, need, object, stamp, text, type Actor, type Input, type Job } from './model'
 import { readClock, transaction } from './store'
 import { parseFieldDefinition, parseFieldValues, requireFieldsAtStage, validateFieldDefinitions, type ReportFieldDefinition, type ReportRecordScope } from './report-field-model'
-import { financialId, reportRecords } from './report-records'
+import { financialId, reportColumns, reportRecordView, reportRecords } from './report-records'
 
 export async function fieldConfig(db: D1Database) {
  const row = await db.prepare('SELECT version,data FROM pl_report_config WHERE id=1').first<{version:number;data:string}>()
@@ -23,11 +23,14 @@ export async function saveField(db: D1Database, actor: Actor, input: Input) {
 export async function saveValues(db:D1Database,actor:Actor,scope:ReportRecordScope,id:string,input:Input) {
  const clock=await readClock(db), config=await fieldConfig(db), record=find(await reportRecords(db,actor,scope),id)
  need(input.expected_version===record.version,'Custom values changed; reload',409,'stale_version')
- const previous=Object.fromEntries(Object.entries(record.values).filter(([key])=>!key.startsWith('native.'))), values=parseFieldValues(input.values,config.fields,scope,record.currency,previous)
+ const stored=await db.prepare('SELECT data FROM pl_report_values WHERE record_scope=? AND record_id=?').bind(scope,id).first<{data:string}>()
+ const previous=JSON.parse(stored?.data??'{}'), columns=reportColumns(config.fields,scope,actor)
+ if(actor.permissions)for(const key of Object.keys(object(input.values)))need(columns.some(column=>column.id===key),'Unknown or unavailable custom field',403,'forbidden')
+ const values=parseFieldValues(input.values,config.fields,scope,record.currency,previous)
  const stage=input.stage===undefined?record.stage:text(input.stage,'stage',80);need(stage.length>0&&stage.length<=80,'Stage must contain one to 80 characters')
  requireFieldsAtStage(config.fields,scope,stage,values)
  await transaction(db,actor,null,[db.prepare('INSERT INTO pl_report_values(record_scope,record_id,job_id,version,stage,data) VALUES(?,?,?,?,?,?) ON CONFLICT(record_scope,record_id) DO UPDATE SET version=excluded.version,stage=excluded.stage,data=excluded.data').bind(scope,id,record.job_id??null,record.version+1,stage,JSON.stringify(values)),reportAudit(db,actor,'values',{id,scope,version:record.version,field_ids:Object.keys(previous)},{id,scope,version:record.version+1,field_ids:Object.keys(values)})],clock)
- return {...record,version:record.version+1,stage,values:{...record.values,...values}}
+ return reportRecordView({...record,version:record.version+1,stage,values:{...record.values,...values}},columns)
 }
 /** Real native lifecycle boundaries consult the same definitions as named custom stage transitions. */
 export async function reportNativeGate(db:D1Database,job:Job,actor:Actor,category:string,id?:string,action?:string) {

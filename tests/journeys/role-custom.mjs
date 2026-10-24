@@ -38,6 +38,26 @@ try{
  await capture(leadPage,'lead-carpenter',async()=>{await expect(leadPage.getByText('Lead Carpenter – no financials',{exact:true}).first()).toBeVisible();await expect(leadPage.getByText('Contract $',{exact:false})).toHaveCount(0);await expect(leadPage.getByRole('navigation',{name:'Job sections'}).getByRole('button',{name:'Billing'})).toHaveCount(0)})
  const read=async()=>(await call('get','/jobs/'+job.id,undefined,contexts[1])).value.job
  assert.equal((await read()).budgets,undefined,'No budget before it is switched on')
+ // Search uses the current projection, including the same feature restrictions as the open job.
+ await leadPage.goto(base+'/app');await leadPage.getByRole('searchbox',{name:'Search jobs'}).fill('Framing')
+ await expect(leadPage.getByRole('heading',{name:'No jobs match “Framing”'})).toBeVisible()
+ await capture(leadPage,'hidden-search',async()=>{await expect(leadPage.getByRole('heading',{name:'No jobs match “Framing”'})).toBeVisible()})
+ await officePage.goto(base+'/app');await officePage.getByRole('searchbox',{name:'Search jobs'}).fill('Framing')
+ await expect(officePage.locator('.job-grid .job-name',{hasText:job.name})).toBeVisible()
+ await capture(officePage,'authorized-search')
+ // Existing Reports controls open the exact scoped CSV and PDF, and revocation removes a financial saved view.
+ const reportSpec={expected_version:0,name:'Assigned job contract',sharing:'shared',scope:{record_scope:'job',record_ids:[job.id]},filters:[],selected_columns:['native.stage','native.contract']}
+ const saved=await call('post','/reports/views',reportSpec);assert.equal(saved.status,201)
+ await officePage.getByRole('searchbox',{name:'Search jobs'}).fill('');await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click()
+ await officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true}).click();await expect(officePage.getByRole('link',{name:'Download scoped PDF'})).toBeVisible()
+ for(const format of ['CSV','PDF']){const path=await officePage.getByRole('link',{name:'Download scoped '+format}).getAttribute('href'),download=await contexts[2].request.get(base+path);assert.equal(download.status(),200)}
+ await capture(officePage,'scoped-report',async()=>{await expect(officePage.getByRole('region',{name:'Saved view results'})).toBeVisible()})
+ await officePage.setViewportSize({width:390,height:1000});const menu=officePage.getByRole('button',{name:'Open menu',exact:true});await menu.focus();assert.equal(await menu.evaluate(el=>getComputedStyle(el,'::after').visibility),'visible','Icon tooltip appears on keyboard focus')
+ const officeRole=(await call('get','/roles')).value.roles.find(r=>r.name==='Office Manager')
+ const hidden=await call('put','/roles/'+officeRole.id,{expected_version:officeRole.version,financial_visible:false});assert.equal(hidden.status,200)
+ await officePage.reload();await officePage.locator('summary',{hasText:'Custom fields and saved views'}).click();await expect(officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true})).toHaveCount(0)
+ await capture(officePage,'financial-report-revoked',async()=>{await expect(officePage.getByRole('button',{name:'Assigned job contract · shared',exact:true})).toHaveCount(0)})
+ assert.equal((await call('put','/roles/'+officeRole.id,{expected_version:hidden.value.role.version,financial_visible:true})).status,200)
  const roles=(await call('get','/roles')).value.roles,carpenter=roles.find(r=>r.name.startsWith('Lead Carpenter'))
  assert.equal((await call('put','/roles/'+carpenter.id,{expected_version:carpenter.version,permissions:{budgets:{view:true}},financial_visible:true})).status,200)
  assert.ok((await read()).budgets.length,'The next request shows the budget once it is switched on')

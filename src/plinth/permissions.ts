@@ -24,15 +24,20 @@ const approving = new Set(['accept', 'issue', 'send', 'approve', 'publish', 'rel
 const common = [/^jobs$/, /^jobs\/[^/]+$/, /^todos(?:\/.*)?$/, /^jobs\/[^/]+\/todos(?:\/.*)?$/]
 const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
 export function requirement(method: string, relative: string): Requirement | 'common' | null {
+ if (method === 'GET' && relative === 'search') return 'common'
  if (method === 'GET' && common.some(rule => rule.test(relative)) || common.slice(2).some(rule => rule.test(relative))) return 'common'
  const parts = relative.split('/').filter(Boolean), job = parts[0] === 'jobs' && parts[1]
+ if (parts[0] === 'reports' && method === 'POST' && parts.length === 2) {
+  if (parts[1] === 'query') return { feature: 'reports', action: 'view' }
+  if (parts[1] === 'fields' || parts[1] === 'views') return { feature: 'reports', action: 'create' }
+ }
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
  const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = feature[category]
  if (!area) return null
  const verbs = rest.slice(1).filter(part => !isId(part)), verb = verbs.at(-1) ?? ''
- const financial = /cost-codes\.(?:json|csv)$/.test(relative) || area === 'estimates' && ['pricing-rates', 'pricing'].includes(category) && method !== 'GET'
+ const financial = (['estimates', 'budgets', 'bills', 'orders', 'changes', 'selections', 'invoices'] as Feature[]).includes(area)
  if (category === 'schedule-actuals' && method === 'POST') return { feature: 'schedule', action: 'edit' }
  const collection = !verb && method === 'POST' && (!rest.slice(1).some(isId) || !job && category === 'bids' && rest.length === 2)
  const action: Action = method === 'GET' ? 'view' : method === 'DELETE' ? 'delete' : verb === 'preview' || verb === 'plan-preview' ? 'view' : approving.has(verb) ? 'approve' : collection ? 'create' : 'edit'
