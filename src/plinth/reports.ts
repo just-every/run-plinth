@@ -73,7 +73,7 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
   need(parts[3]==='export.csv'||parts[3]==='export.pdf','Unknown report route',404,'not_found')
   const pdf=parts[3]==='export.pdf',format=pdf?'pdf':'csv',content=pdf?reportPdf(report,saved.view.name):reportCsv(report)
   await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{view_id:saved.view.id,format,annotation:report.annotation,selected_columns:report.columns})])
-  return new Response(content,{headers:{...headers,'content-type':pdf?'application/pdf':'text/csv; charset=utf-8','content-disposition':`attachment; filename=plinth-scoped-view.${format}`}})
+  return new Response(content,{headers:{...headers,'content-type':pdf?'application\u002fpdf':'text\u002fcsv; charset=utf-8','content-disposition':`attachment; filename=plinth-scoped-view.${format}`}})
  }
  need(false,'Unknown report route',404,'not_found')
 }
