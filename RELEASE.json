@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "previousVersion": null,
-  "publicReleaseNotes": "Prepare Plinth for hosted installation on rer 0.2.80 with a digest-bound setup manifest, a deployment specification, Managed mail and retained source provenance. Native release publication remains a separate round.",
+  "publicReleaseNotes": "Prepare Plinth for hosted installation with a digest-bound setup form, all current database migrations, Managed mail and retained source provenance. Installation guidance uses the public run-site origin.",
   "migrations": [
     "migrations/core/0001_owner.sql",
     "migrations/core/0002_outbox.sql",
@@ -40,5 +40,5 @@
     "migrations/core/202610250900_native_connectors.sql"
   ],
   "breaking": false,
-  "agentUpdateInstructions": "Install the exact source and locked dependencies, review the declared mail provider setup, and preserve applied migration bytes. No native release or tag is produced by this preparation."
+  "agentUpdateInstructions": "Install the exact source and locked dependencies, review the declared mail provider setup, and preserve every applied migration name and byte. Keep a private archive before updating; configure the receiving owner and mail settings separately when restoring into a new installation."
 }
