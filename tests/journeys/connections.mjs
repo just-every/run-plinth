@@ -49,7 +49,10 @@ try {
  const denied = await context.request.post(base+`/api/plinth/connections/${connection.subscription.id}/deliver/${events[0].id}`, {headers: {origin: base}, data: {confirm: false}})
  assert.equal(denied.status(), 400)
  await post(`/connections/${connection.subscription.id}/revoke`)
- await page.reload(); await page.getByRole('button', {name: 'Audit history', exact: true}).click()
+ await page.reload()
+ const initialAudit = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plinth/audit' && !new URL(response.url()).searchParams.has('q'))
+ await page.getByRole('button', {name: 'Audit history', exact: true}).click(); assert.equal((await initialAudit).status(), 200)
+ await expect(page.getByRole('table')).toBeVisible()
  await page.getByLabel('Search', {exact: true}).fill(connection.subscription.id)
  const filtered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plinth/audit' && new URL(response.url()).searchParams.get('q') === connection.subscription.id)
  await page.getByRole('button', {name: 'Search history', exact: true}).click(); assert.equal((await filtered).status(), 200)
@@ -73,7 +76,14 @@ try {
    await expect(close).toBeInViewport(); await checkTooltip(close); await close.click()
    await expect(close).not.toBeInViewport(); await checkTooltip(menu)
   }
+  await expect(page.getByText('connector.consent', {exact: true})).toHaveCount(1)
+  await expect(page.getByText('connector.revoke', {exact: true})).toHaveCount(1)
+  await expect(page.locator('tbody tr')).toHaveCount(2)
   await page.screenshot({path: `${shots}/INT-009-audit-${width}.png`, fullPage: true, animations: 'disabled'})
+  if (width === 390) {
+   await page.locator('.table-scroll').evaluate(el => { el.scrollLeft = el.scrollWidth })
+   await page.screenshot({path: `${shots}/INT-009-audit-owner-${width}.png`, fullPage: true, animations: 'disabled'})
+  }
  }
  const history = (await (await context.request.get(base+'/api/plinth/audit?action=connector.attempt')).json()).events
  assert.equal(history.length, 0, 'No unconsented outbound attempt was created')
