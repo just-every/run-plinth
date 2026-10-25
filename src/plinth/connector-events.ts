@@ -7,5 +7,5 @@ export function connectorEvents(db: D1Database, actor: Actor, job: Job): D1Prepa
  if (/\/(variations|changes|invoices|claims|orders|remittances|costs|retainage)(\/|$)/.test(path)) types.push('financial.updated')
  if (/\/(approve|accept|sign|issue)$/.test(path)) types.push('decision.approved')
  if (/\/variations\/[^/]+\/approve$/.test(path)) types.push('change.approved')
- return types.map(type => db.prepare('INSERT INTO pl_connector_events(id,job_id,job_version,type,subject_id,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), job.id, job.version, type, subject, new Date().toISOString()))
+ return types.flatMap(type => { const id = crypto.randomUUID(); return [db.prepare('INSERT INTO pl_connector_events(id,job_id,job_version,type,subject_id,created_at) VALUES(?,?,?,?,?,?)').bind(id, job.id, job.version, type, subject, new Date(Date.now()).toISOString()), db.prepare('INSERT INTO pl_connector_event_order(event_id) VALUES(?)').bind(id)] })
 }

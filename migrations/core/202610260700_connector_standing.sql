@@ -14,3 +14,9 @@ ALTER TABLE pl_connector_deliveries ADD COLUMN consent_grant_id TEXT;
 ALTER TABLE pl_connector_deliveries ADD COLUMN mode TEXT NOT NULL DEFAULT 'manual';
 ALTER TABLE pl_connector_deliveries ADD COLUMN retry_at TEXT;
 CREATE INDEX pl_connector_event_attempts ON pl_connector_deliveries(subscription_id,event_id,started_at);
+-- A durable sequence cannot reuse an erased event's position at the grant boundary.
+CREATE TABLE pl_connector_event_order (
+ sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+ event_id TEXT NOT NULL UNIQUE REFERENCES pl_connector_events(id) ON DELETE CASCADE
+);
+INSERT INTO pl_connector_event_order(event_id) SELECT id FROM pl_connector_events ORDER BY rowid;

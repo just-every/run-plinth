@@ -167,7 +167,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
     for(const exported of [original,restored]){
       assert.ok(!JSON.stringify(exported).includes(connector.value.signing_key),'INT-009 signing keys never enter a portable archive')
-      assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_api_limits'].includes(table.name)),'INT-009 and INT-014 live receiver and standing-grant authority are excluded from restoration')
+      assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits'].includes(table.name)),'INT-009 and INT-014 live receiver and standing-grant authority are excluded from restoration')
       assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
     }
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records

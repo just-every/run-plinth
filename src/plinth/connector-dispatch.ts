@@ -26,12 +26,12 @@ async function expireLease(db: D1Database, row: Subscription) {
  ])
 }
 async function nextEvent(db: D1Database, row: Subscription) {
- return db.prepare(`SELECT e.* FROM pl_connector_events e JOIN pl_jobs j ON j.id=e.job_id
- WHERE e.rowid>? AND e.job_id IN (SELECT value FROM json_each(?)) AND e.type IN (SELECT value FROM json_each(?))
+ return db.prepare(`SELECT e.* FROM pl_connector_events e JOIN pl_connector_event_order q ON q.event_id=e.id JOIN pl_jobs j ON j.id=e.job_id
+ WHERE q.sequence>? AND e.job_id IN (SELECT value FROM json_each(?)) AND e.type IN (SELECT value FROM json_each(?))
  AND e.type IN (SELECT value FROM json_each(?))
  AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries d WHERE d.subscription_id=? AND d.event_id=e.id AND d.status='accepted')
  AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries d WHERE d.subscription_id=? AND d.event_id=e.id AND (d.status='sending' OR d.retry_at>?))
- ORDER BY e.rowid LIMIT 1`).bind(row.grant_after, row.job_ids, row.event_types, row.grant_event_types, row.id, row.id, instant()).first<ConnectorEvent>()
+ ORDER BY q.sequence LIMIT 1`).bind(row.grant_after, row.job_ids, row.event_types, row.grant_event_types, row.id, row.id, instant()).first<ConnectorEvent>()
 }
 async function dispatchOne(env: Bindings, row: Subscription) {
  const db = env.DB
@@ -46,8 +46,8 @@ async function dispatchOne(env: Bindings, row: Subscription) {
  // The lease, current authority, grant scope and rolling cap commit with audited consent.
  await db.batch([
   db.prepare(`INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(${activeCredentialSql}) AND EXISTS(
-   SELECT 1 FROM pl_connector_subscriptions s JOIN pl_connector_events e ON e.id=? JOIN pl_jobs j ON j.id=e.job_id
-   WHERE s.id=? AND ${liveSql()} AND e.rowid>s.grant_after
+   SELECT 1 FROM pl_connector_subscriptions s JOIN pl_connector_events e ON e.id=? JOIN pl_connector_event_order q ON q.event_id=e.id JOIN pl_jobs j ON j.id=e.job_id
+   WHERE s.id=? AND ${liveSql()} AND q.sequence>s.grant_after
    AND e.job_id IN (SELECT value FROM json_each(s.job_ids)) AND e.type IN (SELECT value FROM json_each(s.event_types))
    AND e.type IN (SELECT value FROM json_each(s.grant_event_types)) AND ${capSql}
    AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries d WHERE d.subscription_id=s.id AND d.event_id=e.id AND (d.status='accepted' OR d.retry_at>?))
@@ -72,7 +72,7 @@ async function dispatchOne(env: Bindings, row: Subscription) {
 export async function dispatchConnectors(env: Bindings) {
  const rows = await env.DB.prepare(`SELECT s.* FROM pl_connector_subscriptions s WHERE s.grant_id IS NOT NULL AND s.revoked_at IS NULL
  AND s.grant_revoked_at IS NULL AND s.paused_at IS NULL AND s.grant_expires_at>? AND ${capSql}
- AND EXISTS(SELECT 1 FROM pl_connector_events e WHERE e.rowid>s.grant_after AND e.job_id IN (SELECT value FROM json_each(s.job_ids))
+ AND EXISTS(SELECT 1 FROM pl_connector_events e JOIN pl_connector_event_order q ON q.event_id=e.id WHERE q.sequence>s.grant_after AND e.job_id IN (SELECT value FROM json_each(s.job_ids))
  AND e.type IN (SELECT value FROM json_each(s.grant_event_types)) AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries d WHERE d.subscription_id=s.id AND d.event_id=e.id AND d.status='accepted')
  AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries d WHERE d.subscription_id=s.id AND d.event_id=e.id AND (d.retry_at>? OR d.status='sending' AND d.started_at>?)))
  ORDER BY s.id LIMIT 25`).bind(instant(), hourAgo(), instant(), new Date(Date.now() - 60_000).toISOString()).all<Subscription>()
