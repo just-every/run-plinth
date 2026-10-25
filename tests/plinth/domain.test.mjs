@@ -560,7 +560,7 @@ test('INT-014 standing consent sends only future scoped events, enforces its cap
   }
   await approve(await f.update())
   await f.scheduled(); assert.equal(f.received.length, 0, 'A connection alone never authorizes unattended delivery')
-  for (const changes of [{confirm: false}, {origin: 'https://unconfigured.example'}, {rate_cap: 1.5}, {expires_at: new Date(0).toISOString()}]) {
+  for (const changes of [{confirm: false}, {origin: 'https://unconfigured.example'}, {payload_class: 'records'}, {event_types: ['financial.updated']}, {rate_cap: 1.5}, {expires_at: new Date(0).toISOString()}]) {
    const result = await f.post(`/connections/${f.id}/grant`, f.grantBody(changes))
    assert.ok(result.status >= 400 && result.status < 500, JSON.stringify(result.value))
   }
@@ -625,6 +625,9 @@ test('INT-014 scheduled retries retain signed event identity across rotation and
   const rotation = await f.post(`/connections/${f.id}/rotate`, {credential_id: f.credential.id})
   assert.equal(rotation.status, 200); signingKey = rotation.value.signing_key
   await f.advance(2 * 60_000); await f.scheduled(); assert.equal(f.received.length, 2)
+  await f.scheduled(); assert.equal(f.received.length, 2, 'The second failure also waits for its later retry')
+  const waiting = (await f.history()).filter(row => row.retry_at).sort((a,b) => a.started_at.localeCompare(b.started_at))
+  assert.ok(Date.parse(waiting[1].retry_at)-Date.parse(waiting[1].finished_at) > Date.parse(waiting[0].retry_at)-Date.parse(waiting[0].finished_at), 'Repeated failures increase the backoff')
   await f.advance(3 * 60_000); await f.scheduled(); assert.equal(f.received.length, 3)
   assert.equal(new Set(f.received.map(row => row.raw)).size, 1, 'Every retry signs the same event body')
   assert.equal(work.length, 1, 'The receiver deduplicates the work whose acceptance response was lost')
