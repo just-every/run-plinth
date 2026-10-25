@@ -356,7 +356,7 @@ test('FIELD-004 — photo observations retain form revisions, qualified trade re
 // Versioned integration uses a generated client against the same real native Worker.
 test('INT-009 generated client pages scoped jobs and keeps one draft across concurrent replay and key replacement', async () => {
  const {createClient} = await import('../../src/plinth/api-client.mjs')
- const f = await createFixture({now: 1792929600000})
+ const f = await createFixture({now: Date.now()})
  try {
   const clientCookie = await f.invite('client@example.com'), outsider = await f.invite('synthetic-plinth-1@example.com')
   const job = await createActiveJob(f, 'Synthetic Plinth kitchen')
@@ -400,6 +400,8 @@ test('INT-009 approved-change webhooks retain signed receiver-aware replay and d
   const raw = await request.text(), signature = request.headers.get('plinth-signature'), [timestamp, digest] = signature.split(',').map(part => part.split('=')[1])
   const expected = createHmac('sha256', signingKey).update(timestamp+'.'+raw).digest('hex')
   assert.ok(timingSafeEqual(Buffer.from(expected), Buffer.from(digest)))
+  const altered = createHmac('sha256', signingKey).update(timestamp+'.'+raw+' ').digest('hex')
+  assert.ok(!timingSafeEqual(Buffer.from(altered), Buffer.from(digest)), 'Changing the exact body invalidates its installation signature')
   const value = JSON.parse(raw); assert.equal(request.headers.get('plinth-event-id'), value.id)
   received.push(value)
   return new Response(null, {status: refuse ? 503 : 202})
@@ -452,5 +454,95 @@ test('INT-009 approved-change webhooks retain signed receiver-aware replay and d
   assert.equal(received.length, 3)
   assert.equal((await post(`/connections/${connection}/revoke`)).status, 200)
   assert.equal((await f.request(`/api/plinth/connections/${connection}/deliveries`, {cookie: f.owner})).status, 403)
+ } finally { await f.close() }
+})
+
+test('Receiver delivery refuses unsafe configured addresses and never follows redirects', async () => {
+ const {connectorFixture} = await import('./connector-support.mjs')
+ let address = '93.184.216.34', dnsStatus = 0, redirect = false
+ const unsafe = ['http://synthetic-plinth.example', 'https://127.0.0.1', 'https://2130706433', 'https://10.0.0.1', 'https://172.16.0.1', 'https://192.168.1.1', 'https://169.254.169.254', 'https://100.64.0.1', 'https://[::1]', 'https://[::ffff:127.0.0.1]', 'https://[fc00::1]', 'https://localhost']
+ const f = await connectorFixture({webhookOrigins: ['https://synthetic-plinth.example', ...unsafe].join(','), webhookDns: request => Response.json({Status: dnsStatus, Answer: new URL(request.url).searchParams.get('type') === 'A' ? [{type: 1, data: address}] : []}), receive: () => new Response(null, {status: redirect ? 307 : 202, ...(redirect ? {headers: {location: 'https://127.0.0.1/private'}} : {})})})
+ try {
+  for (const receiver of unsafe) assert.equal((await f.post('/connections', {...f.consent, receiver})).status, 403, receiver)
+  assert.equal(f.received.length, 0)
+  address = '10.0.0.1'
+  assert.equal((await f.post('/connections', f.consent)).status, 403, 'A configured hostname resolving privately is refused')
+  assert.equal((await f.deliver()).status, 403, 'Resolution is checked again at send')
+  assert.equal(f.received.length, 0)
+  dnsStatus = 2
+  assert.equal((await f.deliver()).status, 403, 'DNS failure denies delivery')
+  assert.equal(f.received.length, 0)
+  dnsStatus = 0; address = '93.184.216.34'
+  assert.equal((await f.deliver()).value.status, 'accepted')
+  redirect = true
+  assert.equal((await f.deliver()).value.status, 'failed')
+  assert.deepEqual(f.received.map(row => row.url), [f.consent.receiver, f.consent.receiver], 'No request reaches the redirect target')
+ } finally { await f.close() }
+})
+
+test('Receiver credential and scoped job grants must be current and can be explicitly regranted', async () => {
+ const {connectorFixture} = await import('./connector-support.mjs'), f = await connectorFixture()
+ try {
+  assert.equal((await f.deliver()).value.status, 'accepted')
+  assert.equal((await f.post(`/agent-credentials/${f.credential.id}/revoke`)).status, 200)
+  assert.equal((await f.deliver()).status, 403); assert.equal(f.received.length, 1)
+  await f.agent()
+  const replacement = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials.find(row => row.id !== f.credential.id && !row.revoked_at)
+  const regranted = await f.create({credential_id: replacement.id})
+  assert.equal((await f.deliver(regranted.subscription.id)).value.status, 'accepted')
+  assert.equal((await f.post(`/connections/${regranted.subscription.id}/revoke`)).status, 200)
+  assert.equal((await f.deliver(regranted.subscription.id)).status, 403); assert.equal(f.received.length, 2)
+  const other = await createActiveJob(f, 'Oak Street bath')
+  const narrowed = await f.create({credential_id: replacement.id, job_ids: [other.id]})
+  assert.equal((await f.deliver(narrowed.subscription.id)).status, 404); assert.equal(f.received.length, 2)
+  const restored = await f.create({credential_id: replacement.id})
+  assert.equal((await f.deliver(restored.subscription.id)).value.status, 'accepted'); assert.equal(f.received.length, 3)
+ } finally { await f.close() }
+})
+
+test('Receiver payloads disclose references only even when the caller submits a record body', async () => {
+ const {connectorFixture} = await import('./connector-support.mjs'), f = await connectorFixture()
+ try {
+  const result = await f.deliver(undefined, {confirm: true, job: f.job, body: {description: 'Private record body', amount_cents: 123456}})
+  assert.equal(result.value.status, 'accepted')
+  const payload = JSON.parse(f.received[0].raw)
+  assert.deepEqual(payload, {api_version: '1', id: f.event.id, job_id: f.job.id, job_version: f.event.job_version, type: f.event.type, subject_id: f.event.subject_id, created_at: f.event.created_at})
+  for (const privateValue of ['Private record body', '123456', f.job.name, f.job.client_email, f.job.address]) assert.ok(!f.received[0].raw.includes(privateValue))
+ } finally { await f.close() }
+})
+
+test('Every outbound attempt has committed consent naming its owner before the receiver is called', async () => {
+ const {connectorFixture} = await import('./connector-support.mjs'), observations = []
+ const f = await connectorFixture({receive: async (_request, fixture) => {
+  observations.push((await fixture.json('/api/plinth/audit?action=connector.attempt', {cookie: fixture.owner})).value.events)
+  return new Response(null, {status: 202})
+ }})
+ try {
+  for (const confirm of [undefined, false, 'true']) assert.equal((await f.deliver(undefined, {confirm})).status, 400)
+  assert.equal(f.received.length, 0)
+  assert.equal((await f.json('/api/plinth/audit?action=connector.attempt', {cookie: f.owner})).value.events.length, 0)
+  for (let n = 1; n <= 2; n++) {
+   const result = await f.deliver(); assert.equal(result.value.status, 'accepted')
+   assert.equal(observations[n-1].length, n)
+   const audit = observations[n-1].find(row => row.detail.attempt_id === result.value.attempt_id)
+   assert.ok(audit); assert.equal(audit.actor_name, 'Builder'); assert.equal(audit.actor_role, 'owner'); assert.equal(audit.source, 'session'); assert.ok(audit.actor_id)
+   assert.equal(audit.subject_id, f.connection.subscription.id); assert.equal(audit.detail.event_id, f.event.id); assert.equal(audit.detail.consent, true)
+  }
+ } finally { await f.close() }
+})
+
+test('Only the owner session can operate native or versioned receiver controls', async () => {
+ const {connectorFixture} = await import('./connector-support.mjs'), f = await connectorFixture()
+ try {
+  const office = await f.invite('synthetic-plinth-3@example.com', 'Office manager', 'admin'), token = await f.agent()
+  for (const prefix of ['/api/plinth/connections', '/api/plinth/v1/connections']) {
+   for (const credentials of [{cookie: office}, {token}]) {
+    for (const [method, suffix, body] of [['GET', ''], ['POST', '', f.consent], ['GET', `/${f.connection.subscription.id}/events`], ['GET', `/${f.connection.subscription.id}/deliveries`], ['POST', `/${f.connection.subscription.id}/rotate`, {credential_id: f.credential.id}], ['POST', `/${f.connection.subscription.id}/revoke`, {}], ['POST', `/${f.connection.subscription.id}/deliver/${f.event.id}`, {confirm: true}]]) {
+     assert.equal((await f.request(prefix+suffix, {method, body, ...credentials})).status, 403, method+' '+suffix)
+    }
+   }
+  }
+  assert.equal(f.received.length, 0)
+  assert.equal((await f.deliver()).value.status, 'accepted'); assert.equal(f.received.length, 1)
  } finally { await f.close() }
 })

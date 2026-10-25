@@ -1,4 +1,5 @@
 import { apiLimit } from './api-limits'
+import { publicReceiver } from './connector-receiver'
 import { requireOwner } from './auth'
 import { connectorEventTypes } from './connector-events'
 import { jobOf, transaction } from './store'
@@ -12,13 +13,6 @@ const publicSubscription = ({secret: omitted, ...row}: Subscription) => ({...row
 const activeCredentialSql = "SELECT c.id FROM oa_credentials c JOIN oa_operators o ON o.id=c.operator_id WHERE c.id=? AND o.id=? AND o.version=? AND c.operator_version=o.version AND o.role='owner' AND o.status='active' AND c.revoked_at IS NULL AND c.expires_at>?"
 async function active(db: D1Database, row: Subscription) {
  need(!row.revoked_at && await db.prepare(activeCredentialSql).bind(row.credential_id, row.operator_id, row.operator_version, Date.now()).first(), 'Receiver grant is no longer current', 403, 'stale_grant')
-}
-function receiver(env: Bindings, value: unknown) {
- let url: URL
- try { url = new URL(text(value, 'receiver', 2000)) } catch { need(false, 'Enter a valid receiver URL') }
- const allowed = (env.PLINTH_WEBHOOK_ORIGINS ?? '').split(',').filter(Boolean)
- need(url.protocol === 'https:' && !url.username && !url.password && !url.hash && allowed.includes(url.origin), 'Receiver origin must be explicitly configured by the installation owner', 403, 'receiver_origin')
- return url.href
 }
 export async function connectorsResponse(request: Request, env: Bindings, actor: Actor, parts: string[], body: (r: Request) => Promise<Input>): Promise<Response | null> {
  if (parts[0] !== 'connections') return null
@@ -36,7 +30,7 @@ export async function connectorsResponse(request: Request, env: Bindings, actor:
   need(Array.isArray(jobIds) && jobIds.length > 0 && jobIds.length <= 100 && jobIds.every(id => typeof id === 'string'), 'Choose 1 to 100 job IDs')
   need(Array.isArray(types) && types.length > 0 && types.length <= connectorEventTypes.length && types.every(type => connectorEventTypes.includes(type)), 'Choose supported event types')
   for (const id of jobIds) await jobOf(db, actor, id)
-  const row: Subscription = {id: crypto.randomUUID(), operator_id: actor.id, operator_version: actor.version, credential_id: credentialId, receiver: receiver(env, input.receiver), job_ids: JSON.stringify([...new Set(jobIds)]), event_types: JSON.stringify([...new Set(types)]), secret: secret(), generation: 1, revoked_at: null, created_at: new Date().toISOString()}
+  const row: Subscription = {id: crypto.randomUUID(), operator_id: actor.id, operator_version: actor.version, credential_id: credentialId, receiver: await publicReceiver(env, input.receiver), job_ids: JSON.stringify([...new Set(jobIds)]), event_types: JSON.stringify([...new Set(types)]), secret: secret(), generation: 1, revoked_at: null, created_at: new Date().toISOString()}
   await active(db, row)
   await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS('+activeCredentialSql+') THEN 1 ELSE 0 END').bind(credentialId, actor.id, actor.version, Date.now()), db.prepare('INSERT INTO pl_connector_subscriptions(id,operator_id,operator_version,credential_id,receiver,job_ids,event_types,secret,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(row.id, row.operator_id, row.operator_version, row.credential_id, row.receiver, row.job_ids, row.event_types, row.secret, row.created_at)], undefined, {kind: 'permission', action: 'connector.consent', subject_id: row.id})
   return json({subscription: publicSubscription(row), signing_key: row.secret}, 201)
@@ -72,13 +66,13 @@ export async function connectorsResponse(request: Request, env: Bindings, actor:
  if (parts.length === 4 && parts[2] === 'deliver' && method === 'POST') {
   const input = await body(request)
   need(input.confirm === true, 'Explicit consent is required for each outbound attempt')
-  receiver(env, row.receiver)
+  await publicReceiver(env, row.receiver)
   const event = await db.prepare('SELECT * FROM pl_connector_events WHERE id=?').bind(parts[3]).first<{id: string; job_id: string; job_version: number; type: string; subject_id: string | null; created_at: string}>()
   need(event && JSON.parse(row.job_ids).includes(event.job_id) && JSON.parse(row.event_types).includes(event.type), 'Event not available to this receiver', 404, 'not_found')
   await jobOf(db, actor, event.job_id)
   const attempt = crypto.randomUUID(), started = new Date().toISOString()
-  await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS('+activeCredentialSql+') AND EXISTS(SELECT 1 FROM pl_connector_subscriptions WHERE id=? AND generation=? AND revoked_at IS NULL) THEN 1 ELSE 0 END').bind(row.credential_id, row.operator_id, row.operator_version, Date.now(), row.id, row.generation), db.prepare("UPDATE pl_connector_deliveries SET status='unknown',finished_at=? WHERE subscription_id=? AND status='sending' AND started_at<?").bind(started, row.id, new Date(Date.now()-60_000).toISOString()), db.prepare("INSERT INTO pl_connector_deliveries(id,subscription_id,event_id,generation,started_at,status) VALUES(?,?,?,?,?,'sending')").bind(attempt, row.id, event.id, row.generation, started)], undefined, {kind: 'send', action: 'connector.attempt', subject_id: row.id, detail: {event_id: event.id}})
-  const payload = JSON.stringify({api_version: '1', ...event}), timestamp = String(Math.floor(Date.now()/1000))
+  await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS('+activeCredentialSql+') AND EXISTS(SELECT 1 FROM pl_connector_subscriptions WHERE id=? AND generation=? AND revoked_at IS NULL) THEN 1 ELSE 0 END').bind(row.credential_id, row.operator_id, row.operator_version, Date.now(), row.id, row.generation), db.prepare("UPDATE pl_connector_deliveries SET status='unknown',finished_at=? WHERE subscription_id=? AND status='sending' AND started_at<?").bind(started, row.id, new Date(Date.now()-60_000).toISOString()), db.prepare("INSERT INTO pl_connector_deliveries(id,subscription_id,event_id,generation,started_at,status) VALUES(?,?,?,?,?,'sending')").bind(attempt, row.id, event.id, row.generation, started)], undefined, {kind: 'send', action: 'connector.attempt', subject_id: row.id, detail: {event_id: event.id, attempt_id: attempt, consent: true}})
+  const payload = JSON.stringify({api_version: '1', id: event.id, job_id: event.job_id, job_version: event.job_version, type: event.type, subject_id: event.subject_id, created_at: event.created_at}), timestamp = String(Math.floor(Date.now()/1000))
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(row.secret), {name: 'HMAC', hash: 'SHA-256'}, false, ['sign'])
   const signature = [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(timestamp+'.'+payload)))].map(n => n.toString(16).padStart(2, '0')).join('')
   let code: number | null = null, status = 'unknown'
@@ -86,6 +80,7 @@ export async function connectorsResponse(request: Request, env: Bindings, actor:
    // Recheck the live subscription and credential immediately before crossing the network edge.
    const current = await db.prepare('SELECT * FROM pl_connector_subscriptions WHERE id=?').bind(row.id).first<Subscription>()
    need(current && current.generation === row.generation, 'Receiver changed', 409, 'stale_grant'); await active(db, current)
+   await jobOf(db, actor, event.job_id)
    const response = await fetch(row.receiver, {method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10_000), headers: {'content-type': 'application/json', 'plinth-event-id': event.id, 'plinth-signature': `t=${timestamp},v1=${signature}`}, body: payload})
    code = response.status; status = response.ok ? 'accepted' : 'failed'; await response.body?.cancel()
   } catch { status = 'unknown' }
