@@ -1,0 +1,31 @@
+.workspace .connections { font-size: 15px; }
+.workspace .connections summary { cursor: pointer; font-weight: 650; overflow-wrap: anywhere; }
+.workspace .connections > details > summary { font-size: 20px; letter-spacing: -.025em; }
+.workspace .connection-content { display: grid; gap: 16px; padding-top: 16px; }
+.workspace .connection-content > .action { margin-top: 0; justify-self: start; }
+.workspace .connections details > :is(form, dl, p, section, .connection-key, .connection-warning) { margin-top: 14px; }
+.workspace .connection-record { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); }
+.workspace .connection-record > summary > span { display: block; }
+.workspace .connection-record > summary > .muted { margin-top: 4px; font-size: 13.5px; font-weight: 400; }
+.workspace .connection-record > h3 { margin-top: 18px; }
+.workspace .connection-record > details { margin-top: 16px; }
+.workspace .connection-facts { display: grid; gap: 8px; }
+.workspace .connection-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
+.workspace .connection-facts dt { color: var(--muted); }
+.workspace .connection-facts dd, .workspace .connection-attempts p { overflow-wrap: anywhere; }
+.workspace .connection-choices { gap: 8px; }
+.workspace .connection-choices legend { margin-bottom: 8px; font-size: 13.5px; font-weight: 600; }
+.workspace .connection-choices label, .workspace .connection-check { display: flex; align-items: flex-start; gap: 10px; }
+.workspace .connection-choices input, .workspace .connection-check input { flex: none; margin-top: 4px; }
+.workspace .connection-key, .workspace .connection-warning { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--blue-tint); }
+.workspace .connection-key label { margin-top: 10px; }
+.workspace .connection-warning { background: var(--ox-tint); }
+.workspace .connection-warning p + p { margin-top: 6px; }
+.workspace .connection-security > form + form { margin-top: 20px; }
+.workspace .connection-attempts { display: grid; gap: 12px; margin-top: 12px; }
+.workspace .connection-attempts > li { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.workspace .connection-attempts p { margin-top: 4px; font-size: 13.5px; }
+@media (max-width: 600px) {
+ .workspace .connection-record { padding: 12px; }
+ .workspace .connection-facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
