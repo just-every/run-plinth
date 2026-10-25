@@ -3993,7 +3993,7 @@
       "executable": false
     },
     "tests/journeys/connections.mjs": {
-      "sha256": "78aa8f1c4ede0db8545ec93faaf6ef87101bc1e1222c4df9e43c64f5886787bf",
+      "sha256": "64cfec6f48317af9fa0cc810bf1809aedd9fc440157146e0589e72722b952559",
       "executable": false
     },
     "tests/journeys/cost-billing.mjs": {

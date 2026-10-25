@@ -35,8 +35,10 @@ try {
  const job = await createActiveJob(f, 'Maple Street kitchen', 'synthetic-plinth-4@dev.localhost', 2450000)
  const minted = await post('/agent-credentials', {expires_in_seconds: 3600})
  const client = createClient({origin: base, token: minted.credential.token})
- assert.ok((await client.pageJobs({limit: 2})).jobs.some(row => row.id === job.id))
- const draft = await client.prepareChange({job_id: job.id, 'Idempotency-Key': 'synthetic-plinth-journey', body: {expected_version: job.version, description: 'Reviewed cabinet finish draft', amount_cents: 45000}})
+ let after, found = false
+ do { const result = await client.pageJobs({limit: 2, after}); found ||= result.jobs.some(row => row.id === job.id); after = result.next } while (after)
+ assert.ok(found)
+ const draft = await client.prepareChange({job_id: job.id, 'Idempotency-Key': 'synthetic-plinth-journey-'+job.id, body: {expected_version: job.version, description: 'Reviewed cabinet finish draft', amount_cents: 45000}})
  await assert.rejects(client.approveChange({job_id: job.id, change_id: draft.draft.id, body: {expected_version: draft.job.version}}), error => error.status === 403)
  const credential = (await (await context.request.get(base+'/api/plinth/agent-credentials')).json()).credentials.find(row => !row.revoked_at)
  const consent = {credential_id: credential.id, receiver: 'https://example.com/plinth-events', job_ids: [job.id], event_types: ['job.updated'], confirm: true}
@@ -53,12 +55,19 @@ try {
  for (const width of [1440,390]) {
   await page.setViewportSize({width, height: 1000}); await page.evaluate(() => scrollTo(0,0))
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1), 'Audit history fits '+width)
-  for (const control of await page.locator('button.icon-button:visible').all()) {
+  const checkTooltip = async control => {
    const tip = await control.getAttribute('data-tip'); assert.ok(tip && tip.trim().split(/\s+/).length >= 2)
    await control.hover(); await page.waitForTimeout(450)
    assert.equal(await control.evaluate(el => getComputedStyle(el, '::after').opacity), '1')
    await page.mouse.move(250,800); await control.focus(); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab')
    assert.equal(await control.evaluate(el => getComputedStyle(el, '::after').opacity), '1')
+  }
+  if (width === 390) {
+   const menu = page.getByRole('button', {name: 'Open menu', exact: true})
+   await expect(menu).toBeVisible(); await checkTooltip(menu); await menu.click()
+   const close = page.getByRole('button', {name: 'Close menu', exact: true})
+   await expect(close).toBeInViewport(); await checkTooltip(close); await close.click()
+   await expect(close).not.toBeInViewport(); await checkTooltip(menu)
   }
   await page.screenshot({path: `${shots}/INT-009-audit-${width}.png`, fullPage: true, animations: 'disabled'})
  }
