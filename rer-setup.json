@@ -207,6 +207,24 @@
         "equals": "cloudflare"
       },
       "group": "mail"
+    },
+    {
+      "name": "MAIL_EVENT_KEY",
+      "label": "Signed delivery-event verification key",
+      "kind": "secret",
+      "input": "entered",
+      "ownerVisible": true,
+      "required": false,
+      "group": "mail",
+      "help": "Optional. The SendGrid or Resend public verification key that signs delivery events to /api/plinth/mail/events, so bounces, complaints and unsubscribes reach the job thread."
+    },
+    {
+      "name": "MAIL_REPLY_DOMAIN",
+      "label": "Reply domain",
+      "kind": "text",
+      "required": false,
+      "group": "mail",
+      "help": "Optional. A Cloudflare Email Routing domain whose catch-all address is routed to this Worker; each message then carries its own reply address on it."
     }
   ],
   "steps": [

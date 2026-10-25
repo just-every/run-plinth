@@ -1,6 +1,8 @@
 import type { Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
 import { requireJobManager, visible } from './auth'
+import { optionalNotice } from './mail-model'
+import { mirrorSend, suppression } from './mail-store'
 import { company } from './company'
 import { DomainError, need, stamp, type Actor, type Job } from './model'
 import { readClock } from './store'
@@ -48,21 +50,21 @@ async function reserve(db: D1Database, jobId: string, promiseId: string, now: nu
  await saveWarrantyJob(db, previous, next, clock, permitted.guards, actor)
  return { job: next, promise: current, attempt }
 }
-function message(reservation: Reservation, from: string, builder: string) {
+function message(reservation: Reservation, from: string, builder: string, footer = '') {
  const { job, promise, attempt } = reservation, component = job.warranties!.components.find(c => c.id === promise.component_id)!
  const text = [
   `${builder}: maintenance reminder for ${job.name}.`, '',
   `Component: ${component.name}`, `Maintenance promise: ${promise.title}`,
   `Due date: ${attempt.due_on} (${job.time_zone ?? 'UTC'}; job-local calendar date).`, '',
   `This reminder follows your recorded reminder agreement. Please contact ${from} about arranging the work or changing the agreement.`,
- ].join('\n')
+ ].join('\n') + footer
  const subject = `Maintenance reminder: ${job.name} / ${component.name} / ${attempt.due_on}`.replace(/[\r\n\u0000-\u001f\u007f]/g, ' ')
  return { deliveryId: attempt.id, from, to: [attempt.recipient_email], replyTo: from, subject, text, html: `<pre style="font-family:inherit;white-space:pre-wrap">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`, headers: {} }
 }
 /** The reservation survives failures. No result, including unknown, is a license to repeat its provider call. */
 async function send(env: Bindings, reservation: Reservation, now: number, actor?: Actor): Promise<WarrantyReminderStatus> {
  const { attempt } = reservation
- let status: WarrantyReminderStatus = 'unknown', label = 'Provider outcome unknown; this occurrence will not be resent automatically', provider_message_id: string | undefined
+ let status: WarrantyReminderStatus = 'unknown', label = 'Provider outcome unknown; this occurrence will not be resent automatically', provider_message_id: string | undefined, sent: ReturnType<typeof message> | undefined
  try {
   const sender = operatorMail(env), builder = (await company(env.DB))?.name ?? 'Your builder'
   let cleared = false
@@ -83,10 +85,14 @@ async function send(env: Bindings, reservation: Reservation, now: number, actor?
   }
   if (!cleared && status !== 'cancelled') { status = 'cancelled'; label = 'Concurrent record changes prevented a send; nothing was sent. Review this occurrence with the office' }
   if (cleared) {
-   if (!sender || !env.MAIL_FROM) {
+   if (await suppression(env.DB, attempt.recipient_email)) {
+    status = 'cancelled'; label = 'The recipient unsubscribed from optional notices; nothing was sent'
+   } else if (!sender || !env.MAIL_FROM) {
     status = 'unconfigured'; label = 'Mail is not configured; this occurrence was not sent and will not be retried automatically'
    } else {
-    const result = await sender.send(message(reservation, env.MAIL_FROM, builder))
+    const notice = await optionalNotice(env, attempt.recipient_email), prepared = { ...message(reservation, env.MAIL_FROM, builder, notice.text), ...(notice.unsubscribe ? { unsubscribe: notice.unsubscribe } : {}) }
+    sent = prepared
+    const result = await sender.send(prepared)
     if (result.status === 'accepted') { status = 'accepted'; label = 'Accepted by the mail provider; delivery is not confirmed'; provider_message_id = result.providerMessageId ?? undefined }
     else if (result.status === 'development') { status = 'development'; label = 'Development mail was suppressed; no external message was sent' }
     else if (result.status === 'rejected' || result.status === 'rate_limited') { status = 'refused'; label = 'The mail provider refused this occurrence; it will not be retried automatically' }
@@ -97,6 +103,7 @@ async function send(env: Bindings, reservation: Reservation, now: number, actor?
   // Other exceptions may occur after provider acceptance. Keep the honest unknown outcome.
  }
  await finishWarrantyAttempt(env.DB, reservation.job.id, attempt.id, { status, label, ...(provider_message_id ? { provider_message_id } : {}) }, now)
+ if (sent) await mirrorSend(env.DB, { id: attempt.id, job_id: reservation.job.id, kind: 'reminder', required: false, to: attempt.recipient_email, visibility: reservation.promise.recipient.kind === 'client' ? 'client' : 'private', subject: sent.subject, text: sent.text, status: status === 'accepted' ? 'accepted' : status === 'development' ? 'development' : status === 'refused' ? 'refused' : 'unknown', label, provider_message_id })
  return status
 }
 function promiseOrder(job: Job, now: number): string[] {

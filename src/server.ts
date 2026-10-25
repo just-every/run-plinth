@@ -13,6 +13,7 @@ import { authResponse, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { plinthResponse } from './plinth/http'
 import { importResponse } from './plinth/imports'
+import { plinthEmail } from './plinth/mail-inbound'
 
 const api = new Hono<{ Bindings: Bindings }>()
 api.get('/health', (context) => context.json({ status: 'ok', ...deploymentHealth(context.env) }))
@@ -28,6 +29,8 @@ function noTransform(response: Response): Response {
 
 export default withDemo({
   scheduled: plinthScheduled,
+  // Cloudflare Email Routing delivers a client's reply here; the handler stores only replies to a message it sent.
+  email: (message, env) => plinthEmail(message, runtimeBindings(env)),
   async fetch(request, env, execution) {
     const asset = await staticAssetResponse(request, env)
     if (asset) return asset

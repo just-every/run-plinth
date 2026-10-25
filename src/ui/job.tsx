@@ -10,6 +10,7 @@ import { PunchWorkspace } from './punch'
 import { RfiWorkspace } from './rfis'
 import { Products } from './products'
 import { Warranties } from './warranties'
+import { Correspondence } from './correspondence'
 import { Selections } from './selections'
 import { useEffect, useState } from 'react'
 import type { Job } from '../plinth/model'
@@ -25,7 +26,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'Financial review', 'History'] as const
+export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'Messages', 'Financial review', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -47,7 +48,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   const open = section ?? (role === 'bookkeeper' || role === 'reader' ? 'Financial review' : role === 'estimator' ? 'Quote' : limited(role) ? 'Today' : job.status === 'active' ? 'Schedule' : 'Quote')
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
   const roleSections:Record<string,readonly Section[]>={estimator:['Quote','Bids','To-dos'],superintendent:['Today','Schedule','Daily logs','Punch','To-dos'],crew:['Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
-  const sectionAllowed=(s:Section)=>limited(role)?roleSections[role]!.includes(s):manager||s==='History'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
+  const sectionAllowed=(s:Section)=>limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
   const props: JobProps = { job, manager, role, mutate, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
@@ -78,6 +79,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Today' && (manager || limited(role)) && <DailyWork {...props}/>}
       {open === 'To-dos' && <Todos job={job}/>}
       {open === 'Handover' && <Handover {...props}/>}
+      {open === 'Messages' && <Correspondence {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}
       {manager && <LinkedTodos job={job} section={open}/>}
     </div>}

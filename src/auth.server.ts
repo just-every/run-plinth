@@ -44,6 +44,10 @@ export interface Bindings {
  MAIL_API_KEY?: string
  MAIL_RELAY_URL?: string
  MAIL_ACCOUNT_ID?: string
+ /** INT-007: SendGrid or Resend public verification key for signed delivery-event webhooks. */
+ MAIL_EVENT_KEY?: string
+ /** INT-007: the Cloudflare Email Routing domain whose catch-all address reaches this Worker; replies carry per-message addresses on it. */
+ MAIL_REPLY_DOMAIN?: string
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env

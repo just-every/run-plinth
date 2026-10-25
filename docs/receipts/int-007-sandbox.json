@@ -1,0 +1,26 @@
+{
+ "clause": "INT-007",
+ "run": "sx-plinth-c-i816",
+ "at": "2026-10-25T23:50Z",
+ "mode": "SendGrid sandbox_mode (validates, never delivers); Cloudflare Email Routing read only; no key, address or content recorded",
+ "sendgrid_sandbox_send": {
+  "status": 200,
+  "validated_not_delivered": true,
+  "carried": [
+   "reply_to",
+   "custom_args",
+   "list_unsubscribe",
+   "one_click"
+  ]
+ },
+ "cloudflare_email_routing": {
+  "zone_visible": true,
+  "routing_api_ok": true,
+  "routing_enabled": true,
+  "catch_all_api_ok": true,
+  "catch_all_rule_present": true,
+  "catch_all_actions": [
+   "drop"
+  ]
+ }
+}

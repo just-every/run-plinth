@@ -44,6 +44,11 @@
     {
       "binding": "MAIL_FROM",
       "environment": "MAIL_FROM"
+    },
+    {
+      "binding": "MAIL_EVENT_KEY",
+      "environment": "MAIL_EVENT_KEY",
+      "optional": true
     }
   ],
   "platforms": [
@@ -54,6 +59,7 @@
     "MAIL_PROVIDER",
     "MAIL_FROM",
     "MAIL_RELAY_URL",
-    "MAIL_ACCOUNT_ID"
+    "MAIL_ACCOUNT_ID",
+    "MAIL_REPLY_DOMAIN"
   ]
 }
