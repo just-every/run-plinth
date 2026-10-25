@@ -11,6 +11,8 @@ import branding from './branding.json'
 const theme = { href: '/rer-theme.css', productName: branding.name, accentColor: branding.primaryColor }
 
 export interface Bindings {
+ /** Exact HTTPS origins explicitly allowed for native webhook receivers. */
+ PLINTH_WEBHOOK_ORIGINS?: string
  DB: D1Database
  /** Built browser files; hosted deploys run the Worker first (staticAssetResponse). */
  ASSETS?: Fetcher

@@ -1,0 +1,1227 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Plinth native draft API",
+    "version": "1.0.0",
+    "description": "Current native version 1 surface. Bearer credentials are draft-only; human final actions use existing session-gated business doors. Other records, reports and import and export doors are documented in docs/COMMANDS.md; their complete machine schemas remain pending."
+  },
+  "servers": [
+    {
+      "url": "/api/plinth/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearer": []
+    },
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/jobs": {
+      "get": {
+        "operationId": "pageJobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "jobs",
+                    "next"
+                  ],
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    },
+                    "next": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Current authority refused"
+          },
+          "404": {
+            "description": "Unavailable record"
+          },
+          "409": {
+            "description": "Stale version or conflicting replay"
+          },
+          "429": {
+            "description": "60 requests per person per UTC minute"
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "operationId": "readJob",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "job"
+                  ],
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Current authority refused"
+          },
+          "404": {
+            "description": "Unavailable record"
+          },
+          "409": {
+            "description": "Stale version or conflicting replay"
+          },
+          "429": {
+            "description": "60 requests per person per UTC minute"
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/changes": {
+      "post": {
+        "operationId": "prepareChange",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "job",
+                    "draft",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "draft": {
+                      "$ref": "#/components/schemas/Draft"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Current authority refused"
+          },
+          "404": {
+            "description": "Unavailable record"
+          },
+          "409": {
+            "description": "Stale version or conflicting replay"
+          },
+          "429": {
+            "description": "60 requests per person per UTC minute"
+          },
+          "201": {
+            "description": "Current authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "job",
+                    "draft",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "draft": {
+                      "$ref": "#/components/schemas/Draft"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expected_version",
+                  "description",
+                  "amount_cents"
+                ],
+                "properties": {
+                  "expected_version": {
+                    "type": "integer"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "amount_cents": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/changes/{change_id}/approve": {
+      "post": {
+        "operationId": "approveChange",
+        "description": "Assigned client session only. Every bearer credential is refused before any final action. Uses the native approval door.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expected_version"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "expected_version": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native immutable human approval result"
+          },
+          "403": {
+            "description": "Bearer or non-client authority refused"
+          },
+          "409": {
+            "description": "Stale or already approved"
+          }
+        }
+      }
+    },
+    "/connections": {
+      "get": {
+        "operationId": "listConnections",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "subscriptions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Subscription"
+                      }
+                    }
+                  },
+                  "required": [
+                    "subscriptions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createConnection",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          },
+          "201": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "subscription": {
+                      "$ref": "#/components/schemas/Subscription"
+                    },
+                    "signing_key": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "subscription",
+                    "signing_key"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Consent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/rotate": {
+      "post": {
+        "operationId": "rotateConnection",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "signing_key": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "signing_key",
+                    "generation"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "credential_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "credential_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/revoke": {
+      "post": {
+        "operationId": "revokeConnection",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/events": {
+      "get": {
+        "operationId": "pageEvents",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ListedEvent"
+                      }
+                    },
+                    "next": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "next"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/deliveries": {
+      "get": {
+        "operationId": "pageDeliveries",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "deliveries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Delivery"
+                      }
+                    },
+                    "next": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deliveries",
+                    "next"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/deliver/{event_id}": {
+      "post": {
+        "operationId": "deliverEvent",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "attempt_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "accepted",
+                        "failed",
+                        "unknown"
+                      ]
+                    },
+                    "http_status": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "attempt_id",
+                    "status",
+                    "http_status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "confirm": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "operator_session"
+      }
+    },
+    "schemas": {
+      "Job": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "name",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "quoting",
+              "active"
+            ]
+          }
+        }
+      },
+      "Draft": {
+        "type": "object",
+        "required": [
+          "id",
+          "description",
+          "amount_cents",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "amount_cents": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Subscription": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "operator_id": {
+            "type": "string"
+          },
+          "credential_id": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "operator_version": {
+            "type": "integer"
+          },
+          "job_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_types": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "job.updated",
+                "financial.updated",
+                "decision.approved",
+                "change.approved"
+              ]
+            }
+          },
+          "generation": {
+            "type": "integer"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "operator_id",
+          "credential_id",
+          "receiver",
+          "created_at",
+          "operator_version",
+          "job_ids",
+          "event_types",
+          "generation",
+          "revoked_at"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "job_version": {
+            "type": "integer"
+          },
+          "subject_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "type",
+          "created_at",
+          "job_version",
+          "subject_id"
+        ]
+      },
+      "ListedEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "job_version": {
+            "type": "integer"
+          },
+          "subject_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sequence": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "type",
+          "created_at",
+          "job_version",
+          "subject_id",
+          "sequence"
+        ]
+      },
+      "Webhook": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "job_version": {
+            "type": "integer"
+          },
+          "subject_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "api_version": {
+            "const": "1"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "type",
+          "created_at",
+          "job_version",
+          "subject_id",
+          "api_version"
+        ]
+      },
+      "Delivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subscription_id": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "sending",
+              "accepted",
+              "failed",
+              "unknown"
+            ]
+          },
+          "http_status": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subscription_id",
+          "event_id",
+          "started_at",
+          "generation",
+          "finished_at",
+          "status",
+          "http_status"
+        ]
+      },
+      "Consent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "credential_id": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string",
+            "format": "uri"
+          },
+          "job_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_types": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "job.updated",
+                "financial.updated",
+                "decision.approved",
+                "change.approved"
+              ]
+            }
+          },
+          "confirm": {
+            "const": true
+          }
+        },
+        "required": [
+          "credential_id",
+          "receiver",
+          "job_ids",
+          "event_types",
+          "confirm"
+        ]
+      }
+    }
+  },
+  "webhooks": {
+    "event": {
+      "post": {
+        "description": "HMAC-SHA256 over timestamp, a literal dot, and raw body bytes. Header plinth-signature contains t=<Unix seconds>,v1=<hex signature>; reject timestamps outside your configured five-minute window and deduplicate by event id. Explicit owner delivery only in the current conservative policy.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Webhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Receiver accepted the event"
+          }
+        }
+      }
+    }
+  }
+}

@@ -17,7 +17,8 @@
     "skipLibCheck": true,
     "types": [
       "@cloudflare/workers-types"
-    ]
+    ],
+    "resolveJsonModule": true
   },
   "include": [
     "src",

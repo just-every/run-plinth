@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "dcae5f532de6f77387f3b16a2c5b0bb746f7a994b8c90026fd692cdb050f2961",
+      "sha256": "fdabd471469d4b3e2953f25fa2274bbdd7bb1d0edfe6f68812d75e817f47384e",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "9fecea1a582bea6e893029f00926170ac0a342c0c4bf4266d5a52df6dddad014",
+      "sha256": "940719e50b3bfd4dd6ce91775c784b3e344afe99f06d832305c44e581428358f",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/COMMANDS.md": {
-      "sha256": "eba3fed3285cb91bbba2bc8a3e543f74a98ed36517c448703b8ed25cc5205cb9",
+      "sha256": "c74148f98f1d3fb43f4bcb4589edc9af33ec97e460b14a1640255d38927ac757",
       "executable": false
     },
     "docs/COSTS.md": {
@@ -186,6 +186,10 @@
     },
     "docs/MOVE-IN.md": {
       "sha256": "b86c9f8eee264b3f441bd8601eb926eeae9b7f7d717c3d12520861e49104d38d",
+      "executable": false
+    },
+    "docs/NATIVE-API.md": {
+      "sha256": "c4fee7167a0e6656b0e15b4b37680bd74890b210170c972c187650451a49812c",
       "executable": false
     },
     "docs/README.md": {
@@ -358,6 +362,10 @@
     },
     "migrations/core/202610240100_base79.sql": {
       "sha256": "8a8b357873b9602a8bbdf0e55fa3d56c0524760c29a1f320e20a00d3bc694dd0",
+      "executable": false
+    },
+    "migrations/core/202610250900_native_connectors.sql": {
+      "sha256": "a82f2fa5b78b6581cc44ecfb7c563713e2abe8ebd29470ed03fef6ecb8749724",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -820,12 +828,16 @@
       "sha256": "54e7246025a618ed16ee042c22dc9a8dc27b06175c30f81c4c6568992ed04799",
       "executable": false
     },
+    "scripts/generate-api-client.mjs": {
+      "sha256": "0e5c5771a9a2e7fc58fcf7e18aa837e2a454a1082a2874f3844ce882918a94b8",
+      "executable": false
+    },
     "scripts/install.mjs": {
       "sha256": "ce9c6eb4f127e88b32d538655a3fb3a2dc9fc3e83e48782fd56ffd3377da16fd",
       "executable": false
     },
     "scripts/installer/local.mjs": {
-      "sha256": "dedeac9d77186d6742f50e58366996bf74a34b363b77c4a7e0112523e2985c40",
+      "sha256": "2d3fb8ddded2b61b90c9b941f3d10e61e06edf45ff0987485cf0a656aa701c68",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -853,7 +865,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "aaa9897e01ec366ad6427b80c29c1112c5ad49426bc7cd0127ba712b26f7e7e7",
+      "sha256": "4523df8bda38006881934520bae4a0bba4a6848201a41d51d172f7467f931fef",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -2732,6 +2744,22 @@
       "sha256": "38713b7bfd6a3c7b8157eed28630fba5a0db59c4d323507cb114291afcf35614",
       "executable": false
     },
+    "src/plinth/api-client.mjs": {
+      "sha256": "ed5de20038d5a85d1eda6cefa308ef90c075e2cb3c3dbf38c591ad00c74a7b8c",
+      "executable": false
+    },
+    "src/plinth/api-limits.ts": {
+      "sha256": "83756469823d2ed20489af3682d5e760caa784fc8eccc0cb4bfffb9cbdafd800",
+      "executable": false
+    },
+    "src/plinth/api-schema.json": {
+      "sha256": "3477b7b9dbebfd1f02676393ca301cebabd688400e49b74296f82cb9ae49e6e4",
+      "executable": false
+    },
+    "src/plinth/api-v1.ts": {
+      "sha256": "aae8e376f0dccc95cf17c1b9ee711db78a20500a6173ea87f16a580a0650320a",
+      "executable": false
+    },
     "src/plinth/attachments.ts": {
       "sha256": "57457b3daf58097bca6cbdb13ff7f9e15f5f65008468545c8a3d1490a2c8cc33",
       "executable": false
@@ -2818,6 +2846,14 @@
     },
     "src/plinth/compliance.ts": {
       "sha256": "6756f7092648d1618dc39ed588e56717df4427289be88273a77a55054b123aa8",
+      "executable": false
+    },
+    "src/plinth/connector-events.ts": {
+      "sha256": "32cc0e13ea2adeb6365b2d876858a38e670975e2a7320ea488f52f2b526b003f",
+      "executable": false
+    },
+    "src/plinth/connectors.ts": {
+      "sha256": "a400057cb681df3dd94b0205214002b587c9dbbb0e16720f6ece1e5f7fc11d90",
       "executable": false
     },
     "src/plinth/continuity-model.ts": {
@@ -2957,7 +2993,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "aec39883b99851c62b004a675837d28417493841da27ced66f59097deceeb597",
+      "sha256": "d96fc43800bbde96d53409b5a6391b094cd31992c7452b0d473e60b41e906b29",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3261,7 +3297,7 @@
       "executable": false
     },
     "src/plinth/store.ts": {
-      "sha256": "e538626ded58a40a65c5242e8302b8b38fa5fadc3ba774c97b169ac60bc1aa1c",
+      "sha256": "235627342161c56625d90ac5e3087e2841ce9ce549e1176edfd08a0a67649160",
       "executable": false
     },
     "src/plinth/subcontractor-portal.ts": {
@@ -4085,7 +4121,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "a93ab767fc565e993e3a6dd52c955314e7ab651fb9d8e2bdebbcc9d1a9e19dc2",
+      "sha256": "41a0ed42a1bd474dae7ff399300666f32322dc8d408cd946b6daab89ec25312f",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
@@ -4093,7 +4129,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "d1835c117f0c7a8b2540135678cd98f665bdcef34410446ab23b4456202e608f",
+      "sha256": "2cdc456f98fe413805458692738d470e918bc24933f6d47186df148646cdee2b",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
@@ -4105,7 +4141,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "2c06bed15eda82b53ffb4fce4b5e88e3782f3dc7d573be3a6ebbea5699b56fe7",
+      "sha256": "fa3e3eec9bb3ed2740b16f2442520c11c539436005c0f9e51613eaf22e449cc0",
       "executable": false
     },
     "tests/plinth/pricing.test.mjs": {
@@ -4161,7 +4197,7 @@
       "executable": false
     },
     "tsconfig.json": {
-      "sha256": "bcf6ec9be5a6f3d07aed17c8dd5a30c69d225623e263418fd4d291ae32d00d69",
+      "sha256": "c8bff7fdb8e11283f5b9c8c95aecc06f5b7a383206fd732cdb813e66e7a38919",
       "executable": false
     },
     "VERIFY-WORKFLOW.md": {

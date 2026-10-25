@@ -352,3 +352,105 @@ test('FIELD-004 — photo observations retain form revisions, qualified trade re
   const final=job.punch.issues[0];assert.deepEqual(final.attempts[0],rejected);assert.equal(final.attempts[1].review.decision,'accepted');assert.equal(job.approvals.filter(a=>a.kind==='punch.inspect').length,2)
  }finally{await f.close()}
 })
+
+// Versioned integration uses a generated client against the same real native Worker.
+test('INT-009 generated client pages scoped jobs and keeps one draft across concurrent replay and key replacement', async () => {
+ const {createClient} = await import('../../src/plinth/api-client.mjs')
+ const f = await createFixture({now: 1792929600000})
+ try {
+  const clientCookie = await f.invite('client@example.com'), outsider = await f.invite('synthetic-plinth-1@example.com')
+  const job = await createActiveJob(f, 'Synthetic Plinth kitchen')
+  await createActiveJob(f, 'Synthetic Plinth bath')
+  await createActiveJob(f, 'Synthetic Plinth roof')
+  const token = await f.agent(), api = createClient({origin: f.origin, token})
+  let page = await api.pageJobs({limit: 2}); assert.equal(page.jobs.length, 2); assert.ok(page.next)
+  const rest = await api.pageJobs({limit: 2, after: page.next})
+  assert.equal(rest.jobs.length, 1); assert.equal(new Set([...page.jobs, ...rest.jobs].map(job => job.id)).size, 3); assert.equal(rest.next, null)
+  assert.equal((await f.request('/api/plinth/v1/jobs', {cookie: outsider})).status, 200)
+  assert.equal((await f.json('/api/plinth/v1/jobs', {cookie: outsider})).value.jobs.length, 0)
+  assert.equal((await f.request('/api/plinth/v1/jobs/'+job.id, {cookie: outsider})).status, 404)
+  assert.equal((await f.json('/api/plinth/v1/jobs/'+job.id, {cookie: clientCookie})).value.job.name, job.name)
+  const input = {job_id: job.id, 'Idempotency-Key': 'synthetic-plinth-draft-1', body: {expected_version: job.version, description: 'Synthetic reviewed countertop change', amount_cents: 25000}}
+  const writes = await Promise.all([api.prepareChange(input), api.prepareChange(input)])
+  assert.equal(writes[0].draft.id, writes[1].draft.id)
+  assert.equal((await api.prepareChange(input)).draft.id, writes[0].draft.id)
+  await assert.rejects(api.prepareChange({...input, body: {...input.body, amount_cents: 30000}}), error => error.status === 409)
+  await assert.rejects(api.approveChange({job_id: job.id, change_id: writes[0].draft.id, body: {expected_version: writes[0].job.version}}), error => error.status === 403)
+  const root = `/api/plinth/jobs/${job.id}/variations/${writes[0].draft.id}/approve`
+  assert.equal((await f.request(root, {method: 'POST', token, body: {expected_version: writes[0].job.version}})).status, 403)
+  assert.equal((await f.request(`/api/plinth/v1/jobs/${job.id}/changes/${writes[0].draft.id}/approve`, {method: 'POST', token, body: {expected_version: writes[0].job.version}})).status, 403)
+  const oldId = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials[0].id
+  const replacement = await f.agent()
+  assert.equal((await f.request(`/api/plinth/agent-credentials/${oldId}/revoke`, {method: 'POST', cookie: f.owner, body: {}})).status, 200)
+  assert.equal((await f.request('/api/plinth/v1/jobs', {token})).status, 401)
+  assert.equal((await createClient({origin: f.origin, token: replacement}).prepareChange(input)).draft.id, writes[0].draft.id)
+  const current = (await f.json('/api/plinth/jobs/'+job.id, {cookie: f.owner})).value.job
+  assert.equal(current.variations.length, 1); assert.equal(current.variations[0].status, 'draft'); assert.equal(current.approvals.filter(a => a.kind === 'variation').length, 0)
+  // A pinned Worker clock keeps every request in the same rate window.
+  const results = await Promise.all(Array.from({length: 61}, () => f.request('/api/plinth/v1/jobs', {token: replacement})))
+  assert.ok(results.some(response => response.status === 429)); assert.ok(results.every(response => [200,429].includes(response.status)))
+ } finally { await f.close() }
+})
+
+test('INT-009 approved-change webhooks retain signed receiver-aware replay and deny revoked grants', async () => {
+ const {createClient} = await import('../../src/plinth/api-client.mjs')
+ const {createHmac, timingSafeEqual} = await import('node:crypto')
+ const received = []; let signingKey, refuse = true
+ const f = await createFixture({webhookReceiver: async request => {
+  const raw = await request.text(), signature = request.headers.get('plinth-signature'), [timestamp, digest] = signature.split(',').map(part => part.split('=')[1])
+  const expected = createHmac('sha256', signingKey).update(timestamp+'.'+raw).digest('hex')
+  assert.ok(timingSafeEqual(Buffer.from(expected), Buffer.from(digest)))
+  const value = JSON.parse(raw); assert.equal(request.headers.get('plinth-event-id'), value.id)
+  received.push(value)
+  return new Response(null, {status: refuse ? 503 : 202})
+ }})
+ try {
+  const client = await f.invite('client@example.com'), outsider = await f.invite('synthetic-plinth-2@example.com')
+  let job = await createActiveJob(f), other = await createActiveJob(f, 'Another receiver scope')
+  const token = await f.agent(), credential = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials[0]
+  const post = (path, body = {}, cookie = f.owner, bearer) => f.json('/api/plinth'+path, {method: 'POST', cookie, token: bearer, body})
+  const consent = {credential_id: credential.id, receiver: 'https://synthetic-plinth.example/events', job_ids: [job.id], event_types: ['change.approved'], confirm: true}
+  assert.equal((await post('/connections', {...consent, confirm: false})).status, 400)
+  assert.equal((await post('/connections', {...consent, receiver: 'https://unconfigured.example/events'})).status, 403)
+  assert.equal((await post('/connections', consent, undefined, token)).status, 403)
+  assert.equal((await post('/connections', consent, outsider)).status, 403)
+  const control = createClient({origin: f.origin, cookie: f.owner})
+  let r = {status: 201, value: await control.createConnection({body: consent})}; assert.equal(r.status, 201); signingKey = r.value.signing_key; const connection = r.value.subscription.id
+  assert.ok(!JSON.stringify((await f.json('/api/plinth/connections', {cookie: f.owner})).value).includes(signingKey))
+  r = await post(`/jobs/${job.id}/variations`, {expected_version: job.version, description: 'Synthetic Plinth approved change', amount_cents: 12500}, undefined, token); assert.equal(r.status, 200); job = r.value.job; const change = r.value.record.id
+  r = await post(`/jobs/${job.id}/variations/${change}/approve`, {expected_version: job.version}, client); assert.equal(r.status, 200); job = r.value.job
+  const list = () => f.json(`/api/plinth/connections/${connection}/events`, {cookie: f.owner})
+  const events = (await list()).value.events; assert.equal(events.length, 1); const event = events[0]
+  assert.equal(event.type, 'change.approved'); assert.equal(event.subject_id, change); assert.equal(event.job_version, job.version)
+  assert.equal((await post(`/jobs/${job.id}/variations/${change}/approve`, {expected_version: job.version}, client)).status, 409)
+  assert.equal((await list()).value.events.length, 1)
+  assert.equal((await post(`/connections/${connection}/deliver/${event.id}`)).status, 400)
+  r = await post(`/connections/${connection}/deliver/${event.id}`, {confirm: true}); assert.equal(r.value.status, 'failed')
+  refuse = false
+  r = {value: await control.deliverEvent({connection_id: connection, event_id: event.id, body: {confirm: true}})}; assert.equal(r.value.status, 'accepted')
+  assert.equal(received.length, 2); assert.deepEqual(received[0], received[1]); assert.equal(received[0].id, event.id)
+  assert.deepEqual(Object.keys(received[0]).sort(), ['api_version','created_at','id','job_id','job_version','subject_id','type'].sort())
+  const history = await f.json(`/api/plinth/connections/${connection}/deliveries`, {cookie: f.owner}); assert.equal(history.value.deliveries.length, 2)
+  const second = await post('/connections', {...consent, job_ids: [other.id]}); assert.equal(second.status, 201)
+  assert.equal((await post(`/connections/${second.value.subscription.id}/deliver/${event.id}`, {confirm: true})).status, 404)
+  const replacement = await f.agent(), replacementId = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials[0].id
+  r = await post(`/connections/${connection}/rotate`, {credential_id: replacementId}); assert.equal(r.status, 200); assert.notEqual(r.value.signing_key, signingKey); signingKey = r.value.signing_key
+  assert.equal((await post(`/agent-credentials/${credential.id}/revoke`)).status, 200)
+  assert.equal((await post(`/connections/${connection}/deliver/${event.id}`, {confirm: true})).value.status, 'accepted')
+  assert.equal(received[2].id, event.id)
+  const liveRevoked = await post('/connections', {...consent, credential_id: replacementId})
+  assert.equal(liveRevoked.status, 201)
+  assert.equal((await post(`/connections/${liveRevoked.value.subscription.id}/revoke`)).status, 200)
+  assert.equal((await post(`/connections/${liveRevoked.value.subscription.id}/deliver/${event.id}`, {confirm: true})).status, 403)
+  assert.equal((await f.request('/api/plinth/jobs/'+job.id, {method: 'DELETE', cookie: f.owner, body: {expected_version: job.version}})).status, 200)
+  assert.equal((await list()).value.events.length, 0)
+  assert.equal((await post(`/connections/${connection}/deliver/${event.id}`, {confirm: true})).status, 404)
+  assert.equal(received.length, 3)
+  assert.equal((await post(`/agent-credentials/${replacementId}/revoke`)).status, 200)
+  assert.equal((await list()).status, 403)
+  assert.equal((await post(`/connections/${connection}/deliver/${event.id}`, {confirm: true})).status, 403)
+  assert.equal(received.length, 3)
+  assert.equal((await post(`/connections/${connection}/revoke`)).status, 200)
+  assert.equal((await f.request(`/api/plinth/connections/${connection}/deliveries`, {cookie: f.owner})).status, 403)
+ } finally { await f.close() }
+})

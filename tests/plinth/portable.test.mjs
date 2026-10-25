@@ -9,7 +9,7 @@ import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
 import { costFixture, original as costOriginal } from './cost-support.mjs'
 
-test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 / EST-005 / CARE-003 / EST-003 / EST-002 / CRM-001 / INT-006 / NATIVE-011 — CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
+test('CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive', async () => {
   const root = resolve('.'), folder = await mkdtemp(join(tmpdir(), 'plinth-portable-'))
   const source = join(folder,'source'), destination = join(folder,'restored'), erased = join(folder,'erased')
   const env = {...process.env, CI:'true', WRANGLER_SEND_METRICS:'false', RER_SERVER_JOURNEY:'1'}
@@ -27,7 +27,7 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
   try {
     await checkout(source); await checkout(destination); await checkout(erased)
     execFileSync(process.execPath,[join(root,'node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','DB','--local','--persist-to',join(source,'.wrangler/state'),'--config',join(source,'wrangler.jsonc')],{env,stdio:'pipe'})
-    f=await createFixture({persistTo:source}); let job=await createActiveJob(f,'Ashgrove kitchen','client@example.com',4_800_000)
+    f=await createFixture({persistTo:source,webhookReceiver:async()=>new Response(null,{status:202})}); let job=await createActiveJob(f,'Ashgrove kitchen','client@example.com',4_800_000)
     let customer=await f.json('/api/plinth/customers',{method:'POST',cookie:f.owner,body:{name:'Chen household archive',kind:'household',contacts:[{id:'archive-client',name:'Client Chen',email:'client@example.com'}],properties:[{id:'archive-home',label:'Home',address:'148 Maple Street, Portland, OR 97205'}],owner_contact_ids:['archive-client'],billing_contact_ids:['archive-client']}});assert.equal(customer.status,201)
     let linked=await f.json(`/api/plinth/jobs/${job.id}/customer`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,customer_id:customer.value.customer.id,property_id:'archive-home',client_contact_ids:['archive-client']}});assert.equal(linked.status,200);job=linked.value.job
     const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
@@ -141,6 +141,12 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     await field('/location',{latitude:44.123456,longitude:-73.123456},fieldWorker)
     const archivedField=(await f.json(`/api/plinth/jobs/${c.job.id}/time`,{cookie:fieldWorker})).value
     assert.equal(archivedField.location_choice.inside,false);assert.equal(archivedField.location_choice.reminder.kind,'clock_out')
+    // Native connector secrets stay installation-local while draft replay identity travels with its job.
+    const connectorToken=await f.agent(),connectorCredential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0]
+    const connector=await f.json('/api/plinth/connections',{method:'POST',cookie:f.owner,body:{credential_id:connectorCredential.id,receiver:'https://synthetic-plinth.example/events',job_ids:[job.id],event_types:['job.updated'],confirm:true}});assert.equal(connector.status,201,JSON.stringify(connector.value))
+    job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
+    const connectorDraft=await f.json('/api/plinth/v1/jobs/'+job.id+'/changes',{method:'POST',token:connectorToken,headers:{'idempotency-key':'synthetic-plinth-archive-draft'},body:{expected_version:job.version,description:'Synthetic archive connector draft',amount_cents:100}});assert.equal(connectorDraft.status,201,JSON.stringify(connectorDraft.value))
+    job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
     const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -158,6 +164,11 @@ test('ROLE-003 / TODO-001 / BILL-006 / BILL-002 / BILL-003 / AUTO-002 / EST-004 
     }
     const receiver=await createFixture({persistTo:destination,ownerCookie:cookie})
     try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
+    for(const exported of [original,restored]){
+      assert.ok(!JSON.stringify(exported).includes(connector.value.signing_key),'INT-009 signing keys never enter a portable archive')
+      assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_api_limits'].includes(table.name)),'INT-009 live receiver authority is excluded from restoration')
+      assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
+    }
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority

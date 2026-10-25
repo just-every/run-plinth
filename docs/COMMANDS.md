@@ -146,3 +146,7 @@ Approve the draft through the existing Billing record or `POST /api/plinth/jobs/
 ## Native human time entry
 
 FIELD-002 provides authenticated HTTP entry, corrections, supervisor approval, reviewed rates, payroll allocations and consented site reminders. These are human-session doors and refuse agent credentials. See [Native field time](FIELD-TIME.md) for the exact routes, custody, rounding and current screen limitations.
+
+## Native API version 1 and receiver controls
+
+The versioned schema, generated client, draft replay semantics, rate limits and conservative owner-only webhook controls are documented in [Native API](NATIVE-API.md). INT-009 remains partial with its exact remaining scope in CONTRACT.md.
