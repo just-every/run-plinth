@@ -875,7 +875,8 @@
       "session": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "operator_session"
+        "name": "__Host-operator_session",
+        "description": "Production native session cookie. Local development uses the origin-specific operator_session_local cookie. Browser clients use their current same-origin session."
       }
     },
     "schemas": {

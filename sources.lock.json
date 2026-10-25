@@ -2753,7 +2753,7 @@
       "executable": false
     },
     "src/plinth/api-schema.json": {
-      "sha256": "3477b7b9dbebfd1f02676393ca301cebabd688400e49b74296f82cb9ae49e6e4",
+      "sha256": "307ce7fb051b689dcff203cc66a4c85c259aa0728ce33e00167f44a502346c10",
       "executable": false
     },
     "src/plinth/api-v1.ts": {
