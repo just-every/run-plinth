@@ -32,6 +32,8 @@ export interface EditionIdentity {
   fonts?: string
   /** #rrggbb for buttons when the theme declares no --rer-accent (as the frames use it). */
   accentColor?: string
+  /** The business's IANA time zone ("Australia/Sydney"): times people read render in it, with its abbreviation (actor.ts). */
+  timeZone?: string
 }
 
 const servedPath = /^\/(?!\/)[A-Za-z0-9._~/-]{1,200}$/
@@ -42,10 +44,9 @@ export function checkIdentity(identity: EditionIdentity): EditionIdentity {
   if (!['lobby', 'page'].includes(identity.installedHome)) throw new Error('Edition identity installedHome is lobby or page.')
   if (identity.manualSetupTokenClaim !== undefined && typeof identity.manualSetupTokenClaim !== 'boolean') throw new Error('Edition identity manualSetupTokenClaim is a boolean.')
   for (const path of [identity.signInPath, identity.theme, identity.mark, ...(identity.band ? [identity.band] : []), ...(identity.fonts ? [identity.fonts] : [])]) if (!servedPath.test(path) || path.includes('/.')) throw new Error('Edition identity paths are same-origin paths.')
-  // Plinth links its public source until a run site exists. Accept an HTTPS path, never credentials.
-  const source = new URL(identity.runSite)
-  if (source.protocol !== 'https:' || source.username || source.password || source.search || source.hash) throw new Error('Edition identity runSite is a safe https URL.')
-  if (identity.accentColor !== undefined && !/^#[0-9a-f]{6}$/i.test(identity.accentColor)) throw new Error('An accent colour is #rrggbb.')
+  if (!/^https:\/\/[a-z0-9.-]+$/.test(identity.runSite)) throw new Error('Edition identity runSite is an https origin.')
+  if (identity.accentColor !== undefined && !/^#[0-9a-f]{6}$/i.test(identity.accentColor)) throw new Error('An accent color is #rrggbb.')
+  if (identity.timeZone !== undefined) try { new Intl.DateTimeFormat('en', { timeZone: identity.timeZone }) } catch { throw new Error('Edition identity timeZone is an IANA time zone such as Australia/Sydney.') }
   return identity
 }
 

@@ -129,7 +129,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "3914057c863751e04ea617202c3bafe1eb885dc96428e68d00d99be44540893e",
+      "sha256": "7add8bf98f2636b73686258c149d31c1ba5936628e3edeeabb5eb83e1d01207c",
       "executable": false
     },
     "composition.lock.json": {
@@ -649,7 +649,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "07f0b240e26a79e4b3163cb1ec0b6527a8cd6ab52d08f3939da45fdc90edb477",
+      "sha256": "a0dda266cfd51b9648a62c4e8df3f947c832ce7979bb18f3f06a065b75dd6c98",
       "executable": false
     },
     "rer-project.json": {
@@ -913,7 +913,7 @@
       "executable": false
     },
     "src/base/identity.ts": {
-      "sha256": "0450cb5a40bccfd5c0b2efbc3b82789e9456c6c6004c441fec36b8a6880cc5d2",
+      "sha256": "0bc7faa1ce3d7fe3839a6a68135160be45387b052e4699dc7b45d13f67cb2106",
       "executable": false
     },
     "src/base/lobby.ts": {
