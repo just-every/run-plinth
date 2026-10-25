@@ -3661,7 +3661,7 @@
       "executable": false
     },
     "src/ui/connection-detail.tsx": {
-      "sha256": "018e4f227152e558df28de948e5491ee7606a92c662932767fe97c4d6f4d4791",
+      "sha256": "d327ef3b56547dfd95754560ac3bb5ad6fdfe4eaa26ddf8be1957368583e6955",
       "executable": false
     },
     "src/ui/connection-history.tsx": {
@@ -4033,7 +4033,7 @@
       "executable": false
     },
     "tests/journeys/connections.mjs": {
-      "sha256": "82ed861246498c623977ee7eb750df633eeb0ad967f5c339493f30dec5bf8963",
+      "sha256": "b3da1e954a3b12080e2c90e33289c0b5b594f71f0a300e8864c4b377081251ff",
       "executable": false
     },
     "tests/journeys/cost-billing.mjs": {

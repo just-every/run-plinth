@@ -110,6 +110,7 @@ try {
  assert.equal((await rotated).status(), 200)
  await expect(record.getByText('2', {exact: true})).toBeVisible()
  await security.getByRole('button', {name: 'Dismiss key', exact: true}).click()
+ await capture('key-rotation')
  await security.locator('summary').click()
  await client.prepareChange({job_id: job.id, 'Idempotency-Key': 'synthetic-plinth-standing-' + job.id, body: {expected_version: draft.job.version, description: 'Synthetic receiver delivery reference', amount_cents: 10000}})
  assert.equal((await context.request.get(base+'/cdn-cgi/local/scheduled?cron=0+*+*+*+*')).status(), 404, 'Public listener refuses scheduled triggers')
