@@ -5,6 +5,8 @@ import {chromium, expect} from '@playwright/test'
 import {createActiveJob} from '../plinth/helpers.mjs'
 import {createClient} from '../../src/plinth/api-client.mjs'
 
+const scheduler = process.env.PLINTH_SCHEDULER_URL
+assert.ok(scheduler && new URL(scheduler).hostname === '127.0.0.1', 'Use the owned local runtime scheduled entry')
 const base = process.env.PLINTH_URL, entrance = process.env.PLINTH_OWNER_OPEN, shots = process.env.PLINTH_SCREENSHOTS
 assert.ok(base && entrance && shots && new URL(entrance).origin === base && ['127.0.0.1','localhost'].includes(new URL(base).hostname), 'Use only this disposable local installation')
 await mkdir(shots, {recursive: true})
@@ -110,7 +112,8 @@ try {
  await security.getByRole('button', {name: 'Dismiss key', exact: true}).click()
  await security.locator('summary').click()
  await client.prepareChange({job_id: job.id, 'Idempotency-Key': 'synthetic-plinth-standing-' + job.id, body: {expected_version: draft.job.version, description: 'Synthetic receiver delivery reference', amount_cents: 10000}})
- const scheduled = await context.request.get(base + '/cdn-cgi/handler/scheduled?cron=0+*+*+*+*')
+ assert.equal((await context.request.get(base+'/cdn-cgi/local/scheduled?cron=0+*+*+*+*')).status(), 404, 'Public listener refuses scheduled triggers')
+ const scheduled = await context.request.get(scheduler + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*')
  assert.equal(scheduled.status(), 200, 'Local scheduled entry runs the real dispatcher')
  const deliveryRows = (await (await context.request.get(base + `/api/plinth/connections/${connection.subscription.id}/deliveries`)).json()).deliveries
  assert.ok(deliveryRows.length, 'Scheduled grant creates a real delivery attempt')
@@ -124,14 +127,14 @@ try {
   assert.ok(Number.isFinite(due), 'Failed receiver publishes its retry due time')
   let remaining = due - Date.now() + 250
   while (remaining > 0) { const wait = Math.min(remaining, 30_000); await page.waitForTimeout(wait); remaining = due - Date.now() + 250 }
-  assert.equal((await context.request.get(base + '/cdn-cgi/handler/scheduled?cron=0+*+*+*+*')).status(), 200)
+  assert.equal((await context.request.get(scheduler + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*')).status(), 200)
  }
  await settings.getByRole('button', {name: 'Refresh connections', exact: true}).click()
  await record.getByRole('button', {name: 'Refresh history', exact: true}).click()
  await expect(record.locator(':scope > summary').getByText('Delivery paused', {exact: true})).toBeVisible()
  await expect(record.locator('.connection-attempts > li')).toHaveCount(3)
  await capture('paused')
- const stopped = await context.request.get(base + '/cdn-cgi/handler/scheduled?cron=0+*+*+*+*')
+ const stopped = await context.request.get(scheduler + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*')
  assert.equal(stopped.status(), 200)
  const pausedLog = (await (await context.request.get(base + `/api/plinth/connections/${connection.subscription.id}/deliveries`)).json()).deliveries
  assert.equal(pausedLog.length, 3, 'Pause prevents any later outbound attempt')

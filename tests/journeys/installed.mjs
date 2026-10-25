@@ -36,7 +36,9 @@ async function waitForRuntime() {
   await delay(1000)
  }
  assert.ok(base && ownerOpen, 'The real rer installation becomes ready within eleven minutes')
- return {base,ownerOpen}
+ const clean = output.replace(/\x1b\[[0-9;]*m/g, '')
+ const runtimePort = [...clean.matchAll(/Local:\s+http:\/\/127\.0\.0\.1:(\d+)/g)].at(-1)?.[1]
+ return {base,ownerOpen,schedulerOrigin:runtimePort ? `http://127.0.0.1:${runtimePort}` : undefined}
 }
 async function stop() {
  signal('SIGTERM')
@@ -44,17 +46,17 @@ async function stop() {
  if(!exited) { signal('SIGKILL');await delay(1000) }
 }
 try {
- let {base,ownerOpen} = await waitForRuntime()
+ let {base,ownerOpen,schedulerOrigin} = await waitForRuntime()
  if (names.includes('connections')) {
   // This disposable receiver origin is installation configuration, never a production default.
   await stop()
   await appendFile('.dev.vars', '\nPLINTH_WEBHOOK_ORIGINS="https://example.com"\n')
-  start(); ({base,ownerOpen} = await waitForRuntime())
+  start(); ({base,ownerOpen,schedulerOrigin} = await waitForRuntime())
  }
  const client = new URL(ownerOpen), fragment = new URLSearchParams(client.hash.slice(1))
  assert.ok(fragment.has('rer-dev'), 'The synthetic installation supplies its own native local dev entrance')
  fragment.set('as','client');fragment.set('next','/auth/dev/enter?as=client&returnTo=/app');client.hash=fragment.toString()
- const env = {...process.env,HOME:userInfo().homedir,PLINTH_URL:base,PLINTH_SITE:[...output.matchAll(/RER_SITE\s+(https?:\/\/\S+)/g)].at(-1)?.[1],PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
+ const env = {...process.env,HOME:userInfo().homedir,PLINTH_URL:base,PLINTH_SCHEDULER_URL:schedulerOrigin,PLINTH_SITE:[...output.matchAll(/RER_SITE\s+(https?:\/\/\S+)/g)].at(-1)?.[1],PLINTH_OWNER_OPEN:ownerOpen,PLINTH_CLIENT_OPEN:client.href,PLINTH_SCREENSHOTS:screenshots}
  const bootstrap=spawn(process.execPath,['tests/journeys/installed-signin.mjs'],{env,stdio:'inherit'})
  const ready=await new Promise((resolve,reject)=>{bootstrap.once('error',reject);bootstrap.once('exit',code=>resolve(code))})
  assert.equal(ready,0,'The native setup browser uses the real HOME and completes')

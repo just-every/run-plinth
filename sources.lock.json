@@ -4033,7 +4033,7 @@
       "executable": false
     },
     "tests/journeys/connections.mjs": {
-      "sha256": "92a586fce0fa9e26fcc8020c60731090fcb49f25b480db048f52d112cd5f69da",
+      "sha256": "82ed861246498c623977ee7eb750df633eeb0ad967f5c339493f30dec5bf8963",
       "executable": false
     },
     "tests/journeys/cost-billing.mjs": {
@@ -4065,7 +4065,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "2b78f28f8ab19e8b0c77c58ed654f467c38ab61272436aa3b05a83087d5c69d7",
+      "sha256": "123583de6fe7a85a39d633fb3d9fe084d4d2200d4d5c9335b5c871ef22b697d2",
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
