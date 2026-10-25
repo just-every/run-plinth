@@ -38,7 +38,7 @@ export function ConnectionDetail({ row, jobs, credentials, refresh }: { row: Con
    <details className="connection-security"><summary>Keys and receiver access</summary>
     {key && <SigningKey value={key} dismiss={() => setKey('')} />}
     <Form submit="Rotate signing key" action={async f => { const result = await api(`/connections/${row.id}/rotate`, {credential_id: f.get('credential_id')}); setKey(result.signing_key); await refresh() }}>
-     <label>Replacement owner credential<select name="credential_id" required defaultValue={row.credential_id}><option value="">Choose a current credential</option>{credentials.map(c => <option key={c.id} value={c.id}>{c.id.slice(0, 8)} · expires {dateTime(c.expires_at)}</option>)}</select></label>
+     <label>Replacement owner credential<select name="credential_id" aria-label="Replacement owner credential" required defaultValue={row.credential_id}><option value="">Choose a current credential</option>{credentials.map(c => <option key={c.id} value={c.id}>{c.id.slice(0, 8)} · expires {dateTime(c.expires_at)}</option>)}</select></label>
      <p className="hint">Rotation replaces the signing key immediately. Update the receiver with the new key.</p>
     </Form>
     <Form submit="Revoke receiver" action={async () => { await api(`/connections/${row.id}/revoke`, {}); setKey(''); await refresh() }}><label className="connection-check"><input type="checkbox" required />I want to revoke this receiver and stop all further deliveries.</label></Form>

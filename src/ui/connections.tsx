@@ -34,7 +34,7 @@ function ConnectionSettings({ jobs }: { jobs: Job[] }) {
     }}>
      <Field label="Receiver URL" name="receiver" type="url" placeholder="https://example.com/plinth-events" />
      <p className="hint">Use a configured public HTTPS receiver. Redirects are refused.</p>
-     <label>Owner credential<select name="credential_id" required><option value="">Choose a current credential</option>{active.map(c => <option key={c.id} value={c.id}>{c.id.slice(0, 8)} · expires {new Date(c.expires_at).toLocaleString()}</option>)}</select></label>
+     <label>Owner credential<select name="credential_id" aria-label="Owner credential" required><option value="">Choose a current credential</option>{active.map(c => <option key={c.id} value={c.id}>{c.id.slice(0, 8)} · expires {new Date(c.expires_at).toLocaleString()}</option>)}</select></label>
      <fieldset className="connection-choices"><legend>Jobs</legend>{jobs.map(job => <label key={job.id}><input type="checkbox" name="job_ids" value={job.id} />{job.name}</label>)}</fieldset>
      <fieldset className="connection-choices"><legend>Event types</legend>{eventTypes.map(type => <label key={type}><input type="checkbox" name="event_types" value={type} defaultChecked={type === 'job.updated'} />{type}</label>)}</fieldset>
      <p className="hint">References only: event ID, job ID and version, event type, subject ID and timestamp. No record contents or attachments.</p>

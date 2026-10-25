@@ -3661,7 +3661,7 @@
       "executable": false
     },
     "src/ui/connection-detail.tsx": {
-      "sha256": "e76f015d3bede0f5bcf751b56f4fdc708edaafd1067ad23302ba5e8a90ae5e78",
+      "sha256": "018e4f227152e558df28de948e5491ee7606a92c662932767fe97c4d6f4d4791",
       "executable": false
     },
     "src/ui/connection-history.tsx": {
@@ -3673,7 +3673,7 @@
       "executable": false
     },
     "src/ui/connections.tsx": {
-      "sha256": "0f0c0632ff727e8077c9e2cf87127fde4d9cb3ce699ffabe7cdd0793c9bd344e",
+      "sha256": "68410cd95009e2455105740dd5e1cdacc647886a6bc2524ee92bcaeec69ccb6d",
       "executable": false
     },
     "src/ui/continuity.tsx": {
@@ -4033,7 +4033,7 @@
       "executable": false
     },
     "tests/journeys/connections.mjs": {
-      "sha256": "4a2314feac18a32c5eb0195a2bef2b12393eeb397dbfa4b3b8436b5f579a53a2",
+      "sha256": "92a586fce0fa9e26fcc8020c60731090fcb49f25b480db048f52d112cd5f69da",
       "executable": false
     },
     "tests/journeys/cost-billing.mjs": {

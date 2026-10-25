@@ -55,6 +55,11 @@ try {
  await create.getByRole('checkbox', {name: job.name, exact: true}).check()
  await create.getByRole('checkbox', {name: 'I approve this receiver and the selected reference fields.', exact: true}).check()
  const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plinth/connections' && response.request().method() === 'POST')
+ for (const width of [1440,390]) {
+  await page.setViewportSize({width,height:1000}); await create.scrollIntoViewIfNeeded()
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1))
+  await page.screenshot({path: `${shots}/INT-014-create-${width}.png`, fullPage:true, animations:'disabled'})
+ }
  await create.getByRole('button', {name: 'Create receiver', exact: true}).click()
  const response = await created; assert.equal(response.status(), 201)
  const connection = await response.json()
@@ -69,6 +74,11 @@ try {
   await form.getByLabel('Attempts per rolling hour', {exact: true}).fill('10')
   await form.getByLabel('Grant expiry (your local time)', {exact: true}).fill(localExpiry(expires))
   await form.getByRole('checkbox', {name: 'I authorize scheduled delivery to this origin for these events, reference fields, rate cap and expiry.', exact: true}).check()
+  for (const width of [1440,390]) {
+   await page.setViewportSize({width,height:1000}); await form.scrollIntoViewIfNeeded()
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1))
+   await page.screenshot({path: `${shots}/INT-014-grant-form-${width}.png`, fullPage:true, animations:'disabled'})
+  }
   const saved = page.waitForResponse(response => new URL(response.url()).pathname === `/api/plinth/connections/${connection.subscription.id}/grant` && response.request().method() === 'POST')
   await form.getByRole('button', {name: 'Approve standing grant', exact: true}).click()
   assert.equal((await saved).status(), 200)
@@ -83,10 +93,10 @@ try {
    await page.screenshot({path: `${shots}/INT-014-${state}-${width}.png`, fullPage: true, animations: 'disabled'})
   }
  }
- await grant(Date.now() + 8_000)
+ await grant(Date.now() + 15_000)
  await expect(record.getByText('10 attempts per rolling hour', {exact: true})).toBeVisible()
  await capture('standing-grant')
- await page.waitForTimeout(8_100)
+ await page.waitForTimeout(15_100)
  await settings.getByRole('button', {name: 'Refresh connections', exact: true}).click()
  await expect(record.getByText('Standing grant expired', {exact: true})).toBeVisible()
  await capture('expired')
