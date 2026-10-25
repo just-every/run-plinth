@@ -41,7 +41,8 @@
         "MAIL_RELAY_URL",
         "MAIL_ACCOUNT_ID",
         "OWNER_EMAIL",
-        "IDENTITY_PROVIDER"
+        "IDENTITY_PROVIDER",
+        "MAIL_REPLY_DOMAIN"
       ],
       "secretNames": [
         "SESSION_SECRET",
@@ -50,7 +51,10 @@
         "MAIL_API_KEY"
       ],
       "optionalSecretNames": [
-        "INSTALLATION_KEY_PREVIOUS"
+        "INSTALLATION_KEY_PREVIOUS",
+        "MAIL_EVENT_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
       ],
       "healthPath": "/health",
       "recovery": "Follow OPERATIONS.md and docs/BACKUP-RESTORE.md: stop writes and scheduled work, retain the exact source and a private archive, restore with rer import into an empty installation, establish the receiving owner and mail settings, re-export and compare job records and photo bytes before routing traffic. Preserve every applied migration name and byte.",
