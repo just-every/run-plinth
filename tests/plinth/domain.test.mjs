@@ -453,7 +453,7 @@ test('INT-009 approved-change webhooks retain signed receiver-aware replay and d
   assert.equal((await post(`/connections/${connection}/deliver/${event.id}`, {confirm: true})).status, 403)
   assert.equal(received.length, 3)
   assert.equal((await post(`/connections/${connection}/revoke`)).status, 200)
-  assert.equal((await f.request(`/api/plinth/connections/${connection}/deliveries`, {cookie: f.owner})).status, 403)
+  assert.equal((await f.request(`/api/plinth/connections/${connection}/deliveries`, {cookie: f.owner})).status, 200)
  } finally { await f.close() }
 })
 
@@ -537,12 +537,152 @@ test('Only the owner session can operate native or versioned receiver controls',
   const office = await f.invite('synthetic-plinth-3@example.com', 'Office manager', 'admin'), token = await f.agent()
   for (const prefix of ['/api/plinth/connections', '/api/plinth/v1/connections']) {
    for (const credentials of [{cookie: office}, {token}]) {
-    for (const [method, suffix, body] of [['GET', ''], ['POST', '', f.consent], ['GET', `/${f.connection.subscription.id}/events`], ['GET', `/${f.connection.subscription.id}/deliveries`], ['POST', `/${f.connection.subscription.id}/rotate`, {credential_id: f.credential.id}], ['POST', `/${f.connection.subscription.id}/revoke`, {}], ['POST', `/${f.connection.subscription.id}/deliver/${f.event.id}`, {confirm: true}]]) {
+    for (const [method, suffix, body] of [['GET', ''], ['POST', '', f.consent], ['GET', `/${f.connection.subscription.id}/events`], ['GET', `/${f.connection.subscription.id}/deliveries`], ['POST', `/${f.connection.subscription.id}/grant`, {confirm: true, origin: 'https://synthetic-plinth.example', event_types: ['job.updated'], payload_class: 'references', rate_cap: 1, expires_at: new Date(Date.now()+600_000).toISOString()}], ['POST', `/${f.connection.subscription.id}/grant/revoke`, {}], ['POST', `/${f.connection.subscription.id}/rotate`, {credential_id: f.credential.id}], ['POST', `/${f.connection.subscription.id}/revoke`, {}], ['POST', `/${f.connection.subscription.id}/deliver/${f.event.id}`, {confirm: true}]]) {
      assert.equal((await f.request(prefix+suffix, {method, body, ...credentials})).status, 403, method+' '+suffix)
     }
    }
   }
   assert.equal(f.received.length, 0)
   assert.equal((await f.deliver()).value.status, 'accepted'); assert.equal(f.received.length, 1)
+ } finally { await f.close() }
+})
+
+test('INT-014 standing consent sends only future scoped events, enforces its cap and stops on revoke or expiry', async () => {
+ const {standingFixture} = await import('./standing-support.mjs')
+ let refuse = true
+ const f = await standingFixture({eventTypes: ['job.updated', 'change.approved'], receive: () => new Response(null, {status: refuse ? 503 : 202})})
+ try {
+  const client = await f.invite('client@example.com'), other = await createActiveJob(f, 'Synthetic Plinth separate job')
+  const approve = async value => {
+   const result = await f.post(`/jobs/${value.job.id}/variations/${value.record.id}/approve`, {expected_version: value.job.version}, client)
+   assert.equal(result.status, 200, JSON.stringify(result.value))
+   return result.value
+  }
+  await approve(await f.update())
+  await f.scheduled(); assert.equal(f.received.length, 0, 'A connection alone never authorizes unattended delivery')
+  for (const changes of [{confirm: false}, {origin: 'https://unconfigured.example'}, {rate_cap: 1.5}, {expires_at: new Date(0).toISOString()}]) {
+   const result = await f.post(`/connections/${f.id}/grant`, f.grantBody(changes))
+   assert.ok(result.status >= 400 && result.status < 500, JSON.stringify(result.value))
+  }
+  await f.advance()
+  const consent = await f.grant({event_types: ['change.approved'], rate_cap: 1})
+  assert.deepEqual((await f.subscription()).grant_event_types, ['change.approved'])
+  await f.scheduled(); assert.equal(f.received.length, 0, 'A grant does not sweep up pre-consent history')
+  await f.advance()
+  const draft = await f.update()
+  await f.scheduled(); assert.equal(f.received.length, 0, 'A job.updated event is outside the granted event type')
+  await approve(await f.update(other.id))
+  await f.scheduled(); assert.equal(f.received.length, 0, 'Another job is outside the connection scope')
+  await f.advance(); await approve(draft); await f.scheduled(); assert.equal(f.received.length, 1)
+  const sent = JSON.parse(f.received[0].raw)
+  assert.equal(sent.type, 'change.approved'); assert.equal(sent.job_id, f.job.id)
+  assert.equal(sent.subject_id, draft.record.id)
+  await f.advance(3 * 60_000)
+  await approve(await f.update()); await f.scheduled(); await f.scheduled()
+  assert.equal(f.received.length, 1, 'The failed attempt consumes the grant cap, including its due retry')
+  let log = await f.history()
+  assert.equal(log.length, 1); assert.equal(log[0].mode, 'standing'); assert.equal(log[0].consent_grant_id, consent.grant_id)
+  assert.equal((await f.post(`/connections/${f.id}/grant/revoke`)).status, 200)
+  assert.ok((await f.subscription()).grant_revoked_at)
+  await f.advance(); await approve(await f.update()); await f.scheduled(); assert.equal(f.received.length, 1)
+  assert.deepEqual(await f.history(), log, 'Revoked standing consent retains its inspection log')
+  refuse = false
+  assert.equal((await f.deliver(f.id)).value.status, 'accepted', 'Revoking standing consent preserves explicit manual delivery')
+  log = await f.history(); assert.equal(log.filter(row => row.mode === 'manual').length, 1)
+  await f.advance()
+  await f.grant({expires_at: new Date(Date.parse(sent.created_at) + 5 * 60_000).toISOString()})
+  await f.advance(3 * 60_000); await f.update(); await f.scheduled()
+  assert.equal(f.received.length, 2, 'An expired grant never starts a request')
+  assert.deepEqual(await f.history(), log)
+ } finally { await f.close() }
+})
+
+test('INT-014 scheduled retries retain signed event identity across rotation and receiver response loss', async () => {
+ const {standingFixture} = await import('./standing-support.mjs')
+ const {createHmac, timingSafeEqual} = await import('node:crypto')
+ let f, signingKey, attempts = 0
+ const completed = new Set(), work = []
+ f = await standingFixture({receive: request => {
+  const row = f.received.at(-1), [timestamp, digest] = row.signature.split(',').map(part => part.split('=')[1])
+  const expected = createHmac('sha256', signingKey).update(timestamp+'.'+row.raw).digest('hex')
+  assert.ok(timingSafeEqual(Buffer.from(expected), Buffer.from(digest)))
+  const body = JSON.parse(row.raw)
+  assert.equal(request.headers.get('plinth-event-id'), body.id)
+  attempts++
+  if (attempts === 1) return new Response(null, {status: 503})
+  if (!completed.has(body.id)) { completed.add(body.id); work.push(body) }
+  if (attempts === 2) throw new TypeError('Synthetic receiver response lost after committing work')
+  return new Response(null, {status: 202})
+ }})
+ try {
+  signingKey = f.connection.signing_key
+  await f.advance(); const consent = await f.grant()
+  await f.advance(); const changed = await f.update(); await f.scheduled()
+  assert.equal(f.received.length, 1)
+  await f.scheduled(); assert.equal(f.received.length, 1, 'Scheduled work waits until the failed attempt is due')
+  const rotation = await f.post(`/connections/${f.id}/rotate`, {credential_id: f.credential.id})
+  assert.equal(rotation.status, 200); signingKey = rotation.value.signing_key
+  await f.advance(2 * 60_000); await f.scheduled(); assert.equal(f.received.length, 2)
+  await f.advance(3 * 60_000); await f.scheduled(); assert.equal(f.received.length, 3)
+  assert.equal(new Set(f.received.map(row => row.raw)).size, 1, 'Every retry signs the same event body')
+  assert.equal(work.length, 1, 'The receiver deduplicates the work whose acceptance response was lost')
+  assert.deepEqual(work[0], {api_version: '1', id: work[0].id, job_id: f.job.id, job_version: changed.job.version, type: 'job.updated', subject_id: null, created_at: work[0].created_at})
+  for (const value of [f.job.name, f.job.address, f.job.client_email, changed.record.description]) assert.ok(!f.received[0].raw.includes(value))
+  const log = await f.history()
+  assert.equal(log.length, 3); assert.equal(log.filter(row => row.status === 'accepted').length, 1)
+  assert.ok(log.every(row => row.mode === 'standing' && row.consent_grant_id === consent.grant_id))
+  assert.ok(log.filter(row => row.status !== 'accepted').every(row => row.retry_at))
+  await f.advance(5 * 60_000); await f.scheduled(); assert.equal(f.received.length, 3, 'Accepted events are not sent again')
+ } finally { await f.close() }
+})
+
+test('INT-014 consecutive receiver failures pause unattended work until a fresh future-only owner grant', async () => {
+ const {standingFixture} = await import('./standing-support.mjs')
+ let refuse = true
+ const f = await standingFixture({receive: () => new Response(null, {status: refuse ? 503 : 202})})
+ try {
+  await f.advance(); const original = await f.grant()
+  await f.advance(); await f.update(); await f.scheduled()
+  await f.advance(2 * 60_000); await f.scheduled()
+  await f.advance(3 * 60_000); await f.scheduled()
+  assert.equal(f.received.length, 3)
+  await f.advance(5 * 60_000); await f.update(); await f.scheduled(); await f.scheduled()
+  assert.equal(f.received.length, 3, 'A paused connection cannot send even later events')
+  const paused = await f.subscription()
+  assert.ok(paused.paused_at); assert.ok(paused.pause_reason); assert.ok(paused.failure_count > 0)
+  assert.equal((await f.history()).length, 3)
+  refuse = false
+  await f.advance(); const renewed = await f.grant()
+  assert.notEqual(renewed.grant_id, original.grant_id)
+  assert.equal(renewed.paused_at, null)
+  assert.equal((await f.subscription()).failure_count, 0)
+  await f.scheduled(); assert.equal(f.received.length, 3, 'Renewal does not replay events accumulated during pause')
+  await f.advance(); const changed = await f.update(); await f.scheduled()
+  assert.equal(f.received.length, 4); assert.equal(JSON.parse(f.received[3].raw).job_version, changed.job.version)
+  const log = await f.history()
+  assert.equal(log.filter(row => row.status === 'accepted' && row.consent_grant_id === renewed.grant_id).length, 1)
+ } finally { await f.close() }
+})
+
+test('INT-014 scheduled delivery rechecks current credentials and job existence before contacting the receiver', async () => {
+ const {standingFixture} = await import('./standing-support.mjs')
+ const f = await standingFixture()
+ try {
+  await f.advance(); await f.grant()
+  await f.advance(); await f.update()
+  assert.equal((await f.post(`/agent-credentials/${f.credential.id}/revoke`)).status, 200)
+  await f.scheduled(); assert.equal(f.received.length, 0)
+  await f.agent()
+  const replacement = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials.find(row => row.id !== f.credential.id && !row.revoked_at)
+  assert.equal((await f.post(`/connections/${f.id}/rotate`, {credential_id: replacement.id})).status, 403)
+  const current = await f.create({credential_id: replacement.id})
+  await f.advance()
+  assert.equal((await f.post(`/connections/${current.subscription.id}/grant`, f.grantBody())).status, 200)
+  await f.advance(); const changed = await f.update()
+  assert.equal((await f.request(`/api/plinth/jobs/${f.job.id}`, {method: 'DELETE', cookie: f.owner, body: {expected_version: changed.job.version}})).status, 200)
+  await f.scheduled(); assert.equal(f.received.length, 0, 'An event for an erased job cannot leave the installation')
+  assert.deepEqual(await f.history(), [])
+  const log = await f.json(`/api/plinth/connections/${current.subscription.id}/deliveries`, {cookie: f.owner})
+  assert.equal(log.status, 200); assert.deepEqual(log.value.deliveries, [])
  } finally { await f.close() }
 })
