@@ -40,7 +40,7 @@ export async function startCheckout(env: Bindings, actor: Actor, job: Job, input
  try {
   const origin = env.AUTH_ORIGIN, meta = { plinth_attempt: id, plinth_invoice: invoice.id, plinth_job: job.id }
   session = await stripeCall<CheckoutSession>(env, '/checkout/sessions', { idempotencyKey: `plinth-checkout-${id}`, body: {
-   mode: 'payment', payment_method_types: ['card', 'us_bank_account'], client_reference_id: id, customer_email: email, metadata: meta, payment_intent_data: { metadata: meta, description: `Invoice ${snapshot.number}: ${job.name}` },
+   mode: 'payment', adaptive_pricing: { enabled: false }, client_reference_id: id, customer_email: email, metadata: meta, payment_intent_data: { metadata: meta, description: `Invoice ${snapshot.number}: ${job.name}` },
    line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: balance.due_cents, product_data: { name: `Invoice ${snapshot.number}: ${job.name}`, description: `${builder}. ${snapshot.description}`.slice(0, 500) } } }],
    success_url: `${origin}/app?job=${job.id}&tab=Billing&paid=${id}`, cancel_url: `${origin}/app?job=${job.id}&tab=Billing&canceled=${id}`, expires_at: Math.floor(now / 1000) + 23 * 3600,
   } })

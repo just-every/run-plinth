@@ -49,6 +49,16 @@
       "binding": "MAIL_EVENT_KEY",
       "environment": "MAIL_EVENT_KEY",
       "optional": true
+    },
+    {
+      "binding": "STRIPE_SECRET_KEY",
+      "environment": "STRIPE_SECRET_KEY",
+      "optional": true
+    },
+    {
+      "binding": "STRIPE_WEBHOOK_SECRET",
+      "environment": "STRIPE_WEBHOOK_SECRET",
+      "optional": true
     }
   ],
   "platforms": [

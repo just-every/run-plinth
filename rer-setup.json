@@ -13,6 +13,10 @@
     {
       "id": "mail",
       "label": "Hosted mail"
+    },
+    {
+      "id": "payments",
+      "label": "Online payments"
     }
   ],
   "fields": [
@@ -225,6 +229,26 @@
       "required": false,
       "group": "mail",
       "help": "Optional. A Cloudflare Email Routing domain whose catch-all address is routed to this Worker; each message then carries its own reply address on it."
+    },
+    {
+      "name": "STRIPE_SECRET_KEY",
+      "label": "Stripe secret key",
+      "kind": "secret",
+      "input": "entered",
+      "ownerVisible": true,
+      "required": false,
+      "group": "payments",
+      "help": "Optional. The builder's own Stripe secret key for hosted card and bank checkout of issued invoices. Use a restricted key limited to Checkout sessions, payment intents and balance transactions."
+    },
+    {
+      "name": "STRIPE_WEBHOOK_SECRET",
+      "label": "Stripe webhook signing secret",
+      "kind": "secret",
+      "input": "entered",
+      "ownerVisible": true,
+      "required": false,
+      "group": "payments",
+      "help": "Optional. The signing secret of the Stripe webhook endpoint pointed at /api/plinth/payments/stripe/events for checkout.session events."
     }
   ],
   "steps": [

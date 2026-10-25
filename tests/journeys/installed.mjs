@@ -8,7 +8,7 @@ import { resolve, join } from 'node:path'
 import { createServer } from 'node:net'
 
 const names = process.argv.slice(2), name = names.join('-')
-assert.ok(names.length && names.every(name => ['cost-billing','punch','handover','bids','todos','bid-comparison','portal-rights','role-field','audit','role-custom','field-day','connections','correspondence'].includes(name)), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights, role-field, audit, role-custom, field-day, connections or correspondence')
+assert.ok(names.length && names.every(name => ['cost-billing','punch','handover','bids','todos','bid-comparison','portal-rights','role-field','audit','role-custom','field-day','connections','correspondence','payments'].includes(name)), 'Choose punch, handover, bids, todos, bid-comparison, portal-rights, role-field, audit, role-custom, field-day, connections, correspondence or payments')
 assert.ok(!existsSync('.dev.vars') && !existsSync('.wrangler/state'), 'Use a fresh disposable checkout; this runner never resets an existing installation')
 const screenshotRoot = process.env.PLINTH_SCREENSHOTS_ROOT ?? join(homedir(), '.cache', 'plinth-journeys')
 await mkdir(screenshotRoot, {recursive:true})
@@ -51,6 +51,12 @@ try {
   // This disposable receiver origin is installation configuration, never a production default.
   await stop()
   await appendFile('.dev.vars', '\nPLINTH_WEBHOOK_ORIGINS="https://example.com"\n')
+  start(); ({base,ownerOpen,schedulerOrigin} = await waitForRuntime())
+ }
+ if (names.includes('payments')) {
+  // Disposable synthetic Stripe settings turn the hosted-checkout screens on; no provider call is made.
+  await stop()
+  await appendFile('.dev.vars', '\nSTRIPE_SECRET_KEY="synthetic-plinth-stripe-secret-1"\nSTRIPE_WEBHOOK_SECRET="synthetic-plinth-webhook-secret-1"\n')
   start(); ({base,ownerOpen,schedulerOrigin} = await waitForRuntime())
  }
  const client = new URL(ownerOpen), fragment = new URLSearchParams(client.hash.slice(1))
