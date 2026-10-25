@@ -509,17 +509,6 @@
       }
     },
     {
-      "path": "src/base/identity.ts",
-      "originPath": "foundation/runtime/identity.ts",
-      "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
-      "files": {
-        "src/base/identity.ts": "0bc7faa1ce3d7fe3839a6a68135160be45387b052e4699dc7b45d13f67cb2106"
-      },
-      "modes": {
-        "src/base/identity.ts": "100644"
-      }
-    },
-    {
       "path": "src/base/page-style.ts",
       "originPath": "foundation/runtime/page-style.ts",
       "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "parent": null,
   "edition": "just-every/run-plinth",
-  "manifest": "c54020915d100627e35a404deeb9feab33ff0a21687d8114aa97a92ce82ec74c",
+  "manifest": "d2a1cf9ba543835bbfaff86a5e3ddf5c3942854e462fd3edd44cdcc7f3290366",
   "toolchain": {
     "id": "runeditrun/edition-authoring",
     "version": "1.1.0",
@@ -26,20 +26,25 @@
           "revision": "11f94fec479228d71ba6d7dd6ea7796c0d42c544",
           "path": "foundation/runtime",
           "paths": [
-            "run-site.ts"
+            "run-site.ts",
+            "identity.ts"
           ]
         },
         "mappings": [
           {
             "path": "src/base/run-site.ts",
             "originPath": "run-site.ts"
+          },
+          {
+            "path": "src/base/identity.ts",
+            "originPath": "identity.ts"
           }
         ]
       },
       "baseline": {
-        "key": "92805868eb23f47a562445878a5004f9891aba12f361bcfba96f764eb01a6726",
-        "digest": "719d74eecd0c2be6cca859d4d299b1afae23dedbfbd75078bdf57791a4c729c4",
-        "sha256": "fba3f63b9d968355ce211353c88f29c90c7ff2202cd9c10bfabc16ce19fdfea0"
+        "key": "88ac5d4d5d3f600f917dabf3a583cdf57ebe404e91c36e78fe41a1eeb227d5f8",
+        "digest": "d6185caf18e2d1a47ee6c9dce996b8c648e4901b531136f020bd224e9b6fab54",
+        "sha256": "7f9024a10eb5382bfe346ee075f654d90888f80992c3049bb8520c57c11723d9"
       }
     },
     {
@@ -129,7 +134,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "7add8bf98f2636b73686258c149d31c1ba5936628e3edeeabb5eb83e1d01207c",
+      "sha256": "3914057c863751e04ea617202c3bafe1eb885dc96428e68d00d99be44540893e",
       "executable": false
     },
     "composition.lock.json": {
@@ -217,7 +222,7 @@
       "executable": false
     },
     "edition.json": {
-      "sha256": "c54020915d100627e35a404deeb9feab33ff0a21687d8114aa97a92ce82ec74c",
+      "sha256": "d2a1cf9ba543835bbfaff86a5e3ddf5c3942854e462fd3edd44cdcc7f3290366",
       "executable": false
     },
     "LICENSE": {
@@ -913,7 +918,7 @@
       "executable": false
     },
     "src/base/identity.ts": {
-      "sha256": "0bc7faa1ce3d7fe3839a6a68135160be45387b052e4699dc7b45d13f67cb2106",
+      "sha256": "85f79dc5201452825a2948433d1f088756ecfb75291b954aa9fb012e75367cd2",
       "executable": false
     },
     "src/base/lobby.ts": {
