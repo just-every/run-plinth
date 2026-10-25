@@ -1,6 +1,6 @@
 {
  "run": "sx-plinth-c-i816",
- "at": "2026-10-25T23:30Z",
+ "at": "2026-10-26T00:20Z",
  "clause": "PAY-001",
  "mode": "Stripe test mode through the real Plinth Worker; card paid on Stripe hosted Checkout; no key, address or card detail recorded",
  "checkout_created": true,
@@ -18,8 +18,18 @@
  "test_mode": true,
  "fee_reported": true,
  "no_card_number_stored": true,
+ "bank_transfer": {
+  "account_connected": true,
+  "returned_to_plinth": true,
+  "completed_event_unpaid": true,
+  "processing_not_credited": true,
+  "settled_event_found": true,
+  "settled_event_accepted": true,
+  "invoice_credited_once": true,
+  "method": "us_bank_account",
+  "test_mode": true
+ },
  "not_exercised": [
-  "bank transfer through Stripe's hosted Financial Connections steps (covered at the processor-event edge only)",
   "a wallet payment on a real device (the Apple Pay button was seen on the hosted page in this sandbox; no wallet payment was made)",
   "the controlled authorized live low-value transaction"
  ]
