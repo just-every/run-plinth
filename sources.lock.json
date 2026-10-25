@@ -4065,7 +4065,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "d2beece5b0f218c9672f7d2d01af00e8f949c3bb1e8f0d17282b3d2f29d75e86",
+      "sha256": "2b78f28f8ab19e8b0c77c58ed654f467c38ab61272436aa3b05a83087d5c69d7",
       "executable": false
     },
     "tests/journeys/invoices.mjs": {

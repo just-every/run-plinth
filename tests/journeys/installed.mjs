@@ -26,7 +26,7 @@ const start = () => {
 start()
 const delay = ms => new Promise(resolve => setTimeout(resolve,ms))
 function signal(sig) { try { process.kill(-child.pid,sig) } catch(error) { if(error.code!=='ESRCH')throw error } }
-async function ready() {
+async function waitForRuntime() {
  let base, ownerOpen
  for (const deadline=Date.now()+660_000;Date.now()<deadline;) {
   base = [...output.matchAll(/RER_READY\s+(https?:\/\/\S+)/g)].at(-1)?.[1]
@@ -44,12 +44,12 @@ async function stop() {
  if(!exited) { signal('SIGKILL');await delay(1000) }
 }
 try {
- let {base,ownerOpen} = await ready()
+ let {base,ownerOpen} = await waitForRuntime()
  if (names.includes('connections')) {
   // This disposable receiver origin is installation configuration, never a production default.
   await stop()
   await appendFile('.dev.vars', '\nPLINTH_WEBHOOK_ORIGINS="https://example.com"\n')
-  start(); ({base,ownerOpen} = await ready())
+  start(); ({base,ownerOpen} = await waitForRuntime())
  }
  const client = new URL(ownerOpen), fragment = new URLSearchParams(client.hash.slice(1))
  assert.ok(fragment.has('rer-dev'), 'The synthetic installation supplies its own native local dev entrance')
