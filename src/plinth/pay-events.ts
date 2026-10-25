@@ -72,8 +72,10 @@ export async function stripeEvents(request: Request, env: Bindings): Promise<Res
  if (!event.type.startsWith('checkout.session.')) { await record(env, event, body, null); return reply(200, { ignored: true }) }
  const session = event.data.object, id = session.client_reference_id ?? session.metadata?.plinth_attempt
  const attempt = typeof id === 'string' ? await attemptOf(env.DB, id) : null
+ // The builder's Stripe account may carry other business: a session with no instruction here is not ours and is acknowledged untouched, so Stripe never disables the endpoint over it.
+ if (!attempt) return reply(200, { ignored: true })
  // The signature proves Stripe sent it; only this installation's own instruction, session, amount and mode make it ours.
- if (!attempt || attempt.session_id !== session.id || session.currency !== 'usd' || session.amount_total !== attempt.amount_cents || (attempt.livemode === 1) !== !!event.livemode) return reply(400, { error: 'event_unauthorized', message: 'The event does not match a payment instruction of this installation' })
+ if (attempt.session_id !== session.id || session.currency !== 'usd' || session.amount_total !== attempt.amount_cents || (attempt.livemode === 1) !== !!event.livemode) return reply(400, { error: 'event_unauthorized', message: 'The event does not match a payment instruction of this installation' })
  try {
   if (event.type === 'checkout.session.completed' && session.payment_status === 'paid' || event.type === 'checkout.session.async_payment_succeeded') await settle(env, attempt, session, event, body)
   else if (event.type === 'checkout.session.completed') await record(env, event, body, attempt, { status: 'processing', label: 'Bank payment processing; the invoice is credited only when the processor confirms it', only: ['open'] })

@@ -59,5 +59,47 @@ try {
  receipt.processor_references = !!after.receipts[0]?.processor?.payment_intent_id?.startsWith('pi_') && after.receipts[0].processor.checkout_session_id.startsWith('cs_')
  receipt.method = after.receipts[0]?.processor?.method; receipt.test_mode = after.receipts[0]?.processor?.livemode === false; receipt.fee_reported = typeof attempt.fee_cents === 'number'
  receipt.no_card_number_stored = !JSON.stringify([after, attempt]).includes('4242')
+
+ // Bank transfer: Stripe's hosted Financial Connections test institution, then the processor settles asynchronously.
+ job = (await api(`/jobs/${job.id}`)).value.job
+ const bankInvoice = await invoice(2600), bankStart = await pay(bankInvoice), bank = {}
+ const bp = await (await browser.newContext()).newPage()
+ await bp.goto(bankStart.value.url, { waitUntil: 'domcontentloaded' })
+ await bp.getByText('US bank account', { exact: true }).waitFor({ timeout: 60_000 })
+ await bp.locator('#payment-method-label-us_bank_account').click({ force: true })
+ await bp.getByLabel('Full name').fill('Alex Chen')
+ await bp.getByText('Test (Non-OAuth)').click()
+ const inModal = async fn => { for (const fr of bp.frames()) { if (!/js\.stripe\.com/.test(fr.url())) continue; const t = await fr.evaluate(() => document.body?.innerText ?? '').catch(() => ''); if (t && !/^Pay with/.test(t) && await fn(fr, t)) return true } return false }
+ const press = re => inModal(async fr => { const b = fr.getByRole('button', { name: re }); if (await b.count()) { await b.first().click(); return true } return false })
+ for (let n = 0; n < 12; n++) {
+  await bp.waitForTimeout(5000)
+  if (await bp.locator('text=/••••6789|Success.*6789/').count()) break
+  await inModal(async (fr, t) => {
+   if (/Sign up or log in/.test(t)) { await fr.locator('input[type=email]').first().fill('synthetic-plinth-client@example.com'); await fr.locator('input[type=tel]').first().fill('2015550123'); return press(/Continue|Sign up|Log in/i) }
+   if (/Select account/.test(t)) { await fr.getByText(/^Success$/).first().click(); await bp.waitForTimeout(1500); return press(/Connect account|Confirm|Continue/i) }
+   return press(/Agree and continue|Connect account|Confirm|Done|Continue/i)
+  })
+ }
+ bank.account_connected = await bp.locator('text=/6789/').count() > 0
+ await bp.locator('.SubmitButton').click()
+ await bp.waitForURL(url => url.origin === f.origin, { timeout: 120_000 })
+ bank.returned_to_plinth = true
+ const bankAttempt = (await f.json(`/api/plinth/jobs/${job.id}/payments`, { cookie: f.owner })).value.attempts.find(a => a.invoice_id === bankInvoice).id
+ let completed
+ for (let n = 0; n < 30 && !completed; n++) { completed = (await events('checkout.session.completed')).find(e => e.data.object.client_reference_id === bankAttempt); if (!completed) await new Promise(r => setTimeout(r, 2000)) }
+ bank.completed_event_unpaid = completed?.data.object.payment_status === 'unpaid'
+ await send(completed)
+ const processing = (await f.json(`/api/plinth/jobs/${job.id}/payments`, { cookie: f.owner })).value.attempts.find(a => a.id === bankAttempt)
+ bank.processing_not_credited = processing.status === 'processing' && (await f.json(`/api/plinth/jobs/${job.id}`, { cookie: f.owner })).value.job.invoices.find(i => i.id === bankInvoice).balance.due_cents === 2600
+ let settled
+ for (let n = 0; n < 150 && !settled; n++) { settled = (await events('checkout.session.async_payment_succeeded')).find(e => e.data.object.client_reference_id === bankAttempt); if (!settled) await new Promise(r => setTimeout(r, 4000)) }
+ bank.settled_event_found = !!settled
+ if (settled) {
+  bank.settled_event_accepted = (await send(settled)).status === 200
+  const done = (await f.json(`/api/plinth/jobs/${job.id}`, { cookie: f.owner })).value.job.invoices.find(i => i.id === bankInvoice)
+  bank.invoice_credited_once = done.receipts.length === 1 && done.balance.due_cents === 0
+  bank.method = done.receipts[0]?.processor?.method; bank.test_mode = done.receipts[0]?.processor?.livemode === false
+ }
+ receipt.bank_transfer = bank
  console.log(JSON.stringify(receipt, null, 1))
 } finally { await browser.close(); await f.mf.dispose() }
