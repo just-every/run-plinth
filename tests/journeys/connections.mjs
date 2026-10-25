@@ -50,7 +50,7 @@ try {
  assert.equal(denied.status(), 400)
  await post(`/connections/${connection.subscription.id}/revoke`)
  await page.reload(); await page.getByRole('button', {name: 'Audit history', exact: true}).click()
- await page.getByLabel('Search', {exact: true}).fill('connector.'); await page.getByRole('button', {name: 'Search history', exact: true}).click()
+ await page.getByLabel('Search', {exact: true}).fill(connection.subscription.id); await page.getByRole('button', {name: 'Search history', exact: true}).click()
  await expect(page.getByText('connector.consent', {exact: true})).toBeVisible(); await expect(page.getByText('connector.revoke', {exact: true})).toBeVisible()
  for (const width of [1440,390]) {
   await page.setViewportSize({width, height: 1000}); await page.evaluate(() => scrollTo(0,0))
