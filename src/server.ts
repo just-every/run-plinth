@@ -1,4 +1,4 @@
-import { warrantyScheduled } from './plinth/warranty-cron'
+import { plinthScheduled } from './plinth/scheduled'
 import { withDemo } from './modules/demo/index.mjs'
 import { seedDemo } from './demo'
 import { rejectedResponse } from './base/rejected-response'
@@ -27,7 +27,7 @@ function noTransform(response: Response): Response {
 }
 
 export default withDemo({
-  scheduled: warrantyScheduled,
+  scheduled: plinthScheduled,
   async fetch(request, env, execution) {
     const asset = await staticAssetResponse(request, env)
     if (asset) return asset

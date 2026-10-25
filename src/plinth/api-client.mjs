@@ -184,6 +184,34 @@ const operations = {
         }
       }
     ]
+  },
+  "grantConnection": {
+    "path": "/connections/{connection_id}/grant",
+    "method": "POST",
+    "parameters": [
+      {
+        "name": "connection_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ]
+  },
+  "revokeConnectionGrant": {
+    "path": "/connections/{connection_id}/grant/revoke",
+    "method": "POST",
+    "parameters": [
+      {
+        "name": "connection_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ]
   }
 }
 export function createClient({origin, token, cookie, fetch: send = fetch}) {

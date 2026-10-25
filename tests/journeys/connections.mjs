@@ -108,6 +108,23 @@ try {
  await record.getByRole('button', {name: 'Refresh history', exact: true}).click()
  await expect(record.locator('.connection-attempts > li')).toHaveCount(deliveryRows.length)
  await capture('delivery-history')
+ for (let retry = 0; retry < 2; retry++) {
+  const history = (await (await context.request.get(base + `/api/plinth/connections/${connection.subscription.id}/deliveries`)).json()).deliveries
+  const due = Math.max(...history.filter(row => row.retry_at).map(row => Date.parse(row.retry_at)))
+  assert.ok(Number.isFinite(due), 'Failed receiver publishes its retry due time')
+  let remaining = due - Date.now() + 250
+  while (remaining > 0) { const wait = Math.min(remaining, 30_000); await page.waitForTimeout(wait); remaining = due - Date.now() + 250 }
+  assert.equal((await context.request.get(base + '/cdn-cgi/handler/scheduled?cron=0+*+*+*+*')).status(), 200)
+ }
+ await settings.getByRole('button', {name: 'Refresh connections', exact: true}).click()
+ await record.getByRole('button', {name: 'Refresh history', exact: true}).click()
+ await expect(record.locator(':scope > summary').getByText('Delivery paused', {exact: true})).toBeVisible()
+ await expect(record.locator('.connection-attempts > li')).toHaveCount(3)
+ await capture('paused')
+ const stopped = await context.request.get(base + '/cdn-cgi/handler/scheduled?cron=0+*+*+*+*')
+ assert.equal(stopped.status(), 200)
+ const pausedLog = (await (await context.request.get(base + `/api/plinth/connections/${connection.subscription.id}/deliveries`)).json()).deliveries
+ assert.equal(pausedLog.length, 3, 'Pause prevents any later outbound attempt')
  const events = (await (await context.request.get(base+`/api/plinth/connections/${connection.subscription.id}/events`)).json()).events
  assert.ok(events.length)
  // Refused consent never creates an attempt. Positive signed delivery uses the real receiver edge in domain.test.mjs.
@@ -116,7 +133,7 @@ try {
  await record.getByRole('button', {name: 'Revoke standing grant', exact: true}).click()
  await expect(record.getByText('Standing grant revoked', {exact: true})).toBeVisible()
  await record.getByRole('button', {name: 'Refresh history', exact: true}).click()
- await expect(record.locator('.connection-attempts > li')).toHaveCount(deliveryRows.length)
+ await expect(record.locator('.connection-attempts > li')).toHaveCount(3)
  await capture('grant-revoked')
  await security.locator('summary').click()
  await security.getByRole('checkbox', {name: 'I want to revoke this receiver and stop all further deliveries.', exact: true}).check()
@@ -137,6 +154,7 @@ try {
  await expect(page.getByText('connector.consent', {exact: true})).toHaveCount(1)
  await expect(page.getByText('connector.revoke', {exact: true})).toHaveCount(1)
  await expect(page.getByText('connector.consent', {exact: true})).toBeVisible(); await expect(page.getByText('connector.revoke', {exact: true})).toBeVisible()
+ const auditRows = (await (await context.request.get(base+'/api/plinth/audit?q='+connection.subscription.id)).json()).events
  for (const width of [1440,390]) {
   await page.setViewportSize({width, height: 1000}); await page.evaluate(() => scrollTo(0,0))
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1), 'Audit history fits '+width)
@@ -156,7 +174,7 @@ try {
   }
   await expect(page.getByText('connector.consent', {exact: true})).toHaveCount(1)
   await expect(page.getByText('connector.revoke', {exact: true})).toHaveCount(1)
-  await expect(page.locator('tbody tr')).toHaveCount(2)
+  await expect(page.locator('tbody tr')).toHaveCount(auditRows.length)
   await page.screenshot({path: `${shots}/INT-009-audit-${width}.png`, fullPage: true, animations: 'disabled'})
   if (width === 390) {
    await page.locator('.table-scroll').evaluate(el => { el.scrollLeft = el.scrollWidth })
@@ -166,5 +184,5 @@ try {
  const history = (await (await context.request.get(base+'/api/plinth/audit?action=connector.attempt')).json()).events
  assert.ok(history.some(row => row.subject_id === connection.subscription.id), 'Standing-consent outbound attempt is audited')
  await context.close()
- console.log('INT-009 and INT-014 PASS: installed generated-client draft and approval refusal; owner receiver creation, standing grant, real expiry, renewal, key rotation, grant and receiver revocation, retained delivery history, refused unconsented send, audit history and tooltips at 1440 and 390')
+ console.log('INT-009 and INT-014 PASS: installed generated-client draft and approval refusal; owner receiver creation, standing grant, failure pause, real expiry, renewal, key rotation, grant and receiver revocation, retained delivery history, refused unconsented send, audit history and tooltips at 1440 and 390')
 } finally { await browser.close() }

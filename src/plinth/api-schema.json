@@ -196,24 +196,6 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Sign in required"
-          },
-          "403": {
-            "description": "Current authority refused"
-          },
-          "404": {
-            "description": "Unavailable record"
-          },
-          "409": {
-            "description": "Stale version or conflicting replay"
-          },
-          "429": {
-            "description": "60 requests per person per UTC minute"
-          },
           "201": {
             "description": "Current authorized result",
             "content": {
@@ -240,6 +222,24 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Current authority refused"
+          },
+          "404": {
+            "description": "Unavailable record"
+          },
+          "409": {
+            "description": "Stale version or conflicting replay"
+          },
+          "429": {
+            "description": "60 requests per person per UTC minute"
           }
         },
         "requestBody": {
@@ -394,24 +394,6 @@
         "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
         "parameters": [],
         "responses": {
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Sign in required"
-          },
-          "403": {
-            "description": "Authority or receiver origin refused"
-          },
-          "404": {
-            "description": "Record unavailable to this receiver"
-          },
-          "409": {
-            "description": "Concurrent record or grant change"
-          },
-          "429": {
-            "description": "Rate limit; Retry-After is 60 seconds"
-          },
           "201": {
             "description": "Current result",
             "content": {
@@ -434,6 +416,24 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
           }
         },
         "requestBody": {
@@ -690,7 +690,7 @@
             "session": []
           }
         ],
-        "description": "Owner session and current receiver grant required. Matching Origin required for mutation. 60 requests per person per UTC minute, shared with version 1 reads and drafts.",
+        "description": "Owner session reads retained delivery attempts, including after grant expiry or receiver revocation. Retries retain event identity; receivers must deduplicate final work by event ID.",
         "parameters": [
           {
             "name": "connection_id",
@@ -864,6 +864,190 @@
           }
         }
       }
+    },
+    "/connections/{connection_id}/grant": {
+      "post": {
+        "operationId": "grantConnection",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session explicitly consents to unattended reference delivery of future events within this origin, event scope, rolling hourly attempt cap and expiry. A new grant clears pause; current credentials, job scope, public HTTPS configuration and refused redirects remain required at send.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Granted standing scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscription": {
+                      "$ref": "#/components/schemas/Subscription"
+                    }
+                  },
+                  "required": [
+                    "subscription"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "confirm",
+                  "origin",
+                  "event_types",
+                  "payload_class",
+                  "rate_cap",
+                  "expires_at"
+                ],
+                "properties": {
+                  "confirm": {
+                    "const": true
+                  },
+                  "origin": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "event_types": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "enum": [
+                        "job.updated",
+                        "financial.updated",
+                        "decision.approved",
+                        "change.approved"
+                      ]
+                    }
+                  },
+                  "payload_class": {
+                    "const": "references"
+                  },
+                  "rate_cap": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{connection_id}/grant/revoke": {
+      "post": {
+        "operationId": "revokeConnectionGrant",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session revokes standing consent. Manual attempts still require separate explicit per-attempt consent. Retained delivery history remains inspectable.",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -979,6 +1163,77 @@
               "string",
               "null"
             ]
+          },
+          "grant_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_origin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_payload_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paused_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pause_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_retry_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grant_rate_cap": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "grant_after": {
+            "type": "integer"
+          },
+          "failure_count": {
+            "type": "integer"
+          },
+          "grant_event_types": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "job.updated",
+                "financial.updated",
+                "decision.approved",
+                "change.approved"
+              ]
+            }
           }
         },
         "required": [
@@ -1143,6 +1398,24 @@
           "http_status": {
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "standing"
+            ]
+          },
+          "consent_grant_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retry_at": {
+            "type": [
+              "string",
               "null"
             ]
           }

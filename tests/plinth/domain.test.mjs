@@ -600,13 +600,15 @@ test('INT-014 standing consent sends only future scoped events, enforces its cap
 test('INT-014 scheduled retries retain signed event identity across rotation and receiver response loss', async () => {
  const {standingFixture} = await import('./standing-support.mjs')
  const {createHmac, timingSafeEqual} = await import('node:crypto')
- let f, signingKey, attempts = 0
+ let f, signingKey, consentGrant, attempts = 0
  const completed = new Set(), work = []
- f = await standingFixture({receive: request => {
+ f = await standingFixture({receive: async request => {
   const row = f.received.at(-1), [timestamp, digest] = row.signature.split(',').map(part => part.split('=')[1])
   const expected = createHmac('sha256', signingKey).update(timestamp+'.'+row.raw).digest('hex')
   assert.ok(timingSafeEqual(Buffer.from(expected), Buffer.from(digest)))
   const body = JSON.parse(row.raw)
+  const audit = (await f.json('/api/plinth/audit?action=connector.attempt', {cookie: f.owner})).value.events.find(item => item.detail.event_id === body.id && item.detail.grant_id === consentGrant)
+  assert.ok(audit, 'Standing consent is committed before the receiver is contacted'); assert.equal(audit.source, 'automation'); assert.equal(audit.detail.consent, true); assert.ok(audit.detail.consent_owner_id)
   assert.equal(request.headers.get('plinth-event-id'), body.id)
   attempts++
   if (attempts === 1) return new Response(null, {status: 503})
@@ -616,7 +618,7 @@ test('INT-014 scheduled retries retain signed event identity across rotation and
  }})
  try {
   signingKey = f.connection.signing_key
-  await f.advance(); const consent = await f.grant()
+  await f.advance(); const consent = await f.grant(); consentGrant = consent.grant_id
   await f.advance(); const changed = await f.update(); await f.scheduled()
   assert.equal(f.received.length, 1)
   await f.scheduled(); assert.equal(f.received.length, 1, 'Scheduled work waits until the failed attempt is due')
