@@ -48,6 +48,9 @@ export interface Bindings {
  MAIL_EVENT_KEY?: string
  /** INT-007: the Cloudflare Email Routing domain whose catch-all address reaches this Worker; replies carry per-message addresses on it. */
  MAIL_REPLY_DOMAIN?: string
+ /** PAY-001: the builder's Stripe secret key and the signing secret of the webhook endpoint that delivers its events; both are deployment secrets, never stored in Plinth data. */
+ STRIPE_SECRET_KEY?: string
+ STRIPE_WEBHOOK_SECRET?: string
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env

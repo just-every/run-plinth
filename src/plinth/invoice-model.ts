@@ -25,9 +25,11 @@ export interface InvoiceSnapshot {
  earned_revenue_cents: number; subtotal_cents: number; tax_cents: number; lines: InvoiceTaxLine[]; sources: InvoiceSources
 }
 export interface InvoiceReceipt {
- id: string; amount_cents: number; received_on: string; reference: string; method: 'bank' | 'check'
+ id: string; amount_cents: number; received_on: string; reference: string; method: 'bank' | 'check' | 'stripe'
  remittance_id?: string; reversal_of?: string
- recorded_by: Stamp; label: 'Recorded by staff; Plinth did not move or independently verify funds' | 'Return recorded by staff; allocation reversed, no funds moved or independently verified' | 'Return recorded by staff; receipt reversed, no funds moved or independently verified' | 'Return recorded by staff; partial receipt reversal, no funds moved or independently verified'
+ /** PAY-001: the processor references of a payment Stripe settled; never a card or bank number. */
+ processor?: { name: 'stripe'; attempt_id: string; checkout_session_id: string; payment_intent_id: string; method: string; wallet: string | null; fee_cents: number | null; livemode: boolean }
+ recorded_by: Stamp; label: 'Settled by the processor and recorded from a signed Stripe event; Plinth did not hold the funds' | 'Recorded by staff; Plinth did not move or independently verify funds' | 'Return recorded by staff; allocation reversed, no funds moved or independently verified' | 'Return recorded by staff; receipt reversed, no funds moved or independently verified' | 'Return recorded by staff; partial receipt reversal, no funds moved or independently verified'
 }
 export interface InvoiceDepositApplication { id: string; deposit_invoice_id: string; amount_cents: number; recorded_by: Stamp }
 export interface InvoiceDelivery {

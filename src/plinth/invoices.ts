@@ -34,7 +34,7 @@ export function invoiceProjection(job: Job, actor?: Actor) {
  return invoiceRows(job).filter(i => i.status === 'issued' && i.issued).map(i => ({
   id: i.id, kind: i.kind, status: i.status, number: i.number, description: i.description, due_on: i.due_on, terms: i.terms,
   recipient_email: i.recipient_email, amount_cents: i.amount_cents, source_application_id: i.source_application_id,
-  issued: publicSnapshot(i.issued!), receipts: i.receipts.map(r => ({ id: r.id, amount_cents: r.amount_cents, received_on: r.received_on, reference: r.reference, method: r.method, recorded_by: r.recorded_by, label: r.label })),
+  issued: publicSnapshot(i.issued!), receipts: i.receipts.map(r => ({ id: r.id, amount_cents: r.amount_cents, received_on: r.received_on, reference: r.reference, method: r.method, recorded_by: r.recorded_by, label: r.label, ...(r.processor ? { processor: { name: r.processor.name, payment_intent_id: r.processor.payment_intent_id, method: r.processor.method, wallet: r.processor.wallet, livemode: r.processor.livemode } } : {}) })),
   deposit_applications: structuredClone(i.deposit_applications), acceptance: i.acceptance, delivery: i.delivery, balance: invoiceBalance(job, i),
  }))
 }
@@ -112,6 +112,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   } else if (action === 'return-receipt') {
    need(input.confirm === true, 'Confirm the external bank/check return; Plinth does not move or independently verify funds')
    const receipt = find(row.receipts, text(input.receipt_id, 'receipt_id', 100))
+   need(!receipt.processor, 'A processor payment is refunded through the processor, not recorded as a staff return', 409, 'processor_receipt')
    need(!receipt.remittance_id, 'Return a remittance through its remittance return door so all allocations reconcile together', 409, 'remittance_history')
    need(receipt.amount_cents > 0 && !receipt.reversal_of, 'Choose an original positive receipt', 409, 'receipt_returned')
    const remaining = sum([receipt.amount_cents, ...row.receipts.filter(r => r.reversal_of === receipt.id).map(r => r.amount_cents)])
