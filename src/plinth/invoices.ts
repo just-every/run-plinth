@@ -1,4 +1,5 @@
 import { costBilling, costBillingAccess, refreshCostBilling } from './cost-billing'
+import { correctInvoice, isInvoiceCorrection, requireReviewedInvoiceCapacity } from './invoice-corrections'
 import { requireJobManager } from './auth'
 import { clientAccess } from './job-customers'
 import { cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
@@ -16,9 +17,12 @@ export function invoiceBalance(job: Job, invoice: Invoice): InvoiceBalance {
  const released_retainage_cents = sum(releases.map(r => r.amount_cents))
  const captured = new Set(invoice.issued?.sources.retainage?.state.releases.map(r => r.id) ?? [])
  const later_released_cents = sum(releases.filter(r => !captured.has(r.id)).map(r => r.amount_cents))
- const payable_cents = sum([invoice.issued?.payable_cents ?? gross_cents - withheld_cents, invoice.issued ? later_released_cents : 0])
+ const correction_cents = sum((invoice.corrections ?? []).map(c => c.document.gross_cents))
+ const credited_cents = -sum((invoice.corrections ?? []).filter(c => c.document.gross_cents < 0).map(c => c.document.gross_cents)), debited_cents = sum((invoice.corrections ?? []).filter(c => c.document.gross_cents > 0).map(c => c.document.gross_cents))
+ const written_off_cents = sum((invoice.write_offs ?? []).map(w => w.amount_cents))
+ const payable_cents = sum([invoice.issued?.payable_cents ?? gross_cents - withheld_cents, invoice.issued ? later_released_cents : 0, correction_cents])
  const deposit_applied_cents = sum(invoice.deposit_applications.map(a => a.amount_cents)), received_cents = sum(invoice.receipts.map(r => r.amount_cents))
- return { gross_cents, withheld_cents, released_retainage_cents, payable_cents, deposit_applied_cents, received_cents, due_cents: sum([payable_cents, -deposit_applied_cents, -received_cents]) }
+ return { gross_cents, withheld_cents, released_retainage_cents, payable_cents, correction_cents, credited_cents, debited_cents, written_off_cents, deposit_applied_cents, received_cents, due_cents: sum([payable_cents, -deposit_applied_cents, -received_cents, -written_off_cents]) }
 }
 function depositAvailable(job: Job, deposit: Invoice) {
  return sum([...deposit.receipts.map(r => r.amount_cents), ...invoiceRows(job).flatMap(i => i.deposit_applications.filter(a => a.deposit_invoice_id === deposit.id).map(a => -a.amount_cents))])
@@ -34,8 +38,9 @@ export function invoiceProjection(job: Job, actor?: Actor) {
  return invoiceRows(job).filter(i => i.status === 'issued' && i.issued).map(i => ({
   id: i.id, kind: i.kind, status: i.status, number: i.number, description: i.description, due_on: i.due_on, terms: i.terms,
   recipient_email: i.recipient_email, amount_cents: i.amount_cents, source_application_id: i.source_application_id,
-  issued: publicSnapshot(i.issued!), receipts: i.receipts.map(r => ({ id: r.id, amount_cents: r.amount_cents, received_on: r.received_on, reference: r.reference, method: r.method, recorded_by: r.recorded_by, label: r.label, ...(r.processor ? { processor: { name: r.processor.name, payment_intent_id: r.processor.payment_intent_id, method: r.processor.method, wallet: r.processor.wallet, livemode: r.processor.livemode } } : {}) })),
+  issued: publicSnapshot(i.issued!), receipts: i.receipts.map(r => ({ id: r.id, amount_cents: r.amount_cents, received_on: r.received_on, reference: r.reference, method: r.method, recorded_by: r.recorded_by, label: r.label, ...(r.processor ? { processor: { confirmation: r.processor.confirmation, name: r.processor.name, payment_intent_id: r.processor.payment_intent_id, method: r.processor.method, wallet: r.processor.wallet, livemode: r.processor.livemode } } : {}) })),
   deposit_applications: structuredClone(i.deposit_applications), acceptance: i.acceptance, delivery: i.delivery, balance: invoiceBalance(job, i),
+  corrections: (i.corrections ?? []).map(c => { const { accounting_entries: _entries, ...document } = c.document; return { id: c.id, document: structuredClone(document) } }),
  }))
 }
 /** Mutates only the caller's cloned job. All returned guards/counter writes belong in its optimistic transaction. */
@@ -66,6 +71,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   return { record, writes }
  }
  const row = find(invoiceRows(job), id)
+ if (isInvoiceCorrection(action)) return { record: row, writes: await correctInvoice(db, job, row, actor, input, action!, invoiceBalance(job, row)) }
  if (action === 'accept') {
   need(actor.role === 'member' && await clientAccess(db, job, actor.email), 'Only a currently assigned signed-in client may acknowledge this invoice', 403, 'forbidden')
   need(row.issued && !row.acceptance, 'Issue the invoice first; acknowledgment is recorded once', 409, 'invoice_state')
@@ -84,10 +90,11 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   need(invoiceDigest(sources) === row.source_digest, 'Approval sources changed; prepare a fresh invoice', 409, 'invoice_stale')
   need(!row.source_application_id || !invoiceRows(job).some(i => i.id !== row.id && i.issued && i.source_application_id === row.source_application_id), 'This application already has an issued invoice', 409, 'invoice_duplicate')
   const lines = invoiceLines(job, row, sources)
+  requireReviewedInvoiceCapacity(job, row, lines)
   need(JSON.stringify(lines) === JSON.stringify(row.lines), 'Earlier invoice allocations changed; prepare a fresh invoice', 409, 'invoice_stale')
   need(row.kind!=='milestone'||!invoiceRows(job).some(i=>i.kind==='cost_plus'&&i.issued),'Cost billing cannot share earned sources with milestone invoices',409,'cost_billing_mode')
-  const billed = sum(invoiceRows(job).filter(i => i.kind !== 'deposit' && i.issued).map(i => i.issued!.gross_cents))
-  const deposits = sum(invoiceRows(job).filter(i => i.kind === 'deposit' && i.issued).map(i => i.issued!.gross_cents))
+  const billed = sum(invoiceRows(job).filter(i => i.kind !== 'deposit' && i.issued).map(i => sum([i.issued!.gross_cents, ...i.corrections?.map(c => c.document.gross_cents) ?? []])))
+  const deposits = sum(invoiceRows(job).filter(i => i.kind === 'deposit' && i.issued).map(i => sum([i.issued!.gross_cents, ...i.corrections?.map(c => c.document.gross_cents) ?? []])))
   need(row.kind === 'deposit' ? sum([deposits, row.amount_cents]) <= sources.current_budget.contract_cents : sum([billed, row.amount_cents]) <= sources.current_budget.contract_cents, 'Invoice exceeds the approved contract ', 409, 'invoice_balance')
   const counter = await db.prepare('SELECT next_number FROM pl_invoice_sequence WHERE id=1').first<{ next_number: number }>()
   need(counter && Number.isSafeInteger(counter.next_number) && counter.next_number > 0 && counter.next_number < 1_000_000_000_000, 'Invoice numbering is unavailable', 409, 'invoice_sequence')

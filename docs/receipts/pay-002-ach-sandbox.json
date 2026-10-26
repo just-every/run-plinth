@@ -1,0 +1,15 @@
+{
+  "run": "sx-plinth-c-i817",
+  "at": "2026-10-26T10:46:47.631Z",
+  "mode": "Real Stripe test-mode ACH hosted Checkout, microdeposit verification and processor records",
+  "ach": {
+    "hosted_checkout_completed": true,
+    "requires_microdeposit_verification": true,
+    "verified": true,
+    "processing_without_credit": true,
+    "settled_before_return": true,
+    "returned": true,
+    "open_balance_cents": 2600,
+    "original_settlement_preserved": true
+  }
+}

@@ -23,8 +23,8 @@ export async function stripeCall<T>(env: Bindings, path: string, options: { body
    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...(options.body ? { 'content-type': 'application/x-www-form-urlencoded' } : {}), ...(options.idempotencyKey ? { 'idempotency-key': options.idempotencyKey } : {}) },
    ...(options.body ? { body: formBody(options.body) } : {}),
   })
- } catch { throw new DomainError('payment_provider', 'Stripe could not be reached; nothing was charged', 502) }
- if (!response.ok) { await response.body?.cancel(); throw new DomainError('payment_provider', 'Stripe refused the request; nothing was charged', 502) }
+ } catch { throw new DomainError('payment_provider', 'Stripe could not be reached; the instruction remains unresolved until reconciliation', 502) }
+ if (!response.ok) { await response.body?.cancel(); throw new DomainError('payment_provider', 'Stripe did not confirm the instruction; reconcile before trying again', 502) }
  try { return await response.json() as T } catch { throw new DomainError('payment_provider', 'Stripe returned an unreadable answer', 502) }
 }
 const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('')
@@ -39,4 +39,12 @@ export async function verifyStripeSignature(rawBody: string, header: string | nu
  return parts.some(([k, v]) => k === 'v1' && v !== undefined && same(v, expected))
 }
 export interface CheckoutSession { id: string; url: string | null; livemode: boolean; payment_status?: string; status?: string; expires_at?: number; payment_intent?: string | null; amount_total?: number; currency?: string; client_reference_id?: string | null; metadata?: Record<string, string> }
-export interface PaymentIntent { id: string; status: string; amount: number; amount_received: number; currency: string; livemode: boolean; latest_charge?: { payment_method_details?: { type?: string; card?: { wallet?: { type?: string } | null } }; balance_transaction?: { fee?: number } | string | null } | string | null }
+export interface StripeDispute { id: string; status: string; amount: number; reason?: string; payment_intent?: string; charge?: string }
+export interface StripeRefund { id: string; status: string; amount: number; payment_intent?: string; charge?: string; metadata?: Record<string, string> }
+export interface StripeCharge {
+ id: string; status?: string; amount: number; amount_refunded?: number; refunded?: boolean; disputed?: boolean; failure_code?: string | null
+ payment_intent?: string; metadata?: Record<string, string>; dispute?: StripeDispute | string | null
+ refunds?: { data: StripeRefund[] }; payment_method_details?: { type?: string; card?: { wallet?: { type?: string } | null } }
+ balance_transaction?: { fee?: number } | string | null
+}
+export interface PaymentIntent { id: string; status: string; amount: number; amount_received: number; currency: string; livemode: boolean; metadata?: Record<string, string>; latest_charge?: StripeCharge | string | null }

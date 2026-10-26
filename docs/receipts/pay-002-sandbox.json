@@ -1,0 +1,32 @@
+{
+  "run": "sx-plinth-c-i817",
+  "at": "2026-10-26T09:49:24.270Z",
+  "mode": "Real Stripe test mode through the real Plinth Worker; real events delivered under an installation-local signing secret",
+  "card": {
+    "real_dispute": true,
+    "real_completed_event": true,
+    "duplicate_no_effect": true,
+    "forged_refused": true,
+    "out_of_order_no_false_settlement": true,
+    "state": "disputed",
+    "original_settlement_preserved": true,
+    "open_balance_cents": 2500,
+    "provider_dispute_cents": 2500
+  },
+  "refund": {
+    "paid_change_invoice": true,
+    "linked_credit": true,
+    "processor_status": "succeeded",
+    "replay_reused": true,
+    "one_real_refund": true,
+    "provider_refunded_cents": 2200,
+    "adjusted_balance_cents": 0,
+    "original_unchanged": true
+  },
+  "uncertain": {
+    "unresolved_until_reconciliation": true,
+    "repeat_refused": true,
+    "one_real_session": true,
+    "recovered_same_instruction": true
+  }
+}
