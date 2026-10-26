@@ -15,6 +15,7 @@ export type MailKind = keyof typeof mailKinds
 export type MailStatus = 'unknown' | 'accepted' | 'deferred' | 'delivered' | 'unsubscribed' | 'bounced' | 'complained' | 'refused' | 'unconfigured' | 'cancelled' | 'development' | 'suppressed' | 'received' | 'note'
 export interface MailMessage {
  id: string; job_id: string; direction: 'out' | 'in' | 'note'; visibility: 'client' | 'private'; kind: string; required: boolean; counterparty: string
+ reply_to?: string | null
  subject: string; body: string; status: MailStatus; label: string; provider_message_id: string | null; reply_to_id: string | null; sender_check: string | null
  by_id: string; by_name: string; created_at: string; status_at: string; files: { id: string; name: string; mime: string; size: number }[]
 }

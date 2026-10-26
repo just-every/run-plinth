@@ -218,7 +218,7 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   const tradeRfi=(await api('/rfi-inbox',undefined,trade)).value.jobs[0].rfis[0];assert.equal(tradeRfi.responses[0].text,response.text);assert.equal(tradeRfi.responses[0].cost_impact_cents,undefined);assert.equal(tradeRfi.responses[0].change_pending,true);assert.equal(tradeRfi.responses[0].recipient_grants,undefined,'Private distribution grant snapshots never leak through the trade view')
   const searchPath=`/rfi-inbox/${job.id}/decision-search`
   const found=await api(searchPath+'?'+new URLSearchParams({q:response.text,sheet:sheet.name,cost_code:'06-100'}),undefined,trade)
-  assert.equal(found.status,200);assert.equal(found.value.count,1);assert.equal(found.value.results[0].source,'rfis:'+job.rfis[0].id)
+  assert.equal(found.status,200);assert.equal(found.value.count,1);assert.equal(found.value.results[0].source,'rfi-responses:'+answer.id)
   assert.ok(found.value.results[0].files.some(file=>file.href.endsWith(sheet.revisions[0].document.id)),'Search links the exact distributed sheet even without a browsing grant')
   assert.equal((await api(found.value.results[0].href.replace('/api/plinth',''),undefined,trade)).value.count,1)
   assert.equal((await api(searchPath+'?q='+encodeURIComponent(response.text),undefined,other)).value.count,0,'New routing cannot expose an older published answer')

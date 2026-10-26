@@ -1,3 +1,4 @@
+import { mailText } from './mail-content'
 import { normalizeInbound, type InboundMail } from '../mail.events.mjs'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { auditStatement, automation } from './audit'
@@ -9,7 +10,7 @@ import { loadWarrantyJob } from './warranty-store'
 /** The Worker side of Cloudflare Email Routing. */
 export interface RoutedEmail { from: string; to: string; headers: Headers; raw: ReadableStream; rawSize: number; setReject(reason: string): void }
 const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('')
-const strip = (html: string) => html.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '').replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<[^>]*>/g, '').replaceAll('&nbsp;', ' ').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+
 const fileName = (name: string, n: number) => (name.replace(/[\\/\u0000-\u001f\u007f]/g, '_').replace(/^\.+/, '').trim().slice(0, 120)) || `attachment-${n + 1}`
 /** Authentication-Results from the receiving edge: any failing SPF, DKIM or DMARC verdict refuses the reply; the verdict is kept as evidence. */
 function senderCheck(headers: Headers): { ok: boolean; verdict: string } {
@@ -36,7 +37,7 @@ export async function plinthEmail(message: RoutedEmail, original: Bindings): Pro
  const job = await loadWarrantyJob(env.DB, origin.job_id)
  if (!job) return refuse(env, message, 'Unknown reply address')
  if (!await clientAccess(env.DB, job, sender)) return refuse(env, message, 'The sender no longer has access to this job', job.id)
- const id = crypto.randomUUID(), now = new Date().toISOString(), body = (mail.text ?? strip(mail.html ?? '')).trim().slice(0, 100_000)
+ const id = crypto.randomUUID(), now = new Date().toISOString(), body = (mail.text ?? mailText(mail.html ?? '')).trim().slice(0, 100_000)
  const files = await Promise.all(mail.attachments.map(async (a, n) => ({ id: crypto.randomUUID(), name: fileName(a.filename, n), mime: (a.contentType || 'application/octet-stream').slice(0, 100), checksum: hex(await crypto.subtle.digest('SHA-256', a.content as BufferSource)), bytes: a.content })))
  const writes = [
   env.DB.prepare("INSERT INTO pl_mail_messages(id,job_id,direction,visibility,kind,required,counterparty,subject,body,status,label,message_id,in_reply_to,reply_to_id,sender_check,by_id,by_name,created_at,status_at) VALUES(?,?,'in','client','reply',0,?,?,?,'received','Reply received by email',?,?,?,?,?,?,?,?)").bind(id, job.id, sender, mail.subject.slice(0, 300), body, mail.messageId, mail.inReplyTo, origin.id, check.verdict, 'inbound:' + sender, sender, now, now),
