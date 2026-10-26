@@ -150,3 +150,15 @@ FIELD-002 provides authenticated HTTP entry, corrections, supervisor approval, r
 ## Native API version 1 and receiver controls
 
 The versioned schema, generated client, draft replay semantics, rate limits and conservative owner-only webhook controls are documented in [Native API](NATIVE-API.md). INT-009 remains partial with its exact remaining scope in CONTRACT.md.
+
+## Native meeting and decision HTTP doors
+
+Meetings currently use authenticated HTTP; installed meeting and search screens are pending. The interim policy keeps meeting records private to current owners, administrators and assigned project managers, and refuses custom roles. It awaits ct approval. Clients search only their currently permitted job records and correspondence. Agents cannot record meetings or search decisions.
+
+Relative to the job endpoint, `POST /meetings` takes the current `expected_version`, `title`, `held_on`, `agenda`, `minutes`, `attendees`, `decisions`, optional `tags`, `sheet` and `cost_code`, and an `actions` list. Each action has `title`, an active office `owner_email` who currently manages the job, and `due_on`. Dates are calendar dates in YYYY-MM-DD form. Meetings are append-only records; each job supports up to 200 meetings and each meeting up to 50 actions.
+
+`POST /meetings/:meeting/add-action` adds another assigned action with the current job version. Only its currently assigned office owner can call `POST /meetings/:meeting/complete`, supplying `action_id`, `answer` and `links`, plus an optional source `message_id` from that job's correspondence. Each link has a `kind` (schedule, rfi, selection, change or daily) and the existing job record's `id`. Completion keeps a content hash and immutable snapshot of each linked work record. Its returned link opens that exact snapshot under the current job and meeting authority. It never changes the linked record or sends a message. Repeated completion is refused; no answer is overwritten.
+
+`GET /decision-search` returns `results` and `count` from current permitted records, with conjunctive optional `q`, `tag`, `sender`, `sheet`, `cost_code` and exact `source` filters. Text and sender filters use case-insensitive substring matching; tags and cost codes use case-insensitive exact matching. Results retain source identities and links. Meeting labels, RFI sheet and cost-code fields, selection comments, permitted diary notes and correspondence text and attachment names are supported today. Full attachment contents and uniform filter metadata across all sources remain pending. A missing source field cannot match a supplied filter. There is no persisted search index. Hold, archive and erasure use the existing job custody; erased or revoked sources cannot return through search.
+
+Distributing an RFI shares its exact referenced sheet revision with its assignee and recipients; the sheet grant governs only browsing and raising. External RFI recipient search remains pending and must preserve this boundary.

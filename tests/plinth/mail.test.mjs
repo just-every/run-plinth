@@ -95,3 +95,58 @@ test('INT-007 — replies are refused unless they reach a message address from i
   for (const table of ['pl_mail_messages', 'pl_mail_files', 'rer_mail_event_receipts']) assert.equal((await f.db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n, 0, `${table} is erased with the job`)
  } finally { await f.mf.dispose() }
 })
+
+test('DOC-005 — site meeting decisions retain assigned action history and the related inbound email while client search refuses private bid sources', async () => {
+ const s = await setup(), { f } = s
+ try {
+  let job = (await s.api(`/jobs/${s.job().id}`)).value.job
+  const path = `/jobs/${job.id}`, read = async () => (await s.api(path)).value.job
+  let r = await s.api(path + '/meetings', { method: 'POST', body: { expected_version: job.version, title: 'Kitchen site meeting', held_on: '2026-10-26', agenda: 'Choose cabinet finish', minutes: 'Alex and Builder reviewed samples at the site.', attendees: ['Alex Chen', 'Builder'], decisions: 'Natural oak confirmed pending email drawing', tags: ['cabinetry'], sheet: 'A-201', cost_code: '06-400', actions: [{ title: 'Record the resolved cabinet selection', owner_email: 'builder@example.com', due_on: '2026-11-03' }] } })
+  assert.equal(r.status, 200, JSON.stringify(r.value)); const meeting = r.value.record; job = await read()
+  assert.equal((await s.api(path + '/meetings', { cookie: s.client })).status, 403)
+  assert.equal((await s.api(path, { cookie: s.client })).value.job.meetings, undefined, 'Job projection never carries private minutes')
+  const find = (query, cookie = f.owner) => s.api(path + '/decision-search?' + new URLSearchParams(query), { cookie })
+  r = await find({ q: 'oak', tag: 'cabinetry', sender: 'Builder', sheet: 'A-201', cost_code: '06-400' }); assert.equal(r.value.count, 1); assert.equal(r.value.results[0].source, 'meetings:' + meeting.id)
+  assert.equal((await find({ q: 'oak', tag: 'wrong' })).value.count, 0, 'Filters combine rather than silently widen')
+  await s.send({ kind: 'selection_request', selection_id: s.selection }); const sent = f.messages.at(-1)
+  assert.deepEqual(await s.reply(sent.replyTo), { rejected: null }); const inbound = (await s.thread()).find(m => m.direction === 'in')
+  r = await find({ q: 'Natural oak', sender: 'client@example.com' }); assert.equal(r.value.count, 1); assert.equal(r.value.results[0].source, 'correspondence:' + inbound.id)
+  const direct = await s.api(r.value.results[0].href.replace('/api/plinth', '')); assert.equal(direct.value.results[0].source, 'correspondence:' + inbound.id)
+  assert.equal((await find({ q: 'drawing.pdf' }, s.client)).value.count, 1, 'Authorized attached filename is searchable')
+  await s.send({ kind: 'note', body: 'Private subcontractor bid: synthetic-plinth-secret-bid-1' })
+  assert.equal((await find({ q: 'synthetic-plinth-secret-bid-1' })).value.count, 1)
+  r = await find({ q: 'synthetic-plinth-secret-bid-1' }, s.client); assert.deepEqual(r.value, { results: [], count: 0 }); assert.ok(!JSON.stringify(r.value).includes('Private subcontractor'), 'No hidden snippet or export data')
+  job = await read(); const complete = { expected_version: job.version, action_id: meeting.actions[0].id, answer: 'Natural oak resolved from the exact client reply.', message_id: inbound.id, links: [{ kind: 'selection', id: s.selection }] }
+  r = await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', cookie: s.client, body: complete }); assert.equal(r.status, 403)
+  r = await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', body: { ...complete, links: [{ kind: 'selection', id: crypto.randomUUID() }] } }); assert.equal(r.status, 404); assert.equal((await read()).version, job.version, 'Invalid cross-record link commits nothing')
+  r = await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', body: complete }); assert.equal(r.status, 200, JSON.stringify(r.value)); assert.equal(r.value.record.completion.message_id, inbound.id); assert.equal(r.value.record.completion.links[0].id, s.selection); assert.ok(r.value.record.completion.links[0].source_ref); const sourceLink = r.value.record.completion.links[0]; const exactSource = await s.api(sourceLink.href.replace('/api/plinth', '')); const storedSelection = structuredClone(job.selections[0]); for (const revision of storedSelection.revisions) delete revision.procurement; assert.deepEqual(exactSource.value.snapshot, storedSelection); assert.equal(exactSource.value.source_ref, (await import('node:crypto')).createHash('sha256').update(JSON.stringify(exactSource.value.snapshot)).digest('hex')); assert.equal((await s.api(sourceLink.href.replace('/api/plinth', ''), { cookie: s.client })).status, 403)
+  job = await read(); assert.equal(job.meetings[0].history.at(-1).kind, 'completed'); assert.equal(job.meetings[0].actions[0].completion.by.name, 'Builder')
+  assert.equal((await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', body: { ...complete, expected_version: job.version } })).status, 409, 'Completed answers are immutable')
+  assert.equal((await find({ q: 'resolved from the exact' })).value.count, 1)
+  r = await s.api(path + `/selections/${s.selection}/comment`, { method: 'POST', body: { expected_version: job.version, revision_id: job.selections[0].revisions[0].id, text: 'Later site review adds a new source comment.' } }); assert.equal(r.status, 200); job = await read(); assert.deepEqual((await s.api(sourceLink.href.replace('/api/plinth', ''))).value, exactSource.value, 'Later source edits never rewrite the completed answer snapshot')
+  const foreign = await f.invite('synthetic-plinth-foreign@example.com'); assert.equal((await find({ q: 'oak' }, foreign)).status, 404)
+  const audit = await s.api('/audit'); assert.ok(!JSON.stringify(audit.value).includes('Natural oak resolved'), 'Audit stores references rather than private content')
+  // Current job assignments govern both reads and completion, including a formerly assigned action owner.
+  const pm = await f.invite('synthetic-plinth-pm@example.com', 'Site manager', 'admin')
+  const person = (await s.api('/team')).value.team.find(p => p.email === 'synthetic-plinth-pm@example.com')
+  assert.equal((await s.api('/team/' + person.id, { method: 'PUT', body: { expected_version: 0, role: 'project_manager', job_ids: [job.id], po_limit_cents: 0 } })).status, 200)
+  assert.equal((await find({ q: 'oak' }, pm)).status, 200)
+  r = await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', cookie: pm, body: { ...complete, expected_version: job.version } }); assert.equal(r.status, 403, 'A different manager cannot complete the assigned action')
+  r = await s.api(path + `/meetings/${meeting.id}/add-action`, { method: 'POST', body: { expected_version: job.version, title: 'Confirm the drawing on site', owner_email: person.email, due_on: '2026-11-04' } }); assert.equal(r.status, 200); const pmAction = r.value.record; job = await read()
+  assert.equal((await s.api('/team/' + person.id, { method: 'PUT', body: { expected_version: 1, role: 'project_manager', job_ids: [], po_limit_cents: 0 } })).status, 200)
+  assert.equal((await find({ q: 'oak' }, pm)).status, 404)
+  assert.equal((await s.api(path + `/meetings/${meeting.id}/complete`, { method: 'POST', cookie: pm, body: { ...complete, action_id: pmAction.id, expected_version: job.version } })).status, 404)
+  const clientPerson = (await f.json('/auth/operators', { cookie: f.owner })).value.find(p => p.email === 'client@example.com')
+  assert.equal((await f.request('/auth/operator/status', { method: 'POST', cookie: f.owner, body: { operatorId: clientPerson.id, status: 'inactive' } })).status, 200)
+  assert.equal((await find({ q: 'Natural oak' }, s.client)).status, 401)
+  assert.equal((await f.request(`/api/plinth${path}/correspondence/files/${inbound.files[0].id}`, { cookie: s.client })).status, 401)
+  const hold = await s.api('/holds', { method: 'POST', body: { subject_kind: 'job', subject_id: job.id, kind: 'legal_hold', reason: 'Meeting decision disputed', confirm: true } }); assert.equal(hold.status, 201)
+  assert.equal((await s.api(path, { method: 'DELETE', body: { expected_version: job.version } })).value.error, 'retention_hold')
+  assert.equal((await find({ q: 'resolved from the exact' })).value.count, 1)
+  assert.equal((await s.api(`/holds/${hold.value.hold.id}/release`, { method: 'POST', body: { reason: 'Decision dispute settled' } })).status, 200)
+  assert.equal((await s.api(path, { method: 'DELETE', body: { expected_version: job.version } })).status, 200)
+  assert.equal((await find({ q: 'oak' })).status, 404, 'Search cannot resurrect erased meetings or correspondence')
+  assert.equal((await f.request(`/api/plinth${path}/correspondence/files/${inbound.files[0].id}`, { cookie: f.owner })).status, 404)
+
+ } finally { await f.close() }
+})
