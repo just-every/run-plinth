@@ -56,7 +56,7 @@ export async function setup(options = {}) {
  }
  const pay = (invoice_id, o = {}) => api(`/jobs/${job.id}/payments`, { method: 'POST', cookie: client, body: { invoice_id, confirm: true }, ...o })
  const event = (type, session, extra = {}, id = `evt_synthetic_${Math.random().toString(36).slice(2)}`) => {if(!session.payment_intent&&extra.payment_intent)session.payment_intent=extra.payment_intent;return ({ id, type, livemode: false, data: { object: { id: session.id, client_reference_id: session.form.get('client_reference_id'), currency: 'usd', amount_total: Number(session.form.get('line_items[0][price_data][unit_amount]')), payment_status: 'paid', ...extra } } })}
- const send = (payload, { secret = SECRET, at = Math.floor(Date.now() / 1000) } = {}) => { const body = JSON.stringify(payload), signature = createHmac('sha256', secret).update(`${at}.${body}`).digest('hex'); return fetch(f.origin + '/api/plinth/payments/stripe/events', { method: 'POST', body, headers: { 'content-type': 'application/json', 'stripe-signature': `t=${at},v1=${signature}` } }) }
+ const send = (payload, { secret = SECRET, at = Math.floor((options.now ?? Date.now()) / 1000) } = {}) => { const body = JSON.stringify(payload), signature = createHmac('sha256', secret).update(`${at}.${body}`).digest('hex'); return fetch(f.origin + '/api/plinth/payments/stripe/events', { method: 'POST', body, headers: { 'content-type': 'application/json', 'stripe-signature': `t=${at},v1=${signature}` } }) }
  const read = async () => (await api(`/jobs/${job.id}`)).value.job
  const attempts = async o => (await api(`/jobs/${job.id}/payments`, o)).value.attempts
  const changeDraw = async (amount, label) => {

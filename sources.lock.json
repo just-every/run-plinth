@@ -4469,11 +4469,11 @@
       "executable": false
     },
     "tests/plinth/payment-fixture.mjs": {
-      "sha256": "0b571cc780a329ae7b850194f137a5f7adbea84f6d71e478eb628a1b48fd02b8",
+      "sha256": "5a1ed21f665a2783187b547765f3bd9c8ee760346e2171daf54bc3674610c9d0",
       "executable": false
     },
     "tests/plinth/payments.test.mjs": {
-      "sha256": "05c1b43e96d67f75f60cdfe110cab206c234b2a12efadbc85994dd6fe394af34",
+      "sha256": "9dbccde7bcfbbf210379dbc67c6e5192b6d640d997b858532f422b6e965141a4",
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {

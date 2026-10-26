@@ -2,13 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { setPortalFeatures } from './helpers.mjs'
 import { setup, intent } from './payment-fixture.mjs'
+const fixtureNow=Date.parse('2026-10-27T15:00:00Z')
 
 test('PAY-001 — a client pays issued draws by card, wallet and bank transfer through hosted Stripe checkout and signed events credit each invoice once', async () => {
  for(const options of [{stripeSecret:''},{stripeWebhookSecret:''}]){
-  const disabled=await setup(options)
+  const disabled=await setup({now:fixtureNow,...options})
   try{const invoice=await disabled.draw(500,'Payment configuration unavailable');assert.equal((await disabled.api(`/jobs/${disabled.job().id}/payments`)).value.enabled,false);assert.equal((await disabled.pay(invoice)).value.error,'payments_unconfigured');assert.equal(disabled.edge.calls.length,0);assert.equal((await disabled.attempts()).length,0)}finally{await disabled.f.close()}
  }
- const s = await setup(), { f, edge } = s
+ const s = await setup({now:fixtureNow}), { f, edge } = s
  try {
   const card = await s.draw(200_000, 'Draw 1: framing'), wallet = await s.draw(150_000, 'Draw 2: windows'), bank = await s.draw(100_000, 'Draw 3: cabinets'), failing = await s.draw(50_000, 'Draw 4: paint')
   // Only the client starts a payment, after confirming the shown authorization; nothing else moves money.
@@ -23,7 +24,7 @@ test('PAY-001 — a client pays issued draws by card, wallet and bank transfer t
   // Signed events only: a bad signature, a stale one, a foreign session, a wrong amount and a wrong mode credit nothing.
   const session = edge.sessions[0], completed = s.event('checkout.session.completed', session, { payment_intent: 'pi_synthetic_card' })
   edge.intents.set('pi_synthetic_card', intent('pi_synthetic_card', 200_000, { fee: 94 }))
-  assert.equal((await s.send(completed, { secret: 'synthetic-plinth-wrong-secret' })).status, 400); assert.equal((await s.send(completed, { at: Math.floor(Date.now() / 1000) - 3600 })).status, 400)
+  assert.equal((await s.send(completed, { secret: 'synthetic-plinth-wrong-secret' })).status, 400); assert.equal((await s.send(completed, { at: Math.floor(fixtureNow / 1000) - 3600 })).status, 400)
   assert.equal((await s.send(s.event('checkout.session.completed', { ...session, id: 'cs_synthetic_unknown' }, { payment_intent: 'pi_synthetic_card' }))).status, 400)
   assert.equal((await s.send(s.event('checkout.session.completed', session, { payment_intent: 'pi_synthetic_card', amount_total: 1 }))).status, 400)
   assert.equal((await s.send({ ...completed, id: 'evt_synthetic_live', livemode: true })).status, 400);assert.equal((await s.send(s.event('checkout.session.completed',session,{payment_intent:'pi_synthetic_card',currency:'aud'}))).status,400,'A signed foreign-currency event cannot credit the USD invoice')
@@ -66,7 +67,7 @@ test('PAY-001 — a client pays issued draws by card, wallet and bank transfer t
 
 // Processor state can change after an invoice was paid; every trigger reads the current provider record.
 test('Settlement reconciliation preserves original receipts through returns, disputes, stale events and uncertain checkout responses', async () => {
- const s=await setup(),{f,edge}=s
+ const s=await setup({now:fixtureNow}),{f,edge}=s
  try {
   const bank=await s.draw(100_000,'Cabinet ACH draw'),card=await s.changeDraw(200_000,'Client-approved framing change order'),unknown=await s.draw(50_000,'Uncertain checkout')
   await s.pay(bank);const bs=edge.sessions.at(-1);bs.payment_intent='synthetic-plinth-bank-1'
