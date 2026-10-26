@@ -4289,7 +4289,7 @@
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
-      "sha256": "dfaeaf6bcb32decaf91b9265b367b1a4d0fba3ecb28544b10b0a9a58801ae291",
+      "sha256": "b42aafc9e64db652eb1c790317808a181deeef2c561e2c07ded1dc77e94347a3",
       "executable": false
     },
     "tests/journeys/meetings.mjs": {
