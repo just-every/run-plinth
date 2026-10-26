@@ -20,7 +20,7 @@ export async function installedWorker(outboundService) {
  }
  const errors = []
  const mf = new Miniflare(convertV4MiniflareOptions({
-  host: '127.0.0.1', port, modulesRoot: resolve('dist/server'),
+  host: '127.0.0.1', port, unsafeTriggerHandlers: true, modulesRoot: resolve('dist/server'),
   modules: [{ type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
   compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
   d1Databases: ['DB'], bindings, outboundService,

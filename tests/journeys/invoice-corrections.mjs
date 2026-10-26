@@ -79,6 +79,7 @@ try {
   const confirm = async (record, label) => {
    const review = record.getByRole('region', { name: 'Review invoice correction', exact: true })
    await expect(review.getByRole('heading', { name: 'Review ' + label, exact: true })).toBeVisible()
+   await review.evaluate(element => { const header = document.querySelector('.topbar')?.getBoundingClientRect().height ?? 0; window.scrollTo({ top: window.scrollY + element.getBoundingClientRect().top - header - 16, behavior: 'instant' }) })
    await screenshot(label.replaceAll(' ', '-'), review)
    await review.getByRole('checkbox').check()
    await review.getByRole('button', { name: 'Confirm ' + label, exact: true }).click()

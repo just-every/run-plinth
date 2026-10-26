@@ -921,7 +921,7 @@
       "executable": false
     },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "02ba26c9eef975038def96e2781d54cd2e18e7369ed319454eb70d1c7a22da53",
+      "sha256": "fbcd1d6f9851b4097ef8a7d131211823fe3996cd2d51916444c7ca77ca8ad04d",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
@@ -4297,7 +4297,7 @@
       "executable": false
     },
     "tests/journeys/invoice-corrections.mjs": {
-      "sha256": "bf4d41af8aae696f06b55e12b6c6d104ba22b6f4a59b779cc64e7ec5203b7456",
+      "sha256": "763e56cf41d3b892a1ef5f88d29d18ee6bd3a18ec250e2aec69b85c34762203e",
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
