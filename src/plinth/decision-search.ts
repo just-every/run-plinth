@@ -5,7 +5,7 @@ import { searchableFile, type SearchFile } from './decision-file-search'
 import type { rfiProjection } from './rfis'
 import type { Actor, Job, Stamp } from './model'
 import { need } from './model'
-export interface DecisionHit { source: string; title: string; text: string; sender: string; tags: string[]; sheet: string; cost_code: string; href: string; files?: { name: string; href: string }[]; extraction?: { status: string; detail?: string } }
+export interface DecisionHit { source: string; title: string; text: string; sender: string; tags: string[]; sheet: string; cost_code: string; href: string; files?: { name: string; href: string }[]; file_checksum?: string; transcription?: { revision: number; supplied_by: Stamp }; extraction?: { status: string; detail?: string } }
 type Sources = Pick<Job, 'diary' | 'schedules' | 'variations' | 'selections' | 'takeoff' | 'todos' | 'punch'> & { rfis?: ReturnType<typeof rfiProjection> }
 const author = (by: Stamp) => by.name
 /** Rebuild from current permitted parents. Source annotations and derived file text never grant access. */

@@ -1,3 +1,4 @@
+import { attachmentTranscription } from './attachment-transcription.mjs'
 import { sharingJourney } from './meeting-sharing.mjs'
 import { meetingCorrespondence } from './meeting-mail.mjs'
 import assert from 'node:assert/strict'
@@ -37,6 +38,7 @@ try {
  for(const source of ['correspondence:'+captured.id,'files:'+captured.files[0].id]){const result=await owner.request.post(base+`/api/plinth/jobs/${job.id}/decision-search/metadata`,{headers:{origin:base},data:{source,tags:['cabinetry'],sheet:'A-201',cost_code:'06-400'}});assert.equal(result.status(),200)}
  await page.getByLabel('Search text',{exact:true}).fill('synthetic-plinth-private-bid-878');await page.getByLabel('Sender',{exact:true}).fill('synthetic-plinth-sub@example.com');await page.getByRole('button',{name:'Search decisions',exact:true}).click();await expect(page.getByText('1 matching records',{exact:true})).toBeVisible();await capture(page,'private-bid-content')
  await clientPage.goto(base+`/app?job=${job.id}&tab=Decision%20search`);await clientPage.getByLabel('Search text',{exact:true}).fill('synthetic-plinth-private-bid-878');await clientPage.getByRole('button',{name:'Search decisions',exact:true}).click();await expect(clientPage.getByText('0 matching records',{exact:true})).toBeVisible();await expect(clientPage.getByText('Private millwork subcontractor bid',{exact:false})).toHaveCount(0);for(const path of [`/correspondence/files/${captured.files[0].id}`,`/correspondence/${captured.id}/original`])assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}`+path)).status(),404);await capture(clientPage,'client-private-search')
+ await attachmentTranscription({base,page,clientPage,owner,client,job,capture})
  await clientPage.goto(base+`/app?job=${job.id}&tab=Meetings`);await expect(clientPage.getByRole('heading',{name:'Shared meeting decisions',exact:true})).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}/meetings`)).status(),403);await expect(clientPage.getByRole('heading',{name:'Kitchen site meeting',exact:true})).toHaveCount(0);await capture(clientPage,'meeting-permission-failure')
  const currentMeetings=(await(await owner.request.get(base+`/api/plinth/jobs/${job.id}/meetings`)).json()).meetings
  await sharingJourney({base,entrance,browser,page,clientPage,owner,client,job,meeting:currentMeetings[0],ownerEmail,email,selection,capture})

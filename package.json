@@ -35,10 +35,14 @@
   "dependencies": {
     "@tanstack/react-router": "1.170.41",
     "@tanstack/react-start": "1.168.60",
+    "@tesseract.js-data/eng": "1.0.0",
     "hono": "4.13.7",
+    "mammoth": "1.13.0",
     "marked": "18.1.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.54.5",

@@ -221,7 +221,7 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   let job=(await s.api(`/jobs/${s.job().id}`)).value.job
   const path=`/jobs/${job.id}`,read=async()=>job=(await s.api(path)).value.job
   const act=async(route,body={},cookie=f.owner)=>{await read();const r=await s.api(path+route,{method:'POST',cookie,body:{expected_version:job.version,...body}});if(r.value.job)job=r.value.job;return r}
-  const field=await f.invite('synthetic-plinth-shared-field@example.com','Field lead','admin'),custom=await f.invite('synthetic-plinth-shared-custom@example.com','Custom office','admin'),sub=await f.invite('synthetic-plinth-shared-sub@example.com','Subcontractor'),other=await f.invite('synthetic-plinth-shared-other@example.com')
+  const field=await f.invite('synthetic-plinth-shared-field@example.com','Field lead','admin'),custom=await f.invite('synthetic-plinth-shared-custom@example.com','Custom office','admin'),sub=await f.invite('synthetic-plinth-shared-sub@example.com','Subcontractor'),other=await f.invite('synthetic-plinth-shared-other@example.com'),admin=await f.invite('synthetic-plinth-2421@example.com','Office administrator','admin')
   const people=(await s.api('/team')).value.team,fieldPerson=people.find(p=>p.email==='synthetic-plinth-shared-field@example.com'),customPerson=people.find(p=>p.email==='synthetic-plinth-shared-custom@example.com')
   const team=async(person,body)=>s.api('/team/'+person.id,{method:'PUT',body:{expected_version:0,job_ids:[job.id],po_limit_cents:0,...body}})
   assert.equal((await team(fieldPerson,{role:'superintendent'})).status,200)
@@ -237,8 +237,14 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   const agent=await f.agent();await read();assert.equal((await s.api(path+`/meetings/${meeting.id}/share`,{method:'POST',token:agent,cookie:undefined,body:{expected_version:job.version,...input}})).status,403)
   assert.equal((await s.api('/meeting-inbox',{cookie:custom})).value.jobs.length,0,'Copied permissions grant no extract without an explicit record grant')
   const beforePublication=f.messages.length
+  let customRole=copied.value.role
+  const setDocuments=async permissions=>{const changed=await s.api('/roles/'+customRole.id,{method:'PUT',body:{expected_version:customRole.version,permissions:{documents:permissions}}});assert.equal(changed.status,200,JSON.stringify(changed.value));customRole=changed.value.role}
+  await setDocuments({view:true,create:false})
+  r=await act(`/meetings/${meeting.id}/share`,input);assert.equal(r.status,403);assert.equal(r.value.error,'recipient_authority','A commenting custom recipient must also hold document creation authority')
+  await setDocuments({view:true,create:true})
   r=await act(`/meetings/${meeting.id}/share`,input);assert.equal(r.status,200,JSON.stringify(r.value));const share=r.value.record;assert.equal(f.messages.length,beforePublication,'Publishing an extract sends nothing')
   assert.equal((await act(`/meetings/${meeting.id}/share`,input)).status,409)
+  r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-2422',recipients:[{email:'builder@example.com',kind:'office',can_comment:false}]},admin);assert.equal(r.status,200,JSON.stringify(r.value));const administratorShare=r.value.record;assert.equal(administratorShare.body,input.body);assert.equal(administratorShare.by.name,'Office administrator');assert.equal(f.messages.length,beforePublication,'An administrator can publish a reviewed extract without sending email')
   const inbox=async(cookie)=>s.api('/meeting-inbox',{cookie})
   for(const cookie of [s.client,field,custom,sub]){
    const value=(await inbox(cookie)).value;assert.equal(value.jobs.length,1,JSON.stringify(value));assert.equal(value.jobs[0].shares.length,1)
@@ -264,14 +270,30 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   const previewCopy=id=>s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${id}`)
   const sendCopy=(request,preview,cookie=f.owner)=>act(sendPath,{request_id:request.id,confirm:true,digest:preview.digest},cookie)
   const copyState=async id=>(await s.api(path+`/meetings/${meeting.id}/shares`)).value.shares.find(s=>s.id===share.id).email_requests.find(r=>r.id===id)
+  const requestExtractCopy=async(shareId,cookie,extra={})=>{await read();return s.api(`/meeting-inbox/${job.id}/${shareId}/email-copy`,{method:'POST',cookie,body:{expected_version:job.version,kind:'minutes',confirm:true,operation_id:crypto.randomUUID(),...extra}})}
+  const previewExtractCopy=(shareId,id)=>s.api(path+`/meeting-shares/${shareId}/email-preview?request_id=${id}`)
+  const refusedPendingCopy=async(shareId,request,review,error)=>{
+   const before=f.messages.length,version=(await read()).version
+   const preview=await previewExtractCopy(shareId,request.id);assert.equal(preview.status,409);assert.equal(preview.value.error,error)
+   const send=await act(`/meeting-shares/${shareId}/send-email`,{request_id:request.id,digest:review.digest,confirm:true});assert.equal(send.status,409);assert.equal(send.value.error,error)
+   assert.equal((await read()).version,version);const shares=(await s.api(path+`/meetings/${meeting.id}/shares`)).value.shares;assert.equal(shares.find(row=>row.id===shareId).email_requests.find(row=>row.id===request.id).status,'requested');assert.equal(f.messages.length,before,'Lost extract authority refuses both email doors before any provider call')
+  }
+  // A reviewed request remains unreserved when its exact extract is withdrawn.
+  r=await requestExtractCopy(administratorShare.id,f.owner);assert.equal(r.status,200);const withdrawnRequest=r.value.record,withdrawnPreview=await previewExtractCopy(administratorShare.id,withdrawnRequest.id);assert.equal(withdrawnPreview.status,200)
+  r=await act(`/meeting-shares/${administratorShare.id}/revoke`,{reason:'synthetic-plinth-2423',operation_id:'synthetic-plinth-2424',confirm:true});assert.equal(r.status,200)
+  await refusedPendingCopy(administratorShare.id,withdrawnRequest,withdrawnPreview.value,'mail_authority')
   const mailBefore=f.messages.length,versionBeforeConsent=(await read()).version
   for(const confirm of [false,undefined])assert.equal((await requestCopy(s.client,{confirm})).status,400,'An email request requires explicit recipient consent')
   assert.equal((await read()).version,versionBeforeConsent);assert.equal(f.messages.length,mailBefore)
   r=await requestCopy(s.client);assert.equal(r.status,200,JSON.stringify(r.value));const emailRequest=r.value.record
   assert.equal(f.messages.length,mailBefore,'A recipient request sends nothing')
   const initialPreview=await previewCopy(emailRequest.id);assert.equal(initialPreview.status,200)
-  const admin=await f.invite('synthetic-plinth-2421@example.com','Office administrator','admin'),beforeAuthority=f.messages.length
-  for(const cookie of [s.client,admin,field,custom])assert.equal((await sendCopy(emailRequest,initialPreview.value,cookie)).status,403,'Another signed-in role cannot finalize meeting delivery')
+  const beforeAuthority=f.messages.length
+  for(const cookie of [s.client,admin,field,custom]){
+   assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`,{cookie})).status,403,'Only the signed-in owner can open the complete email review')
+   assert.equal((await sendCopy(emailRequest,initialPreview.value,cookie)).status,403,'Another signed-in role cannot finalize meeting delivery')
+  }
+  assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`,{cookie:undefined,token:agent})).status,403,'An owner-issued bearer cannot open the email review')
   await read();assert.equal((await s.api(path+sendPath,{method:'POST',cookie:undefined,token:agent,body:{expected_version:job.version,request_id:emailRequest.id,confirm:true,digest:initialPreview.value.digest}})).status,403,'An owner-issued bearer is still draft-only')
   assert.equal((await copyState(emailRequest.id)).status,'requested');assert.equal(f.messages.length,beforeAuthority)
   const preferences={assignment:'off',comment:'off',reminder:'off'}
@@ -341,11 +363,23 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   assert.equal((await fetch(f.origin+unsubscribe.pathname,{method:'POST',body:'List-Unsubscribe=One-Click',headers:{'content-type':'application/x-www-form-urlencoded'}})).status,200)
   const beforeSuppressed=f.messages.length
   assert.equal((await sendCopy(suppressed,suppressedPreview)).status,200);assert.equal((await copyState(suppressed.id)).status,'cancelled');assert.equal(f.messages.length,beforeSuppressed,'A signed unsubscribe blocks the meeting-email provider call')
-  const roleChange=await s.api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version,permissions:{documents:{view:false}}}});assert.equal(roleChange.status,200,JSON.stringify(roleChange.value))
+  // Removing an authorized household contact ends both extract access and a pending email request.
+  r=await s.api('/customers',{method:'POST',body:{name:'synthetic-plinth-2425',kind:'household',contacts:[{id:'synthetic-plinth-2426',name:'synthetic-plinth-2427',email:'synthetic-plinth-shared-other@example.com'}],properties:[{id:'synthetic-plinth-2428',label:'synthetic-plinth-2429',address:'synthetic-plinth-2430'}]}});assert.equal(r.status,201);const customer=r.value.customer
+  const clientLink={customer_id:customer.id,property_id:'synthetic-plinth-2428',client_contact_ids:['synthetic-plinth-2426']}
+  assert.equal((await act('/customer',clientLink)).status,200)
+  r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-2431',recipients:[{email:'synthetic-plinth-shared-other@example.com',kind:'client',can_comment:false}]});assert.equal(r.status,200);const contactShare=r.value.record
+  assert.equal((await inbox(other)).value.jobs[0].shares[0].id,contactShare.id);assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${contactShare.id}/export.json`,{cookie:other})).status,200)
+  r=await requestExtractCopy(contactShare.id,other);assert.equal(r.status,200);const contactRequest=r.value.record,contactPreview=await previewExtractCopy(contactShare.id,contactRequest.id);assert.equal(contactPreview.status,200)
+  assert.equal((await act('/customer',{...clientLink,client_contact_ids:[]})).status,200)
+  assert.equal((await inbox(other)).value.jobs.length,0,'A named extract cannot outlive the recipient current client authority');assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${contactShare.id}/export.json`,{cookie:other})).status,404)
+  await refusedPendingCopy(contactShare.id,contactRequest,contactPreview.value,'recipient_authority')
+  const roleChange=await s.api('/roles/'+customRole.id,{method:'PUT',body:{expected_version:customRole.version,permissions:{documents:{view:false}}}});assert.equal(roleChange.status,200,JSON.stringify(roleChange.value))
   assert.equal((await inbox(custom)).status,403,'Changing the custom role removes its explicit extract capability on the next request')
   assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie:custom})).status,403)
   assert.equal((await s.api('/team/'+fieldPerson.id,{method:'PUT',body:{expected_version:1,role:'superintendent',job_ids:[],po_limit_cents:0}})).status,200)
   assert.equal((await inbox(field)).value.jobs.length,0)
+  const beforeStaleRecipient=(await read()).version
+  r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-2432',recipients:[recipients[1]]});assert.equal(r.status,403);assert.equal(r.value.error,'recipient_authority','Publication refuses a recipient whose job assignment ended');assert.equal((await read()).version,beforeStaleRecipient)
   r=await act(`/subcontracts/${released.scope.id}/access`,{contact_ids:[],reason:'The named subcontractor contact left this released scope'});assert.equal(r.status,200)
   assert.equal((await inbox(sub)).value.jobs.length,0,'Released company contact revocation applies to meeting extracts on the next request')
   assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie:sub})).status,404)
@@ -353,6 +387,17 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   assert.equal((await inbox(s.client)).value.jobs.length,0);assert.equal((await inbox(sub)).value.jobs.length,0)
   assert.equal((await s.api(`/meeting-inbox/${job.id}/decision-search?q=field`,{cookie:s.client})).status,404)
   assert.equal((await s.api(path,{cookie:s.client})).value.job.meeting_shares,undefined,'Job projections never expose full sharing grants or private feedback')
+  // An extract grant alone cannot authorize an outstanding action reminder.
+  r=await act(`/meetings/${meeting.id}/add-action`,{title:'synthetic-plinth-2433',owner_email:'synthetic-plinth-2421@example.com',due_on:'2026-11-03'});assert.equal(r.status,200);const officeAction=r.value.record
+  const administrator=(await s.api('/team')).value.team.find(person=>person.email==='synthetic-plinth-2421@example.com')
+  assert.equal((await team(administrator,{role:'superintendent'})).status,200)
+  r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-2434',recipients:[{email:'synthetic-plinth-2421@example.com',kind:'office',can_comment:false},{email:'builder@example.com',kind:'office',can_comment:false}]});assert.equal(r.status,200);const officeShare=r.value.record
+  const beforeRefusedReminders=f.messages.length
+  r=await requestExtractCopy(officeShare.id,admin);assert.equal(r.status,200,'The former office manager still has a current extract grant');const ordinaryCopy=r.value.record
+  assert.equal((await requestExtractCopy(officeShare.id,admin,{cancel:true,request_id:ordinaryCopy.id})).status,200)
+  r=await requestExtractCopy(officeShare.id,f.owner,{kind:'action_reminder',action_id:officeAction.id});assert.equal(r.status,409);assert.equal(r.value.error,'meeting_action','A different authorized office manager cannot request the assigned action reminder')
+  r=await requestExtractCopy(officeShare.id,admin,{kind:'action_reminder',action_id:officeAction.id});assert.equal(r.status,403);assert.equal(r.value.error,'forbidden','The assignee cannot request a reminder after losing office management authority')
+  await read();assert.equal(job.meetings.find(row=>row.id===meeting.id).actions.find(row=>row.id===officeAction.id).completion,undefined);assert.equal(f.messages.length,beforeRefusedReminders,'Refused reminder requests leave the action outstanding and send nothing')
   r=await act(`/meetings/${meeting.id}/add-action`,{title:'Confirm the revised shop drawing',owner_email:'builder@example.com',due_on:'2026-11-03'});assert.equal(r.status,200);const action=r.value.record
   r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-reminder-extract',recipients:[{email:'builder@example.com',kind:'office',can_comment:false}]});assert.equal(r.status,200);const reminderShare=r.value.record
   await read();r=await s.api(`/meeting-inbox/${job.id}/${reminderShare.id}/email-copy`,{method:'POST',body:{expected_version:job.version,kind:'action_reminder',action_id:action.id,confirm:true,operation_id:'synthetic-plinth-reminder-request'}});assert.equal(r.status,200);const reminder=r.value.record

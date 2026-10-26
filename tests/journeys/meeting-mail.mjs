@@ -3,7 +3,7 @@ import { expect } from '@playwright/test'
 import { searchDocument } from '../fixtures/search-document.mjs'
 
 export function originalEmail({ from, to, subject, text, file, id = crypto.randomUUID() }) {
- return Buffer.from([`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Message-ID: <synthetic-plinth-${id}@example.com>`, 'Authentication-Results: mx.synthetic.local; spf=pass; dkim=pass', 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="synthetic-plinth-journey"', '', '--synthetic-plinth-journey', 'Content-Type: text/plain; charset=utf-8', '', text, '', '--synthetic-plinth-journey', `Content-Type: application/pdf; name="${file.name}"`, `Content-Disposition: attachment; filename="${file.name}"`, 'Content-Transfer-Encoding: base64', '', file.bytes.toString('base64'), '', '--synthetic-plinth-journey--', ''].join('\r\n'))
+ return Buffer.from([`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Message-ID: <synthetic-plinth-${id}@example.com>`, 'Authentication-Results: mx.synthetic.local; spf=pass; dkim=pass', 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="synthetic-plinth-journey"', '', '--synthetic-plinth-journey', 'Content-Type: text/plain; charset=utf-8', '', text, '', '--synthetic-plinth-journey', `Content-Type: ${file.mime ?? 'application/pdf'}; name="${file.name}"`, `Content-Disposition: attachment; filename="${file.name}"`, 'Content-Transfer-Encoding: base64', '', file.bytes.toString('base64'), '', '--synthetic-plinth-journey--', ''].join('\r\n'))
 }
 /** Real local Email Routing transport invokes the installed Worker's email event. */
 export async function meetingCorrespondence({ base, page, owner, job, email, post, capture }) {

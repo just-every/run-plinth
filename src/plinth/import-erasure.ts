@@ -19,6 +19,7 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
     { sql: "DELETE FROM rer_mail_event_receipts WHERE event_namespace='job-mail' AND json_extract(event_json,'$.deliveryId') IN (SELECT id FROM pl_mail_messages WHERE job_id=?)", params: [job.id] },
     { sql: "DELETE FROM rer_mail_event_states WHERE event_namespace='job-mail' AND provider_message_id IN (SELECT provider_message_id FROM pl_mail_messages WHERE job_id=? AND provider_message_id IS NOT NULL)", params: [job.id] },
     { sql: 'DELETE FROM pl_payment_events WHERE attempt_id IN (SELECT id FROM pl_payment_attempts WHERE job_id=?)', params: [job.id] },
+    { sql: 'DELETE FROM pl_file_transcriptions WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_decision_metadata WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_mail_originals WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_mail_files WHERE job_id=?', params: [job.id] },
