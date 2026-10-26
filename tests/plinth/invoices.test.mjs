@@ -33,6 +33,11 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   await act(`/invoices/${paidId}/receipt`,{amount_cents:11001,method:'bank',received_on:'2026-10-22',reference:'synthetic-plinth-settlement-5',confirm:true})
   const receipt=structuredClone(job.invoices.find(i=>i.id===paidId).receipts[0])
   const correction={operation_id:'synthetic-plinth-operation-5',confirm:true,reason:'Private negotiated material dispute and office review',description:'Agreed partial credit for the addition',lines:[{invoice_line_id:sourceId,amount_cents:3333}]},path=`/invoices/${paidId}`
+  const draftClerk=await f.invite('synthetic-plinth-invoice-clerk@example.com','Invoice draft clerk','admin')
+  const clerkRole=await api('/roles',{copy_of:'administrator',name:'Invoice drafting without approval',permissions:{invoices:{approve:false}}});assert.equal(clerkRole.status,201)
+  const clerk=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-invoice-clerk@example.com')
+  assert.equal((await f.json('/api/plinth/team/'+clerk.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:clerkRole.value.role.id,job_ids:[],po_limit_cents:0}})).status,200)
+  assert.equal((await attempt(path+'/credit',correction,draftClerk)).status,403,'Invoice draft editing never grants final correction approval')
   for(const [cookie,token,status] of [[client,undefined,403],[foreign,undefined,404],[undefined,agent,403]])assert.equal((await attempt(path+'/credit',correction,cookie,token)).status,status)
   await unchanged(path+'/credit',{...correction,confirm:false},400);await unchanged(path+'/credit',{...correction,reason:''},400)
   await unchanged(path+'/credit',{...correction,lines:[{invoice_line_id:sourceId,amount_cents:11002}]},409)
