@@ -39,7 +39,7 @@ export function costBilling(job:Job,value:unknown,ownId?:string):CostBilling{
  // Fees round once per category and tax treatment, preserving the accepted tax code mapping.
  let fee_cents=0
  for(const [index,group] of groups.entries())for(const isTaxable of (fee_categories===undefined&&p.numerator===0n?[false]:[false,true])){const selected=entries.filter(e=>group.cost_codes.includes(e.cost_code)&&(fee_categories===undefined&&p.numerator===0n||taxable(e.cost_code)===isTaxable));if(!selected.length)continue;const fee=round(sum(selected.map(e=>e.amount_cents)),group.fee_bps);fee_cents=sum([fee_cents,fee]);priced_lines.push(line(`contract-fee-${index}-${isTaxable}`,group.name,fee,isTaxable))}
- const cost_cents=sum(entries.map(e=>e.amount_cents)),uncapped_cents=sum(priced_lines.map(l=>l.gross_cents)),billed=sum(prior.map(i=>i.issued!.gross_cents))
+ const cost_cents=sum(entries.map(e=>e.amount_cents)),uncapped_cents=sum(priced_lines.map(l=>l.gross_cents)),billed=sum(prior.map(i=>sum([i.issued!.gross_cents,...(i.corrections??[]).map(c=>c.document.gross_cents)])))
  const total_cents=uncapped_cents<0?uncapped_cents:Math.min(uncapped_cents,Math.max(0,cap_cents-billed)),cap_reduction_cents=sum([uncapped_cents,-total_cents])
  need(total_cents!==0&&billed+total_cents>=0,'The issue must have a nonzero value and credits cannot exceed earlier billed value',409,'cost_billing_balance')
  if(total_cents<0)need(entries.filter(e=>e.amount_cents<0).every(e=>{const bill=state.bills.find(b=>b.id===e.source_id);return bill?.credit_of&&prior.some(i=>i.sources.cost_billing?.entries.some(old=>old.source_id===bill.credit_of))}),'A net credit must link an originally billed vendor source',409,'cost_billing_credit')

@@ -95,6 +95,32 @@ test('BILL-005 — human corrections preserve paid change invoices, close review
   assert.equal(await(await f.request(`/api/plinth/jobs/${job.id}/invoices/${paidId}/document.html`,{cookie:f.owner})).text(),originalHtml)
   const documents=job.invoices.flatMap(i=>(i.corrections??[]).map(c=>c.document.number));assert.equal(new Set(documents).size,documents.length)
   assert.ok(job.approvals.some(a=>a.kind==='invoice.credit'&&a.snapshot.reason===correction.reason));assert.ok(job.approvals.some(a=>a.kind==='invoice.write_off'&&a.snapshot.reason===writeoff.reason))
+  job=(await api('/jobs',{name:'Retained contract draw corrections',client_email:email,address:'22 Synthetic Street'})).value.job
+  await act('/quotes',{lines:[{id:'synthetic-plinth-retained-5',description:'Reviewed taxable retained work',cost_code:'06-100',category:'material',phase:'Construction',quantity:'1',unit:'job',unit_cents:10000,cost_unit_cents:5000}]})
+  const retainedPricing={...pricing,tax:{rate_id:rate.id,taxable_line_ids:['synthetic-plinth-retained-5']}}
+  const retainedPreview=await attempt('/pricing/preview',retainedPricing);assert.equal(retainedPreview.status,200)
+  await act('/pricing/apply',{...retainedPricing,digest:retainedPreview.value.preview.digest})
+  await act(`/quotes/${job.quotes.at(-1).id}/accept`,{method:'signed',evidence:'Reviewed retained contract',schedule_choice:{kind:'none',reason:'Schedule separately'}})
+  await act('/sov',{})
+  const retainedLine='quote:synthetic-plinth-retained-5'
+  await act('/retainage',{contract_reference:'Signed five percent contract hold',rules:[{line_id:retainedLine,work_bps:500,stored_bps:500}],milestones:[{id:'synthetic-plinth-completion',name:'Inspected completion',completion_requirements:['Inspection'],waiver_requirements:[]}]})
+  const app=await act('/claims',{description:'Taxable retained work',lines:[{line_id:retainedLine,completed_cents:11000,stored_cents:0,evidence:'Reviewed installed work'}]})
+  await act(`/claims/${app.id}/approve`);await act(`/claims/${app.id}/issue`)
+  const retained=await act('/invoices',{...invoiceInput,source_application_id:app.id,description:'Retained draw'})
+  await act(`/invoices/${retained.id}/issue`)
+  const retainedOriginal=structuredClone(job.invoices.find(i=>i.id===retained.id).issued),retainedPath=`/invoices/${retained.id}`
+  assert.equal(retainedOriginal.withheld_cents,550)
+  await act(retainedPath+'/receipt',{amount_cents:10450,method:'bank',received_on:'2026-10-26',reference:'synthetic-plinth-retained-payment',confirm:true})
+  await act(retainedPath+'/credit',{...correction,operation_id:'synthetic-plinth-retained-credit',lines:[{invoice_line_id:retainedLine,amount_cents:1100}]})
+  let retainedCurrent=job.invoices.find(i=>i.id===retained.id)
+  assert.equal(retainedCurrent.balance.due_cents,-1100);assert.equal(retainedCurrent.balance.withheld_cents,550);assert.equal(retainedCurrent.corrections[0].document.tax_cents,-100)
+  await unchanged(retainedPath+'/credit',{...correction,operation_id:'synthetic-plinth-retained-excess',lines:[{invoice_line_id:retainedLine,amount_cents:9900}]},409)
+  await act(retainedPath+'/debit',{...correction,operation_id:'synthetic-plinth-retained-debit',lines:[{invoice_line_id:retainedLine,amount_cents:550}]})
+  await act('/retainage/release',{claim_id:app.id,milestone_id:'synthetic-plinth-completion',lines:[{line_id:retainedLine,amount_cents:550}],completion_references:[{requirement:'Inspection',reference:'synthetic-plinth-inspection'}],waiver_references:[]})
+  retainedCurrent=job.invoices.find(i=>i.id===retained.id)
+  assert.equal(retainedCurrent.balance.due_cents,0);assert.equal(retainedCurrent.balance.released_retainage_cents,550);assert.deepEqual(retainedCurrent.issued,retainedOriginal)
+  assert.equal(retainedCurrent.corrections.reduce((n,c)=>n+c.document.tax_cents,0),-50)
+  for(const c of retainedCurrent.corrections)assert.equal(c.document.accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0)
  }finally{await f.close()}
 })
 
@@ -432,13 +458,28 @@ test('BILL-004 — approved actuals bill once with reviewed tax, fee categories,
   await c.ok(`/invoices/${adjustment.id}/issue`)
   assert.deepEqual((await c.read()).invoices.find(i=>i.id===adjustment.id).issued.adjusts_invoice_numbers,[frozen.number])
   assert.equal((await c.act('/invoices',{...input,cost_billing:creditConfig})).status,409,'Credit sources cannot issue twice')
+  const negativeOriginal=structuredClone(c.job.invoices.find(i=>i.id===adjustment.id).issued),negativeLine=negativeOriginal.lines.find(l=>l.gross_cents<0)
+  const correction={operation_id:'synthetic-plinth-negative-debit',confirm:true,reason:'Reviewed partial reversal of credited material',description:'Partial debit reversing original vendor credit',lines:[{invoice_line_id:negativeLine.id,amount_cents:501}]}
+  assert.equal((await c.act(`/invoices/${adjustment.id}/credit`,correction)).status,409,'A negative source cannot be credited beyond its reviewed amount')
+  await c.ok(`/invoices/${adjustment.id}/debit`,correction)
+  let corrected=c.job.invoices.find(i=>i.id===adjustment.id)
+  assert.equal(corrected.balance.due_cents,-951);assert.equal(corrected.corrections[0].document.tax_cents,46)
+  assert.equal((await c.act(`/invoices/${adjustment.id}/debit`,{...correction,operation_id:'synthetic-plinth-negative-excess',lines:[{invoice_line_id:negativeLine.id,amount_cents:1000}]})).status,409)
+  await c.ok(`/invoices/${adjustment.id}/credit`,{...correction,operation_id:'synthetic-plinth-negative-recredit',lines:[{invoice_line_id:negativeLine.id,amount_cents:501}]})
+  corrected=c.job.invoices.find(i=>i.id===adjustment.id)
+  assert.equal(corrected.balance.due_cents,-1452);assert.equal(corrected.corrections.reduce((n,c)=>n+c.document.tax_cents,0),0);assert.deepEqual(corrected.issued,negativeOriginal)
+  assert.equal((await c.act(`/invoices/${adjustment.id}/credit`,{...correction,operation_id:'synthetic-plinth-negative-credit-excess'})).status,409)
+  for(const document of corrected.corrections.map(c=>c.document)){assert.equal(document.original_invoice_number,negativeOriginal.number);assert.equal(document.accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0)}
+  assert.equal((await c.ledger()).totals.posted_actual_cents,actualBefore-1100,'Invoice corrections never change actual costs')
   const late=(await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-taxable-late-time',dated_on:'2026-10-24',period:'2026-10',cost_code:'01-100',employee_reference:'synthetic-plinth-worker',minutes:60,hour_cents:3000,burden_bps:2000})).record;await c.ok(`/costs/sources/${late.id}/approve`)
   const lateEntries=(await c.ledger()).rows.flatMap(r=>r.sources.actual).filter(e=>e.source_id===late.id),next=(await c.ok('/invoices',{...input,cost_billing:{...config,entry_ids:lateEntries.map(e=>e.id)}})).record
   assert.equal(next.amount_cents,3342);assert.equal(next.sources.cost_billing.cap_reduction_cents,816);assert.equal(next.lines.reduce((n,l)=>n+l.tax_cents,0),304)
   await c.ok(`/invoices/${next.id}/issue`);await c.read()
   assert.equal(c.job.invoices.filter(i=>i.issued).reduce((n,i)=>n+i.issued.gross_cents,0),57000)
+  assert.equal((await c.act(`/invoices/${adjustment.id}/debit`,{...correction,operation_id:'synthetic-plinth-cap-debit'})).status,409,'A correction cannot exceed the fixed contractual cap after later billing consumes reopened capacity')
   assert.deepEqual(c.job.invoices.find(i=>i.id===first.id).issued,frozen)
   assert.equal((await c.ledger()).totals.posted_actual_cents,actualBefore-1100+3600,'Credits and late time alone change actual costs')
+
  }finally{await taxable.close()}
 
 })

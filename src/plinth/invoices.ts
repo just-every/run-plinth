@@ -1,5 +1,6 @@
 import { costBilling, costBillingAccess, refreshCostBilling } from './cost-billing'
-import { correctInvoice, isInvoiceCorrection, requireReviewedInvoiceCapacity } from './invoice-corrections'
+import { correctInvoice, isInvoiceCorrection } from './invoice-corrections'
+import { requireReviewedInvoiceCapacity } from './invoice-correction-pricing'
 import { requireJobManager } from './auth'
 import { clientAccess } from './job-customers'
 import { cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'

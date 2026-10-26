@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f036a6b21eea10ed32321022c4ecca09cb2f469f6e41d2898a10df688f8c2542",
+      "sha256": "fc8aebe2f68f97b9dc82684c90c1dc889b870f8c5b8fda9b5bf95b6738071a19",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "80104933528c0fae4c266dceab2d404ab582d2a9a04476c7fef80c07185cd016",
+      "sha256": "6a8a4334e5d484c366cce5e536614331216041bd7c4b02ef6eb446efbf92f3dc",
       "executable": false
     },
     "DEMO.md": {
@@ -2957,7 +2957,7 @@
       "executable": false
     },
     "src/plinth/cost-billing.ts": {
-      "sha256": "f8a8a4db59b2d0f5e8df163143084c518093d415a0724f4fac2824a1b607fdd9",
+      "sha256": "59a0da4cfbfe0759a3c51049168822e92e6f8b83ee51072b9b2e44b424038924",
       "executable": false
     },
     "src/plinth/cost-bills.ts": {
@@ -3112,8 +3112,12 @@
       "sha256": "69da419053f44e8a0a019e03bcb40b669249ae78d250ffb4f3be57b61835e032",
       "executable": false
     },
+    "src/plinth/invoice-correction-pricing.ts": {
+      "sha256": "28065ab577d9a02919163555da7058661aedb59c8815b5ff03a0d83a3ef6a849",
+      "executable": false
+    },
     "src/plinth/invoice-corrections.ts": {
-      "sha256": "48d333711548df5b0f61bb34aac93dd1c4719fe23ccf68957f83111870db459c",
+      "sha256": "2aefe7d88ef37ed22c87dc00ab13d7c14fa076b544306d33d0f061cc5dc8adef",
       "executable": false
     },
     "src/plinth/invoice-model.ts": {
@@ -3129,7 +3133,7 @@
       "executable": false
     },
     "src/plinth/invoices.ts": {
-      "sha256": "b6f9665592382db07cefcd75cbd4e17bee71c3d7125acdc35a2d0a90cd99d8b5",
+      "sha256": "e5973611b4625f5f008f6d1846cd38b87ca6a4b8aad54c2079d1b499005ed5d1",
       "executable": false
     },
     "src/plinth/job-customers.ts": {
@@ -3885,7 +3889,7 @@
       "executable": false
     },
     "src/ui/invoice-corrections.tsx": {
-      "sha256": "609ba87aa7163818bfc43aafba56e8cc9eb0e359c62722ba590091972ae1f276",
+      "sha256": "db05a353c60603254ddf97d7fce1a75326897e0fe8739bf017f1da3552ac4251",
       "executable": false
     },
     "src/ui/invoices.css": {
@@ -4349,7 +4353,7 @@
       "executable": false
     },
     "tests/plinth/invoices.test.mjs": {
-      "sha256": "4e5da9df5e356b99221d7d294378d6646bad5cdddc4f016f7f531c35ff6ebe02",
+      "sha256": "395117a6bfcc9ed7e1eb08c419ed4c3dfda3232259382218d670d121eb0da224",
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
