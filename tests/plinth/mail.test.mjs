@@ -241,6 +241,11 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   assert.equal((await feedback(sub,'A view-only subcontractor cannot comment')).status,403)
   assert.equal((await inbox(custom)).value.jobs[0].shares[0].feedback.length,0)
   assert.equal((await inbox(s.client)).value.jobs[0].shares[0].feedback[0].body,'Client question for the office only')
+  const financial=(await act('/claims',{description:'Reviewed financial record is not a meeting grant',cumulative_cents:1000})).value.record
+  assert.equal((await act(`/claims/${financial.id}/approve`)).status,200);assert.equal((await act(`/claims/${financial.id}/export`)).status,200)
+  const repeatedExport=await act(`/claims/${financial.id}/export`,{},custom);assert.equal(repeatedExport.status,200)
+  assert.equal(repeatedExport.value.job.meetings,undefined,'An unrelated repeated financial export cannot expose private meetings to a custom role')
+  assert.equal(repeatedExport.value.job.meeting_shares,undefined,'An unrelated repeated financial export cannot expose sharing grants or private feedback')
   const requestCopy=async(cookie,extra={})=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{method:'POST',cookie,body:{expected_version:current.version,kind:'minutes',confirm:true,operation_id:crypto.randomUUID(),...extra}})}
   const mailBefore=f.messages.length
   r=await requestCopy(s.client);assert.equal(r.status,200,JSON.stringify(r.value));const emailRequest=r.value.record

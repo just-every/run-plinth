@@ -191,7 +191,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   await eraseJob(env.DB,actor,previous)
   return json({erased:true,job_id:previous.id})
  }
- need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireJobManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:previous,record:exported,role:role(actor),report:exported.export})}
+ need(method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);if(parts.length===5&&parts[2]==='claims'&&parts[4]==='export'){requireJobManager(actor);const exported=previous.claims.find(c=>c.id===parts[3]&&c.status==='exported');if(exported)return json({job:display(previous,actor),record:exported,role:role(actor),report:exported.export})}
  need(input.expected_version===previous.version,'Job changed. Reload before applying this action.',409,'stale_version')
  if(parts.length===4&&parts[2]==='warranty-reminders'&&parts[3]==='run'){
   requireJobManager(actor);const report=await dispatchWarrantyReminders(env,{jobId:previous.id,actor});return json({job:display((await named(env.DB,[await jobOf(env.DB,actor,previous.id)]))[0]!,actor),report,role:role(actor)})
