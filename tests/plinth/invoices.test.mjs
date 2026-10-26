@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
 
-test('BILL-005 — human corrections preserve paid change invoices, close reviewed tax exactly, isolate disputed write-offs and void only untouched requests',async()=>{
+test('BILL-005 — human corrections preserve paid and retained invoices, close reviewed tax exactly, isolate disputed write-offs and void only untouched requests',async()=>{
  const f=await createFixture();try{
   const email='synthetic-plinth-client-5@example.com',client=await f.invite(email),foreign=await f.invite('synthetic-plinth-client-6@example.com'),agent=await f.agent(),admin=await f.invite('synthetic-plinth-admin-5@example.com','Office administrator','admin')
   const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{...(body===undefined?{}:{method:'POST',body}),cookie,token})
