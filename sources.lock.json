@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "0d5274fecf071336832612af69cc265f3cbdebe65a056eb0fbbdf0002e69cdd8",
+      "sha256": "3587688c1b688240a14184444d3ac2e10241c31acbdaf949eca134e639c2a9e5",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "7f356de2341a928b9b4c583d869e842d55a79d8f1063f28900c08f6fbd5daa05",
+      "sha256": "333f4874c406f9a0ac108695ef0fba7e6f11fcf8e902f764b87c500b3bf419c4",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/COMMANDS.md": {
-      "sha256": "2f119a63a660b673604d96845ecee62316dcbaa93997ab31a3cc90ff1336be78",
+      "sha256": "81440c1c5b905144c5b688a0939af6f9ac24d39f55d69ddfe3fbb8e3c0e7ae54",
       "executable": false
     },
     "docs/COSTS.md": {
@@ -3205,7 +3205,7 @@
       "executable": false
     },
     "src/plinth/meeting-share-mail.ts": {
-      "sha256": "adb9ff69721f35e47810038e9029349559760628ed3e3f53a8613c9d4fb176a2",
+      "sha256": "fbe7b84ced47a643aa2eb83c6fa65c059fc7c73d626d101d75255681f64121e7",
       "executable": false
     },
     "src/plinth/meeting-sharing-model.ts": {
@@ -3953,7 +3953,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "2c914da7db24e5debe4d408bc9723a56c9e1622aa7e3f97eba7ef112867cdc80",
+      "sha256": "0231921b63f327edeb5ef76ae2653643dad10f6f4d3707ef15a8c57199ec99de",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -3969,11 +3969,11 @@
       "executable": false
     },
     "src/ui/meeting-sharing.tsx": {
-      "sha256": "da4f13e356e246d7cf9cd34469186d3924f674c43c9ba70d7da9e900ccc430c4",
+      "sha256": "cc087fae8925d0b2f16786d646995b2347145e0cbbd99a380c773e5df14299f9",
       "executable": false
     },
     "src/ui/meetings.tsx": {
-      "sha256": "138dda8486411a15cdd4af6dd9b8cc81f9e92ff470eec09d589ce65437a9267a",
+      "sha256": "6a0244ac478b069bae0650d1bc345c682bd2f1a7b3f0930b321364ee7a5da23e",
       "executable": false
     },
     "src/ui/money.tsx": {
@@ -4289,11 +4289,11 @@
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
-      "sha256": "5d1eecb29e052b9cc864e052a879667401118f48dbc4b9b82098563b00b204d3",
+      "sha256": "dfaeaf6bcb32decaf91b9265b367b1a4d0fba3ecb28544b10b0a9a58801ae291",
       "executable": false
     },
     "tests/journeys/meetings.mjs": {
-      "sha256": "b2b21ad6399810d50a2a08df13956c1bbc8402aeba6d4fba88164f93a28a219c",
+      "sha256": "d8dcf62658016242bffe537aef8073bc3d0b2f9319bef644f3ca895d2ed5745e",
       "executable": false
     },
     "tests/journeys/payments.mjs": {
@@ -4425,7 +4425,7 @@
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
-      "sha256": "802ddfb1bd9075ad41aff4e701cb942b60fac647056e2c803db7846eecf6300e",
+      "sha256": "b3f17f423f73e83e6318a43cf3e03649ecb2e3a5b73228d0e6ca80cdb65c1be0",
       "executable": false
     },
     "tests/plinth/payments.test.mjs": {

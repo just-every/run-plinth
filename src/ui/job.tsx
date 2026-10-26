@@ -29,7 +29,7 @@ import { Subcontracts } from './job-subcontracts'
 
 export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'Messages', 'Meetings', 'Decision search', 'Financial review', 'History'] as const
 export type Section = typeof sections[number]
-export type JobProps = { job: Job; manager: boolean; role: string; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
+export type JobProps = { job: Job; manager: boolean; role: string; refresh: () => Promise<void>; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
 
 export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: string; onBack: () => void; onChange: () => Promise<void>}) {
@@ -50,7 +50,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
   const roleSections:Record<string,readonly Section[]>={estimator:['Quote','Bids','To-dos'],superintendent:['Today','Schedule','Daily logs','Punch','To-dos'],crew:['Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
   const sectionAllowed=(s:Section)=>s==='Meetings'?true:limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||s==='Decision search'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
-  const props: JobProps = { job, manager, role, mutate, go: setSection }
+  const props: JobProps = { job, manager, role, mutate, refresh, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
     <header className="job-head">

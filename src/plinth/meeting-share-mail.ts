@@ -8,6 +8,8 @@ import { officeAuthority, authorityGuards, checkWarrantySend, loadWarrantyJob, w
 import { readClock, saveJob } from './store'
 import { digest } from './attachments'
 import { optionalNotice } from './mail-model'
+import { preferences } from './todo-notices'
+import { wallClock } from './time-zone'
 import { suppression } from './mail-store'
 
 export interface MeetingEmailRequest {
@@ -45,7 +47,10 @@ async function eligible(db: D1Database, job: MeetingSharingJob, share: MeetingSh
  // The grant checker re-reads native team, role, client and released company scope authority.
  const recipient = await currentMeetingShareRecipient(db, job, {id:person.id,email:person.email,version:person.version}, share)
  need(recipient, 'The recipient no longer has this exact extract grant', 409, 'recipient_authority')
+ const preference=await preferences(db,person.id),quiet=preference?.data.quiet
+ if(quiet){const current=wallClock(Date.now(),quiet.time_zone),minute=current.hour*60+current.minute;need(!(quiet.start===quiet.end||quiet.start<quiet.end&&minute>=quiet.start&&minute<quiet.end||quiet.start>quiet.end&&(minute>=quiet.start||minute<quiet.end)),'The recipient’s recorded quiet hours currently hold this optional email',409,'mail_quiet')}
  const guards = meetingShareRecipientGuards(db,recipient)
+ guards.push(preference?db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_todo_library WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(preference.id,preference.version):db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pl_todo_library WHERE id=?) THEN 1 ELSE 0 END').bind('preference:'+person.id))
  let reminder = ''
  if (request.action_id) { const current = await currentAction(db,job,share,request.email,request.action_id);guards.push(...current.guards);reminder=`\nOutstanding action: ${current.action.title}\nDue: ${current.action.due_on}\n` }
  const subject = request.kind === 'action_reminder' ? 'Meeting action reminder: ' + share.title : 'Meeting decision: ' + share.title

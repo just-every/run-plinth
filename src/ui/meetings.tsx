@@ -7,7 +7,7 @@ import { api, Badge, calendarDay, Field, Form } from './shared'
 
 export function Meetings(props: JobProps) {
  const {job}=props
- if (!job.meeting_office_access) return <SharedMeetingDecisions job={job}/>
+ if (!job.meeting_office_access) return <SharedMeetingDecisions job={job} refresh={props.refresh}/>
  return <OfficeMeetings {...props}/>
 }
 function OfficeMeetings(props: JobProps) {

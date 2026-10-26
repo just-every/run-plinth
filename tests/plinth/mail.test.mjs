@@ -105,6 +105,7 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   const meetingMailCount=f.messages.length
   let r = await s.api(path + '/meetings', { method: 'POST', body: { expected_version: job.version, title: 'Kitchen site meeting', held_on: '2026-10-26', agenda: 'Choose cabinet finish', minutes: 'Alex and Builder reviewed samples at the site.', attendees: ['Alex Chen', 'Builder'], decisions: 'Natural oak confirmed pending email drawing', tags: ['cabinetry'], sheet: 'A-201', cost_code: '06-400', actions: [{ title: 'Record the resolved cabinet selection', owner_email: 'builder@example.com', due_on: '2026-11-03' }] } })
   assert.equal(r.status, 200, JSON.stringify(r.value)); const meeting = r.value.record; job = await read();assert.equal(f.messages.length,meetingMailCount,'Recording minutes and assigning an action sends nothing')
+  assert.deepEqual({agenda:job.meetings[0].agenda,minutes:job.meetings[0].minutes,attendees:job.meetings[0].attendees,decisions:job.meetings[0].decisions,action:job.meetings[0].actions.map(a=>({title:a.title,owner_email:a.owner_email,due_on:a.due_on}))},{agenda:'Choose cabinet finish',minutes:'Alex and Builder reviewed samples at the site.',attendees:['Alex Chen','Builder'],decisions:'Natural oak confirmed pending email drawing',action:[{title:'Record the resolved cabinet selection',owner_email:'builder@example.com',due_on:'2026-11-03'}]})
   assert.equal((await s.api(path + '/meetings', { cookie: s.client })).status, 403)
   assert.equal((await s.api(path, { cookie: s.client })).value.job.meetings, undefined, 'Job projection never carries private minutes')
   const find = (query, cookie = f.owner) => s.api(path + '/decision-search?' + new URLSearchParams(query), { cookie })
@@ -123,6 +124,9 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   assert.equal((await annotate('files:'+inbound.files[0].id,s.client)).status,403)
   assert.equal((await find({q:'service-clearance-2418',tag:'cabinetry',sender:'client@example.com',sheet:'A-201',cost_code:'06-400'},s.client)).value.count,1)
   assert.equal((await find({q:'Natural oak please',tag:'cabinetry',sender:'client@example.com',sheet:'A-201',cost_code:'06-400'})).value.count,1)
+  const textFile=Buffer.from('Service specification: synthetic-plinth-unicode-2420 — façade clearance')
+  assert.deepEqual(await s.reply(sent.replyTo,{}, {id:'<synthetic-plinth-text-2420@example.com>',text:'Supplemental specification attached',file:{name:'service-specification.txt',type:'text/plain',bytes:textFile}}),{rejected:null})
+  r=await find({q:'façade clearance',sender:'client@example.com'},s.client);assert.equal(r.value.count,1);assert.equal(r.value.results[0].extraction.status,'complete')
   const bidBytes=searchDocument(['Confidential subcontractor pricing', 'Private bid content synthetic-plinth-bid-value-2418'])
   const originalBid=Buffer.from(mime({from:'Trade Estimator <synthetic-plinth-sub@example.com>',to:'builder@example.com',subject:'Private millwork bid',id:'<synthetic-plinth-bid-2418@example.com>',text:'Private commercial bid for this job only',file:{name:'millwork-bid.pdf',type:'application/pdf',bytes:bidBytes}}))
   const sentBeforeCapture=f.messages.length
@@ -241,6 +245,10 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   const mailBefore=f.messages.length
   r=await requestCopy(s.client);assert.equal(r.status,200,JSON.stringify(r.value));const emailRequest=r.value.record
   assert.equal(f.messages.length,mailBefore,'A recipient request sends nothing')
+  const preferences={assignment:'off',comment:'off',reminder:'off'}
+  assert.equal((await s.api('/todos/preferences',{method:'POST',cookie:s.client,body:{expected_revision:0,...preferences,quiet:{start:'00:00',end:'00:00',time_zone:'America/New_York'}}})).status,200)
+  assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`)).status,409,'The recipient’s recorded quiet hours hold optional meeting email')
+  assert.equal((await s.api('/todos/preferences',{method:'POST',cookie:s.client,body:{expected_revision:1,...preferences}})).status,200)
   const preview=await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.email,'client@example.com');assert.equal(preview.value.body.includes('synthetic-plinth-private-2419'),false)
   assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:'stale review'})).status,409)
   r=await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:preview.value.digest});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(f.messages.length,mailBefore+1);assert.deepEqual(f.messages.at(-1).to,['client@example.com']);assert.ok(f.messages.at(-1).text.includes(input.body));assert.equal(f.messages.at(-1).text.includes('synthetic-plinth-private-2419'),false)
