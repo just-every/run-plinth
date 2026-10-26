@@ -1,13 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { setPortalFeatures } from './helpers.mjs'
 import { setup, intent } from './payment-fixture.mjs'
 
 test('PAY-001 — a client pays issued draws by card, wallet and bank transfer through hosted Stripe checkout and signed events credit each invoice once', async () => {
+ for(const options of [{stripeSecret:''},{stripeWebhookSecret:''}]){
+  const disabled=await setup(options)
+  try{const invoice=await disabled.draw(500,'Payment configuration unavailable');assert.equal((await disabled.api(`/jobs/${disabled.job().id}/payments`)).value.enabled,false);assert.equal((await disabled.pay(invoice)).value.error,'payments_unconfigured');assert.equal(disabled.edge.calls.length,0);assert.equal((await disabled.attempts()).length,0)}finally{await disabled.f.close()}
+ }
  const s = await setup(), { f, edge } = s
  try {
   const card = await s.draw(200_000, 'Draw 1: framing'), wallet = await s.draw(150_000, 'Draw 2: windows'), bank = await s.draw(100_000, 'Draw 3: cabinets'), failing = await s.draw(50_000, 'Draw 4: paint')
   // Only the client starts a payment, after confirming the shown authorization; nothing else moves money.
   for (const who of [{ cookie: f.owner }, { cookie: s.foreign }, { cookie: undefined, token: s.agent }]) assert.ok([403, 404].includes((await s.pay(card, who)).status))
+  await setPortalFeatures(f,s.job().id,['billing']);assert.equal((await s.pay(card)).status,404,'A revoked client billing feature refuses Checkout');assert.equal(edge.calls.length,0);await setPortalFeatures(f,s.job().id,[])
   assert.equal((await s.pay(card, { body: { invoice_id: card } })).status, 400); assert.equal(edge.sessions.length, 0, 'No Stripe call without the client\'s confirmation')
   let r = await s.pay(card); assert.equal(r.status, 201); assert.match(r.value.url, /^https:\/\/checkout\.stripe\.test\/c\/pay\/cs_synthetic_1$/); assert.equal(r.value.attempt.status, 'open'); assert.equal(r.value.attempt.livemode, false)
   const form = edge.sessions[0].form; assert.deepEqual([form.get('payment_method_types[0]'), form.get('mode'), form.get('line_items[0][price_data][unit_amount]'), form.get('line_items[0][price_data][currency]'), form.get('customer_email')], [null, 'payment', '200000', 'usd', 'client@example.com'], 'Payment methods are the ones the builder enabled in Stripe, never forced by the request')
@@ -20,7 +26,7 @@ test('PAY-001 — a client pays issued draws by card, wallet and bank transfer t
   assert.equal((await s.send(completed, { secret: 'synthetic-plinth-wrong-secret' })).status, 400); assert.equal((await s.send(completed, { at: Math.floor(Date.now() / 1000) - 3600 })).status, 400)
   assert.equal((await s.send(s.event('checkout.session.completed', { ...session, id: 'cs_synthetic_unknown' }, { payment_intent: 'pi_synthetic_card' }))).status, 400)
   assert.equal((await s.send(s.event('checkout.session.completed', session, { payment_intent: 'pi_synthetic_card', amount_total: 1 }))).status, 400)
-  assert.equal((await s.send({ ...completed, id: 'evt_synthetic_live', livemode: true })).status, 400)
+  assert.equal((await s.send({ ...completed, id: 'evt_synthetic_live', livemode: true })).status, 400);assert.equal((await s.send(s.event('checkout.session.completed',session,{payment_intent:'pi_synthetic_card',currency:'aud'}))).status,400,'A signed foreign-currency event cannot credit the USD invoice')
   edge.intents.set('synthetic-plinth-foreign-intent-1',intent('synthetic-plinth-foreign-intent-1',200_000));assert.equal((await s.send(s.event('checkout.session.completed',session,{payment_intent:'synthetic-plinth-foreign-intent-1'}))).status,400,'A valid signature cannot attach an unrelated payment without the instruction metadata')
   let job = await s.read(); assert.equal(job.invoices.find(i => i.id === card).receipts.length, 0)
   // The card payment settles: one receipt with the processor references, the balance is paid and a replay changes nothing.
@@ -123,6 +129,7 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   current=await s.read();row=current.invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0);assert.equal(row.balance.received_cents,175_000);assert.deepEqual(row.issued,original)
   for(const receipt of row.receipts){assert.equal(receipt.accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0);assert.ok(receipt.accounting_entries.some(e=>e.account==='stripe_clearing'))}
   assert.equal((await s.attempts()).find(a=>a.id===attempt.id).settlement_state,'refunded')
+  for(const fee of [100,75]){cp.latest_charge.balance_transaction.fee=fee;assert.equal((await reconcile()).status,200);assert.equal((await s.attempts()).find(a=>a.id===attempt.id).fee_cents,fee,'Refund fee outcomes follow fresh provider evidence rather than inferred recovery')}
   current=await s.read();row=current.invoices.find(i=>i.id===card)
   correction=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:current.version,operation_id:'synthetic-plinth-credit-operation-2',description:'Further agreed scope credit',reason:'Reviewed reduction',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:10_000}]}});assert.equal(correction.status,200)
   const uncertainRefund={...refundBody,operation_id:'synthetic-plinth-refund-operation-2',amount_cents:10_000,expected_version:correction.value.job.version}
@@ -160,9 +167,15 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   assert.equal(edge.refunds.length,expectedRefundCount);assert.equal((await reconcile()).status,200)
   current=await s.read();row=current.invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0)
   correction=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:current.version,operation_id:'synthetic-plinth-credit-operation-4',description:'Additional approved credit',reason:'Reviewed reduction',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:1_000}]}});assert.equal(correction.status,200)
+  const late=await s.draw(9_000,'Checkout paid after an agreed invoice reduction');await s.pay(late);const lateSession=edge.sessions.at(-1),lateOriginal=structuredClone((await s.read()).invoices.find(i=>i.id===late).issued)
+  const lateJob=await s.read(),lateCredit=await s.api(`/jobs/${lateJob.id}/invoices/${late}/credit`,{method:'POST',body:{expected_version:lateJob.version,operation_id:'synthetic-plinth-late-credit-1',description:'Agreed reduction before payment arrived',reason:'Human reviewed late settlement case',confirm:true,lines:[{invoice_line_id:lateOriginal.lines[0].id,amount_cents:1_000}]}});assert.equal(lateCredit.status,200)
+  const refundsBeforeLate=edge.refunds.length;lateSession.payment_intent='synthetic-plinth-late-intent-1';edge.intents.set(lateSession.payment_intent,intent(lateSession.payment_intent,9_000));const lateEvent=s.event('checkout.session.completed',lateSession,{payment_intent:lateSession.payment_intent})
+  assert.equal((await s.send(lateEvent)).status,200);assert.equal((await(await s.send(lateEvent)).json()).duplicate,true)
+  const lateInvoice=(await s.read()).invoices.find(i=>i.id===late),lateAttempt=(await s.attempts()).find(a=>a.invoice_id===late)
+  assert.equal(lateAttempt.status,'review');assert.match(lateAttempt.label,/office review required/);assert.equal(lateInvoice.balance.due_cents,-1_000);assert.equal(lateInvoice.receipts.length,1);assert.equal(lateInvoice.receipts[0].amount_cents,9_000);assert.deepEqual(lateInvoice.issued,lateOriginal);assert.equal(edge.refunds.length,refundsBeforeLate,'A changed balance never automatically authorizes a late-payment refund')
   const beforeChangedCount=edge.refunds.length,beforeChangedPayments=(await s.api(`/jobs/${current.id}/payments`)).value
   edge.onIntent=async()=>{const fresh=await s.read();const revised=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:fresh.version,operation_id:'synthetic-plinth-changing-credit-1',description:'New review required',reason:'Client revised the final refund economics',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:100}]}});assert.equal(revised.status,200)}
-  const changed=await refund({...refundBody,operation_id:'synthetic-plinth-changing-refund-1',amount_cents:1_000,expected_version:correction.value.job.version})
+  const changed=await refund({...refundBody,operation_id:'synthetic-plinth-changing-refund-1',amount_cents:1_000,expected_version:(await s.read()).version})
   assert.equal(changed.status,409);assert.equal(changed.value.error,'stale_version');assert.equal(edge.refunds.length,beforeChangedCount);assert.deepEqual((await s.api(`/jobs/${current.id}/payments`)).value,beforeChangedPayments,'Changed economics cannot reserve or send the stale refund')
   const enable=await s.api(`/roles/${clerkRole.id}`,{method:'PUT',body:{expected_version:clerkRole.version,permissions:{invoices:{approve:true}}}});assert.equal(enable.status,200);clerkRole=enable.value.role
   edge.onIntent=async()=>{const revoke=await s.api(`/roles/${clerkRole.id}`,{method:'PUT',body:{expected_version:clerkRole.version,permissions:{invoices:{approve:false}}}});assert.equal(revoke.status,200);clerkRole=revoke.value.role}
