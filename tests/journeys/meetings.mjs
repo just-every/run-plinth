@@ -2,7 +2,7 @@ import { attachmentTranscription } from './attachment-transcription.mjs'
 import { sharingJourney } from './meeting-sharing.mjs'
 import { meetingCorrespondence } from './meeting-mail.mjs'
 import assert from 'node:assert/strict'
-import {mkdir,readFile} from 'node:fs/promises'
+import {mkdir,readFile,writeFile} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
 import {nativeSignIn} from '../../scripts/verify/native-signin.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
@@ -43,4 +43,4 @@ try {
  const currentMeetings=(await(await owner.request.get(base+`/api/plinth/jobs/${job.id}/meetings`)).json()).meetings
  await sharingJourney({base,entrance,browser,page,clientPage,owner,client,job,meeting:currentMeetings[0],ownerEmail,email,selection,capture})
  await owner.close();await client.close();console.log('DOC-005 PASS: installed Worker inbound email and original PDF, private bid capture, metadata and full embedded-text search, assigned completion and retained work source, reviewed audience-safe sharing, recipient consent, owner email review, orphan recovery and client and field revocation; 1440 and 390')
-} finally {await browser.close()}
+} catch(error) { for(const context of browser.contexts())for(const failed of context.pages())if(new URL(failed.url()).origin===base&&new URL(failed.url()).pathname==='/app'){await failed.screenshot({path:`${shots}/DOC-005-failure-${context===browser.contexts()[0]?'owner':'recipient'}.png`,fullPage:true});await writeFile(`${shots}/DOC-005-failure.txt`,await failed.locator('body').innerText());break}throw error } finally {await browser.close()}
