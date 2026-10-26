@@ -4453,7 +4453,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "65e4d40104303a5713695e75848f04190171cd45db38a8628ca0b95811337036",
+      "sha256": "978af9d02e6d518cb6bb44e57af5979e9de7735bff6abf75165e9b5b0fca7c2d",
       "executable": false
     },
     "tests/plinth/pricing.test.mjs": {
