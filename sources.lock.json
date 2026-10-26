@@ -901,7 +901,7 @@
       "executable": false
     },
     "scripts/live-proof/settlement-sandbox.mjs": {
-      "sha256": "9e4235e30c8d62792e482419d46e8ba42b88ecce808c1d4a72b6e752689a4747",
+      "sha256": "c374f24cbc923ce4a93abc38f54016cb46ec12a889a8b1e8879200ebc540fc6f",
       "executable": false
     },
     "scripts/live-proof/stripe-fixture.mjs": {
@@ -4449,7 +4449,7 @@
       "executable": false
     },
     "tests/plinth/payments.test.mjs": {
-      "sha256": "fe56cdc677391871e2cb4880b286d2a180728629d58219779bf1bb6aca1343ef",
+      "sha256": "b48c8e163497b0ed65e83f379b43c544547ae62603e96b41ba83a90e00649f49",
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
