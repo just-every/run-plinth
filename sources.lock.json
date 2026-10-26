@@ -168,6 +168,10 @@
       "sha256": "eef7bdd4e90499e3d91f8077cc84bc67faa3a956e0dfec3b7fe69fb1825a8c20",
       "executable": false
     },
+    "docs/DECISION-SEARCH.md": {
+      "sha256": "3fee4ecbd16979252c69b2dc56f220b77801f568900891a29b17bc9ad969cdb4",
+      "executable": false
+    },
     "docs/FIELD-TIME.md": {
       "sha256": "10b1bdabba76ac1d5362f53e72a8553774f9a9ea7b000734c36da4dbcf3a14fe",
       "executable": false
@@ -4281,11 +4285,11 @@
       "executable": false
     },
     "tests/journeys/attachment-extraction.mjs": {
-      "sha256": "073e4c7fe4a0e2de5fd87e581a509750689b3308a5a841706016c799a748ef2f",
+      "sha256": "0b85f21768484c76082745c4a81e70354e5b5db0d7ab801da87a0c41be470cfa",
       "executable": false
     },
     "tests/journeys/attachment-transcription.mjs": {
-      "sha256": "1fbdac73e82bb25f6ab62dbc27dcad70b736dbb214c58ebef91cfd0034c63fbb",
+      "sha256": "9802873758be91310e0e868c5abc16882cb78a98be09209462ea45eb208b8b29",
       "executable": false
     },
     "tests/journeys/audit.mjs": {
