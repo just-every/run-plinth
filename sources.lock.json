@@ -4285,11 +4285,11 @@
       "executable": false
     },
     "tests/journeys/attachment-extraction.mjs": {
-      "sha256": "0b85f21768484c76082745c4a81e70354e5b5db0d7ab801da87a0c41be470cfa",
+      "sha256": "e7e09dd003d38b878e28da645b81fe91dcbb06a75c7c1016e0aed5f77a8fc119",
       "executable": false
     },
     "tests/journeys/attachment-transcription.mjs": {
-      "sha256": "9802873758be91310e0e868c5abc16882cb78a98be09209462ea45eb208b8b29",
+      "sha256": "4c4543d6244cb7b07c541237281168f00de925644b5652df043b30d7cbeb2459",
       "executable": false
     },
     "tests/journeys/audit.mjs": {
