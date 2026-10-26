@@ -39,7 +39,14 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   const clerk=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-invoice-clerk@example.com')
   assert.equal((await f.json('/api/plinth/team/'+clerk.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:clerkRole.value.role.id,job_ids:[],po_limit_cents:0}})).status,200)
   const clerkDraft=await act('/invoices',{...invoiceInput,kind:'deposit',amount_cents:100,description:'Synthetic drafting authority proof'},draftClerk);assert.equal(clerkDraft.status,'draft');assert.equal(clerkDraft.prepared_by.name,'Invoice draft clerk')
-  await unchanged(path+'/credit',correction,403,draftClerk)
+  let clerkPolicy=clerkRole.value.role
+  const deniedDecision=async(route,input)=>{
+   await unchanged(route,input,403,draftClerk)
+   let updated=await f.json('/api/plinth/roles/'+clerkPolicy.id,{method:'PUT',cookie:f.owner,body:{expected_version:clerkPolicy.version,financial_visible:false,permissions:{invoices:{approve:true}}}});assert.equal(updated.status,200);clerkPolicy=updated.value.role
+   await unchanged(route,input,403,draftClerk)
+   updated=await f.json('/api/plinth/roles/'+clerkPolicy.id,{method:'PUT',cookie:f.owner,body:{expected_version:clerkPolicy.version,financial_visible:true,permissions:{invoices:{approve:false}}}});assert.equal(updated.status,200);clerkPolicy=updated.value.role
+  }
+  await deniedDecision(path+'/credit',correction)
   for(const [cookie,token,status] of [[client,undefined,403],[foreign,undefined,404],[undefined,agent,403]])assert.equal((await attempt(path+'/credit',correction,cookie,token)).status,status)
   await unchanged(path+'/credit',{...correction,confirm:false},400);await unchanged(path+'/credit',{...correction,reason:''},400)
   await unchanged(path+'/credit',{...correction,lines:[{invoice_line_id:sourceId,amount_cents:11002}]},409)
@@ -56,7 +63,7 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   await unchanged(path+'/credit',correction,409)
   await unchanged(path+'/credit',{...correction,operation_id:'synthetic-plinth-operation-stale-5',expected_version:job.version-1},409)
   await unchanged(path+'/void',{...correction,operation_id:'synthetic-plinth-void-paid-5',lines:undefined},409)
-  await unchanged(path+'/debit',{...correction,operation_id:'synthetic-plinth-16',lines:[{invoice_line_id:sourceId,amount_cents:1000}]},403,draftClerk)
+  await deniedDecision(path+'/debit',{...correction,operation_id:'synthetic-plinth-16',lines:[{invoice_line_id:sourceId,amount_cents:1000}]})
   await act(path+'/debit',{...correction,operation_id:'synthetic-plinth-operation-6',description:'Restore the separately reviewed part of the credit',lines:[{invoice_line_id:sourceId,amount_cents:1000}]})
   current=job.invoices.find(i=>i.id===paidId);assert.equal(current.balance.due_cents,-2333);assert.equal(current.balance.debited_cents,1000);assert.equal(current.corrections[1].document.tax_cents,91)
   const raceInput={...correction,operation_id:'synthetic-plinth-operation-7',expected_version:job.version,lines:[{invoice_line_id:sourceId,amount_cents:1}]}
@@ -72,7 +79,7 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   await unchanged(residualPath+'/write-off',{...writeoff,amount_cents:40001},409)
   await unchanged(residualPath+'/write-off',{...writeoff,dispute_reference:''},400)
   await unchanged(residualPath+'/credit',{...correction,lines:[{invoice_line_id:quoteId,amount_cents:1}]},409)
-  await unchanged(residualPath+'/write-off',writeoff,403,draftClerk)
+  await deniedDecision(residualPath+'/write-off',writeoff)
   await act(residualPath+'/write-off',writeoff,admin)
   const written=job.invoices.find(i=>i.id===residual.id);assert.equal(written.balance.due_cents,0);assert.equal(written.balance.written_off_cents,40000);assert.equal(written.balance.credited_cents,0);assert.equal(written.balance.received_cents,10000)
   assert.deepEqual(written.write_offs[0].accounting_entries,[{account:'bad_debt_expense',debit_cents:40000,credit_cents:0},{account:'accounts_receivable',debit_cents:0,credit_cents:40000}],'Write-off consumes receivables as bad debt without revenue, sales tax or cash entries')
@@ -82,7 +89,7 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   const deposit=await act('/invoices',{...invoiceInput,kind:'deposit',amount_cents:10000,description:'Unpaid deposit request to void'}),depositPath=`/invoices/${deposit.id}`
   await act(depositPath+'/issue');const depositOriginal=structuredClone(job.invoices.find(i=>i.id===deposit.id).issued)
   await act(depositPath+'/credit',{...correction,operation_id:'synthetic-plinth-operation-10',lines:[{invoice_line_id:depositOriginal.lines[0].id,amount_cents:1}]})
-  await unchanged(depositPath+'/void',{operation_id:'synthetic-plinth-17',confirm:true,reason:'Synthetic duplicate review',description:'Synthetic unused request'},403,draftClerk)
+  await deniedDecision(depositPath+'/void',{operation_id:'synthetic-plinth-17',confirm:true,reason:'Synthetic duplicate review',description:'Synthetic unused request'})
   await act(depositPath+'/void',{operation_id:'synthetic-plinth-operation-11',confirm:true,reason:'Private duplicate request review',description:'Void of unused deposit request'})
   const voided=job.invoices.find(i=>i.id===deposit.id)
   assert.equal(voided.balance.due_cents,0);assert.equal(voided.corrections.at(-1).document.kind,'void');assert.equal(voided.corrections.at(-1).document.gross_cents,-9999)
@@ -451,7 +458,7 @@ test('BILL-004 — approved actuals bill once with reviewed tax, fee categories,
   const competing=(await c.ok('/invoices',{...input,description:'Competing draft must not reserve the same costs twice'})).record
   await c.ok(`/invoices/${invoice.id}/issue`);await unchanged(`/invoices/${competing.id}/issue`,{},409);await unchanged(`/invoices/${invoice.id}/issue`,{},409)
   const first=(await c.read()).invoices.find(i=>i.id===invoice.id),frozen=structuredClone(first.issued)
-  assert.equal(frozen.gross_cents,55220);assert.equal(frozen.earned_revenue_cents,55220)
+  assert.equal(frozen.gross_cents,55220);assert.equal(frozen.earned_revenue_cents,55220);assert.equal((await c.ledger()).totals.client_billed_cents,55220,'Cost-plus original issues enter billed value before linked corrections')
   const originalResponse=await f.request(`/api/plinth/jobs/${c.job.id}/invoices/${invoice.id}/document.html`,{cookie:f.owner}),html=await originalResponse.text();assert.equal(originalResponse.status,200)
   await unchanged('/invoices',input,409)
   await unchanged('/invoices',{...input,cost_billing:{...config,entry_ids:[excluded.id],excluded_entry_ids:[]}},409)
@@ -511,7 +518,7 @@ test('BILL-004 — approved actuals bill once with reviewed tax, fee categories,
   assert.equal((await c.act(`/invoices/${adjustment.id}/credit`,correction)).status,409,'A negative source cannot be credited beyond its reviewed amount')
   await c.ok(`/invoices/${adjustment.id}/debit`,correction)
   let corrected=c.job.invoices.find(i=>i.id===adjustment.id)
-  assert.equal(corrected.balance.due_cents,-951);assert.equal(corrected.corrections[0].document.tax_cents,46)
+  assert.equal((await c.ledger()).totals.client_billed_cents,frozen.gross_cents-951,'The native ledger includes both the original cost-plus issue and the signed corrected vendor credit');assert.equal(corrected.balance.due_cents,-951);assert.equal(corrected.corrections[0].document.tax_cents,46)
   assert.equal((await c.act(`/invoices/${adjustment.id}/debit`,{...correction,operation_id:'synthetic-plinth-negative-excess',lines:[{invoice_line_id:negativeLine.id,amount_cents:1000}]})).status,409)
   await c.ok(`/invoices/${adjustment.id}/credit`,{...correction,operation_id:'synthetic-plinth-negative-recredit',lines:[{invoice_line_id:negativeLine.id,amount_cents:501}]})
   corrected=c.job.invoices.find(i=>i.id===adjustment.id)

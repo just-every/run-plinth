@@ -362,7 +362,7 @@ No separate owner-approved desk-built CLAIMS.md was supplied for Plinth as of 17
 
 ## Status
 
-Status inventory reconciled on 27 October 2026 with the CT rulings dated 26 October 2026. BILL-005 and DOC-005 remain PARTIAL pending fresh exact-SHA judgment of this fix revision; named assertions below describe the exercised scope.
+Judged from the code and tests at commit `5f9eb897899375602961e8e086c14421080bcba0` (26 October 2026). This baseline inventory is reconciled with the CT rulings dated 26 October 2026; the subsequent fix-round assertions below await fresh exact-SHA judgment. BILL-005 and DOC-005 remain PARTIAL.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
