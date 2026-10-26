@@ -44,3 +44,34 @@ The delivery log includes `mode`, `consent_grant_id`, event ID, key generation, 
 Signing uses HMAC-SHA256 over the ASCII Unix timestamp, a literal dot and the exact UTF-8 request body. `plinth-signature` contains `t=<timestamp>,v1=<lowercase hex digest>`; `plinth-event-id` repeats the body ID. The schema's Webhook record names all disclosed fields. Verify the signature with the current key, compare in constant time, reject timestamps outside a five-minute tolerance and deduplicate by event ID. A deliberate replay is signed at its new attempt time with the current key while retaining the same event body and ID. Event IDs are independent for different job versions; attempt IDs do not replace event IDs.
 
 Subscriptions, signing material, delivery leases and rate counters are excluded from private portability. Receiving installations must mint credentials and explicitly consent again. Content-free event references and draft idempotency records travel with the job and are removed by its erasure. There is no new retention schedule; ROLE-005 remains responsible for future retention policy. Delivery history is retained on the source installation while its subscription and job exist. No live receiver or paid provider proof is claimed: automated integration proofs use a controlled receiver at the network edge, as ACCEPTANCE.md permits.
+
+## Restoring connector configuration
+
+OPS-002 recovery retains an inert binding with its ID, public receiver origin,
+job IDs, event types and revocation marker. Endpoint paths and query strings
+are omitted because they can contain provider credentials. Signing keys, source
+credentials, standing grants, delivery leases and rate counters are excluded.
+Older archives made before this metadata existed still require manual receiver
+configuration. No restored binding can send an event.
+
+After restoring and signing in as the destination owner, use the generated
+`listConnectionRecovery` operation. It pages up to 100 bindings, with `next`
+passed back as `after` until null. This is also available at
+`GET /api/plinth/connections/recovery`. Active receivers are omitted; revoked
+bindings remain visible as revoked and cannot be reactivated through recovery.
+Ordinary administrators and bearer credentials cannot read this checklist.
+
+Reconfigure the destination's permitted public HTTPS origins and mint a fresh
+owner credential through the existing identity-confirmation door. Re-enter the
+full receiver URL privately. Call generated `createConnection` with its ordinary
+consent body plus `recovery_id` from the checklist. The origin, job IDs and event
+types must match the recovered binding exactly; each job must still exist.
+Explicit `confirm: true` and a valid destination credential are required.
+The source credential cannot authorize recovery. The new subscription retains
+the binding ID and returns a new signing key once; configure that key at the
+receiver privately. Repeating recovery cannot create another subscription.
+
+The receiver initially has no standing grant. Manual delivery still requires
+consent per attempt. If scheduled delivery is wanted, approve a fresh expiring
+standing grant through the existing owner controls; it authorizes only future
+events. Recovery never resumes a source installation's unattended work.

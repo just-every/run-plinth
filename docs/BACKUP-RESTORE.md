@@ -38,6 +38,18 @@ Replace `/private/path/plinth.rer` with the archive's actual private path. Enter
 
 Check **Jobs**, accepted quotes, approvals and downloaded daily-log photos. Open **Move in → Import journal** to inspect retained imports. Use the destination's new owner session to manage retained imports.
 
+## Reconnect native receivers
+
+Backups retain an inert checklist of receiver origins, job IDs, event types and
+revocations. They omit full endpoint paths, query strings, signing keys, provider
+credentials and standing consent. A restored checklist cannot send anything.
+Follow [Restoring connector configuration](NATIVE-API.md#restoring-connector-configuration)
+to inspect it as the destination owner, re-enter each endpoint privately and
+reconnect with a newly minted credential and explicit approval. Configure the
+new signing key at the receiver. Scheduled delivery needs a separate fresh
+standing grant and never replays pre-grant events automatically. Older archives
+without a checklist require manual receiver configuration.
+
 ## Erase a job and carry the erasure forward
 
 Only the owner can permanently erase a job. In that job, open **History → Erase this job**, choose **Erase job permanently** and confirm.

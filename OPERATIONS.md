@@ -52,6 +52,18 @@ Preserve ambiguous state and applied migration history. Never place a remote
 credential, owner secret or local resource ID in source. A schema change needs
 a forward migration and verified transition/recovery.
 
+## Native connector recovery
+
+The private archive retains receiver origin and scope metadata as an inert
+checklist, including revocation markers. Full endpoint paths, query strings,
+credentials, signing keys and standing consent remain installation-local.
+After restore, the destination owner follows
+[the connector recovery procedure](docs/NATIVE-API.md#restoring-connector-configuration),
+re-enters the endpoint and creates a fresh credential before explicitly
+reconnecting. A new standing grant is separate and covers only future events.
+This native recovery does not configure external accounting connectors or
+resume provider work that those future clauses have not implemented.
+
 ## Deployment
 
 `rer deploy --dry-run` validates the real owner-account

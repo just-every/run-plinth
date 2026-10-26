@@ -1048,6 +1048,75 @@
           }
         }
       }
+    },
+    "/connections/recovery": {
+      "get": {
+        "operationId": "listConnectionRecovery",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Owner session only. Lists inert archive bindings with no active receiver. No credentials or standing consent are restored.",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecoveryBinding"
+                      }
+                    },
+                    "next": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "bindings",
+                    "next"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Sign in required"
+          },
+          "403": {
+            "description": "Authority or receiver origin refused"
+          },
+          "404": {
+            "description": "Record unavailable to this receiver"
+          },
+          "409": {
+            "description": "Concurrent record or grant change"
+          },
+          "429": {
+            "description": "Rate limit; Retry-After is 60 seconds"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1464,6 +1533,10 @@
           },
           "confirm": {
             "const": true
+          },
+          "recovery_id": {
+            "type": "string",
+            "description": "Optional inert archive binding ID. Exact origin and scope, fresh credential and explicit consent are required."
           }
         },
         "required": [
@@ -1472,6 +1545,44 @@
           "job_ids",
           "event_types",
           "confirm"
+        ]
+      },
+      "RecoveryBinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "receiver_origin": {
+            "type": "string",
+            "format": "uri"
+          },
+          "job_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "receiver_origin",
+          "job_ids",
+          "event_types",
+          "revoked_at"
         ]
       }
     }

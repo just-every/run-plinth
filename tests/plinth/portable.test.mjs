@@ -1,3 +1,4 @@
+import {proveConnectorRecovery} from './connector-recovery-support.mjs'
 import { stripeEdge, intent } from './payment-fixture.mjs'
 import { takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
@@ -172,7 +173,9 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(archivedField.location_choice.inside,false);assert.equal(archivedField.location_choice.reminder.kind,'clock_out')
     // Native connector secrets stay installation-local while draft replay identity travels with its job.
     const connectorToken=await f.agent(),connectorCredential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0]
-    const connector=await f.json('/api/plinth/connections',{method:'POST',cookie:f.owner,body:{credential_id:connectorCredential.id,receiver:'https://synthetic-plinth.example/events',job_ids:[job.id],event_types:['job.updated'],confirm:true}});assert.equal(connector.status,201,JSON.stringify(connector.value))
+    const connector=await f.json('/api/plinth/connections',{method:'POST',cookie:f.owner,body:{credential_id:connectorCredential.id,receiver:'https://synthetic-plinth.example/synthetic-plinth-private-path?secret=synthetic-plinth-private-query',job_ids:[job.id],event_types:['job.updated'],confirm:true}});assert.equal(connector.status,201,JSON.stringify(connector.value))
+    const revokedConnector=await f.json('/api/plinth/connections',{method:'POST',cookie:f.owner,body:{credential_id:connectorCredential.id,receiver:'https://synthetic-plinth.example/revoked',job_ids:[job.id],event_types:['job.updated'],confirm:true}});assert.equal(revokedConnector.status,201)
+    assert.equal((await f.json(`/api/plinth/connections/${revokedConnector.value.subscription.id}/revoke`,{method:'POST',cookie:f.owner,body:{}})).status,200)
     const standingGrant=await f.json(`/api/plinth/connections/${connector.value.subscription.id}/grant`,{method:'POST',cookie:f.owner,body:{confirm:true,origin:'https://synthetic-plinth.example',event_types:['job.updated'],payload_class:'references',rate_cap:10,expires_at:new Date(Date.now()+3_600_000).toISOString()}});assert.equal(standingGrant.status,200,JSON.stringify(standingGrant.value))
     job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
     const connectorDraft=await f.json('/api/plinth/v1/jobs/'+job.id+'/changes',{method:'POST',token:connectorToken,headers:{'idempotency-key':'synthetic-plinth-archive-draft'},body:{expected_version:job.version,description:'Synthetic archive connector draft',amount_cents:100}});assert.equal(connectorDraft.status,201,JSON.stringify(connectorDraft.value))
@@ -195,6 +198,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const receiver=await createFixture({persistTo:destination,ownerCookie:cookie})
     try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
     for(const exported of [original,restored]){
+      for(const value of ['synthetic-plinth-private-path','synthetic-plinth-private-query'])assert.ok(!JSON.stringify(exported).includes(value),'OPS-002 endpoint paths and query credentials never enter a recovery archive')
+      assert.deepEqual(rows(exported).find(item=>item.table==='pl_connector_bindings'&&item.row.id===connector.value.subscription.id).row,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:JSON.stringify([job.id]),event_types:JSON.stringify(['job.updated']),revoked_at:null},'OPS-002 inert connector scope survives private CLI recovery')
       assert.ok(!JSON.stringify(exported).includes(connector.value.signing_key),'INT-009 signing keys never enter a portable archive')
       assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits'].includes(table.name)),'INT-009 and INT-014 live receiver and standing-grant authority are excluded from restoration')
       assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
@@ -249,6 +254,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!serialized.includes(feedPath.split('/').at(-1).replace('.ics','')))
     assert.ok(!restored[0].tables.some(t=>t.name==='pl_calendar_tokens'))
     assert.ok(!serialized.includes('test-session-secret-for-plinth-integration-only-2026'))
+    await proveConnectorRecovery(destination,cookie,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:[job.id],event_types:['job.updated'],revoked_at:null},revokedConnector.value.subscription.id,connectorCredential.id,connector.value.signing_key)
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job

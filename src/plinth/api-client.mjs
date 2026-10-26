@@ -212,6 +212,19 @@ const operations = {
         }
       }
     ]
+  },
+  "listConnectionRecovery": {
+    "path": "/connections/recovery",
+    "method": "GET",
+    "parameters": [
+      {
+        "name": "after",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      }
+    ]
   }
 }
 export function createClient({origin, token, cookie, fetch: send = fetch}) {

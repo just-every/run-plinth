@@ -1,3 +1,4 @@
+import { bindingStatement, recoveryBindings, recoveryId } from './connector-recovery'
 import { grantReceiver, revokeGrant } from './connector-grants'
 import { active, activeCredentialSql, instant, publicSubscription, type Subscription } from './connector-state'
 import { sendReferences } from './connector-send'
@@ -16,6 +17,7 @@ export async function connectorsResponse(request: Request, env: Bindings, actor:
  requireOwner(actor)
  const db = env.DB, method = request.method
  await apiLimit(db, actor)
+ if (parts.length === 2 && parts[1] === 'recovery' && method === 'GET') return json(await recoveryBindings(db, new URL(request.url).searchParams.get('after') ?? ''))
  if (parts.length === 1 && method === 'GET') {
   const rows = await db.prepare(`SELECT s.*,(SELECT MIN(d.retry_at) FROM pl_connector_deliveries d WHERE d.subscription_id=s.id AND d.status IN ('failed','unknown') AND s.paused_at IS NULL AND s.grant_revoked_at IS NULL AND s.revoked_at IS NULL AND s.grant_expires_at>? AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries newer WHERE newer.subscription_id=s.id AND newer.event_id=d.event_id AND newer.rowid>d.rowid) AND NOT EXISTS(SELECT 1 FROM pl_connector_deliveries ok WHERE ok.subscription_id=s.id AND ok.event_id=d.event_id AND ok.status='accepted')) AS next_retry_at FROM pl_connector_subscriptions s WHERE operator_id=? ORDER BY id`).bind(instant(), actor.id).all<Subscription>()
   return json({subscriptions: rows.results.map(publicSubscription)})
@@ -27,16 +29,17 @@ export async function connectorsResponse(request: Request, env: Bindings, actor:
   need(Array.isArray(jobIds) && jobIds.length > 0 && jobIds.length <= 100 && jobIds.every(id => typeof id === 'string'), 'Choose 1 to 100 job IDs')
   need(Array.isArray(types) && types.length > 0 && types.length <= connectorEventTypes.length && types.every(type => connectorEventTypes.includes(type)), 'Choose supported event types')
   for (const id of jobIds) await jobOf(db, actor, id)
-  const row = {id: crypto.randomUUID(), operator_id: actor.id, operator_version: actor.version, credential_id: credentialId, receiver: await publicReceiver(env, input.receiver), job_ids: JSON.stringify([...new Set(jobIds)]), event_types: JSON.stringify([...new Set(types)]), secret: secret(), generation: 1, revoked_at: null, created_at: instant()} as Subscription
+  const receiver = await publicReceiver(env, input.receiver)
+  const row = {id: await recoveryId(db, input, receiver, jobIds, types), operator_id: actor.id, operator_version: actor.version, credential_id: credentialId, receiver, job_ids: JSON.stringify([...new Set(jobIds)]), event_types: JSON.stringify([...new Set(types)]), secret: secret(), generation: 1, revoked_at: null, created_at: instant()} as Subscription
   await active(db, row)
-  await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS('+activeCredentialSql+') THEN 1 ELSE 0 END').bind(credentialId, actor.id, actor.version, Date.now()), db.prepare('INSERT INTO pl_connector_subscriptions(id,operator_id,operator_version,credential_id,receiver,job_ids,event_types,secret,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(row.id, row.operator_id, row.operator_version, row.credential_id, row.receiver, row.job_ids, row.event_types, row.secret, row.created_at)], undefined, {kind: 'permission', action: 'connector.consent', subject_id: row.id})
+  await transaction(db, actor, null, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS('+activeCredentialSql+') THEN 1 ELSE 0 END').bind(credentialId, actor.id, actor.version, Date.now()), db.prepare('INSERT INTO pl_connector_subscriptions(id,operator_id,operator_version,credential_id,receiver,job_ids,event_types,secret,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(row.id, row.operator_id, row.operator_version, row.credential_id, row.receiver, row.job_ids, row.event_types, row.secret, row.created_at), bindingStatement(db, row)], undefined, {kind: 'permission', action: 'connector.consent', subject_id: row.id})
   return json({subscription: publicSubscription((await db.prepare('SELECT * FROM pl_connector_subscriptions WHERE id=?').bind(row.id).first<Subscription>())!), signing_key: row.secret}, 201)
  }
  const row = await db.prepare('SELECT * FROM pl_connector_subscriptions WHERE id=? AND operator_id=?').bind(parts[1] ?? '', actor.id).first<Subscription>()
  need(row, 'Connection not found', 404, 'not_found')
  if (parts.length === 3 && parts[2] === 'revoke' && method === 'POST') {
   await body(request)
-  await transaction(db, actor, null, [db.prepare("UPDATE pl_connector_subscriptions SET revoked_at=COALESCE(revoked_at,?),secret='' WHERE id=?").bind(new Date().toISOString(), row.id)], undefined, {kind: 'permission', action: 'connector.revoke', subject_id: row.id})
+  await transaction(db, actor, null, [db.prepare("UPDATE pl_connector_subscriptions SET revoked_at=COALESCE(revoked_at,?),secret='' WHERE id=?").bind(new Date().toISOString(), row.id), db.prepare('UPDATE pl_connector_bindings SET revoked_at=COALESCE(revoked_at,?) WHERE id=?').bind(instant(), row.id)], undefined, {kind: 'permission', action: 'connector.revoke', subject_id: row.id})
   return json({revoked: true})
  }
  if (parts.length === 3 && parts[2] === 'deliveries' && method === 'GET') {
