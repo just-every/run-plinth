@@ -15,7 +15,7 @@ const feature: Record<string, Feature> = {
  schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', forecast: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
  diary: 'logs', time: 'time',
  'meeting-inbox': 'documents', rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
- invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
+ payments: 'invoices', invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
  reports: 'reports', audit: 'reports', holds: 'reports',
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
 }

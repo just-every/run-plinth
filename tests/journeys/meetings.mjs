@@ -3,21 +3,22 @@ import { meetingCorrespondence } from './meeting-mail.mjs'
 import assert from 'node:assert/strict'
 import {mkdir,readFile} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
+import {nativeSignIn} from '../../scripts/verify/native-signin.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
 assert.ok(base&&shots)
 assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))
-const entrance=process.env.PLINTH_OWNER_OPEN??(await readFile('.rer/local/open-url','utf8')).trim()
-const browser=await chromium.launch({headless:true,...(process.platform==='linux'?{executablePath:'/usr/bin/chromium',args:['--no-sandbox']}:{args:['--use-mock-keychain','--password-store=basic']})})
+const state=process.env.PLINTH_STATE,entrance=state?undefined:process.env.PLINTH_OWNER_OPEN??(await readFile('.rer/local/open-url','utf8')).trim()
+const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
 await mkdir(shots,{recursive:true})
 try {
- const owner=await browser.newContext(),client=await browser.newContext(),page=await owner.newPage(),clientPage=await client.newPage()
- await page.goto(entrance);await page.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))
+ const owner=await browser.newContext(state?{storageState:state}:{}),client=await browser.newContext(),page=await owner.newPage(),clientPage=await client.newPage()
+ await page.goto(state?base+'/app':entrance);await page.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))
  if(new URL(page.url()).pathname==='/setup'){await page.getByLabel('Your name',{exact:true}).fill('Synthetic Plinth builder');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup',exact:true}).click();await page.waitForURL('**/app')}
  const team=await (await owner.request.get(base+'/api/plinth/team')).json(),ownerEmail=team.team.find(p=>p.role==='owner').email
  const email=`synthetic-plinth-meetings-${Date.now()}@dev.localhost`
  assert.equal((await owner.request.post(base+'/auth/invite',{headers:{origin:base},data:{email,displayName:'Alex Mason',role:'member',returnTo:'/app'}})).status(),202)
- const clientEntrance=new URL(entrance),hash=new URLSearchParams(clientEntrance.hash.slice(1));hash.set('as',email);hash.set('next',`/auth/dev/enter?as=${encodeURIComponent(email)}&returnTo=/app`);clientEntrance.hash=hash.toString()
- await clientPage.goto(clientEntrance.href);await clientPage.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))
+ if(state)await nativeSignIn(clientPage,email)
+ else{const clientEntrance=new URL(entrance),hash=new URLSearchParams(clientEntrance.hash.slice(1));hash.set('as',email);hash.set('next',`/auth/dev/enter?as=${encodeURIComponent(email)}&returnTo=/app`);clientEntrance.hash=hash.toString();await clientPage.goto(clientEntrance.href);await clientPage.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))}
  const post=async(path,data)=>{const r=await owner.request.post(base+'/api/plinth'+path,{headers:{origin:base},data});assert.ok(r.ok(),path+' '+await r.text());return r.json()}
  let {job}=await post('/jobs',{name:'Mason kitchen and mudroom remodel',client_email:email,address:'4518 Alder Avenue, Portland, OR 97211'})
  const act=async(path,data={})=>{const r=await post(`/jobs/${job.id}${path}`,{expected_version:job.version,...data});job=(await(await owner.request.get(base+'/api/plinth/jobs/'+job.id)).json()).job;return r.record}

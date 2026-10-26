@@ -10,8 +10,8 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   let job=(await api('/jobs',{name:'Reviewed change invoice correction ledger',client_email:email,address:'22 Synthetic Street'})).value.job
   const attempt=(path,body={},cookie=f.owner,token)=>api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body},cookie,token)
   const read=async()=>job=(await api(`/jobs/${job.id}`)).value.job
-  const act=async(path,body={},cookie=f.owner)=>{const r=await attempt(path,body,cookie);assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job;return r.value.record}
-  const unchanged=async(path,body,status)=>{const before=await read(),r=await attempt(path,body);assert.equal(r.status,status,JSON.stringify(r.value));assert.deepEqual(await read(),before)}
+  const act=async(path,body={},cookie=f.owner)=>{const r=await attempt(path,body,cookie);assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job??(await api(`/jobs/${job.id}`)).value.job;return r.value.record}
+  const unchanged=async(path,body,status,cookie=f.owner)=>{const before=await read(),r=await attempt(path,body,cookie);assert.equal(r.status,status,JSON.stringify(r.value));assert.deepEqual(await read(),before)}
   await act('/quotes',{lines:[{id:'synthetic-plinth-scope-5',description:'Reviewed exempt original scope',cost_code:'06-100',category:'material',phase:'Construction',quantity:'1',unit:'job',unit_cents:50000,cost_unit_cents:30000}]})
   const rate=(await api('/pricing-rates',{jurisdiction:'Human reviewed synthetic jurisdiction',kind:'sales',percent:'10',effective_on:'2026-01-01',reference:'synthetic-plinth-tax-5',human_reviewed:true})).value.rate
   const pricing={basis:'sell',as_of:'2026-10-21',rules:[],tax:{rate_id:rate.id,taxable_line_ids:[],exemption_reference:'Reviewed original scope exemption'}}
@@ -21,6 +21,7 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   const priced=await attempt('/variation-pricing/preview',change);assert.equal(priced.status,200);await act('/variation-pricing/apply',{...change,digest:priced.value.preview.digest})
   await act(`/variations/${job.variations.at(-1).id}/approve`,{},client);await read();await act('/sov',{code_assignments:{['variation:'+job.variations.at(-1).id]:'06-100'}})
   const changeId=job.variations.at(-1).id,sourceId='variation:'+changeId,quoteId='quote:synthetic-plinth-scope-5'
+  const signedTerms=structuredClone({quotes:job.quotes,variations:job.variations,budgets:job.budgets})
   const invoiceInput={kind:'milestone',recipient_email:email,due_on:'2026-11-04',terms:'Due within fourteen calendar days under the reviewed agreement'}
   const issue=async(originalCents,description)=>{
    const claim=await act('/claims',{description,lines:[{line_id:quoteId,completed_cents:originalCents,stored_cents:0,evidence:'Reviewed original work'},{line_id:sourceId,completed_cents:11001,stored_cents:0,evidence:'Reviewed installed addition'}]})
@@ -37,7 +38,8 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   const clerkRole=await api('/roles',{copy_of:'administrator',name:'Invoice drafting without approval',permissions:{invoices:{approve:false}}});assert.equal(clerkRole.status,201)
   const clerk=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-invoice-clerk@example.com')
   assert.equal((await f.json('/api/plinth/team/'+clerk.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:clerkRole.value.role.id,job_ids:[],po_limit_cents:0}})).status,200)
-  assert.equal((await attempt(path+'/credit',correction,draftClerk)).status,403,'Invoice draft editing never grants final correction approval')
+  const clerkDraft=await act('/invoices',{...invoiceInput,kind:'deposit',amount_cents:100,description:'Synthetic drafting authority proof'},draftClerk);assert.equal(clerkDraft.status,'draft');assert.equal(clerkDraft.prepared_by.name,'Invoice draft clerk')
+  await unchanged(path+'/credit',correction,403,draftClerk)
   for(const [cookie,token,status] of [[client,undefined,403],[foreign,undefined,404],[undefined,agent,403]])assert.equal((await attempt(path+'/credit',correction,cookie,token)).status,status)
   await unchanged(path+'/credit',{...correction,confirm:false},400);await unchanged(path+'/credit',{...correction,reason:''},400)
   await unchanged(path+'/credit',{...correction,lines:[{invoice_line_id:sourceId,amount_cents:11002}]},409)
@@ -54,6 +56,7 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   await unchanged(path+'/credit',correction,409)
   await unchanged(path+'/credit',{...correction,operation_id:'synthetic-plinth-operation-stale-5',expected_version:job.version-1},409)
   await unchanged(path+'/void',{...correction,operation_id:'synthetic-plinth-void-paid-5',lines:undefined},409)
+  await unchanged(path+'/debit',{...correction,operation_id:'synthetic-plinth-16',lines:[{invoice_line_id:sourceId,amount_cents:1000}]},403,draftClerk)
   await act(path+'/debit',{...correction,operation_id:'synthetic-plinth-operation-6',description:'Restore the separately reviewed part of the credit',lines:[{invoice_line_id:sourceId,amount_cents:1000}]})
   current=job.invoices.find(i=>i.id===paidId);assert.equal(current.balance.due_cents,-2333);assert.equal(current.balance.debited_cents,1000);assert.equal(current.corrections[1].document.tax_cents,91)
   const raceInput={...correction,operation_id:'synthetic-plinth-operation-7',expected_version:job.version,lines:[{invoice_line_id:sourceId,amount_cents:1}]}
@@ -64,18 +67,22 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   assert.deepEqual(current.corrections[0],credit);assert.deepEqual(current.issued,original);assert.deepEqual(current.receipts,[receipt])
   const residual=await issue(50000,'Separate disputed original-scope residual'),residualPath=`/invoices/${residual.id}`
   await act(residualPath+'/receipt',{amount_cents:10000,method:'check',received_on:'2026-10-23',reference:'synthetic-plinth-settlement-6',confirm:true})
+  const residualReceipt=structuredClone(job.invoices.find(i=>i.id===residual.id).receipts[0])
   const writeoff={operation_id:'synthetic-plinth-operation-9',amount_cents:40000,confirm:true,reason:'Private disputed residual accepted as uncollectible',dispute_reference:'synthetic-plinth-dispute-5'}
   await unchanged(residualPath+'/write-off',{...writeoff,amount_cents:40001},409)
   await unchanged(residualPath+'/write-off',{...writeoff,dispute_reference:''},400)
   await unchanged(residualPath+'/credit',{...correction,lines:[{invoice_line_id:quoteId,amount_cents:1}]},409)
+  await unchanged(residualPath+'/write-off',writeoff,403,draftClerk)
   await act(residualPath+'/write-off',writeoff,admin)
   const written=job.invoices.find(i=>i.id===residual.id);assert.equal(written.balance.due_cents,0);assert.equal(written.balance.written_off_cents,40000);assert.equal(written.balance.credited_cents,0);assert.equal(written.balance.received_cents,10000)
-  assert.equal(written.write_offs[0].accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0)
+  assert.deepEqual(written.write_offs[0].accounting_entries,[{account:'bad_debt_expense',debit_cents:40000,credit_cents:0},{account:'accounts_receivable',debit_cents:0,credit_cents:40000}],'Write-off consumes receivables as bad debt without revenue, sales tax or cash entries')
+  assert.deepEqual(written.receipts,[residualReceipt]);assert.equal(written.issued.tax_cents,residual.issued.tax_cents)
   assert.deepEqual(written.issued,residual.issued);await unchanged(residualPath+'/write-off',writeoff,409)
   assert.equal(JSON.stringify((await api(`/jobs/${job.id}`,undefined,client)).value).includes('accounting_entries'),false)
   const deposit=await act('/invoices',{...invoiceInput,kind:'deposit',amount_cents:10000,description:'Unpaid deposit request to void'}),depositPath=`/invoices/${deposit.id}`
   await act(depositPath+'/issue');const depositOriginal=structuredClone(job.invoices.find(i=>i.id===deposit.id).issued)
   await act(depositPath+'/credit',{...correction,operation_id:'synthetic-plinth-operation-10',lines:[{invoice_line_id:depositOriginal.lines[0].id,amount_cents:1}]})
+  await unchanged(depositPath+'/void',{operation_id:'synthetic-plinth-17',confirm:true,reason:'Synthetic duplicate review',description:'Synthetic unused request'},403,draftClerk)
   await act(depositPath+'/void',{operation_id:'synthetic-plinth-operation-11',confirm:true,reason:'Private duplicate request review',description:'Void of unused deposit request'})
   const voided=job.invoices.find(i=>i.id===deposit.id)
   assert.equal(voided.balance.due_cents,0);assert.equal(voided.corrections.at(-1).document.kind,'void');assert.equal(voided.corrections.at(-1).document.gross_cents,-9999)
@@ -99,7 +106,17 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   }
   assert.equal(await(await f.request(`/api/plinth/jobs/${job.id}/invoices/${paidId}/document.html`,{cookie:f.owner})).text(),originalHtml)
   const documents=job.invoices.flatMap(i=>(i.corrections??[]).map(c=>c.document.number));assert.equal(new Set(documents).size,documents.length)
-  assert.ok(job.approvals.some(a=>a.kind==='invoice.credit'&&a.snapshot.reason===correction.reason));assert.ok(job.approvals.some(a=>a.kind==='invoice.write_off'&&a.snapshot.reason===writeoff.reason))
+  assert.deepEqual({quotes:job.quotes,variations:job.variations,budgets:job.budgets},signedTerms,'Final invoice decisions preserve the accepted contract and client-approved change economics')
+  for(const action of ['credit','debit','void','write_off']){
+   const decisions=job.approvals.filter(a=>a.kind==='invoice.'+action),events=await api('/audit?'+new URLSearchParams({kind:'financial',action:'invoices.'+action.replace('_','-'),job_id:job.id,limit:'200'}))
+   assert.equal(events.status,200);assert.equal(events.value.events.length,decisions.length)
+   for(const approval of decisions){
+    const invoice=job.invoices.find(i=>i.id===approval.subject_id),snapshot=action==='write_off'?invoice.write_offs.find(w=>w.id===approval.snapshot.id):invoice.corrections.find(c=>c.id===approval.snapshot.id),by=action==='write_off'?snapshot.recorded_by:snapshot.document.issued_by
+    assert.deepEqual(approval.snapshot,snapshot);assert.equal(approval.decision,'approved');assert.equal(approval.approved_by.id,by.id);assert.equal(approval.approved_by.name,action==='write_off'?'Office administrator':'Builder');assert.equal(approval.approved_by.role,action==='write_off'?'admin':'owner')
+    assert.equal(action==='write_off'?snapshot.invoice_number:snapshot.document.original_invoice_number,invoice.issued.number)
+    const event=events.value.events.find(e=>e.subject_id===invoice.id&&e.actor_id===by.id);assert.ok(event);assert.equal(event.subject_kind,'invoices');assert.equal(event.actor_role,by.role);assert.equal(event.actor_name,by.name);assert.equal(event.source,'session');assert.equal(event.credential_id,null);assert.equal(event.version_after,event.version_before+1);assert.match(event.before_ref,/^[0-9a-f]{64}$/);assert.match(event.after_ref,/^[0-9a-f]{64}$/);assert.notEqual(event.before_ref,event.after_ref)
+   }
+  }
   job=(await api('/jobs',{name:'Retained contract draw corrections',client_email:email,address:'22 Synthetic Street'})).value.job
   await act('/quotes',{lines:[{id:'synthetic-plinth-retained-5',description:'Reviewed taxable retained work',cost_code:'06-100',category:'material',phase:'Construction',quantity:'1',unit:'job',unit_cents:10000,cost_unit_cents:5000}]})
   const retainedPricing={...pricing,tax:{rate_id:rate.id,taxable_line_ids:['synthetic-plinth-retained-5']}}
@@ -126,6 +143,32 @@ test('BILL-005 — human corrections preserve paid and retained invoices, close 
   assert.equal(retainedCurrent.balance.due_cents,0);assert.equal(retainedCurrent.balance.released_retainage_cents,550);assert.deepEqual(retainedCurrent.issued,retainedOriginal)
   assert.equal(retainedCurrent.corrections.reduce((n,c)=>n+c.document.tax_cents,0),-50)
   for(const c of retainedCurrent.corrections)assert.equal(c.document.accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0)
+  const unused=await act('/invoices',{...invoiceInput,kind:'deposit',amount_cents:1000,description:'Synthetic period-controlled unused request'});await act(`/invoices/${unused.id}/issue`)
+  const accountant=await f.invite('synthetic-plinth-18@example.com','Synthetic correction accountant','admin'),person=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-18@example.com')
+  assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'bookkeeper',job_ids:[job.id],po_limit_cents:0}})).status,200)
+  await act('/costs/accountant',{accountant_id:person.id,reason:'Synthetic accountant designation for invoice correction period'})
+  const period=retainedOriginal.issued_by.at.slice(0,7),nextMonth=new Date(period+'-01T00:00:00Z');nextMonth.setUTCMonth(nextMonth.getUTCMonth()+1);const open=nextMonth.toISOString().slice(0,7)
+  const closeInput={period,opening_cash_cents:0,months:3},reviewed=await api(`/jobs/${job.id}/costs/period-preview?`+new URLSearchParams(closeInput),undefined,accountant);assert.equal(reviewed.status,200)
+  const review=await act('/costs/period-reviews',{...closeInput,confirm:true,digest:reviewed.value.digest,reference:'synthetic-plinth-19'},accountant)
+  const close=structuredClone(await act('/costs/periods',{...closeInput,native_review_id:review.id})),beforePeriodDecisions=structuredClone({quotes:job.quotes,budgets:job.budgets,receipts:job.invoices.find(i=>i.id===retained.id).receipts})
+  const decisions=[['credit',retained.id,{lines:[{invoice_line_id:retainedLine,amount_cents:100}]}],['debit',retained.id,{lines:[{invoice_line_id:retainedLine,amount_cents:200}]}],['write-off',retained.id,{amount_cents:100,dispute_reference:'synthetic-plinth-20'}],['void',unused.id,{}]]
+  for(const [index,[action,id,fields]] of decisions.entries()){
+   const route=`/invoices/${id}/${action}`,input={operation_id:`synthetic-plinth-${21+index}`,confirm:true,reason:'Synthetic reviewed correction after close',description:'Synthetic current-period correction',...fields}
+   const beforeRefusal=structuredClone(job),refused=await attempt(route,input);assert.equal(refused.status,409);assert.equal(refused.value.error,'cost_period_closed');assert.deepEqual(await read(),beforeRefusal)
+   await unchanged(route,{...input,posting_period:period,adjustment_reference:'synthetic-plinth-25'},409)
+   await unchanged(route,{...input,posting_period:open,adjustment_reference:''},400)
+   const result=await act(route,{...input,posting_period:open,adjustment_reference:'synthetic-plinth-26'}),record=action==='write-off'?result.write_offs.at(-1):result.corrections.at(-1)
+   const ledger=await api(`/jobs/${job.id}/costs/ledger`);assert.equal(ledger.status,200)
+   const sources=ledger.value.rows.flatMap(r=>r.sources.billing).filter(e=>e.id===record.id);assert.ok(sources.length);assert.ok(sources.every(e=>e.period===open&&e.dated_on.startsWith(period)))
+   assert.equal(sources.reduce((n,e)=>n+e.amount_cents,0),action==='write-off'?100:record.document.gross_cents)
+   assert.ok(sources.every(e=>e.kind===(action==='write-off'?'written_off':action==='void'?'deposit_correction':'billed')))
+   if(action==='write-off')assert.deepEqual(record.accounting_entries,[{account:'bad_debt_expense',debit_cents:100,credit_cents:0},{account:'accounts_receivable',debit_cents:0,credit_cents:100}],'A taxable original also keeps its sales-tax liability when the disputed receivable is written off')
+   const adjustment=job.approvals.find(a=>a.kind==='cost.period.adjustment'&&a.subject_id===record.id);assert.ok(adjustment);assert.equal(adjustment.snapshot.source_period,period);assert.equal(adjustment.snapshot.posting_period,open);assert.equal(adjustment.snapshot.reason,'synthetic-plinth-26')
+   assert.deepEqual((await api(`/jobs/${job.id}/costs/periods`)).value.periods[0],close,'Final decisions leave the accountant-approved closed snapshot fixed')
+  }
+  assert.deepEqual({quotes:job.quotes,budgets:job.budgets,receipts:job.invoices.find(i=>i.id===retained.id).receipts},beforePeriodDecisions)
+  assert.deepEqual(job.invoices.find(i=>i.id===retained.id).issued,retainedOriginal)
+
  }finally{await f.close()}
 })
 

@@ -11,7 +11,7 @@ export function classify(method: string, path: string): Required<Pick<AuditEvent
  const parts = path.replace(/^\/api\/plinth\//, '').split('/').filter(Boolean), job = parts[0] === 'jobs' && parts[1] ? parts[1] : undefined, rest = job ? parts.slice(2) : parts
  const category = rest[0] ?? (job ? 'job' : 'plinth'), id = rest.find((part, n) => n > 0 && isId(part)), verbs = rest.slice(1).filter(part => !isId(part))
  const verb = verbs.at(-1) ?? (method === 'DELETE' ? 'erase' : id || method === 'PUT' || (job && !rest.length) ? 'update' : 'create')
- const kind: AuditKind = category==='costs'&&rest[1]==='accountant'?'permission':['send', 'notify', 'run'].includes(verb) ? 'send' : verb.startsWith('export') ? 'export' : permission.has(category) || verb === 'access' ? 'permission' : category === 'imports' ? 'import' : method === 'DELETE' ? 'erasure' : financial.has(category) || ['draws', 'lien', 'retainage'].includes(verb) ? 'financial' : 'record'
+ const kind: AuditKind = category==='costs'&&rest[1]==='accountant'?'permission':['send', 'send-email', 'notify', 'run'].includes(verb) ? 'send' : verb.startsWith('export') ? 'export' : permission.has(category) || verb === 'access' ? 'permission' : category === 'imports' ? 'import' : method === 'DELETE' ? 'erasure' : financial.has(category) || ['draws', 'lien', 'retainage'].includes(verb) ? 'financial' : 'record'
  return { kind, action: `${category === 'costs' ? 'cost.' + (rest[1] ?? 'ledger') : category}.${verb === rest[1] && category === 'costs' ? 'create' : verb}`, subject_kind: category, ...(id ? { subject_id: id } : {}), ...(job ? { job_id: job } : {}) }
 }
 export const source = (actor: Actor) => actor.credential_id ? 'agent' : actor.session_id ? 'session' : 'automation'

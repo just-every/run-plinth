@@ -57,16 +57,20 @@ async function eligible(db: D1Database, job: MeetingSharingJob, share: MeetingSh
  const body = `${share.title}\n\n${share.body}\n${reminder}\nThis is the reviewed extract you requested. Private minutes and original sources are not included.`
  return { subject, body, guards }
 }
-export async function meetingEmailPreview(db: D1Database, job: MeetingSharingJob, actor: Actor, shareId: string, requestId: string) {
+async function outgoing(env: Bindings, job: MeetingSharingJob, share: MeetingShare, request: MeetingEmailRequest) {
+ const value = await eligible(env.DB, job, share, request), optional = await optionalNotice(env, request.email)
+ return { ...value, body: value.body + optional.text, optional }
+}
+export async function meetingEmailPreview(env: Bindings, job: MeetingSharingJob, actor: Actor, shareId: string, requestId: string) {
  requireOwner(actor);need(actor.session_id && !actor.credential_id, 'Sign in as the owner to review an email copy', 403, 'human_required')
  const share=find(job.meeting_shares??[],shareId),request=requested(share,requestId)
  need(request.status==='requested','This request already has a delivery attempt; reconcile its recorded outcome',409,'mail_reserved')
- const value=await eligible(db,job,share,request),preview={request_id:request.id,email:request.email,subject:value.subject,body:value.body}
+ const value=await outgoing(env,job,share,request),preview={request_id:request.id,email:request.email,subject:value.subject,body:value.body}
  return {...preview,digest:await digest(new TextEncoder().encode(JSON.stringify(preview)))}
 }
 /** Reserve once before the provider call. Unknown remains unknown and cannot be sent again. */
 export async function sendMeetingEmail(env: Bindings, previous: MeetingSharingJob, actor: Actor, input: Input, shareId: string, clock: number) {
- const id=text(input.request_id,'Email request',100),preview=await meetingEmailPreview(env.DB,previous,actor,shareId,id)
+ const id=text(input.request_id,'Email request',100),preview=await meetingEmailPreview(env,previous,actor,shareId,id)
  need(input.confirm===true && input.digest===preview.digest,'Review and confirm this exact email copy before sending',409,'mail_review')
  const next=structuredClone(previous),share=find(next.meeting_shares??[],shareId),request=requested(share,id),value=await eligible(env.DB,next,share,request)
  Object.assign(request,{status:'unknown',label:'Email reserved; provider outcome unknown. No automatic resend.',approved_by:stamp(actor),subject:preview.subject,body:preview.body})
@@ -75,14 +79,14 @@ export async function sendMeetingEmail(env: Bindings, previous: MeetingSharingJo
  try {
   const seen=await readClock(env.DB)
   const latest=await loadWarrantyJob(env.DB,next.id) as MeetingSharingJob|null;need(latest,'Job erased',404,'not_found')
-  const currentShare=find(latest.meeting_shares??[],shareId),current=requested(currentShare,id),check=await eligible(env.DB,latest,currentShare,current)
+  const currentShare=find(latest.meeting_shares??[],shareId),current=requested(currentShare,id),check=await outgoing(env,latest,currentShare,current)
   need(check.subject===preview.subject && check.body===preview.body,'The reviewed action changed',409,'mail_review')
   await checkWarrantySend(env.DB,latest,seen,check.guards,actor)
   if(await suppression(env.DB,current.email)){status='cancelled';label='Not sent: the recipient suppressed optional notices'}
   else {
    const sender=operatorMail(env)
    if(!sender||!env.MAIL_FROM){status='unconfigured';label='Mail is not configured; nothing sent'}
-   else {const optional=await optionalNotice(env,current.email),body=preview.body+optional.text,escape=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');const outcome=await sender.send({deliveryId:current.id,from:env.MAIL_FROM,to:[current.email],subject:preview.subject,text:body,html:'<pre>'+escape(body)+'</pre>',headers:{},...(optional.unsubscribe?{unsubscribe:optional.unsubscribe}:{})});status=outcome.status==='accepted'?'accepted':outcome.status==='development'?'development':outcome.status==='rejected'||outcome.status==='rate_limited'?'refused':'unknown';label=status==='accepted'?'Accepted by the mail provider; delivery is not confirmed':status==='development'?'Development mail suppressed; nothing sent':status==='refused'?'Provider refused the email; no automatic resend':request.label;providerId=outcome.providerMessageId??undefined}
+   else {const body=preview.body,escape=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');const outcome=await sender.send({deliveryId:current.id,from:env.MAIL_FROM,to:[current.email],subject:preview.subject,text:body,html:'<pre>'+escape(body)+'</pre>',headers:{},...(check.optional.unsubscribe?{unsubscribe:check.optional.unsubscribe}:{})});status=outcome.status==='accepted'?'accepted':outcome.status==='development'?'development':outcome.status==='rejected'||outcome.status==='rate_limited'?'refused':'unknown';label=status==='accepted'?'Accepted by the mail provider; delivery is not confirmed':status==='development'?'Development mail suppressed; nothing sent':status==='refused'?'Provider refused the email; no automatic resend':request.label;providerId=outcome.providerMessageId??undefined}
   }
  } catch { /* The durable reservation stays unknown after an uncertain provider response. */ }
  const latest=await loadWarrantyJob(env.DB,next.id) as MeetingSharingJob|null

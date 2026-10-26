@@ -2,14 +2,14 @@ import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
 import {costFixture,original} from '../plinth/cost-support.mjs'
-const base=process.env.PLINTH_URL,entrance=process.env.PLINTH_OWNER_OPEN,shots=process.env.PLINTH_SCREENSHOTS
-assert.ok(base&&entrance&&shots,'Use the disposable native installation and private dev sign-in')
+const base=process.env.PLINTH_URL,entrance=process.env.PLINTH_OWNER_OPEN,state=process.env.PLINTH_STATE,shots=process.env.PLINTH_SCREENSHOTS
+assert.ok(base&&(entrance||state)&&shots,'Use the disposable native installation and private native sign-in')
 assert.ok(['localhost','127.0.0.1','[::1]'].includes(new URL(base).hostname))
 await mkdir(shots,{recursive:true})
 const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
 try{
- const context=await browser.newContext(),page=await context.newPage()
- await page.goto(entrance);await page.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))
+ const context=await browser.newContext(state?{storageState:state}:{}),page=await context.newPage()
+ await page.goto(state?base+'/app':entrance);await page.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))
  if(new URL(page.url()).pathname==='/setup'){
   await page.getByLabel('Your name',{exact:true}).fill('Synthetic Plinth builder');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Finish setup',exact:true}).click();await page.waitForURL('**/app')
  }

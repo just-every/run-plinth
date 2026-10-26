@@ -1,4 +1,5 @@
 import type { Bindings } from '../auth.server'
+import { jobRef } from './audit'
 import { actorPredicate, authorize, requireManager } from './auth'
 import { invoiceBalance } from './invoices'
 import { invoiceRows } from './invoice-model'
@@ -38,7 +39,7 @@ export async function refundPayment(request: Request, env: Bindings, actor: Acto
  const invoice = find(invoiceRows(currentJob), attempt.invoice_id), pending = await env.DB.prepare("SELECT COALESCE(SUM(r.amount_cents),0) AS amount,COALESCE(SUM(CASE WHEN r.attempt_id=? THEN r.amount_cents ELSE 0 END),0) AS reserved_funds FROM pl_payment_refunds r JOIN pl_payment_attempts a ON a.id=r.attempt_id WHERE a.invoice_id=? AND r.status IN ('unresolved','pending','requires_action')").bind(id,invoice.id).first<{amount: number;reserved_funds:number}>()
  need(amount <= attempt.amount_cents - fact.reversed - (pending?.reserved_funds ?? 0), 'Pending refund instructions already reserve these settled funds', 409, 'refund_funds')
  need(amount <= -invoiceBalance(currentJob, invoice).due_cents - (pending?.amount ?? 0), 'Issue a linked credit before refunding; the refund cannot exceed available customer credit', 409, 'refund_credit')
- await transaction(env.DB, actor, currentJob, [env.DB.prepare("INSERT INTO pl_payment_refunds(id,attempt_id,amount_cents,reason,created_by,status,created_at) VALUES(?,?,?,?,?,'unresolved',?)").bind(operation, id, amount, reason, actor.id, new Date().toISOString())], clock, {kind:'financial',action:'payments.refund.approve',subject_kind:'payment',subject_id:id,job_id:job.id,detail:{operation_id:operation,amount_cents:amount}})
+ await transaction(env.DB, actor, currentJob, [env.DB.prepare("INSERT INTO pl_payment_refunds(id,attempt_id,amount_cents,reason,created_by,status,created_at) VALUES(?,?,?,?,?,'unresolved',?)").bind(operation, id, amount, reason, actor.id, new Date().toISOString())], clock, {kind:'financial',action:'payments.refund.approve',subject_kind:'payment',subject_id:id,job_id:job.id,version_before:currentJob.version,version_after:currentJob.version,before_ref:await jobRef(JSON.stringify(currentJob)),after_ref:await jobRef(JSON.stringify(currentJob)),detail:{operation_id:operation,amount_cents:amount,invoice_id:invoice.id,invoice_number:invoice.number,payment_intent_id:fact.intent.id,original_receipt_id:attempt.receipt_id}})
  const authority = actorPredicate(actor)
  need((await jobOf(env.DB,actor,job.id)).version === input.expected_version, 'Refund credit changed before the provider instruction', 409, 'stale_version')
  need(await env.DB.prepare(`SELECT 1 WHERE ${authority.sql}`).bind(...authority.params).first(), 'Refund authority changed', 403, 'forbidden')

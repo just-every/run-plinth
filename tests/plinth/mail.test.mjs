@@ -1,7 +1,12 @@
 import { searchDocument } from '../fixtures/search-document.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { generateKeyPairSync, sign } from 'node:crypto'
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 import { createActiveJob, createFixture } from './helpers.mjs'
 
 const DOMAIN = 'replies.synthetic-plinth.test'
@@ -179,7 +184,7 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   const reassignmentMailCount=f.messages.length
   r=await s.api(path+`/meetings/${meeting.id}/reassign`,{method:'POST',body:{expected_version:job.version,action_id:pmAction.id,owner_email:'builder@example.com',reason:'Site manager left this job; builder resumes the reviewed action'}});assert.equal(r.status,200,JSON.stringify(r.value));job=await read()
   const reassigned=job.meetings[0].actions.find(a=>a.id===pmAction.id)
-  assert.equal(reassigned.owner_email,'builder@example.com');assert.equal(reassigned.assignment_history[0].previous_owner_email,person.email);assert.equal(reassigned.assignment_history[0].owner_email,'builder@example.com');assert.equal(reassigned.assignment_history[0].by.name,'Builder');assert.ok(reassigned.assignment_history[0].by.at)
+  assert.equal(reassigned.owner_email,'builder@example.com');assert.equal(reassigned.assignment_history[0].previous_owner_email,person.email);assert.equal(reassigned.assignment_history[0].owner_email,'builder@example.com');assert.equal(reassigned.assignment_history[0].reason,'Site manager left this job; builder resumes the reviewed action');assert.equal(reassigned.assignment_history[0].by.name,'Builder');assert.ok(reassigned.assignment_history[0].by.at)
   assert.equal((await s.api('/team/'+person.id,{method:'PUT',body:{expected_version:2,role:'project_manager',job_ids:[job.id],po_limit_cents:0}})).status,200)
   assert.equal((await s.api(path+`/meetings/${meeting.id}/complete`,{method:'POST',cookie:pm,body:{...complete,expected_version:job.version,action_id:pmAction.id}})).status,403,'The former assignee cannot complete after access returns')
   assert.equal((await s.api(path+`/meetings/${meeting.id}/complete`,{method:'POST',body:{...complete,expected_version:job.version-1,action_id:pmAction.id}})).status,409,'The stale pre-reassignment decision is refused')
@@ -202,8 +207,16 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
 
 test('Reviewed meeting extracts isolate named audiences, delegated feedback, explicit custom capabilities and next-request revocation', async () => {
  const {createReleasedScope}=await import('./helpers.mjs')
- let uncertain=false
- const s=await setup({now:Date.parse('2026-10-26T12:00:00Z'),mailResponse:message=>{if(uncertain&&message.subject.startsWith('Meeting decision:'))throw Error('Synthetic lost provider response');return new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-meeting-delivery'}})}}),{f}=s
+ const persistTo=await mkdtemp(join(tmpdir(),'synthetic-plinth-'))
+ let uncertain=false,deliveryGate,restarted,s,sourceClosed=false
+ try {
+  execFileSync(process.execPath,[fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js',import.meta.url)),'d1','migrations','apply','DB','--local','--persist-to',join(persistTo,'.wrangler/state'),'--config',fileURLToPath(new URL('../../wrangler.jsonc',import.meta.url))],{env:{...process.env,WRANGLER_SEND_METRICS:'false'},stdio:'pipe'})
+  s=await setup({persistTo,now:Date.parse('2026-10-26T12:00:00Z'),mailResponse:async message=>{
+   if(message.subject.startsWith('Meeting decision:')){if(deliveryGate){deliveryGate.entered.resolve();await deliveryGate.release.promise}if(uncertain)throw Error('Synthetic lost provider response')}
+   return new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-meeting-delivery'}})
+  }})
+ } catch(error){await s?.f.close();await rm(persistTo,{recursive:true,force:true});throw error}
+ const {f}=s
  try {
   let job=(await s.api(`/jobs/${s.job().id}`)).value.job
   const path=`/jobs/${job.id}`,read=async()=>job=(await s.api(path)).value.job
@@ -246,26 +259,88 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   const repeatedExport=await act(`/claims/${financial.id}/export`,{},custom);assert.equal(repeatedExport.status,200)
   assert.equal(repeatedExport.value.job.meetings,undefined,'An unrelated repeated financial export cannot expose private meetings to a custom role')
   assert.equal(repeatedExport.value.job.meeting_shares,undefined,'An unrelated repeated financial export cannot expose sharing grants or private feedback')
-  const requestCopy=async(cookie,extra={})=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{method:'POST',cookie,body:{expected_version:current.version,kind:'minutes',confirm:true,operation_id:crypto.randomUUID(),...extra}})}
-  const mailBefore=f.messages.length
+  const copyPath=`/meeting-inbox/${job.id}/${share.id}/email-copy`,sendPath=`/meeting-shares/${share.id}/send-email`
+  const requestCopy=async(cookie,extra={})=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(copyPath,{method:'POST',cookie,body:{expected_version:current.version,kind:'minutes',confirm:true,operation_id:crypto.randomUUID(),...extra}})}
+  const previewCopy=id=>s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${id}`)
+  const sendCopy=(request,preview,cookie=f.owner)=>act(sendPath,{request_id:request.id,confirm:true,digest:preview.digest},cookie)
+  const copyState=async id=>(await s.api(path+`/meetings/${meeting.id}/shares`)).value.shares.find(s=>s.id===share.id).email_requests.find(r=>r.id===id)
+  const mailBefore=f.messages.length,versionBeforeConsent=(await read()).version
+  for(const confirm of [false,undefined])assert.equal((await requestCopy(s.client,{confirm})).status,400,'An email request requires explicit recipient consent')
+  assert.equal((await read()).version,versionBeforeConsent);assert.equal(f.messages.length,mailBefore)
   r=await requestCopy(s.client);assert.equal(r.status,200,JSON.stringify(r.value));const emailRequest=r.value.record
   assert.equal(f.messages.length,mailBefore,'A recipient request sends nothing')
+  const initialPreview=await previewCopy(emailRequest.id);assert.equal(initialPreview.status,200)
+  const admin=await f.invite('synthetic-plinth-2421@example.com','Office administrator','admin'),beforeAuthority=f.messages.length
+  for(const cookie of [s.client,admin,field,custom])assert.equal((await sendCopy(emailRequest,initialPreview.value,cookie)).status,403,'Another signed-in role cannot finalize meeting delivery')
+  await read();assert.equal((await s.api(path+sendPath,{method:'POST',cookie:undefined,token:agent,body:{expected_version:job.version,request_id:emailRequest.id,confirm:true,digest:initialPreview.value.digest}})).status,403,'An owner-issued bearer is still draft-only')
+  assert.equal((await copyState(emailRequest.id)).status,'requested');assert.equal(f.messages.length,beforeAuthority)
   const preferences={assignment:'off',comment:'off',reminder:'off'}
-  assert.equal((await s.api('/todos/preferences',{method:'POST',cookie:s.client,body:{expected_revision:0,...preferences,quiet:{start:'00:00',end:'00:00',time_zone:'America/New_York'}}})).status,200)
-  assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`)).status,409,'The recipient’s recorded quiet hours hold optional meeting email')
-  assert.equal((await s.api('/todos/preferences',{method:'POST',cookie:s.client,body:{expected_revision:1,...preferences}})).status,200)
-  const preview=await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.email,'client@example.com');assert.equal(preview.value.body.includes('synthetic-plinth-private-2419'),false)
-  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:'stale review'})).status,409)
-  r=await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:preview.value.digest});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(f.messages.length,mailBefore+1);assert.deepEqual(f.messages.at(-1).to,['client@example.com']);assert.ok(f.messages.at(-1).text.includes(input.body));assert.equal(f.messages.at(-1).text.includes('synthetic-plinth-private-2419'),false)
-  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:preview.value.digest})).status,409);assert.equal(f.messages.length,mailBefore+1,'A delivered request never sends twice')
-  r=await requestCopy(s.client);assert.equal(r.status,200);assert.equal((await requestCopy(s.client,{cancel:true,request_id:r.value.record.id})).status,200)
-  assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${r.value.record.id}`)).status,409,'A recipient can cancel before reservation')
+  let preferenceRevision=0
+  const quiet=async value=>{const r=await s.api('/todos/preferences',{method:'POST',cookie:s.client,body:{expected_revision:preferenceRevision,...preferences,...(value?{quiet:value}:{})}});assert.equal(r.status,200,JSON.stringify(r.value));preferenceRevision++}
+  await quiet({start:'00:00',end:'00:00',time_zone:'America/New_York'})
+  assert.equal((await previewCopy(emailRequest.id)).value.error,'mail_quiet')
+  assert.equal((await sendCopy(emailRequest,initialPreview.value)).value.error,'mail_quiet','Final send rechecks quiet hours after review')
+  await quiet()
+  const preview=await previewCopy(emailRequest.id);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.email,'client@example.com');assert.equal(preview.value.body.includes('synthetic-plinth-private-2419'),false)
+  assert.equal(preview.value.digest,initialPreview.value.digest,'Unchanged complete outgoing content has a stable review digest')
+  const unsubscribe=new URL(preview.value.body.match(/https?:\/\/\S+\/api\/plinth\/mail\/unsubscribe\/\S+/)[0])
+  const reviewed={request_id:emailRequest.id,email:preview.value.email,subject:preview.value.subject,body:preview.value.body}
+  assert.equal(preview.value.digest,createHash('sha256').update(JSON.stringify(reviewed)).digest('hex'),'The review binds the complete outgoing body, including its unsubscribe footer')
+  assert.equal((await act(sendPath,{request_id:emailRequest.id,confirm:true,digest:'stale review'})).status,409)
+  assert.equal((await act(sendPath,{request_id:emailRequest.id,confirm:false,digest:preview.value.digest})).status,409)
+  const gate={entered:Promise.withResolvers(),release:Promise.withResolvers()};deliveryGate=gate
+  await read();const concurrentBody={expected_version:job.version,request_id:emailRequest.id,confirm:true,digest:preview.value.digest},beforeConcurrent=f.messages.length
+  const attempts=Promise.all([s.api(path+sendPath,{method:'POST',body:concurrentBody}),s.api(path+sendPath,{method:'POST',body:concurrentBody})])
+  let gateError
+  try {
+   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Meeting send never reached the provider edge')),20000);gate.entered.promise.then(()=>{clearTimeout(timer);resolve()})})
+   assert.equal((await copyState(emailRequest.id)).status,'unknown','The reservation is durable before the provider responds')
+   assert.equal((await requestCopy(s.client,{cancel:true,request_id:emailRequest.id})).value.error,'mail_reserved','Cancellation cannot undo a reserved send')
+  } catch(error){gateError=error} finally {gate.release.resolve();deliveryGate=undefined}
+  const results=await attempts;if(gateError)throw gateError;assert.deepEqual(results.map(r=>r.status).sort(),[200,409],'Concurrent final sends reserve only once')
+  assert.equal(f.messages.length,beforeConcurrent+1)
+  const wire=f.messages.at(-1);assert.deepEqual(wire.to,[preview.value.email]);assert.equal(wire.subject,preview.value.subject);assert.equal(wire.text,preview.value.body)
+  assert.equal(wire.wire.content.find(c=>c.type==='text/html').value,'<pre>'+preview.value.body.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')+'</pre>')
+  const stored=await copyState(emailRequest.id);assert.equal(stored.body,wire.text);assert.equal(stored.subject,wire.subject)
+  const sends=(await s.api('/audit?'+new URLSearchParams({kind:'send',action:'meeting-shares.send-email',job_id:job.id,subject_id:share.id}))).value.events
+  assert.equal(sends.length,2,'Reservation and outcome are both classified as meeting sends')
+  for(const event of sends){assert.equal(event.actor_id,stored.approved_by.id);assert.equal(event.actor_role,'owner');assert.equal(event.source,'session');assert.equal(event.subject_kind,'meeting-shares');assert.equal(event.version_after,event.version_before+1);assert.match(event.before_ref,/^[0-9a-f]{64}$/);assert.match(event.after_ref,/^[0-9a-f]{64}$/);assert.notEqual(event.before_ref,event.after_ref)}
+  assert.equal(sends[0].before_ref,sends[1].after_ref,'The outcome references the exact reserved state');assert.equal(JSON.stringify(sends).includes(input.body),false)
+  assert.equal((await sendCopy(emailRequest,preview.value)).status,409);assert.equal(f.messages.length,beforeConcurrent+1,'A delivered request never sends twice')
+  r=await requestCopy(s.client);assert.equal(r.status,200);const cancelled=r.value.record,cancelledPreview=(await previewCopy(cancelled.id)).value
+  assert.equal((await requestCopy(s.client,{cancel:true,request_id:cancelled.id})).status,200)
+  const beforeCancelled=f.messages.length
+  assert.equal((await previewCopy(cancelled.id)).status,409);assert.equal((await sendCopy(cancelled,cancelledPreview)).status,409);assert.equal(f.messages.length,beforeCancelled,'A cancelled request cannot pass the final send door')
+  // Both contenders carry the same native optimistic version; exactly one wins.
+  r=await requestCopy(s.client);assert.equal(r.status,200);const racing=r.value.record,racingPreview=(await previewCopy(racing.id)).value;await read()
+  const raceVersion=job.version,beforeRace=f.messages.length
+  const race=await Promise.all([s.api(path+sendPath,{method:'POST',body:{expected_version:raceVersion,request_id:racing.id,confirm:true,digest:racingPreview.digest}}),s.api(copyPath,{method:'POST',cookie:s.client,body:{expected_version:raceVersion,confirm:true,cancel:true,request_id:racing.id}})])
+  assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);const raceState=await copyState(racing.id)
+  assert.equal(raceState.status,race[0].status===200?'accepted':'cancelled');assert.equal(f.messages.length,beforeRace+(race[0].status===200?1:0))
+  // Wall-clock boundaries include daytime, overnight and the repeated DST hour.
+  for(const window of [
+   {start:'08:00',end:'09:00',before:'2026-10-26T11:59:00Z',held:['2026-10-26T12:00:00Z','2026-10-26T12:59:00Z'],after:'2026-10-26T13:00:00Z'},
+   {start:'22:00',end:'07:00',before:'2026-10-27T01:59:00Z',held:['2026-10-27T02:00:00Z','2026-10-27T10:59:00Z'],after:'2026-10-27T11:00:00Z'},
+   {start:'01:00',end:'02:00',before:'2026-11-01T04:59:00Z',held:['2026-11-01T05:00:00Z','2026-11-01T05:30:00Z','2026-11-01T06:30:00Z','2026-11-01T06:59:00Z'],after:'2026-11-01T07:00:00Z'},
+  ]){
+   f.setNow(Date.parse(window.before));await quiet({start:window.start,end:window.end,time_zone:'America/New_York'})
+   r=await requestCopy(s.client);assert.equal(r.status,200);const request=r.value.record,review=(await previewCopy(request.id)).value,beforeBoundary=f.messages.length
+   assert.ok(review.digest)
+   for(const time of window.held){f.setNow(Date.parse(time));assert.equal((await previewCopy(request.id)).value.error,'mail_quiet');assert.equal((await sendCopy(request,review)).value.error,'mail_quiet');assert.equal((await copyState(request.id)).status,'requested');assert.equal(f.messages.length,beforeBoundary)}
+   f.setNow(Date.parse(window.after));assert.equal((await previewCopy(request.id)).value.digest,review.digest);assert.equal((await sendCopy(request,review)).status,200);assert.equal(f.messages.length,beforeBoundary+1);assert.equal(f.messages.at(-1).text,review.body)
+  }
+  f.setNow(Date.parse('2026-10-26T12:00:00Z'));await quiet()
   uncertain=true;r=await requestCopy(s.client);assert.equal(r.status,200);const uncertainRequest=r.value.record
-  const uncertainPreview=await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${uncertainRequest.id}`);assert.equal(uncertainPreview.status,200)
+  const uncertainPreview=await previewCopy(uncertainRequest.id);assert.equal(uncertainPreview.status,200)
   const beforeUncertain=f.messages.length
-  r=await act(`/meeting-shares/${share.id}/send-email`,{request_id:uncertainRequest.id,confirm:true,digest:uncertainPreview.value.digest});assert.equal(r.status,200);assert.equal(f.messages.length,beforeUncertain+1)
+  r=await sendCopy(uncertainRequest,uncertainPreview.value);assert.equal(r.status,200);assert.equal(f.messages.length,beforeUncertain+1)
   assert.equal((await inbox(s.client)).value.jobs[0].shares[0].email_copy.status,'unknown')
-  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:uncertainRequest.id,confirm:true,digest:uncertainPreview.value.digest})).status,409);assert.equal(f.messages.length,beforeUncertain+1,'An uncertain send cannot automatically resend');uncertain=false
+  assert.equal((await sendCopy(uncertainRequest,uncertainPreview.value)).status,409);assert.equal(f.messages.length,beforeUncertain+1,'An uncertain send cannot automatically resend');uncertain=false
+  // Suppression is exercised at this sender, using the footer it actually reviewed.
+  r=await requestCopy(s.client);assert.equal(r.status,200);const suppressed=r.value.record,suppressedPreview=(await previewCopy(suppressed.id)).value
+  assert.equal((await fetch(f.origin+unsubscribe.pathname,{method:'POST',body:'List-Unsubscribe=One-Click',headers:{'content-type':'application/x-www-form-urlencoded'}})).status,200)
+  const beforeSuppressed=f.messages.length
+  assert.equal((await sendCopy(suppressed,suppressedPreview)).status,200);assert.equal((await copyState(suppressed.id)).status,'cancelled');assert.equal(f.messages.length,beforeSuppressed,'A signed unsubscribe blocks the meeting-email provider call')
   const roleChange=await s.api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version,permissions:{documents:{view:false}}}});assert.equal(roleChange.status,200,JSON.stringify(roleChange.value))
   assert.equal((await inbox(custom)).status,403,'Changing the custom role removes its explicit extract capability on the next request')
   assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie:custom})).status,403)
@@ -289,5 +364,17 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   assert.equal((await s.api(path+`/meeting-shares/${reminderShare.id}/email-preview?request_id=${superseded.id}`)).status,409,'A completed action cannot receive a later reminder instruction');assert.equal(f.messages.length,beforeReminder+1)
 
 
- } finally {await f.close()}
+  // Reopen the same D1 installation and replay both accepted and uncertain reservations.
+  const cookie=f.owner;await f.close();sourceClosed=true
+  restarted=await createFixture({persistTo,ownerCookie:cookie,now:Date.parse('2026-10-26T12:00:00Z')})
+  const recovered=await restarted.json('/api/plinth'+path+`/meetings/${meeting.id}/shares`,{cookie});assert.equal(recovered.status,200)
+  const saved=recovered.value.shares.find(s=>s.id===share.id).email_requests
+  for(const [request,review,status] of [[emailRequest,preview.value,'accepted'],[uncertainRequest,uncertainPreview.value,'unknown']]){
+   assert.equal(saved.find(r=>r.id===request.id).status,status)
+   const current=(await restarted.json('/api/plinth'+path,{cookie})).value.job
+   const replay=await restarted.json('/api/plinth'+path+sendPath,{method:'POST',cookie,body:{expected_version:current.version,request_id:request.id,digest:review.digest,confirm:true}})
+   assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved')
+  }
+  assert.equal(restarted.messages.length,0,'Restart cannot replay an accepted or uncertain delivery')
+ } finally {deliveryGate?.release.resolve();await restarted?.close();if(!sourceClosed)await f.close();await rm(persistTo,{recursive:true,force:true})}
 })

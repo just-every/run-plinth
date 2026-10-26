@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -30,3 +30,48 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run verify
+
+  installed:
+    name: Installed ${{ matrix.journey }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        journey: [invoice-corrections, cost-billing, settlements, meetings]
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
+      - name: Exercise emitted Worker and native sign-in at 1440 and 390
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs ${{ matrix.journey }}
+      - name: Exercise settlement script against the processor boundary
+        if: matrix.journey == 'settlements'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/live-proof/settlement-sandbox.mjs "$RUNNER_TEMP/plinth-settlement" --provider-edge
+      - name: Preserve installed journey screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installed-${{ matrix.journey }}
+          path: artifacts/installed/${{ matrix.journey }}/*.png
+          if-no-files-found: warn
+      - name: Preserve settlement boundary receipt
+        if: always() && matrix.journey == 'settlements'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: settlement-provider-edge
+          path: |
+            ${{ runner.temp }}/plinth-settlement/*.json
+            ${{ runner.temp }}/plinth-settlement/*.png
+          if-no-files-found: warn

@@ -150,7 +150,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===3&&parts[2]==='decision-search'&&method==='GET')return json(await decisionSearch(env.DB,previous,display(previous,actor),actor,new URL(request.url).searchParams))
  if(parts.length===7&&parts[2]==='meetings'&&parts[4]==='links'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.completion?.links.find((_,index)=>String(index)===parts[6]);need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===3&&parts[2]==='meetings'&&method==='GET'){meetingAccess(actor);return json({meetings:previous.meetings??[]})}
- if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='email-preview'&&method==='GET')return json(await meetingEmailPreview(env.DB,previous as MeetingSharingJob,actor,parts[3]!,new URL(request.url).searchParams.get('request_id')??''))
+ if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='email-preview'&&method==='GET')return json(await meetingEmailPreview(env,previous as MeetingSharingJob,actor,parts[3]!,new URL(request.url).searchParams.get('request_id')??''))
  if(parts.length===5&&parts[2]==='meetings'&&parts[4]==='shares'&&method==='GET'){meetingAccess(actor);return json({shares:((previous as MeetingSharingJob).meeting_shares??[]).filter(share=>share.meeting_id===parts[3])})}
  const correspondence=await jobMailResponse(request,env,actor,previous,parts,body);if(correspondence)return correspondence
  const payments=await jobPayResponse(request,env,actor,previous,parts,body);if(payments)return payments

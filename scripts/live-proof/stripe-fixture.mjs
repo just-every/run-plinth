@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import {createHmac} from 'node:crypto'
+import {stripeEdge, intent} from '../../tests/plinth/payment-fixture.mjs'
 import {createFixture} from '../../tests/plinth/helpers.mjs'
 
 /** A real Worker and real test-mode processor, with optional loss of the first Checkout response. */
-export async function stripeFixture(key) {
+export async function stripeFixture(key, {providerEdge=false}={}) {
  let lose=false
+ const edge=providerEdge?stripeEdge():null,syntheticEvents=[]
  const f=await createFixture({stripeSecret:key,stripeEdge:async request=>{
-  const response=await fetch(request.url,{method:request.method,headers:request.headers,...(request.method==='POST'?{body:await request.text()}:{})})
+  const response=edge?await edge.handler(request):await fetch(request.url,{method:request.method,headers:request.headers,...(request.method==='POST'?{body:await request.text()}:{})})
   if(lose&&request.method==='POST'&&new URL(request.url).pathname==='/v1/checkout/sessions'){lose=false;await response.arrayBuffer();return new Response(null,{status:502})}
   return response
  }})
@@ -29,9 +31,10 @@ export async function stripeFixture(key) {
   const row=await act('/invoices',{kind:milestone?'milestone':'deposit',description,amount_cents:amount,recipient_email:email,due_on:'2026-11-15',terms:'Due fourteen days from issue',...(source?{source_application_id:source}:{})});await act(`/invoices/${row.id}/issue`);return row.id
  }
  const send=async event=>{const body=JSON.stringify(event),at=Math.floor(Date.now()/1000);return fetch(f.origin+'/api/plinth/payments/stripe/events',{method:'POST',body,headers:{'content-type':'application/json','stripe-signature':`t=${at},v1=${createHmac('sha256','synthetic-plinth-webhook-secret-1').update(`${at}.${body}`).digest('hex')}`}})}
- const stripe=async path=>{const r=await fetch('https://api.stripe.com/v1'+path,{headers:{authorization:`Bearer ${key}`}});assert.ok(r.ok,'Provider lookup succeeded');return r.json()}
+ const stripe=async path=>{if(edge){if(path.startsWith('/events?')){const type=new URL('https://synthetic-plinth.example'+path).searchParams.get('type');return {data:syntheticEvents.filter(e=>e.type===type)}}const r=await edge.handler(new Request('https://api.stripe.com/v1'+path));assert.ok(r.ok,'Synthetic provider lookup succeeds');return r.json()}const r=await fetch('https://api.stripe.com/v1'+path,{headers:{authorization:`Bearer ${key}`}});assert.ok(r.ok,'Provider lookup succeeded');return r.json()}
  const attempts=async()=>(await api(`/jobs/${job.id}/payments`)).value.attempts
  const pay=async id=>{const r=await api(`/jobs/${job.id}/payments`,{invoice_id:id,confirm:true},client);return r}
  const events=async(type,attempt)=>{const list=await stripe(`/events?type=${encodeURIComponent(type)}&limit=100&created[gte]=${Math.floor(Date.now()/1000)-3600}`);return list.data.filter(e=>e.data.object.client_reference_id===attempt||e.data.object.metadata?.plinth_attempt===attempt)}
- return {f,read,act,invoice,pay,send,stripe,attempts,events,loseNext:()=>{lose=true},job:()=>job}
+ const settle=async(url,disputed)=>{const session=edge.sessions.find(s=>s.id===new URL(url).pathname.split('/').pop());assert.ok(session);const amount=Number(session.form.get('line_items[0][price_data][unit_amount]')),id='synthetic-plinth-intent-'+edge.intents.size,payment=intent(id,amount);session.payment_intent=id;session.status='complete';session.payment_status='paid';payment.metadata={plinth_attempt:session.form.get('client_reference_id')};if(disputed){const dispute={id:'synthetic-plinth-dispute-'+edge.disputes.length,amount,status:'needs_response',reason:'fraudulent',payment_intent:id};payment.latest_charge.dispute=dispute;edge.disputes.push(dispute);syntheticEvents.push({id:crypto.randomUUID(),type:'charge.dispute.created',livemode:false,data:{object:dispute}})}edge.intents.set(id,payment);syntheticEvents.push({id:crypto.randomUUID(),type:'checkout.session.completed',livemode:false,data:{object:{id:session.id,payment_intent:id,client_reference_id:session.form.get('client_reference_id'),currency:'usd',amount_total:amount,payment_status:'paid'}}})}
+ return {edge,settle,f,read,act,invoice,pay,send,stripe,attempts,events,loseNext:()=>{lose=true},job:()=>job}
 }

@@ -1,67 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
-import { createFixture } from './helpers.mjs'
-
-const SECRET = 'synthetic-plinth-webhook-secret-1'
-/** Stripe at the network edge: hosted checkout sessions and the processor's own record of each payment. */
-function stripeEdge() {
- const edge = { sessions: [], intents: new Map(), disputes: [], refunds: [], loseResponse: false, refundStatus: 'succeeded', loseRefundResponse: false, calls: [], handler: async request => {
-  const url = new URL(request.url); edge.calls.push(`${request.method} ${url.pathname}`)
-  if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
-   const form = new URLSearchParams(await request.text()), id = `cs_synthetic_${edge.sessions.length + 1}`
-   edge.sessions.push({ id, form, key: request.headers.get('idempotency-key'), payment_status: 'unpaid', status: 'open', livemode: false })
-   edge.onCheckout?.();if(edge.holdCheckout)await edge.holdCheckout
-   if (edge.loseResponse) return new Response('response lost after creation', {status:502})
-   return Response.json({ id, url: `https://checkout.stripe.test/c/pay/${id}`, livemode: false, status: 'open', payment_status: 'unpaid' })
-  }
-  if (request.method === 'POST' && /^\/v1\/checkout\/sessions\/[^/]+\/expire$/.test(url.pathname)) return Response.json({ status: 'expired' })
-  if (request.method === 'GET' && url.pathname.startsWith('/v1/checkout/sessions')) {
-   const project = s => ({id:s.id,url:`https://checkout.stripe.test/c/pay/${s.id}`,client_reference_id:s.form.get('client_reference_id'),metadata:{plinth_attempt:s.form.get('client_reference_id')},currency:'usd',amount_total:Number(s.form.get('line_items[0][price_data][unit_amount]')),payment_intent:s.payment_intent??null,payment_status:s.payment_status,status:s.status,livemode:s.livemode})
-   const session = edge.sessions.find(s => s.id === url.pathname.split('/').pop())
-   return Response.json(session ? project(session) : {data:edge.sessions.map(project),has_more:false})
-  }
-  if (url.pathname === '/v1/disputes') return Response.json({data:edge.disputes})
-  if (url.pathname === '/v1/refunds') {
-   if (request.method === 'GET') return Response.json({data:edge.refunds})
-   const form = new URLSearchParams(await request.text()), pi = edge.intents.get(form.get('payment_intent')), amount=Number(form.get('amount'))
-   const refund={id:`synthetic-plinth-refund-${edge.refunds.length+1}`,status:edge.refundStatus,amount,payment_intent:pi.id,metadata:{plinth_refund:form.get('metadata[plinth_refund]')}}
-   edge.refunds.push(refund);if(edge.failAfterRefund)edge.failIntentOnce=true;if(refund.status==='succeeded')pi.latest_charge.amount_refunded=(pi.latest_charge.amount_refunded??0)+amount;pi.latest_charge.refunds={data:edge.refunds};return edge.loseRefundResponse?new Response(null,{status:502}):Response.json(refund)
-  }
-  const intent = edge.intents.get(url.pathname.split('/').pop())
-  if (request.method === 'GET' && intent) {const own=edge.sessions.find(s=>s.payment_intent===intent.id);if(own&&!intent.metadata)intent.metadata={plinth_attempt:own.form.get('client_reference_id')};if(edge.failIntentOnce){edge.failIntentOnce=false;return new Response(null,{status:502})}const hook=edge.onIntent;edge.onIntent=null;if(hook)await hook();return Response.json(intent)}
-  return new Response('unexpected', { status: 500 })
- } }
- return edge
-}
-const intent = (id, amount, { type = 'card', wallet = null, fee = 100 } = {}) => ({ id, status: 'succeeded', amount, amount_received: amount, currency: 'usd', livemode: false, latest_charge: { id: `synthetic-plinth-charge-${id}`, amount, payment_method_details: { type, ...(type === 'card' ? { card: { wallet: wallet ? { type: wallet } : null } } : {}) }, balance_transaction: { fee } } })
-
-async function setup() {
- const edge = stripeEdge(), f = await createFixture({ stripeEdge: edge.handler })
- const client = await f.invite('client@example.com', 'Alex Chen'), foreign = await f.invite('foreign@example.com', 'Other client'), agent = await f.agent()
- const api = (path, o = {}) => f.json('/api/plinth' + path, { cookie: f.owner, ...o })
- let job = (await api('/jobs', { method: 'POST', body: { name: 'Maple Street framing draws', client_email: 'client@example.com', address: '2480 Maple Street, Burlington, VT 05401', time_zone: 'America/New_York' } })).value.job
- const act = async (path, body = {}) => { const r = await api(`/jobs/${job.id}${path}`, { method: 'POST', body: { expected_version: job.version, ...body } }); if (r.value.job) job = r.value.job; return r }
- assert.equal((await act('/quotes', { lines: [{ id: 'material', description: 'Framing material', cost_code: '06-100', phase: 'Framing', category: 'material', quantity: '1', unit: 'job', unit_cents: 1000000, cost_unit_cents: 750000 }, { id: 'labor', description: 'Framing labor', cost_code: '06-200', phase: 'Framing', category: 'labor', quantity: '1', unit: 'job', unit_cents: 1000000, cost_unit_cents: 600000 }] })).status, 200)
- const rate = (await api('/pricing-rates', { method: 'POST', body: { jurisdiction: 'Human-reviewed fixture jurisdiction', kind: 'sales', percent: '10', effective_on: '2026-01-01', reference: 'Reviewed fixture taxable materials and labor exemption', human_reviewed: true } })).value.rate
- const price = { basis: 'sell', as_of: '2026-10-21', rules: [], tax: { rate_id: rate.id, taxable_line_ids: ['material'], exemption_reference: 'Reviewed labor exemption' } }
- let r0 = await act('/pricing/preview', price); assert.equal(r0.status, 200); assert.equal((await act('/pricing/apply', { ...price, digest: r0.value.preview.digest })).status, 200)
- assert.equal((await act(`/quotes/${job.quotes.at(-1).id}/accept`, { method: 'signed', evidence: 'Externally signed contract with fixed draws', schedule_choice: { kind: 'none', reason: 'Construction dates planned separately' } })).status, 200)
- await act('/sov', {})
- const draw = async (amount, label) => {
-  job=(await api(`/jobs/${job.id}`)).value.job
-  let r = await api(`/jobs/${job.id}/invoices`, { method: 'POST', body: { expected_version: job.version, kind: 'deposit', description: label, amount_cents: amount, recipient_email: 'client@example.com', due_on: '2026-11-15', terms: 'Card or bank transfer through the hosted checkout' } }); assert.equal(r.status, 200, JSON.stringify(r.value))
-  const id = r.value.record.id; job = r.value.job
-  r = await api(`/jobs/${job.id}/invoices/${id}/issue`, { method: 'POST', body: { expected_version: job.version } }); assert.equal(r.status, 200); job = r.value.job
-  return id
- }
- const pay = (invoice_id, o = {}) => api(`/jobs/${job.id}/payments`, { method: 'POST', cookie: client, body: { invoice_id, confirm: true }, ...o })
- const event = (type, session, extra = {}, id = `evt_synthetic_${Math.random().toString(36).slice(2)}`) => {if(!session.payment_intent&&extra.payment_intent)session.payment_intent=extra.payment_intent;return ({ id, type, livemode: false, data: { object: { id: session.id, client_reference_id: session.form.get('client_reference_id'), currency: 'usd', amount_total: Number(session.form.get('line_items[0][price_data][unit_amount]')), payment_status: 'paid', ...extra } } })}
- const send = (payload, { secret = SECRET, at = Math.floor(Date.now() / 1000) } = {}) => { const body = JSON.stringify(payload), signature = createHmac('sha256', secret).update(`${at}.${body}`).digest('hex'); return fetch(f.origin + '/api/plinth/payments/stripe/events', { method: 'POST', body, headers: { 'content-type': 'application/json', 'stripe-signature': `t=${at},v1=${signature}` } }) }
- const read = async () => (await api(`/jobs/${job.id}`)).value.job
- const attempts = async o => (await api(`/jobs/${job.id}/payments`, o)).value.attempts
- return { f, edge, client, foreign, agent, api, job: () => job, draw, pay, event, send, read, attempts }
-}
+import { setup, intent } from './payment-fixture.mjs'
 
 test('PAY-001 — a client pays issued draws by card, wallet and bank transfer through hosted Stripe checkout and signed events credit each invoice once', async () => {
  const s = await setup(), { f, edge } = s
@@ -123,7 +62,7 @@ test('PAY-001 — a client pays issued draws by card, wallet and bank transfer t
 test('Settlement reconciliation preserves original receipts through returns, disputes, stale events and uncertain checkout responses', async () => {
  const s=await setup(),{f,edge}=s
  try {
-  const bank=await s.draw(100_000,'Cabinet ACH draw'),card=await s.draw(200_000,'Card draw'),unknown=await s.draw(50_000,'Uncertain checkout')
+  const bank=await s.draw(100_000,'Cabinet ACH draw'),card=await s.changeDraw(200_000,'Client-approved framing change order'),unknown=await s.draw(50_000,'Uncertain checkout')
   await s.pay(bank);const bs=edge.sessions.at(-1);bs.payment_intent='synthetic-plinth-bank-1'
   const pi=intent(bs.payment_intent,100_000,{type:'us_bank_account'});pi.status='requires_action';pi.amount_received=0;edge.intents.set(pi.id,pi)
   const completed=s.event('checkout.session.completed',bs,{payment_intent:pi.id,payment_status:'unpaid'})
@@ -156,11 +95,29 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   // A linked issued credit authorizes only that amount of processor refund; replay never sends twice.
   let current=await s.read();row=current.invoices.find(i=>i.id===card);const original=structuredClone(row.issued)
   const refundBody={expected_version:current.version,operation_id:'synthetic-plinth-refund-operation-1',amount_cents:25_000,reason:'Customer approved reduced scope',confirm:true}
-  const refund=body=>s.api(`/jobs/${current.id}/payments/${attempt.id}/refund`,{method:'POST',body})
+  const refund=(body,options={})=>s.api(`/jobs/${current.id}/payments/${attempt.id}/refund`,{method:'POST',body,...options})
   assert.equal((await refund(refundBody)).value.error,'refund_credit');assert.equal(edge.refunds.length,0)
   let correction=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:current.version,operation_id:'synthetic-plinth-credit-operation-1',description:'Credit for reduced scope',reason:'Reviewed reduction',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:25_000}]}})
   assert.equal(correction.status,200,JSON.stringify(correction.value));refundBody.expected_version=correction.value.job.version
+  const beforeRefund=await s.api(`/jobs/${current.id}/payments`),beforeJob=await s.read()
+  for(const confirm of [undefined,false]){const rejected=await refund({...refundBody,confirm});assert.equal(rejected.status,400,'Absent or false confirmation cannot instruct money');assert.equal(edge.refunds.length,0);assert.deepEqual((await s.api(`/jobs/${current.id}/payments`)).value,beforeRefund.value);assert.deepEqual(await s.read(),beforeJob)}
+  const restricted=[]
+  for(const role of ['project_manager','bookkeeper','reader']){
+   const email=`synthetic-plinth-${role.replace('_','-')}-refund@example.com`,cookie=await f.invite(email,role,'admin'),person=(await s.api('/team')).value.team.find(p=>p.email===email)
+   const assigned=await s.api(`/team/${person.id}`,{method:'PUT',body:{expected_version:0,role,job_ids:[current.id],po_limit_cents:0}});assert.equal(assigned.status,200)
+   restricted.push(cookie)
+  }
+  const clerk=await f.invite('synthetic-plinth-refund-clerk@example.com','Invoice drafting clerk','admin'),clerkPerson=(await s.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-refund-clerk@example.com')
+  let clerkRole=(await s.api('/roles',{method:'POST',body:{copy_of:'administrator',name:'Refund decision restricted',permissions:{invoices:{approve:false}}}})).value.role
+  assert.equal((await s.api(`/team/${clerkPerson.id}`,{method:'PUT',body:{expected_version:0,role:'custom',role_id:clerkRole.id,job_ids:[current.id],po_limit_cents:0}})).status,200)
+  for(const options of [...restricted.map(cookie=>({cookie})),{cookie:clerk},{cookie:s.client},{cookie:s.foreign},{cookie:undefined,token:s.agent}]){const denied=await refund(refundBody,options);assert.ok([403,404].includes(denied.status),'Current named roles and approval-disabled administrator cannot approve a refund');assert.equal(edge.refunds.length,0);assert.deepEqual((await s.api(`/jobs/${current.id}/payments`)).value,beforeRefund.value);assert.deepEqual(await s.read(),beforeJob)}
   const result=await refund(refundBody);assert.equal(result.status,200,JSON.stringify(result.value));assert.equal(edge.refunds.length,1)
+  assert.equal(edge.refundKeys[0],`plinth-refund-${attempt.id}-${refundBody.operation_id}`,'The exact durable instruction supplies the provider idempotency key')
+  const audit=(await s.api(`/audit?kind=financial&action=payments.refund.approve&job_id=${current.id}`)).value.events
+  const approval=audit.find(e=>e.detail.operation_id===refundBody.operation_id)
+  assert.ok(approval);assert.equal(approval.actor_id,original.issued_by.id);assert.equal(approval.actor_name,original.issued_by.name);assert.equal(approval.actor_role,'owner');assert.equal(approval.source,'session');assert.equal(approval.subject_id,attempt.id);assert.equal(approval.subject_kind,'payment');assert.equal(approval.job_id,current.id)
+  assert.deepEqual(approval.detail,{operation_id:refundBody.operation_id,amount_cents:25_000,invoice_id:card,invoice_number:original.number,payment_intent_id:cp.id,original_receipt_id:attempt.receipt_id})
+  assert.match(approval.before_ref,/^[a-f0-9]{64}$/);assert.equal(approval.after_ref,approval.before_ref,'Reservation audits its exact unchanged invoice source');assert.ok(approval.at)
   assert.equal((await refund(refundBody)).value.reused,true);assert.equal(edge.refunds.length,1)
   assert.equal((await refund({...refundBody,amount_cents:26_000})).value.error,'refund_conflict')
   current=await s.read();row=current.invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0);assert.equal(row.balance.received_cents,175_000);assert.deepEqual(row.issued,original)
@@ -203,10 +160,18 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   assert.equal(edge.refunds.length,expectedRefundCount);assert.equal((await reconcile()).status,200)
   current=await s.read();row=current.invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0)
   correction=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:current.version,operation_id:'synthetic-plinth-credit-operation-4',description:'Additional approved credit',reason:'Reviewed reduction',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:1_000}]}});assert.equal(correction.status,200)
+  const beforeChangedCount=edge.refunds.length,beforeChangedPayments=(await s.api(`/jobs/${current.id}/payments`)).value
+  edge.onIntent=async()=>{const fresh=await s.read();const revised=await s.api(`/jobs/${current.id}/invoices/${card}/credit`,{method:'POST',body:{expected_version:fresh.version,operation_id:'synthetic-plinth-changing-credit-1',description:'New review required',reason:'Client revised the final refund economics',confirm:true,lines:[{invoice_line_id:row.issued.lines[0].id,amount_cents:100}]}});assert.equal(revised.status,200)}
+  const changed=await refund({...refundBody,operation_id:'synthetic-plinth-changing-refund-1',amount_cents:1_000,expected_version:correction.value.job.version})
+  assert.equal(changed.status,409);assert.equal(changed.value.error,'stale_version');assert.equal(edge.refunds.length,beforeChangedCount);assert.deepEqual((await s.api(`/jobs/${current.id}/payments`)).value,beforeChangedPayments,'Changed economics cannot reserve or send the stale refund')
+  const enable=await s.api(`/roles/${clerkRole.id}`,{method:'PUT',body:{expected_version:clerkRole.version,permissions:{invoices:{approve:true}}}});assert.equal(enable.status,200);clerkRole=enable.value.role
+  edge.onIntent=async()=>{const revoke=await s.api(`/roles/${clerkRole.id}`,{method:'PUT',body:{expected_version:clerkRole.version,permissions:{invoices:{approve:false}}}});assert.equal(revoke.status,200);clerkRole=revoke.value.role}
+  const narrowed=await refund({...refundBody,operation_id:'synthetic-plinth-narrowed-refund-1',amount_cents:1_000,expected_version:(await s.read()).version},{cookie:clerk})
+  assert.equal(narrowed.status,403,'Revoking invoice approval during the processor read refuses the final instruction');assert.equal(edge.refunds.length,beforeChangedCount);assert.deepEqual((await s.api(`/jobs/${current.id}/payments`)).value,beforeChangedPayments)
   let signedOut;edge.onIntent=async()=>{signedOut=await f.request('/auth/signout',{method:'POST',cookie:f.owner,body:{}})}
-  const revoked=await refund({...refundBody,operation_id:'synthetic-plinth-refund-operation-3',amount_cents:1_000,expected_version:correction.value.job.version})
+  const revoked=await refund({...refundBody,operation_id:'synthetic-plinth-refund-operation-3',amount_cents:1_000,expected_version:(await s.read()).version})
   assert.equal(signedOut.status,204);assert.equal(revoked.status,401,'A session revoked during the Stripe read cannot send a refund');assert.equal(edge.refunds.length,expectedRefundCount)
-  assert.equal((await s.api(`/jobs/${current.id}`,{cookie:s.client})).value.job.invoices.find(i=>i.id===card).balance.due_cents,-1_000)
+  assert.equal((await s.api(`/jobs/${current.id}`,{cookie:s.client})).value.job.invoices.find(i=>i.id===card).balance.due_cents,-1_100)
 
  }finally{await f.mf.dispose()}
 })
