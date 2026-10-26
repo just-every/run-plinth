@@ -3,6 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
 import { unstable_splitSqlQuery } from 'wrangler'
+import { diagnostic } from './diagnostics.mjs'
 
 // The same emitted entry and assets deployed by rer build; never the API-only test entry.
 export async function installedWorker(outboundService) {
@@ -17,12 +18,14 @@ export async function installedWorker(outboundService) {
   MAIL_PROVIDER: 'resend', MAIL_API_KEY: 'synthetic-plinth-3', MAIL_FROM: 'builder@example.com', MAIL_REPLY_DOMAIN: 'synthetic-plinth.example',
   STRIPE_SECRET_KEY: 'synthetic-plinth-4', STRIPE_WEBHOOK_SECRET: 'synthetic-plinth-webhook-secret-1',
  }
+ const errors = []
  const mf = new Miniflare(convertV4MiniflareOptions({
   host: '127.0.0.1', port, modulesRoot: resolve('dist/server'),
   modules: [{ type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
   compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
   d1Databases: ['DB'], bindings, outboundService,
-  assets: { directory: resolve('dist/client'), binding: 'ASSETS', run_worker_first: true },
+  assets: { directory: resolve('dist/client'), binding: 'ASSETS', run_worker_first: true, routerConfig: { has_user_worker: true } },
+  handleUncaughtError: error => { errors.push(diagnostic(error.stack ?? error, bindings)); if (errors.length > 5) errors.shift() },
  }))
  try {
   const db = await mf.getD1Database('DB')
@@ -31,6 +34,6 @@ export async function installedWorker(outboundService) {
    if (statements.length) await db.batch(statements.map(sql => db.prepare(sql)))
   }
   await mf.ready
-  return { origin, bindings, close: () => mf.dispose() }
+  return { origin, bindings, diagnostics: () => [...errors], close: () => mf.dispose() }
  } catch (error) { await mf.dispose(); throw error }
 }

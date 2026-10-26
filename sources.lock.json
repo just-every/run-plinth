@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "d3fb42deca353715553d555cf48ad56680d545291ffca93da24dc98b289b8b1e",
+      "sha256": "c3353eba2c1f5a2948c7400393cb87ffd966873b73000b9a1b2f9608eb7ce358",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e52433dbe40aa2be1776a51f80c7e00c544e0746af28d5c8338c705fa773bce1",
+      "sha256": "f431d2981c8fb2efebefa690dc956da36d07ce3c2c6f3d22dee36e002e43e484",
       "executable": false
     },
     "DEMO.md": {
@@ -916,12 +916,16 @@
       "sha256": "decbd8619e40c741708b49639d54282bd19edc4581a782b240d96a423ad47f01",
       "executable": false
     },
+    "scripts/verify/diagnostics.mjs": {
+      "sha256": "04d3f6cc93eb57ed60b7128ddc263c8109165688a78157acadc7f0f2421ede88",
+      "executable": false
+    },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "1eb8e342272570f2d9a629ed61b15808f6718f1661cd697a873160154055ea50",
+      "sha256": "02ba26c9eef975038def96e2781d54cd2e18e7369ed319454eb70d1c7a22da53",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "cc4baa4298bdd6e85b65d53ab11fb204bf5c57ba629f80519527afbe8558e354",
+      "sha256": "83b6d79dc1f568996227a73dc7c24de33ad2be9759adfbdcf47dc5d81056d591",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {

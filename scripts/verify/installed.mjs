@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test'
 import { installedWorker } from './installed-worker.mjs'
 import { providerEdge } from './provider-edge.mjs'
 import { nativeSignIn } from './native-signin.mjs'
+import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
 assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings'].includes(name), 'Choose an installed Billing or Meetings journey')
@@ -30,10 +31,10 @@ try {
  browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
  const owner = await browser.newContext(), page = await owner.newPage()
  const post = (path, data) => owner.request.post(worker.origin + path, { maxRedirects: 0, headers: { origin: worker.origin }, data })
- assert.equal((await post('/auth/bootstrap', { token: worker.bindings.SETUP_TOKEN, displayName: 'Synthetic Plinth builder', returnTo: '/app' })).status(), 303, 'Native installation bootstrap')
+ await requireStatus(await post('/auth/bootstrap', { token: worker.bindings.SETUP_TOKEN, displayName: 'Synthetic Plinth builder', returnTo: '/app' }), 303, 'Native installation bootstrap', worker)
  // Sign out the bootstrap session; prove the ordinary native email confirmation.
- assert.equal((await post('/auth/signout', {})).status(), 204)
- assert.equal((await post('/auth/magic-link', { email: worker.bindings.OWNER_EMAIL, returnTo: '/app' })).status(), 202)
+ await requireStatus(await post('/auth/signout', {}), 204, 'Native sign-out', worker)
+ await requireStatus(await post('/auth/magic-link', { email: worker.bindings.OWNER_EMAIL, returnTo: '/app' }), 202, 'Native sign-in email', worker)
  await nativeSignIn(page, worker.bindings.OWNER_EMAIL)
  await page.goto(worker.origin + '/app')
  assert.equal(new URL(page.url()).pathname, '/setup', 'Fresh installation requires native owner setup')
@@ -42,7 +43,7 @@ try {
  await page.getByRole('button', { name: 'Finish setup', exact: true }).click()
  await page.waitForURL('**/app')
  await owner.storageState({ path: ownerState })
- assert.equal((await post('/auth/invite', { email: 'client@dev.localhost', displayName: 'Synthetic Plinth client', role: 'member', returnTo: '/app' })).status(), 202, 'Native client invitation')
+ await requireStatus(await post('/auth/invite', { email: 'client@dev.localhost', displayName: 'Synthetic Plinth client', role: 'member', returnTo: '/app' }), 202, 'Native client invitation', worker)
  const client = await browser.newContext(), clientPage = await client.newPage()
  await nativeSignIn(clientPage, 'client@dev.localhost')
  await client.storageState({ path: clientState })
