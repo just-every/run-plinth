@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
+import { correctionSourceJourney } from './invoice-correction-sources.mjs'
 
 const base = process.env.PLINTH_URL, shots = process.env.PLINTH_SCREENSHOTS
 const ownerOpen = process.env.PLINTH_OWNER_OPEN, clientOpen = process.env.PLINTH_CLIENT_OPEN
@@ -151,6 +152,7 @@ try {
   assert.equal(denied.status(), 403)
   assert.equal(await clientPage.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
   await clientRecord.scrollIntoViewIfNeeded(); await clientPage.screenshot({ path: `${shots}/BILL-005-client-documents-${width}.png`, animations: 'disabled' })
+  await correctionSourceJourney({ base, owner, page, width, shots })
   for (const control of await page.locator('button.icon-button:visible').all()) {
    const tip = await control.getAttribute('data-tip'); assert.ok(tip && tip.split(' ').length >= 2 && tip.split(' ').length <= 4)
    await control.hover(); await page.waitForTimeout(350)

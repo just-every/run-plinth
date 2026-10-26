@@ -4216,8 +4216,12 @@
       "sha256": "82957541d0b06f0dd84c15895ad46bc4db0a5087febdf1645e6dfc07514e9a25",
       "executable": false
     },
+    "tests/journeys/invoice-correction-sources.mjs": {
+      "sha256": "5c0ea0d3c69e422b43f2bc1432228ebdc05c5d01aa7588bab3c66c2ecedb324a",
+      "executable": false
+    },
     "tests/journeys/invoice-corrections.mjs": {
-      "sha256": "341a9ffa9b776e27712cda497eec08c9e5bcb8266fe3478a6152e75a3fc5b4ce",
+      "sha256": "bf4d41af8aae696f06b55e12b6c6d104ba22b6f4a59b779cc64e7ec5203b7456",
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
