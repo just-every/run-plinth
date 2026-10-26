@@ -1,6 +1,6 @@
 # Payment settlement and invoice corrections
 
-Clients authorize the full current USD invoice balance before leaving for the builder's own Stripe hosted Checkout. The client pays no surcharge; the builder bears the processor fee. These PAY-001 policy defaults remain ADOPTED pending ct approval.
+Clients authorize the full current USD invoice balance before leaving for the builder's own Stripe hosted Checkout. The client pays no surcharge; the builder bears the processor fee. The additive CT ruling dated 26 October 2026 approves these inherited PAY-001 policy defaults with riders; live funds and real-device obligations retain their recorded statuses.
 
 The office's Billing payment history separates initiated, processing, settled, failed, canceled, ACH returned, disputed, refunded and unresolved instructions. A receipt credits the invoice only after Stripe confirms settlement. Its confirmation source distinguishes a signed event from reconciliation against provider records. Reconcile with Stripe reads the current Checkout and PaymentIntent records, including refunds and disputes. Configure the webhook at `/api/plinth/payments/stripe/events` for Checkout session events, payment intent events, charge events, dispute events and refund events. Signed events trigger the same reconciliation; their arrival order never determines the money balance.
 

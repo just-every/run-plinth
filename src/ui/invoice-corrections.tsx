@@ -11,6 +11,7 @@ type Review = {
  kind: Kind; version: number; operation_id: string; reason: string; description?: string
  amount_cents: number; tax_cents?: number; dispute_reference?: string; attempt_id?: string
  lines?: { invoice_line_id: string; amount_cents: number }[]
+ posting_period?: string; adjustment_reference?: string
 }
 const names: Record<Kind, string> = { credit: 'credit document', debit: 'debit document', void: 'invoice void', 'write-off': 'residual write-off', refund: 'Stripe refund' }
 const positive = (value: FormDataEntryValue | null) => { const amount = cents(value); if (amount <= 0) throw new Error('Enter an amount greater than zero.'); return amount }
@@ -29,10 +30,11 @@ function CorrectionDocuments({ invoice, job, office }: Omit<Props, 'mutate'>) {
 
 function RefundPreparation({ job, invoice, prepare }: Pick<Props, 'job' | 'invoice'> & { prepare: (review: Review) => void }) {
  const [attempts, setAttempts] = useState<PaymentAttempt[]>(), [error, setError] = useState('')
+ const [posting, setPosting] = useState<{source_on:string;closed:boolean}>()
  const credit = Math.max(0, -invoice.balance!.due_cents)
  async function load() {
   setError('')
-  try { const result = await api(`/jobs/${job.id}/payments`); setAttempts(result.attempts) }
+  try { const result = await api(`/jobs/${job.id}/payments`); setAttempts(result.attempts); setPosting(result.refund_posting) }
   catch (e) { setError(e instanceof Error ? e.message : 'Could not load Stripe payments.') }
  }
  useEffect(() => { if (attempts) void load() }, [job.id, job.version])
@@ -43,8 +45,8 @@ function RefundPreparation({ job, invoice, prepare }: Pick<Props, 'job' | 'invoi
    {attempts && (eligible.length ? <Form submit="Review Stripe refund" action={async f => {
     const attempt = eligible.find(a => a.id === f.get('attempt_id')), amount = positive(f.get('amount'))
     if (!attempt || amount > Math.min(credit, attempt.amount_cents - attempt.reversed_cents)) throw new Error('Refund only available customer credit within this settled payment.')
-    prepare({ kind: 'refund', version: job.version, operation_id: crypto.randomUUID(), attempt_id: attempt.id, amount_cents: amount, reason: String(f.get('reason')) })
-   }}><label>Settled Stripe payment<select name="attempt_id">{eligible.map(a => <option key={a.id} value={a.id}>{a.payment_intent_id ?? a.id} · {money(a.amount_cents - a.reversed_cents)} available</option>)}</select></label><Field name="amount" label="Refund amount (USD)" inputMode="decimal" /><Field name="reason" label="Private refund reason" /></Form> : <p>No settled Stripe payment is available for this invoice.</p>)}</>}
+    prepare({ kind: 'refund', version: job.version, operation_id: crypto.randomUUID(), attempt_id: attempt.id, amount_cents: amount, reason: String(f.get('reason')), ...(posting?.closed ? {posting_period:String(f.get('posting_period')),adjustment_reference:String(f.get('adjustment_reference'))} : {}) })
+   }}><label>Settled Stripe payment<select name="attempt_id">{eligible.map(a => <option key={a.id} value={a.id}>{a.payment_intent_id ?? a.id} · {money(a.amount_cents - a.reversed_cents)} available</option>)}</select></label><Field name="amount" label="Refund amount (USD)" inputMode="decimal" /><Field name="reason" label="Private refund reason" />{posting?.closed && <><p>The source date {posting.source_on} is in a closed accounting period. Retain that date and choose an open period for the adjustment.</p><Field name="posting_period" label="Open posting period" type="month" /><Field name="adjustment_reference" label="Adjustment evidence" /></>}</Form> : <p>No settled Stripe payment is available for this invoice.</p>)}</>}
  </details>
 }
 
@@ -61,6 +63,7 @@ export function InvoiceCorrections({ job, invoice, office, mutate }: Props) {
    {review ? <section aria-label="Review invoice correction"><h4>Review {names[review.kind]}</h4><p>Original invoice {invoice.number} · {invoice.description}</p>
     {review.description && <p>Public description: {review.description}</p>}<p>Private reason: {review.reason}</p>{review.dispute_reference && <p>Dispute reference: {review.dispute_reference}</p>}
     {review.attempt_id && <p>Stripe payment: {review.attempt_id}</p>}
+    {review.posting_period && <p>Open posting period: {review.posting_period}. Adjustment evidence: {review.adjustment_reference}.</p>}
     {review.lines?.map(l => <p key={l.invoice_line_id}>{issued.lines.find(original => original.id === l.invoice_line_id)?.description} · {money(l.amount_cents)}</p>)}
     <dl className="reconciliation"><div><dt>{review.kind === 'refund' ? 'Funds to refund' : review.kind === 'write-off' ? 'Residual to write off' : 'Document total'}</dt><dd>{money(review.amount_cents)}</dd></div>{review.tax_cents !== undefined && <div><dt>Sales tax adjustment</dt><dd>{money(review.tax_cents)}</dd></div>}</dl>
     <p>{review.kind === 'refund' ? 'This authorizes Stripe to return funds. A completed processor instruction cannot be edited.' : review.kind === 'write-off' ? 'This records bad debt without receiving funds or reversing sales tax. The original invoice stays fixed.' : 'This issues an immutable linked document. The original invoice and its terms stay fixed. No funds move.'}</p>

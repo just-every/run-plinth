@@ -99,7 +99,7 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   cp.latest_charge.dispute.status='won';assert.equal((await reconcile()).status,200)
   row=(await s.read()).invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0);assert.deepEqual(row.receipts.map(r=>r.amount_cents),[200_000,-75_000,75_000])
   // A linked issued credit authorizes only that amount of processor refund; replay never sends twice.
-  let current=await s.read();row=current.invoices.find(i=>i.id===card);const original=structuredClone(row.issued)
+  let current=await s.read();row=current.invoices.find(i=>i.id===card);const original=structuredClone(row.issued),originalReceipts=structuredClone(row.receipts),originalAttempt=structuredClone((await s.attempts()).find(a=>a.id===attempt.id))
   assert.equal(original.kind,'milestone');assert.equal(original.source_application_id,row.source_application_id);assert.equal(original.sources.contract.variations.length,1);assert.equal(original.sources.contract.variations[0].approved_by.role,'member');assert.equal(original.lines.filter(l=>l.gross_cents>0).length,1);assert.equal(original.lines.find(l=>l.gross_cents>0).source_id,original.sources.contract.variations[0].id)
   const refundBody={expected_version:current.version,operation_id:'synthetic-plinth-refund-operation-1',amount_cents:25_000,reason:'Customer approved reduced scope',confirm:true}
   const refund=(body,options={})=>s.api(`/jobs/${current.id}/payments/${attempt.id}/refund`,{method:'POST',body,...options})
@@ -131,6 +131,12 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   assert.equal((await refund(refundBody)).value.reused,true);assert.equal(edge.refunds.length,1)
   assert.equal((await refund({...refundBody,amount_cents:26_000})).value.error,'refund_conflict')
   current=await s.read();row=current.invoices.find(i=>i.id===card);assert.equal(row.balance.due_cents,0);assert.equal(row.balance.received_cents,175_000);assert.deepEqual(row.issued,original)
+  assert.deepEqual(row.receipts.slice(0,originalReceipts.length),originalReceipts,'Refund and replay leave every original settlement and dispute receipt byte-for-byte unchanged')
+  const refundReversal=row.receipts.at(-1)
+  assert.deepEqual({amount:refundReversal.amount_cents,original:refundReversal.reversal_of,reference:refundReversal.reference,processor:refundReversal.processor_refund_id,instruction:refundReversal.refund_instruction_id}, {amount:-25_000,original:originalReceipts[0].id,reference:edge.refunds[0].id,processor:edge.refunds[0].id,instruction:refundBody.operation_id})
+  assert.deepEqual(refundReversal.accounting_entries,[{account:'stripe_clearing',debit_cents:0,credit_cents:25_000},{account:'accounts_receivable',debit_cents:25_000,credit_cents:0}],'A change-order refund reverses receivables, never deposit liability')
+  const refundedAttempt=(await s.attempts()).find(a=>a.id===attempt.id)
+  for(const key of ['receipt_id','payment_intent_id','session_id','invoice_id'])assert.equal(refundedAttempt[key],originalAttempt[key],'Original payment identity remains fixed: '+key)
   for(const receipt of row.receipts){assert.equal(receipt.accounting_entries.reduce((n,e)=>n+e.debit_cents-e.credit_cents,0),0);assert.ok(receipt.accounting_entries.some(e=>e.account==='stripe_clearing'))}
   assert.equal((await s.attempts()).find(a=>a.id===attempt.id).settlement_state,'refunded')
   for(const fee of [100,75]){cp.latest_charge.balance_transaction.fee=fee;assert.equal((await reconcile()).status,200);assert.equal((await s.attempts()).find(a=>a.id===attempt.id).fee_cents,fee,'Refund fee outcomes follow fresh provider evidence rather than inferred recovery')}
@@ -191,4 +197,45 @@ test('Settlement reconciliation preserves original receipts through returns, dis
   assert.equal((await s.api(`/jobs/${current.id}`,{cookie:s.client})).value.job.invoices.find(i=>i.id===card).balance.due_cents,-1_100)
 
  }finally{await f.mf.dispose()}
+})
+
+test('A processor refund after an accountant-reviewed close needs an explicit open-period adjustment and preserves the closed snapshot', async () => {
+ const now=Date.parse('2026-10-27T15:00:00Z'),s=await setup({now}),{f,edge}=s
+ try {
+  const id=await s.changeDraw(200_000,'Reviewed change-order refund after close')
+  await s.pay(id);const session=edge.sessions.at(-1);session.payment_intent='synthetic-plinth-301';edge.intents.set(session.payment_intent,intent(session.payment_intent,200_000))
+  assert.equal((await s.send(s.event('checkout.session.completed',session,{payment_intent:session.payment_intent}),{at:now/1000})).status,200)
+  let job=await s.read()
+  const act=async(path,input={},cookie=f.owner)=>{job=await s.read();const result=await s.api(`/jobs/${job.id}${path}`,{method:'POST',cookie,body:{expected_version:job.version,...input}});assert.equal(result.status,200,JSON.stringify(result.value));job=await s.read();return result.value.record??result.value}
+  const original=structuredClone(job.invoices.find(i=>i.id===id)),line=original.issued.lines.find(l=>l.gross_cents>0).id
+  await act(`/invoices/${id}/credit`,{operation_id:'synthetic-plinth-302',description:'Reviewed reduced scope',reason:'Client-approved reduction',confirm:true,lines:[{invoice_line_id:line,amount_cents:25_000}]})
+  const accountant=await f.invite('synthetic-plinth-303@example.com','Synthetic refund accountant','admin'),person=(await s.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-303@example.com')
+  assert.equal((await s.api(`/team/${person.id}`,{method:'PUT',body:{expected_version:0,role:'bookkeeper',job_ids:[job.id],po_limit_cents:0}})).status,200)
+  await act('/costs/accountant',{accountant_id:person.id,reason:'Review the refund source period'})
+  const closeInput={period:'2026-10',opening_cash_cents:0,months:3},preview=await s.api(`/jobs/${job.id}/costs/period-preview?`+new URLSearchParams(closeInput),{cookie:accountant});assert.equal(preview.status,200)
+  const review=await act('/costs/period-reviews',{...closeInput,confirm:true,digest:preview.value.digest,reference:'synthetic-plinth-304'},accountant)
+  const closed=structuredClone(await act('/costs/periods',{...closeInput,native_review_id:review.id})),attempt=(await s.attempts()).find(a=>a.invoice_id===id)
+  const body={expected_version:job.version,operation_id:'synthetic-plinth-305',amount_cents:25_000,reason:'Approved customer credit after close',confirm:true},refund=fields=>s.api(`/jobs/${job.id}/payments/${attempt.id}/refund`,{method:'POST',body:{...body,...fields}})
+  const before=structuredClone(job),payments=(await s.api(`/jobs/${job.id}/payments`)).value
+  for(const [fields,status] of [[{},409],[{posting_period:'2026-10',adjustment_reference:'synthetic-plinth-306'},409],[{posting_period:'2026-11',adjustment_reference:''},400]]){
+   const refused=await refund(fields);assert.equal(refused.status,status);if(status===409)assert.equal(refused.value.error,'cost_period_closed');assert.equal(edge.refunds.length,0);assert.deepEqual(await s.read(),before);assert.deepEqual((await s.api(`/jobs/${job.id}/payments`)).value,payments,'An invalid booking reserves nothing and sends no money')
+  }
+  edge.refundStatus='pending'
+  assert.equal((await refund({posting_period:'2026-11',adjustment_reference:'synthetic-plinth-307'})).status,200)
+  assert.equal(edge.refunds.length,1);job=await s.read();assert.equal(job.invoices.find(i=>i.id===id).balance.due_cents,-25_000,'Pending processor evidence is not a completed reversal')
+  // The later processor event uses the durable reviewed booking, not its arrival day.
+  f.setNow(Date.parse('2026-11-02T15:00:00Z'));edge.refunds[0].status='succeeded';edge.intents.get(session.payment_intent).latest_charge.amount_refunded=25_000
+  assert.equal((await s.api(`/jobs/${job.id}/payments/${attempt.id}/reconcile`,{method:'POST',body:{}})).status,200)
+  job=await s.read();const invoice=job.invoices.find(i=>i.id===id),reversal=invoice.receipts.at(-1)
+  assert.deepEqual(invoice.receipts[0],original.receipts[0]);assert.deepEqual(invoice.issued,original.issued)
+  assert.deepEqual({amount:reversal.amount_cents,date:reversal.received_on,original:reversal.reversal_of,reference:reversal.reference,instruction:reversal.refund_instruction_id},{amount:-25_000,date:'2026-10-27',original:original.receipts[0].id,reference:edge.refunds[0].id,instruction:body.operation_id})
+  assert.deepEqual(reversal.accounting_entries,[{account:'stripe_clearing',debit_cents:0,credit_cents:25_000},{account:'accounts_receivable',debit_cents:25_000,credit_cents:0}])
+  const ledger=(await s.api(`/jobs/${job.id}/costs/ledger`)).value,sources=ledger.rows.flatMap(r=>r.sources.billing).filter(r=>r.id===reversal.id)
+  assert.ok(sources.length);assert.ok(sources.every(r=>r.dated_on==='2026-10-27'&&r.period==='2026-11'&&r.kind==='collected'))
+  assert.deepEqual(sources.filter(r=>r.amount_cents!==0).map(r=>({code:r.cost_code,amount:r.amount_cents})),[{code:'06-100',amount:-25_000}])
+  const adjustment=job.approvals.find(a=>a.kind==='cost.period.adjustment'&&a.subject_id===reversal.id)
+  assert.ok(adjustment);assert.equal(adjustment.approved_by.id,original.issued.issued_by.id);assert.deepEqual(adjustment.snapshot,{source_id:reversal.id,source_period:'2026-10',posting_period:'2026-11',reason:'synthetic-plinth-307'})
+  assert.deepEqual((await s.api(`/jobs/${job.id}/costs/periods`)).value.periods[0],closed)
+  assert.equal((await refund({})).value.reused,true);assert.equal(edge.refunds.length,1);assert.deepEqual((await s.read()).invoices.find(i=>i.id===id).receipts,invoice.receipts,'Delayed reconciliation and replay append exactly one refund')
+ }finally{await f.close()}
 })

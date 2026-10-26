@@ -7,6 +7,7 @@ import { stripeCall, type CheckoutSession, type PaymentIntent, type StripeDisput
 import { DomainError, find, need, type Job, type Stamp } from './model'
 import { readClock } from './store'
 import { wallClock } from './time-zone'
+import { postRefund, type RefundPosting } from './refund-posting'
 import { loadWarrantyJob } from './warranty-store'
 
 export const paymentAttempt = (db: D1Database, id: string) => db.prepare(`SELECT ${attemptColumns} FROM pl_payment_attempts WHERE id=?`).bind(id).first<PaymentAttempt>()
@@ -56,7 +57,18 @@ export async function applyPaymentFact(env: Bindings, id: string, fact: PaymentF
   }
   // Dispute wins restore only the prior reversal; repeated facts have a zero delta.
   const delta = settled ? fact.reversed - current.reversed_cents : 0
-  if (delta) invoice.receipts.push({ id: crypto.randomUUID(), amount_cents: -delta, received_on, reference: `${fact.reference ?? fact.intent!.id}:${fact.state}:${fact.reversed}`, method: 'stripe', recorded_by: by, reversal_of: receiptId!, accounting_entries: entries(-delta), label: 'Processor reversal reconciled against Stripe; original receipt preserved' })
+  let remaining = delta
+  if (delta > 0 && fact.state === 'refunded') for (const refund of fact.refunds ?? []) {
+   if (refund.status !== 'succeeded' || !refund.metadata?.plinth_refund || invoice.receipts.some(r => r.processor_refund_id === refund.id)) continue
+   const reservation = await env.DB.prepare('SELECT posting_json FROM pl_payment_refunds WHERE id=? AND attempt_id=?').bind(refund.metadata.plinth_refund, id).first<{posting_json: string | null}>()
+   if (!reservation?.posting_json) continue
+   need(refund.amount > 0 && refund.amount <= remaining, 'Processor refund does not match the remaining reversal', 409, 'refund_conflict')
+   const posting = JSON.parse(reservation.posting_json) as RefundPosting, reversalId = crypto.randomUUID()
+   postRefund(next, reversalId, posting)
+   invoice.receipts.push({ id: reversalId, amount_cents: -refund.amount, received_on: posting.received_on, reference: refund.id, processor_refund_id: refund.id, refund_instruction_id: refund.metadata.plinth_refund, method: 'stripe', recorded_by: by, reversal_of: receiptId!, accounting_entries: entries(-refund.amount), label: 'Processor reversal reconciled against Stripe; original receipt preserved' })
+   remaining -= refund.amount
+  }
+  if (remaining) invoice.receipts.push({ id: crypto.randomUUID(), amount_cents: -remaining, received_on, reference: `${fact.reference ?? fact.intent!.id}:${fact.state}:${fact.reversed}`, method: 'stripe', recorded_by: by, reversal_of: receiptId!, accounting_entries: entries(-remaining), label: 'Processor reversal reconciled against Stripe; original receipt preserved' })
   const review = !hasSettlement && settled && (current.status !== 'open' && current.status !== 'processing' || current.amount_cents > before.due_cents)
   const status = fact.state === 'processing' || fact.state === 'unresolved' ? 'processing' : fact.state === 'initiated' ? 'open' : fact.state === 'canceled' ? 'expired' : fact.state === 'failed' || fact.state === 'ach_returned' ? 'failed' : review ? 'review' : 'paid'
   const labels: Record<SettlementState, string> = { initiated: 'Checkout initiated; no settled funds recorded', processing: 'Bank payment processing; the invoice is not credited yet', settled: review ? 'Settled after the balance changed; office review required' : 'Settled against Stripe records; invoice credited', failed: 'Payment failed; no new settled funds', canceled: 'Payment canceled; no new settled funds', ach_returned: 'ACH returned by the bank; original settlement reversed and collection reopened', disputed: 'Card payment disputed; disputed funds removed from collections until resolved', refunded: 'Processor refund reconciled; refunded funds removed from collections', unresolved: 'Provider instruction unresolved; reconcile before another payment' }

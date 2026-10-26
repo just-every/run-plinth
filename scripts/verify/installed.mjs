@@ -21,7 +21,7 @@ const stop = () => signal('SIGTERM')
 process.once('SIGTERM', stop); process.once('SIGINT', stop)
 try {
  provider = await providerEdge()
- worker = await installedWorker(provider.outboundService)
+ worker = await installedWorker(provider.outboundService, name === 'settlements' ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
  const ownerState = join(scratch, 'owner.json'), clientState = join(scratch, 'client.json')
  Object.assign(process.env, {
   PLINTH_URL: worker.origin, PLINTH_STATE: ownerState, PLINTH_CLIENT_STATE: clientState,

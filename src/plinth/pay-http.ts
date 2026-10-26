@@ -6,6 +6,7 @@ import { paymentAttempt, reconcilePayment } from './pay-reconcile'
 import { refundPayment } from './pay-refunds'
 import { feeStatement } from './pay-model'
 import { need, type Actor, type Input, type Job } from './model'
+import { wallClock } from './time-zone'
 
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers })
@@ -20,7 +21,13 @@ export async function jobPayResponse(request: Request, env: Bindings, actor: Act
   return json({ attempt: await reconcilePayment(env, attempt) })
  }
  need(parts.length === 3, 'Unknown payments route', 404, 'not_found')
- if (request.method === 'GET') return json({ enabled: paymentsEnabled(env), statement: feeStatement, attempts: shown(await attempts(env.DB, job.id, actor), actor), ...(actor.role === 'owner' || actor.role === 'admin' ? { refunds: (await env.DB.prepare('SELECT r.id,r.attempt_id,r.amount_cents,r.status,r.provider_id,r.created_at FROM pl_payment_refunds r JOIN pl_payment_attempts a ON a.id=r.attempt_id WHERE a.job_id=? ORDER BY r.created_at').bind(job.id).all()).results } : {}) })
+ if (request.method === 'GET') {
+  const source_on = wallClock(Date.now(), job.time_zone ?? 'UTC').date
+  return json({ enabled: paymentsEnabled(env), statement: feeStatement, attempts: shown(await attempts(env.DB, job.id, actor), actor), ...(actor.role === 'owner' || actor.role === 'admin' ? {
+   refund_posting: { source_on, closed: job.cost_records?.periods?.some(p => p.period === source_on.slice(0, 7)) ?? false },
+   refunds: (await env.DB.prepare('SELECT r.id,r.attempt_id,r.amount_cents,r.status,r.provider_id,r.created_at FROM pl_payment_refunds r JOIN pl_payment_attempts a ON a.id=r.attempt_id WHERE a.job_id=? ORDER BY r.created_at').bind(job.id).all()).results,
+  } : {}) })
+ }
  if (request.method === 'POST') return json(await startCheckout(env, actor, job, await body(request)), 201)
  need(false, 'Method not allowed', 405, 'method_not_allowed')
 }

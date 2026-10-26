@@ -6,7 +6,7 @@ import { unstable_splitSqlQuery } from 'wrangler'
 import { diagnostic } from './diagnostics.mjs'
 
 // The same emitted entry and assets deployed by rer build; never the API-only test entry.
-export async function installedWorker(outboundService) {
+export async function installedWorker(outboundService, { now } = {}) {
  const socket = createServer()
  await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve) })
  const port = socket.address().port
@@ -21,7 +21,7 @@ export async function installedWorker(outboundService) {
  const errors = []
  const mf = new Miniflare(convertV4MiniflareOptions({
   host: '127.0.0.1', port, unsafeTriggerHandlers: true, modulesRoot: resolve('dist/server'),
-  modules: [{ type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
+  modules: [...(now === undefined ? [] : [{ type: 'ESModule', path: resolve('dist/server/pinned-clock.mjs'), contents: `import worker from './index.js'; const NativeDate=Date; globalThis.Date=class extends NativeDate { constructor(...args){super(...(args.length?args:[${Number(now)}]))} static now(){return ${Number(now)}} }; export default worker;` }]), { type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
   compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
   d1Databases: ['DB'], bindings, outboundService,
   assets: { directory: resolve('dist/client'), binding: 'ASSETS', run_worker_first: true, routerConfig: { has_user_worker: true } },

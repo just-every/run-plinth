@@ -26,7 +26,7 @@ export interface InvoiceSnapshot {
 }
 export interface InvoiceReceipt {
  id: string; amount_cents: number; received_on: string; reference: string; method: 'bank' | 'check' | 'stripe'
- remittance_id?: string; reversal_of?: string; accounting_entries?: InvoiceAccountingEntry[]
+ remittance_id?: string; reversal_of?: string; processor_refund_id?: string; refund_instruction_id?: string; accounting_entries?: InvoiceAccountingEntry[]
  /** PAY-001: the processor references of a payment Stripe settled; never a card or bank number. */
  processor?: { confirmation?: 'signed_event' | 'provider_record'; name: 'stripe'; attempt_id: string; checkout_session_id: string; payment_intent_id: string; method: string; wallet: string | null; fee_cents: number | null; livemode: boolean }
  recorded_by: Stamp; label: 'Settled by the processor and reconciled against Stripe records; Plinth did not hold the funds' | 'Processor reversal reconciled against Stripe; original receipt preserved' | 'Settled by the processor and recorded from a signed Stripe event; Plinth did not hold the funds' | 'Recorded by staff; Plinth did not move or independently verify funds' | 'Return recorded by staff; allocation reversed, no funds moved or independently verified' | 'Return recorded by staff; receipt reversed, no funds moved or independently verified' | 'Return recorded by staff; partial receipt reversal, no funds moved or independently verified'
