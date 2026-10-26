@@ -27,10 +27,10 @@ try{
  await expect(page.getByText('No messages yet.')).toBeVisible()
  await page.getByLabel('Kind').selectOption('selection_request');await page.getByRole('button',{name:'Send message',exact:true}).click()
  await expect(page.getByText('Selection needed',{exact:false}).or(page.getByText('Your decision is needed',{exact:false})).first()).toBeVisible()
- await expect(page.getByText('required message',{exact:false})).toBeVisible()
+ await expect(page.locator('.row .muted',{hasText:'· required message'})).toBeVisible()
  await page.getByLabel('Kind').selectOption('update');await page.getByLabel('Subject').fill('Tile delivery timing');await page.getByLabel('Message',{exact:true}).fill('The tile is expected on site next Friday.');await page.getByRole('button',{name:'Send message',exact:true}).click()
- await expect(page.getByText('optional notice',{exact:false})).toBeVisible()
- await page.getByLabel('Kind').selectOption('note');await page.getByLabel('Note').fill('Client prefers the porcelain; confirm lead time with the supplier.');await page.getByRole('button',{name:'Save note',exact:true}).click()
+ await expect(page.locator('.row .muted',{hasText:'· optional notice'})).toBeVisible()
+ await page.getByLabel('Kind').selectOption('note');await page.getByLabel('Note',{exact:true}).fill('Client prefers the porcelain; confirm lead time with the supplier.');await page.getByRole('button',{name:'Save note',exact:true}).click()
  await expect(page.getByText('Private note: office only, never emailed')).toBeVisible()
  await capture(page,'office-thread',async()=>{await expect(page.getByText('Client prefers the porcelain',{exact:false})).toBeVisible()})
  // The client sees only the messages addressed to them, never the private note.
