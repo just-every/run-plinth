@@ -1,4 +1,8 @@
 import { meetingAction, meetingAccess } from './meetings'
+import { meetingEmailPreview, sendMeetingEmail } from './meeting-share-mail'
+import { meetingInboxResponse } from './meeting-share-http'
+import { publishMeetingShare, revokeMeetingShare } from './meeting-sharing'
+import type { MeetingSharingJob } from './meeting-sharing-model'
 import { annotateDecision } from './decision-metadata'
 import { decisionSearch } from './decision-search'
 import { apiV1Response } from './api-v1'
@@ -94,6 +98,7 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
+ job={...job,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -128,6 +133,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
  const pricing=await pricingResponse(request,env.DB,actor,parts,body);if(pricing)return pricing
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
+ const meetingInbox=await meetingInboxResponse(request,env,actor,parts,body);if(meetingInbox)return meetingInbox
  const rfiInbox=await rfiInboxResponse(request,env,actor,parts,body);if(rfiInbox)return rfiInbox
  const tradePortal=await tradePortalResponse(request,env,actor,parts,body);if(tradePortal)return tradePortal
  const resource=await resourceResponse(request,env.DB,actor,parts,body);if(resource)return resource
@@ -144,6 +150,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===3&&parts[2]==='decision-search'&&method==='GET')return json(await decisionSearch(env.DB,previous,display(previous,actor),actor,new URL(request.url).searchParams))
  if(parts.length===7&&parts[2]==='meetings'&&parts[4]==='links'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.completion?.links.find((_,index)=>String(index)===parts[6]);need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===3&&parts[2]==='meetings'&&method==='GET'){meetingAccess(actor);return json({meetings:previous.meetings??[]})}
+ if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='email-preview'&&method==='GET')return json(await meetingEmailPreview(env.DB,previous as MeetingSharingJob,actor,parts[3]!,new URL(request.url).searchParams.get('request_id')??''))
+ if(parts.length===5&&parts[2]==='meetings'&&parts[4]==='shares'&&method==='GET'){meetingAccess(actor);return json({shares:((previous as MeetingSharingJob).meeting_shares??[]).filter(share=>share.meeting_id===parts[3])})}
  const correspondence=await jobMailResponse(request,env,actor,previous,parts,body);if(correspondence)return correspondence
  const payments=await jobPayResponse(request,env,actor,previous,parts,body);if(payments)return payments
  if(parts.length===3&&parts[2]==='receivables'&&method==='GET'){requireJobManager(actor);return json(receivables(previous,new URL(request.url).searchParams.get('as_of')??undefined))}
@@ -198,11 +206,14 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===4&&parts[2]==='schedule-template'&&parts[3]==='preview')return json({preview:await resourcePreview(env.DB,previous,actor,await previewScheduleTemplate(previous,actor,input,await getScheduleTemplate(env.DB,String(input.template_id)),await jobs(env.DB)))})
  if(parts.length===4&&parts[2]==='schedule'&&parts[3]==='preview')return json({preview:await resourcePreview(env.DB,previous,actor,await previewSchedule(previous,actor,input,await jobs(env.DB)))})
  if(parts.length===5&&parts[2]==='invoices'&&parts[4]==='send'){const sent=await sendInvoice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
+ if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='send-email'){const sent=await sendMeetingEmail(env,previous as MeetingSharingJob,actor,input,parts[3]!,clock);return json({job:display(sent,actor),role:role(actor)})}
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
+ else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
+ else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='portal-policy'&&parts.length===3)record=portalPolicy(job,actor,input)
  else if(category==='rfi-access'&&parts.length===3)record=await rfiAccess(env.DB,job,actor,input)
  else if(category==='rfis'&&(parts.length===3||parts.length===5)){const result=await rfiAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}

@@ -1,3 +1,4 @@
+import { projectMeetingShares } from './meeting-sharing'
 import { thread } from './mail-store'
 import { decisionMetadata } from './decision-metadata'
 import { searchableFile, type SearchFile } from './decision-file-search'
@@ -45,6 +46,11 @@ export async function decisionSearch(db: D1Database, job: Job, projected: Source
  for (const issue of projected.punch?.issues ?? []) {
   add('punch', issue.id, issue.title, issue.description, author(issue.by), [], issue.sheet?.name ?? '', '', [{ ...issue.photo, href: `${base}/punch/files/${issue.photo.id}` }])
   for (const attempt of issue.attempts) add('punch-attempts', attempt.id, issue.title, attempt.note, author(attempt.by), [], issue.sheet?.name ?? '', '', attempt.attachments.map(f => ({ ...f, href: `${base}/punch/files/${f.id}` })))
+ }
+ if (!rfiOnly) for (const share of await projectMeetingShares(db, job, actor)) {
+  if ('revocation' in share && share.revocation) continue
+  const source='meeting-extracts:'+share.id
+  hits.push({source,title:share.title,text:share.body,sender:share.by.name,tags:[],sheet:'',cost_code:'',href:`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`})
  }
  const seen = new Set<string>()
  for (const { parent, file } of pending) {

@@ -37,6 +37,7 @@ export function permissionView(job: Job, actor: Actor): Job {
  if (!can('company')) drop('customer_id', 'property_id', 'client_contact_ids', 'portal_features', 'portal_policy', 'import_evidence')
  if (!can('leads') && !can('estimates') && !can('invoices')) { out.client_email = ''; drop('client_name') }
  drop('todos', 'meetings')
+ out.meeting_office_access=false
  if (!p.financial) {
   out.quotes = []; out.variations = []; out.orders = []; out.claims = []; out.invoices = []; out.approvals = []
   drop('selections', 'subcontracts', 'portal_submissions', 'remittances', 'retainage', 'retainage_balance', 'sov', 'invoice_deposit_liability_cents', 'bid_comparisons', 'bid_cost_adjustments', 'bid_comparison_awards')

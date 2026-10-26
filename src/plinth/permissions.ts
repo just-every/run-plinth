@@ -14,7 +14,7 @@ const feature: Record<string, Feature> = {
  orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
  schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', forecast: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
  diary: 'logs', time: 'time',
- rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
+ 'meeting-inbox': 'documents', rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
  invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
  reports: 'reports', audit: 'reports', holds: 'reports',
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
@@ -31,6 +31,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
   if (parts[1] === 'query') return { feature: 'reports', action: 'view' }
   if (parts[1] === 'fields' || parts[1] === 'views') return { feature: 'reports', action: 'create' }
  }
+ if (parts[0] === 'meeting-inbox') return { feature: 'documents', action: method === 'GET' || parts.at(-1) === 'email-copy' ? 'view' : 'create' }
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost

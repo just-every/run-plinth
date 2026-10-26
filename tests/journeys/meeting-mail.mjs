@@ -12,7 +12,9 @@ export async function meetingCorrespondence({ base, page, owner, job, email, pos
  const outgoing = thread.find(m => m.id === publicMessage.id)
  assert.ok(outgoing.reply_to, 'Configure the local reply domain for this installed email journey')
  const drawing = searchDocument(), raw = originalEmail({ from: email, to: outgoing.reply_to, subject: 'Reviewed cabinet service drawing', text: 'The reviewed cabinet service drawing is attached for the meeting action.', file: { name: 'client-service-drawing.pdf', bytes: drawing } })
- const transport = new URL('/cdn-cgi/local/email', base)
+ const emailBase=process.env.PLINTH_EMAIL_URL
+ assert.ok(emailBase && ['localhost','127.0.0.1'].includes(new URL(emailBase).hostname), 'Use this installation’s local Worker transport listener')
+ const transport = new URL('/cdn-cgi/local/email', emailBase)
  transport.search = new URLSearchParams({ from: email, to: outgoing.reply_to, format: 'json' })
  let response
  try { response = await owner.request.post(transport.href, { headers: { 'content-type': 'message/rfc822' }, data: raw }) }

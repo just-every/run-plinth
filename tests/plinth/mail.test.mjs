@@ -195,3 +195,86 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
 
  } finally { await f.close() }
 })
+
+test('Reviewed meeting extracts isolate named audiences, delegated feedback, explicit custom capabilities and next-request revocation', async () => {
+ const {createReleasedScope}=await import('./helpers.mjs')
+ let uncertain=false
+ const s=await setup({now:Date.parse('2026-10-26T12:00:00Z'),mailResponse:message=>{if(uncertain&&message.subject.startsWith('Meeting decision:'))throw Error('Synthetic lost provider response');return new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-meeting-delivery'}})}}),{f}=s
+ try {
+  let job=(await s.api(`/jobs/${s.job().id}`)).value.job
+  const path=`/jobs/${job.id}`,read=async()=>job=(await s.api(path)).value.job
+  const act=async(route,body={},cookie=f.owner)=>{await read();const r=await s.api(path+route,{method:'POST',cookie,body:{expected_version:job.version,...body}});if(r.value.job)job=r.value.job;return r}
+  const field=await f.invite('synthetic-plinth-shared-field@example.com','Field lead','admin'),custom=await f.invite('synthetic-plinth-shared-custom@example.com','Custom office','admin'),sub=await f.invite('synthetic-plinth-shared-sub@example.com','Subcontractor'),other=await f.invite('synthetic-plinth-shared-other@example.com')
+  const people=(await s.api('/team')).value.team,fieldPerson=people.find(p=>p.email==='synthetic-plinth-shared-field@example.com'),customPerson=people.find(p=>p.email==='synthetic-plinth-shared-custom@example.com')
+  const team=async(person,body)=>s.api('/team/'+person.id,{method:'PUT',body:{expected_version:0,job_ids:[job.id],po_limit_cents:0,...body}})
+  assert.equal((await team(fieldPerson,{role:'superintendent'})).status,200)
+  const copied=await s.api('/roles',{method:'POST',body:{copy_of:'project_manager',name:'Explicit extract reader'}});assert.equal(copied.status,201)
+  assert.equal((await team(customPerson,{role:'custom',role_id:copied.value.role.id})).status,200)
+  const released=await createReleasedScope(f,job,'synthetic-plinth-shared-sub@example.com','Millwork');job=released.job
+  let r=await act('/meetings',{title:'Private coordination meeting',held_on:'2026-10-26',agenda:'Office coordination',minutes:'Private subcontractor price synthetic-plinth-private-2419',attendees:['Field lead','Client'],decisions:'Private office decision',tags:[],sheet:'',cost_code:'',actions:[]});assert.equal(r.status,200);const meeting=r.value.record
+  const recipients=[{email:'client@example.com',kind:'client',can_comment:true},{email:fieldPerson.email,kind:'office',can_comment:true},{email:customPerson.email,kind:'office',can_comment:true},{email:'synthetic-plinth-shared-sub@example.com',kind:'sub',subcontract_id:released.scope.id,can_comment:false}]
+  const input={title:'Reviewed cabinetry coordination',body:'Cabinet shop drawing review is needed before the field measurement.',recipients,operation_id:'synthetic-plinth-share-2419',confirm:true}
+  const before=f.messages.length
+  assert.equal((await act(`/meetings/${meeting.id}/share`,{...input,confirm:false})).status,400)
+  assert.equal((await act(`/meetings/${meeting.id}/share`,input,field)).status,403)
+  const agent=await f.agent();await read();assert.equal((await s.api(path+`/meetings/${meeting.id}/share`,{method:'POST',token:agent,cookie:undefined,body:{expected_version:job.version,...input}})).status,403)
+  assert.equal((await s.api('/meeting-inbox',{cookie:custom})).value.jobs.length,0,'Copied permissions grant no extract without an explicit record grant')
+  const beforePublication=f.messages.length
+  r=await act(`/meetings/${meeting.id}/share`,input);assert.equal(r.status,200,JSON.stringify(r.value));const share=r.value.record;assert.equal(f.messages.length,beforePublication,'Publishing an extract sends nothing')
+  assert.equal((await act(`/meetings/${meeting.id}/share`,input)).status,409)
+  const inbox=async(cookie)=>s.api('/meeting-inbox',{cookie})
+  for(const cookie of [s.client,field,custom,sub]){
+   const value=(await inbox(cookie)).value;assert.equal(value.jobs.length,1,JSON.stringify(value));assert.equal(value.jobs[0].shares.length,1)
+   const serialized=JSON.stringify(value);for(const privateText of ['synthetic-plinth-private-2419','meeting_id','recipients','operator_version','operation_id'])assert.equal(serialized.includes(privateText),false)
+   assert.equal((await s.api(path+'/meetings',{cookie})).status,cookie===sub?404:403,'An extract never grants private meeting access')
+   const artifact=await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie});assert.equal(artifact.status,200);assert.equal((await artifact.json()).body,input.body)
+   assert.equal((await s.api(`/meeting-inbox/${job.id}/decision-search?q=field`,{cookie})).value.count,1)
+  }
+  assert.equal((await inbox(other)).value.jobs.length,0)
+  const feedback=async(cookie,body)=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(`/meeting-inbox/${job.id}/${share.id}/feedback`,{method:'POST',cookie,body:{expected_version:current.version,operation_id:crypto.randomUUID(),body}})}
+  assert.equal((await feedback(s.client,'Client question for the office only')).status,200)
+  assert.equal((await feedback(field,'Field observation for the office only')).status,200)
+  assert.equal((await feedback(sub,'A view-only subcontractor cannot comment')).status,403)
+  assert.equal((await inbox(custom)).value.jobs[0].shares[0].feedback.length,0)
+  assert.equal((await inbox(s.client)).value.jobs[0].shares[0].feedback[0].body,'Client question for the office only')
+  const requestCopy=async(cookie,extra={})=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{method:'POST',cookie,body:{expected_version:current.version,kind:'minutes',confirm:true,operation_id:crypto.randomUUID(),...extra}})}
+  const mailBefore=f.messages.length
+  r=await requestCopy(s.client);assert.equal(r.status,200,JSON.stringify(r.value));const emailRequest=r.value.record
+  assert.equal(f.messages.length,mailBefore,'A recipient request sends nothing')
+  const preview=await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${emailRequest.id}`);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.email,'client@example.com');assert.equal(preview.value.body.includes('synthetic-plinth-private-2419'),false)
+  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:'stale review'})).status,409)
+  r=await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:preview.value.digest});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(f.messages.length,mailBefore+1);assert.deepEqual(f.messages.at(-1).to,['client@example.com']);assert.ok(f.messages.at(-1).text.includes(input.body));assert.equal(f.messages.at(-1).text.includes('synthetic-plinth-private-2419'),false)
+  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:emailRequest.id,confirm:true,digest:preview.value.digest})).status,409);assert.equal(f.messages.length,mailBefore+1,'A delivered request never sends twice')
+  r=await requestCopy(s.client);assert.equal(r.status,200);assert.equal((await requestCopy(s.client,{cancel:true,request_id:r.value.record.id})).status,200)
+  assert.equal((await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${r.value.record.id}`)).status,409,'A recipient can cancel before reservation')
+  uncertain=true;r=await requestCopy(s.client);assert.equal(r.status,200);const uncertainRequest=r.value.record
+  const uncertainPreview=await s.api(path+`/meeting-shares/${share.id}/email-preview?request_id=${uncertainRequest.id}`);assert.equal(uncertainPreview.status,200)
+  const beforeUncertain=f.messages.length
+  r=await act(`/meeting-shares/${share.id}/send-email`,{request_id:uncertainRequest.id,confirm:true,digest:uncertainPreview.value.digest});assert.equal(r.status,200);assert.equal(f.messages.length,beforeUncertain+1)
+  assert.equal((await inbox(s.client)).value.jobs[0].shares[0].email_copy.status,'unknown')
+  assert.equal((await act(`/meeting-shares/${share.id}/send-email`,{request_id:uncertainRequest.id,confirm:true,digest:uncertainPreview.value.digest})).status,409);assert.equal(f.messages.length,beforeUncertain+1,'An uncertain send cannot automatically resend');uncertain=false
+  const roleChange=await s.api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version,permissions:{documents:{view:false}}}});assert.equal(roleChange.status,200,JSON.stringify(roleChange.value))
+  assert.equal((await inbox(custom)).status,403,'Changing the custom role removes its explicit extract capability on the next request')
+  assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie:custom})).status,403)
+  assert.equal((await s.api('/team/'+fieldPerson.id,{method:'PUT',body:{expected_version:1,role:'superintendent',job_ids:[],po_limit_cents:0}})).status,200)
+  assert.equal((await inbox(field)).value.jobs.length,0)
+  r=await act(`/subcontracts/${released.scope.id}/access`,{contact_ids:[],reason:'The named subcontractor contact left this released scope'});assert.equal(r.status,200)
+  assert.equal((await inbox(sub)).value.jobs.length,0,'Released company contact revocation applies to meeting extracts on the next request')
+  assert.equal((await f.request(`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`,{cookie:sub})).status,404)
+  r=await act(`/meeting-shares/${share.id}/revoke`,{reason:'Withdraw the reviewed extract after the coordination change',operation_id:'synthetic-plinth-revoke-2419',confirm:true});assert.equal(r.status,200)
+  assert.equal((await inbox(s.client)).value.jobs.length,0);assert.equal((await inbox(sub)).value.jobs.length,0)
+  assert.equal((await s.api(`/meeting-inbox/${job.id}/decision-search?q=field`,{cookie:s.client})).status,404)
+  assert.equal((await s.api(path,{cookie:s.client})).value.job.meeting_shares,undefined,'Job projections never expose full sharing grants or private feedback')
+  r=await act(`/meetings/${meeting.id}/add-action`,{title:'Confirm the revised shop drawing',owner_email:'builder@example.com',due_on:'2026-11-03'});assert.equal(r.status,200);const action=r.value.record
+  r=await act(`/meetings/${meeting.id}/share`,{...input,operation_id:'synthetic-plinth-reminder-extract',recipients:[{email:'builder@example.com',kind:'office',can_comment:false}]});assert.equal(r.status,200);const reminderShare=r.value.record
+  await read();r=await s.api(`/meeting-inbox/${job.id}/${reminderShare.id}/email-copy`,{method:'POST',body:{expected_version:job.version,kind:'action_reminder',action_id:action.id,confirm:true,operation_id:'synthetic-plinth-reminder-request'}});assert.equal(r.status,200);const reminder=r.value.record
+  const reminderPreview=await s.api(path+`/meeting-shares/${reminderShare.id}/email-preview?request_id=${reminder.id}`);assert.equal(reminderPreview.status,200);assert.ok(reminderPreview.value.body.includes(action.title));assert.ok(reminderPreview.value.body.includes(action.due_on))
+  const beforeReminder=f.messages.length
+  r=await act(`/meeting-shares/${reminderShare.id}/send-email`,{request_id:reminder.id,digest:reminderPreview.value.digest,confirm:true});assert.equal(r.status,200);assert.equal(f.messages.length,beforeReminder+1);assert.deepEqual(f.messages.at(-1).to,['builder@example.com'])
+  await read();r=await s.api(`/meeting-inbox/${job.id}/${reminderShare.id}/email-copy`,{method:'POST',body:{expected_version:job.version,kind:'action_reminder',action_id:action.id,confirm:true,operation_id:'synthetic-plinth-completed-reminder-request'}});assert.equal(r.status,200);const superseded=r.value.record
+  assert.equal((await act(`/meetings/${meeting.id}/complete`,{action_id:action.id,answer:'The field clearance was reviewed against the retained selection.',links:[{kind:'selection',id:s.selection}]})).status,200)
+  assert.equal((await s.api(path+`/meeting-shares/${reminderShare.id}/email-preview?request_id=${superseded.id}`)).status,409,'A completed action cannot receive a later reminder instruction');assert.equal(f.messages.length,beforeReminder+1)
+
+
+ } finally {await f.close()}
+})
