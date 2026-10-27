@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "899d5df290612312fca9d32d9f939574a7b2e7a93c4c7abf601011844dc44200",
+      "sha256": "6460e2de7555cf7019ded9b69c401266509e3b6edff29e1ad0b9258cc1112624",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "fd04f411ac37350bc0259fc1ddec7580245f32314646412afa5932ffa9bd416e",
+      "sha256": "86a35dded248adbcf2c185be7d8603167b232872ab415fcfb73fb967ab3b1217",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "af11a5a8c3308c4c7ff449d21c49f2e537eef2acbb7fa0b8d66a78bc49684f96",
+      "sha256": "d01631e1000081f24c1cc1277fc35e75de55c3895a4c92e927d9606877c107ea",
       "executable": false
     },
     "docs/FIELD-TIME.md": {
@@ -3873,19 +3873,19 @@
       "executable": false
     },
     "src/ui/attachment-formats/tiff-header.ts": {
-      "sha256": "bf1b59eb672e734c7dd870ffed9eec495feb4fe776373bee828ebe55d6a5c615",
+      "sha256": "e52f10c945db369be919a96989e591150f36d33719df98d3196e287fba88b29e",
       "executable": false
     },
     "src/ui/attachment-formats/tiff-inflate.ts": {
-      "sha256": "ba79dacbbdd9776023209ec1aa2fb33303f0253011bd0674fe086cf7f1978b12",
+      "sha256": "ab5d46d9852abc3be816dd85e50a59fb9e7097d1ca0e39c2789fc01fbd320595",
       "executable": false
     },
     "src/ui/attachment-formats/tiff-worker.ts": {
-      "sha256": "eb92bdf2a93014fc3686bf52207d3bc600f620928f0aa853fb70c32a6d7e912b",
+      "sha256": "582b9832668efe8aa5db20a206c400c495ec1ac11b463bebfb63b16414e2a93b",
       "executable": false
     },
     "src/ui/attachment-formats/tiff.ts": {
-      "sha256": "c17eb0be6d9a6aa4bf2ac0fefebbb69f698f36ba51970b503ce0a3c9d8b07336",
+      "sha256": "40f3e803b01452302115d43699f02a9fdc703b6d647a46fac1e8690eff5191e6",
       "executable": false
     },
     "src/ui/attachment-legacy/compound.ts": {
@@ -4416,6 +4416,10 @@
       "sha256": "acf999929d8e94c0bc1112db5040f8666d3727432cd4fa74cda0e0c176f39438",
       "executable": false
     },
+    "tests/fixtures/advanced-tiff.mjs": {
+      "sha256": "ac9ff4d23ce6424316b66c0c2e0ffb802bfce91e549cacf7808781d036679c0f",
+      "executable": false
+    },
     "tests/fixtures/chart-document.mjs": {
       "sha256": "8836f10e75bece803ef6908fc8c17453f1862ba14367ea3892170852e83c17a4",
       "executable": false
@@ -4585,7 +4589,7 @@
       "executable": false
     },
     "tests/journeys/other-attachment-search.mjs": {
-      "sha256": "825963cca949330356304a8a03c1fded4d1b87a29f88af798fa7a389cc3c113f",
+      "sha256": "a20d906f5ab85327eb8594f983fa54005afa1a1d0b2d143a4a49a34015ce721b",
       "executable": false
     },
     "tests/journeys/payments.mjs": {

@@ -36,7 +36,7 @@ export async function extractTiff(bytes: Uint8Array<ArrayBuffer>, hooks: OfficeH
    else draft.notes.add(`No text was recognized on TIFF page ${index + 1}. Check it manually.`)
   }
   draft.notes.add(`Read ${ready.pages} main TIFF pages with local OCR. Orientation was applied. OCR words, tables, handwriting, symbols and reading order require review.`)
-  draft.notes.add('TIFF limits: 200 pages, 16 megapixels per page, 64 megapixels total. Tiled, JPEG-compressed, planar, raw camera, signed and floating-point TIFF images are unsupported.')
+  draft.notes.add('TIFF limits: 200 pages, 16 megapixels per page and 64 megapixels total including tile padding. Tiles support uncompressed, LZW, PackBits and deflate storage. JPEG supports stripped three-component 8-bit sequential RGB or YCbCr only. BigTIFF, old JPEG compression 6, grayscale JPEG, tiled JPEG, tiled fax, CMYK, planar, raw camera, signed and floating-point samples are unsupported.')
   return draft.result()
  } finally { hooks.signal.removeEventListener('abort', stop); worker.terminate() }
 }

@@ -29,7 +29,10 @@ slide text. Its notes name unread comments, pictures and other omissions. Encryp
 
 Multi-page TIFF, RTF code pages and Unicode, BOM UTF-16 plain text, inert HTML
 and SVG stored text also have local readers. TIFF and inline raster pictures use
-English OCR. Unsupported TIFF layouts and codecs fail explicitly. Scripts are
+English OCR. TIFF includes bounded tiled uncompressed, LZW, PackBits and deflate
+images and stripped sequential RGB or YCbCr JPEG scans. BigTIFF, old JPEG,
+tiled JPEG, grayscale JPEG, progressive JPEG and unsupported sample models fail
+explicitly. Scripts are
 never executed; HTML linked resources are not fetched, and SVG external
 references are refused. Markup layout, outlined vector glyphs, embedded objects
 and unsupported parts still require manual inspection and supplied text.
