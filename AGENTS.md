@@ -24,3 +24,7 @@ Run `rer check` for command contract inspection and `rer verify` for CI-equivale
 - Use small modules, remove superseded paths, and preserve applied migration names. Do not rename project, package, Worker, edition or D1 ids.
 - Pin `@runeditrun/rer` exactly and keep package mode; no local CLI copies. Keep copied Base auth byte-exact to its recorded revision. Source attribution is in docs/REUSE.md.
 - Before a public push, run Base's full publication scan on the exact tree with zero findings and no exclusions. Research and private evidence stay outside this repository. Never print secrets or commit private settings.
+
+## Lander-Regenerate
+
+After changing a clause Status row, run `node scripts/contract-docs.mjs write CLAUSE-ID` then `node scripts/contract-docs.mjs check CLAUSE-ID`, naming every changed clause. This retains other acceptance narratives while generating the selected acceptance entries, contract summary counts and `docs/CLAIMS.md` from `CONTRACT.md`. Regenerate the edition source lock last with `node scripts/edition-authoring/cli.mjs lock`, then run its `check`.

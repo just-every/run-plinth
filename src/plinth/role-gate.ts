@@ -32,7 +32,7 @@ const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
  // Superintendents record the day: logs are saved as drafts for the office to publish, and observations are captured with photos.
  superintendent: [...common, rule('GET', `jobs/${id}/time`), rule('POST', `jobs/${id}/time`), rule('POST', `jobs/${id}/time/${id}/correct`), rule('POST', `jobs/${id}/time/(?:consent|location)`), rule('POST', `jobs/${id}/diary`), rule('POST', `jobs/${id}/punch/issues`), rule('POST', `jobs/${id}/schedule-actuals`)],
  bookkeeper: [rule('GET', `jobs/${id}/costs/period-preview`), rule('POST', `jobs/${id}/costs/period-reviews`), rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs(?:/(?:ledger|bills|forecasts|cash|periods))?`), rule('GET', `jobs/${id}/costs/bills/${id}/original`), rule('POST', `jobs/${id}/costs/bills`), rule('POST', `jobs/${id}/costs/bills/${id}/(?:recode|review|route)`), rule('POST', `jobs/${id}/costs/reconcile`)],
- reader: [rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs/draw-packet`)],
+ reader: [rule('GET', `report-schedules(?:/${id}/downloads/${id})?`),rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs/draw-packet`)],
  crew: [...common, rule('GET', `jobs/${id}/time`), rule('POST', `jobs/${id}/time`), rule('POST', `jobs/${id}/time/${id}/correct`), rule('POST', `jobs/${id}/time/(?:consent|location)`)],
 }
 export function roleGate(actor: Actor, request: Request) {

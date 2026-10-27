@@ -150,11 +150,12 @@ test('RPT-003 — weekly manager digest and monthly redacted packets retain fail
  const f=await createFixture({now:Date.parse('2026-10-27T10:00:00Z'),mailResponse:async m=>{if(m.subject.startsWith('Your scheduled Plinth')&&m.to.includes('synthetic-plinth-lender@example.com')&&refuse)return Response.json({message:'Synthetic refusal'},{status:422});if(m.subject.startsWith('Your scheduled Plinth')&&uncertain)throw Error('Synthetic connection lost');return Response.json({id:'synthetic-plinth-mail-1'})}})
  try{
   const {c,photo,inspection,release}=await packetFixture(f)
-  const manager=await f.invite('synthetic-plinth-manager@example.com','Assigned manager','admin'),lender=await f.invite('synthetic-plinth-lender@example.com','Lender'),client=await f.invite('synthetic-plinth-client@example.com'),foreign=await f.invite('synthetic-plinth-foreign@example.com'),agent=await f.agent()
+  const manager=await f.invite('synthetic-plinth-manager@example.com','Assigned manager','admin'),lender=await f.invite('synthetic-plinth-lender@example.com','Lender','admin'),client=await f.invite('synthetic-plinth-client@example.com'),foreign=await f.invite('synthetic-plinth-foreign@example.com'),agent=await f.agent()
   const api=(path,options={})=>f.json('/api/plinth'+path,{cookie:f.owner,...options})
   const managerPerson=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@example.com')
   const assign=async(ids,version)=>api('/team/'+managerPerson.id,{method:'PUT',body:{expected_version:version,role:'project_manager',job_ids:ids,po_limit_cents:0}})
   assert.equal((await assign([c.job.id],0)).status,200)
+  const lenderPerson=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-lender@example.com');assert.equal((await api('/team/'+lenderPerson.id,{method:'PUT',body:{expected_version:0,role:'reader',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
   const create=async(audience,cadence,email,options={})=>api('/report-schedules',{method:'POST',body:{job_id:c.job.id,expected_version:(await c.read()).version,audience,cadence,recipient_email:email,anchor_on:'2026-10-27',confirm:true},...options})
   const missingConsent=await create('lender','monthly','synthetic-plinth-lender@example.com',{body:{job_id:c.job.id,expected_version:c.job.version,audience:'lender',cadence:'monthly',recipient_email:'synthetic-plinth-lender@example.com',anchor_on:'2026-10-27'}});assert.equal(missingConsent.status,400)
   for(const cookie of [manager,lender,client])assert.equal((await create('lender','monthly','synthetic-plinth-lender@example.com',{cookie})).status,403)
@@ -171,7 +172,7 @@ test('RPT-003 — weekly manager digest and monthly redacted packets retain fail
   const path=s=>'/api/plinth/report-schedules/'+s.schedule.id+'/downloads/'+s.schedule.deliveries[0].id
   const downloaded=await f.request(path(lm),{cookie:lender});assert.equal(downloaded.status,200);assert.equal(downloaded.headers.get('cache-control'),'private, no-store');assert.ok(downloaded.headers.get('content-disposition').startsWith('attachment;'))
   const packet=await downloaded.json();assert.equal(packet.job_id,c.job.id);assert.equal(packet.sov.lines.length,2);assert.deepEqual(packet.sov.lines.map(l=>l.scheduled_cents),[200000,100000])
-  assert.deepEqual(packet.applications.map(a=>[a.current_cents,a.total_cents,a.balance_cents]),[[150000,150000,150000]])
+  assert.deepEqual(packet.applications.map(a=>[a.current_cents,a.total_cents,a.balance_cents]),[[150000,150000,150000]]);assert.deepEqual(packet.applications[0].lines.map(l=>[l.cost_code,l.previous_cents,l.current_cents,l.total_cents,l.balance_cents]),[['06-100',0,100000,100000,100000],['01-100',0,50000,50000,50000]])
   assert.deepEqual(packet.invoices.map(i=>[i.gross_cents,i.due_cents]),[[150000,150000]])
   assert.deepEqual(packet.photos.map(p=>p.base64),[photo]);assert.deepEqual(packet.inspections.map(i=>i.status),['cleared'])
   assert.equal(Buffer.from(packet.inspections[0].documents[0].base64,'base64').compare(inspection),0)
@@ -183,13 +184,28 @@ test('RPT-003 — weekly manager digest and monthly redacted packets retain fail
   const digest=await(await f.request(path(wm),{cookie:manager})).json();assert.equal(digest.job_id,c.job.id);assert.equal(digest.values['native.contract'].amount_cents,300000)
   for(const credentials of [{cookie:foreign},{cookie:client},{cookie:manager},{token:agent},{}])assert.ok([401,403,404].includes((await f.request(path(lm),credentials)).status))
   const reportMessages=f.messages.filter(m=>m.subject.startsWith('Your scheduled Plinth'));assert.equal(reportMessages.length,3)
-  for(const m of reportMessages){assert.ok(m.text.includes('/report-schedules/'));assert.ok(!m.text.includes('98765'));assert.equal(m.attachments,undefined)}
+  for(const m of reportMessages){assert.ok(m.text.includes('/report-schedules/'));assert.ok(m.html.includes('/report-schedules/'));assert.ok(!m.text.includes('98765'));assert.equal(m.attachments,undefined)}
   await f.scheduled('2026-10-27T12:00:00Z');assert.equal(f.messages.filter(m=>m.subject.startsWith('Your scheduled Plinth')).length,3,'An occurrence never sends twice')
   f.setNow(Date.parse('2026-11-03T10:00:00Z'));await f.scheduled('2026-11-03T10:00:00Z');f.setNow(Date.parse('2026-10-27T10:00:00Z'))
   let rows=(await api('/report-schedules')).value.schedules;assert.deepEqual(rows.find(r=>r.schedule.id===weekly.value.schedule.id).schedule.deliveries.map(d=>d.due_on),['2026-10-27','2026-11-03']);assert.equal(rows.find(r=>r.schedule.id===monthly.value.schedule.id).schedule.deliveries.length,1)
   refuse=false;f.setNow(Date.parse('2026-11-27T10:00:00Z'));await f.scheduled('2026-11-27T10:00:00Z');f.setNow(Date.parse('2026-10-27T10:00:00Z'));rows=(await api('/report-schedules')).value.schedules;assert.deepEqual(rows.find(r=>r.schedule.id===monthly.value.schedule.id).schedule.deliveries.map(d=>[d.due_on,d.status]),[['2026-10-27','refused'],['2026-11-27','accepted']]);
+  const scheduleAudit=(await api('/audit?job_id='+c.job.id+'&action=report.schedule')).value.events
+  assert.equal(scheduleAudit.length,3);assert.ok(scheduleAudit.every(e=>e.actor_role==='owner'&&e.source==='session'&&e.after_ref&&e.detail.schedules.some(s=>s.consent.id===c.job.created_by.id)))
+  uncertain=true;await f.scheduled('2026-12-27T10:00:00Z');f.setNow(Date.parse('2026-10-27T10:00:00Z'))
+  const unknown=(await api('/report-schedules')).value.schedules.find(r=>r.schedule.id===monthly.value.schedule.id).schedule.deliveries.at(-1);assert.equal(unknown.status,'unknown')
+  const uncertainCount=f.messages.length;await f.scheduled('2026-12-27T11:00:00Z');assert.equal(f.messages.length,uncertainCount,'Unknown provider outcomes never resend an occurrence')
+  const beforePolicy=await c.read();assert.equal((await api('/jobs/'+c.job.id+'/portal-policy',{method:'POST',body:{expected_version:beforePolicy.version,disabled:{client:['billing'],subcontractor:[]},reason:'Synthetic owner restriction'}})).status,200)
+  assert.equal((await f.request(path(lm),{cookie:lender})).status,404,'A prior snapshot cannot bypass current portal restrictions')
+  const disabled=await c.read();assert.equal((await api('/jobs/'+c.job.id+'/portal-policy',{method:'POST',body:{expected_version:disabled.version,disabled:{client:[],subcontractor:[]},reason:'Synthetic explicit owner regrant'}})).status,200)
   assert.equal((await assign([],1)).status,200);assert.equal((await f.request(path(wm),{cookie:manager})).status,404)
   assert.equal((await api('/report-schedules/'+monthly.value.schedule.id,{method:'DELETE',body:{}})).status,200);assert.equal((await f.request(path(lm),{cookie:lender})).status,404)
+  const copied=await api('/roles',{method:'POST',body:{copy_of:'reader',name:'Synthetic lender reports',financial_visible:true}});assert.equal(copied.status,201)
+  assert.equal((await api('/team/'+lenderPerson.id,{method:'PUT',body:{expected_version:1,role:'custom',role_id:copied.value.role.id,job_ids:[c.job.id],po_limit_cents:0}})).status,200)
+  const copiedSchedule=await create('lender','monthly','synthetic-plinth-lender@example.com');assert.equal(copiedSchedule.status,201)
+  uncertain=false;await f.scheduled('2026-10-27T10:00:00Z')
+  const copiedRow=(await api('/report-schedules',{cookie:lender})).value.schedules.find(r=>r.schedule.id===copiedSchedule.value.schedule.id);assert.ok(copiedRow);assert.equal((await f.request(path(copiedRow),{cookie:lender})).status,200)
+  assert.equal((await api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version,financial_visible:false}})).status,200)
+  assert.equal((await f.request(path(copiedRow),{cookie:lender})).status,404,'A custom reader cannot download money after financial visibility is revoked')
   const fresh=(await c.read());assert.ok(!JSON.stringify(fresh).includes('report_schedules'),'Raw job projection never exposes delivery grants or snapshots')
  }finally{await f.close()}
 })

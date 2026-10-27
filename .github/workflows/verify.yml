@@ -29,6 +29,7 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - run: node scripts/contract-docs.mjs check RPT-003
       - run: pnpm run verify
 
   installed:

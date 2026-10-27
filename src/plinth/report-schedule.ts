@@ -1,12 +1,14 @@
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { operatorMail } from '../mail.server.mjs'
 import { requireOwner } from './auth'
-import { auditStatement, automation } from './audit'
+import { auditStatement, automation, jobRef } from './audit'
 import { jobs, jobOf, readClock, transaction } from './store'
 import { need, stamp, text, type Actor, type Input, type Job, DomainError } from './model'
 import { officeAuthority, authorityGuards, warrantyGeneration, loadWarrantyJob, checkWarrantySend } from './warranty-store'
 import { clientAccess } from './job-customers'
 import { portalEnabled } from './portal-policy'
+import { roleOf } from './role-store'
+import { presets } from './role-model'
 import { teamGrant } from './team'
 import { optionalNotice } from './mail-model'
 import { suppression } from './mail-store'
@@ -19,7 +21,7 @@ import { reportRecords } from './report-records'
 export interface ReportDelivery { id:string; due_on:string; generated_at:string; status:string; label:string; content:unknown; provider_message_id?:string }
 export interface ReportSchedule {
  id:string; kind:'digest'|'packet'; audience:'manager'|'client'|'lender'; cadence:'weekly'|'monthly'; anchor_on:string
- recipient_id:string; recipient_email:string; owner_id:string; owner_version:number; generation:number
+ recipient_id:string; recipient_email:string; recipient_version:number; recipient_team_version?:number; recipient_role_version?:number; owner_id:string; owner_version:number; generation:number
  status:'active'|'paused'; consent:ReturnType<typeof stamp>; deliveries:ReportDelivery[]
 }
 export type ReportJob=Job&{report_schedules?:ReportSchedule[]}
@@ -42,24 +44,29 @@ async function guards(db:D1Database,job:Job,s:ReportSchedule):Promise<D1Prepared
  const owner=await officeAuthority(db,job,s.owner_id,true)
  if(!owner||owner.role!=='owner'||owner.version!==s.owner_version)return null
  const p=await db.prepare("SELECT id,email,version,role FROM oa_operators WHERE id=? AND status='active'").bind(s.recipient_id).first<{id:string;email:string;version:number;role:string}>()
- if(!p||p.email.toLowerCase()!==s.recipient_email)return null
+ if(!p||p.version!==s.recipient_version||p.email.toLowerCase()!==s.recipient_email)return null
+ const recipient=await reportRecipient(db,p)
+ if(!recipient||recipient.team?.version!==s.recipient_team_version||recipient.permissions?.role_version!==s.recipient_role_version)return null
+ if(recipient.permissions&&!recipient.permissions.matrix.reports.view)return null
  const result=[...authorityGuards(db,owner),db.prepare("INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND status='active') THEN 1 ELSE 0 END").bind(p.id,p.version),db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_auth_settings WHERE singleton=1 AND generation=?) THEN 1 ELSE 0 END').bind(s.generation)]
+ if(recipient.team)result.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_team WHERE operator_id=? AND version=?) THEN 1 ELSE 0 END').bind(p.id,recipient.team.version))
+ else if(p.role==='admin')result.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pl_team WHERE operator_id=?) THEN 1 ELSE 0 END').bind(p.id))
+ if(recipient.permissions)result.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_roles WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(recipient.permissions.role_id,recipient.permissions.role_version))
  if(s.audience==='manager'){
-  const office=await officeAuthority(db,job,p.id,true);if(!office)return null
-  result.push(...authorityGuards(db,office))
- }else if(s.audience==='client'&&!await clientAccess(db,job,p.email))return null
+  if(!['owner','admin','project_manager'].includes(recipient.role)||recipient.role==='project_manager'&&!recipient.team?.job_ids.includes(job.id))return null
+ }else if(s.audience==='client'){
+  if(recipient.role!=='member'||!await clientAccess(db,job,p.email))return null
+ }else if(recipient.role!=='reader'||!recipient.team?.job_ids.includes(job.id)||recipient.permissions&&!recipient.permissions.financial)return null
  if(s.kind==='packet'&&!['billing','photos'].every(feature=>portalEnabled(job,'client',feature)))return null
- // A grant cannot widen a custom role or bypass an internal assignment.
- const team=await teamGrant(db,p.id)
- if(team&&s.audience!=='manager')return null
  return result
 }
 async function save(db:D1Database,previous:ReportJob,next:ReportJob,checks:D1PreparedStatement[],actor?:Actor,clock?:number){
  const seen=clock??await readClock(db);next.version=previous.version+1
  const data=JSON.stringify(next);need(data.length<=8_000_000,'Report packet history is full; pause schedules and archive the job',409,'report_limit')
+ const event={job_id:next.id,version_before:previous.version,version_after:next.version,before_ref:await jobRef(JSON.stringify(previous)),after_ref:await jobRef(data),detail:{schedules:(next.report_schedules??[]).map(s=>({id:s.id,recipient_id:s.recipient_id,audience:s.audience,cadence:s.cadence,anchor_on:s.anchor_on,status:s.status,consent:s.consent,deliveries:s.deliveries.map(d=>({id:d.id,due_on:d.due_on,status:d.status}))}))}}
  const writes=[...checks,db.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(next.version,data,next.id,previous.version)]
- if(actor)return transaction(db,actor,previous,writes,seen,{action:'report.schedule',job_id:next.id})
- try{await db.batch([db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_clock WHERE id=1 AND version=?) AND EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(seen,previous.id,previous.version),...writes,auditStatement(db,automation('report-scheduler','Scheduled reports'),{kind:'automation',action:'report.delivery',job_id:next.id}),db.prepare('UPDATE pl_clock SET version=version+1 WHERE id=1'),db.prepare('DELETE FROM pl_guard')])}
+ if(actor)return transaction(db,actor,previous,writes,seen,{kind:'permission',action:'report.schedule',...event})
+ try{await db.batch([db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_clock WHERE id=1 AND version=?) AND EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(seen,previous.id,previous.version),...writes,auditStatement(db,automation('report-scheduler','Scheduled reports'),{kind:'automation',action:'report.delivery',...event}),db.prepare('UPDATE pl_clock SET version=version+1 WHERE id=1'),db.prepare('DELETE FROM pl_guard')])}
  catch(error){if(/CHECK constraint|UNIQUE constraint/.test(String(error)))throw new DomainError('conflict','Report authority changed',409);throw error}
 }
 export async function reportScheduleResponse(request:Request,env:Bindings,actor:Actor,parts:string[],body:(r:Request)=>Promise<Input>):Promise<Response|null>{
@@ -75,8 +82,9 @@ export async function reportScheduleResponse(request:Request,env:Bindings,actor:
   need(input.expected_version===job.version,'Job changed; reload',409,'stale_version');need(input.confirm===true,'Confirm recurring delivery to this named person',400,'consent')
   need(['manager','client','lender'].includes(String(input.audience)),'Choose a packet audience')
   need(['weekly','monthly'].includes(String(input.cadence)),'Choose weekly or monthly')
-  const p=await env.DB.prepare("SELECT id,email FROM oa_operators WHERE lower(email)=? AND status='active'").bind(text(input.recipient_email,'Recipient email',254).toLowerCase()).first<{id:string;email:string}>();need(p,'Invite this person and have them sign in first',400,'recipient')
-  const s:ReportSchedule={id:crypto.randomUUID(),kind:input.audience==='manager'?'digest':'packet',audience:input.audience as ReportSchedule['audience'],cadence:input.cadence as ReportSchedule['cadence'],anchor_on:warrantyDay(input.anchor_on,'First report date'),recipient_id:p.id,recipient_email:p.email.toLowerCase(),owner_id:actor.id,owner_version:actor.version,generation:await warrantyGeneration(env.DB),status:'active',consent:stamp(actor),deliveries:[]}
+  const p=await env.DB.prepare("SELECT id,email,role,version FROM oa_operators WHERE lower(email)=? AND status='active'").bind(text(input.recipient_email,'Recipient email',254).toLowerCase()).first<{id:string;email:string;role:string;version:number}>();need(p,'Invite this person and have them sign in first',400,'recipient')
+  const recipient=await reportRecipient(env.DB,p);need(recipient,'Recipient role unavailable',403,'recipient')
+  const s:ReportSchedule={id:crypto.randomUUID(),kind:input.audience==='manager'?'digest':'packet',audience:input.audience as ReportSchedule['audience'],cadence:input.cadence as ReportSchedule['cadence'],anchor_on:warrantyDay(input.anchor_on,'First report date'),recipient_id:p.id,recipient_email:p.email.toLowerCase(),recipient_version:p.version,...(recipient.team?{recipient_team_version:recipient.team.version}:{}),...(recipient.permissions?{recipient_role_version:recipient.permissions.role_version}:{}),owner_id:actor.id,owner_version:actor.version,generation:await warrantyGeneration(env.DB),status:'active',consent:stamp(actor),deliveries:[]}
   need(s.anchor_on>=new Date(Date.now()).toISOString().slice(0,10),'Choose today or a future date')
   const checks=await guards(env.DB,job,s);need(checks,'The recipient has no current authority for this report',403,'recipient')
   const next=structuredClone(job);need((next.report_schedules??[]).length<20,'This job has reached its report schedule limit');(next.report_schedules??=[]).push(s)
@@ -115,7 +123,7 @@ export async function dispatchReportSchedules(original:Bindings,now:number){
     const current=await loadWarrantyJob(env.DB,job.id) as ReportJob|null,currentSchedule=current?.report_schedules?.find(r=>r.id===s.id),fresh=current&&currentSchedule?await guards(env.DB,current,currentSchedule):null
     need(current&&fresh,'Report authority changed',409,'conflict');await checkWarrantySend(env.DB,current,await readClock(env.DB),fresh)
     const optional=await optionalNotice(env,s.recipient_email),link=new URL('/api/plinth/report-schedules/'+s.id+'/downloads/'+delivery.id,env.AUTH_ORIGIN).href
-    const message=await sender.send({deliveryId:delivery.id,from:env.MAIL_FROM,to:[s.recipient_email],subject:'Your scheduled Plinth '+(s.kind==='digest'?'manager digest':'draw packet'),text:'Sign in to download your permission-scoped report: '+link+(optional?.text??''),html:'<p>Sign in to Plinth to download your scheduled report.</p>',headers:{},...(optional?.unsubscribe?{unsubscribe:optional.unsubscribe}:{})})
+    const message=await sender.send({deliveryId:delivery.id,from:env.MAIL_FROM,to:[s.recipient_email],subject:'Your scheduled Plinth '+(s.kind==='digest'?'manager digest':'draw packet'),text:'Sign in to download your permission-scoped report: '+link+(optional?.text??''),html:'<p><a href="'+link+'">Sign in to download your scheduled report</a></p>',headers:{},...(optional?.unsubscribe?{unsubscribe:optional.unsubscribe}:{})})
     outcome=statusOf(message);if('providerMessageId' in message)providerId=String(message.providerMessageId)
    }
   }catch{outcome={status:'unknown',label:'Provider outcome unknown. No automatic resend.'}}
@@ -125,7 +133,14 @@ export async function dispatchReportSchedules(original:Bindings,now:number){
 }
 async function managerDigest(db:D1Database,job:Job,s:ReportSchedule,now:number){
  const p=await db.prepare('SELECT id,email,display_name,role,version FROM oa_operators WHERE id=?').bind(s.recipient_id).first<{id:string;email:string;display_name:string;role:'owner'|'admin';version:number}>();need(p,'Recipient unavailable')
- const grant=await teamGrant(db,p.id),actor:Actor={id:p.id,email:p.email,name:p.display_name,role:grant?'project_manager':p.role,version:p.version,...(grant?{team:{version:grant.version,job_ids:grant.grant.job_ids,po_limit_cents:grant.grant.po_limit_cents}}:{})}
+ const actor=await reportRecipient(db,p);need(actor,'Recipient role unavailable')
  const record=(await reportRecords(db,actor,'job')).find(r=>r.id===job.id);need(record,'Job unavailable')
  return {format:'plinth-manager-digest-v1',as_of:new Date(now).toISOString(),job_id:job.id,job_name:job.name,values:record.values}
+}
+
+async function reportRecipient(db:D1Database,p:{id:string;email:string;role:string;version:number;display_name?:string}):Promise<Actor|null>{
+ const grant=p.role==='admin'?await teamGrant(db,p.id):null,custom=grant?.grant.role==='custom'?await roleOf(db,grant.grant.role_id??''):null
+ if(grant?.grant.role==='custom'&&!custom)return null
+ const role=(custom?presets[custom.role.copy_of].base:grant?.grant.role??p.role) as Actor['role']
+ return {id:p.id,email:p.email,name:p.display_name??p.email,role,version:p.version,...(grant?{team:{version:grant.version,job_ids:grant.grant.job_ids,po_limit_cents:grant.grant.po_limit_cents}}:{}),...(custom?{permissions:{role_id:custom.role.id,role_version:custom.version,name:custom.role.name,matrix:custom.role.permissions,financial:custom.role.financial_visible,po_limit_cents:custom.role.po_limit_cents}}:{})}
 }

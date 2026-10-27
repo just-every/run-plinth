@@ -12,12 +12,13 @@ try{
  const call=async(path,{method='GET',body}={})=>{const r=await owner.request.fetch(base+path,{method,headers:{origin:base},...(body?{data:body}:{})});return {status:r.status(),value:await r.json()}}
  const {c}=await packetFixture({owner:'owner',json:call})
  const contexts=[]
- for(const [email,role] of [['synthetic-plinth-manager@example.com','admin'],['synthetic-plinth-lender@example.com','member'],['synthetic-plinth-client@example.com','member']]){
+ for(const [email,role] of [['synthetic-plinth-manager@example.com','admin'],['synthetic-plinth-lender@example.com','admin'],['synthetic-plinth-client@example.com','member']]){
   const response=await owner.request.post(base+'/auth/invite',{headers:{origin:base},data:{email,displayName:'Synthetic report recipient',role,returnTo:'/app'}});assert.equal(response.status(),202)
   const context=await browser.newContext({viewport:{width:1440,height:1000}}),p=await context.newPage();await nativeSignIn(p,email);contexts.push({context,page:p,email})
  }
  const [manager,lender,client]=contexts,person=(await call('/api/plinth/team')).value.team.find(p=>p.email===manager.email)
  assert.equal((await call('/api/plinth/team/'+person.id,{method:'PUT',body:{expected_version:0,role:'project_manager',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
+ const lenderPerson=(await call('/api/plinth/team')).value.team.find(p=>p.email===lender.email);assert.equal((await call('/api/plinth/team/'+lenderPerson.id,{method:'PUT',body:{expected_version:0,role:'reader',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
  await page.goto(base+'/app');await page.getByRole('button',{name:'People & access',exact:true}).click();await page.locator('summary',{hasText:'Scheduled report settings'}).click()
  const settings=page.locator('section.card').filter({has:page.locator('summary',{hasText:'Scheduled report settings'})})
  for(const [audience,cadence,recipient] of [['manager','weekly',manager.email],['lender','monthly',lender.email],['client','monthly',client.email]]){
@@ -35,7 +36,7 @@ try{
   await who.page.goto(base+'/app');await who.page.locator('summary',{hasText:'Scheduled report downloads'}).click()
   const link=who.page.getByRole('link',{name:who===manager?'Download manager digest':'Download draw packet',exact:true});await expect(link).toHaveCount(1)
   const response=await who.context.request.get(base+await link.getAttribute('href'));assert.equal(response.status(),200);const packet=await response.json();assert.equal(packet.job_id,c.job.id)
-  if(who!==manager){assert.equal(packet.sov.lines.length,2);assert.equal(packet.invoices[0].gross_cents,150000);assert.equal(packet.photos.length,1);assert.equal(packet.inspections.length,1);assert.equal(packet.waivers[0].status,'accepted');for(const text of ['synthetic-plinth-private-bid','98765','hour_cents','cost_unit_cents'])assert.ok(!JSON.stringify(packet).includes(text))}
+  if(who!==manager){await who.page.getByRole('button',{name:'Review draw packet',exact:true}).click();await expect(who.page.getByRole('region',{name:'Draw packet contents'})).toBeVisible();await expect(who.page.getByRole('heading',{name:'Inspection evidence',exact:true})).toBeVisible();await expect(who.page.getByRole('link',{name:'synthetic-plinth-waiver.pdf',exact:true})).toBeVisible();assert.equal(packet.sov.lines.length,2);assert.equal(packet.invoices[0].gross_cents,150000);assert.equal(packet.photos.length,1);assert.equal(packet.inspections.length,1);assert.equal(packet.waivers[0].status,'accepted');for(const text of ['synthetic-plinth-private-bid','98765','hour_cents','cost_unit_cents']){assert.ok(!JSON.stringify(packet).includes(text));assert.ok(!(await who.page.locator('body').innerText()).includes(text))}}
  }
  const capture=async(p,who)=>{for(const width of [1440,390]){await p.setViewportSize({width,height:1000});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No page overflow');if(width===390){const menu=p.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}await p.screenshot({path:shots+'/RPT-003-'+who+'-'+width+'.png',fullPage:true,animations:'disabled'})}}
  await capture(page,'owner');await capture(manager.page,'manager');await capture(lender.page,'lender');await capture(client.page,'client')
