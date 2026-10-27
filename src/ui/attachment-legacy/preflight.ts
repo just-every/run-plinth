@@ -1,5 +1,6 @@
 import { Compound } from './compound'
 import { presentationGraph } from './presentation-graph'
+import { spreadsheetComments } from './spreadsheet-comments'
 import { fail, type LegacyFormat } from './types'
 const u16 = (bytes: Uint8Array, at: number) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(at, true)
 const u32 = (bytes: Uint8Array, at: number) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(at, true)
@@ -40,8 +41,9 @@ export function preflight(bytes: Uint8Array, format: LegacyFormat) {
  const presentation = format === 'ppt' ? presentationGraph(cfb) : undefined
  if (format === 'doc') word(cfb)
  else if (format === 'xls') spreadsheet(cfb)
- return { presentation, notes: ['The local reader does not execute macros, follow external links, recognize image text or recursively extract embedded OLE payloads.',
+ const comments = format === 'xls' ? spreadsheetComments(bytes) : undefined
+ return { presentation, comments, notes: ['The local reader does not execute macros, follow external links, recognize image text or recursively extract embedded OLE payloads.',
   ...(format === 'doc' ? ['This reader combines main Word text with declared footnotes, grouped headers and footers, annotations, endnotes and text boxes. Individual anchors, fields, layout, tracked-change acceptance, images and embedded objects are not interpreted.'] : []),
-  ...(format === 'xls' ? ['This reader extracts stored Excel cell values and cached formula results. Formatting, formula expressions, comments, chart content, drawings and embedded objects are not fully read. Cached results are not recalculated.'] : []),
+  ...(format === 'xls' ? ['This reader extracts stored Excel cell values, cached formula results and anchored current worksheet comments. Formatting, formula expressions, chart content, other drawings and embedded objects are not fully read. Cached results are not recalculated.'] : []),
  ] }
 }

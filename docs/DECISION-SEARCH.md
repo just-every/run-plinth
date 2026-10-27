@@ -24,9 +24,11 @@ recalculation; slide layouts and masters can repeat text. Embedded objects,
 equations, threaded comments and unsupported pictures can remain unread;
 the draft shows these limitations. Legacy binary Office files have a bounded
 local reader: main Word text and declared footnotes, grouped headers and footers,
-annotations, endnotes and text boxes, saved spreadsheet cell values, and current
+annotations, endnotes and text boxes, saved spreadsheet cell values and current
+cell comments with their sheet and cell references, and current
 slide text, grouped shapes, speaker notes and main, title, notes and handout
-master text. PowerPoint follows the current document references and newest saved
+master text. Excel excludes unlisted sheet records, deleted comment shapes and
+revision-history streams. PowerPoint follows the current document references and newest saved
 object mappings; it does not sweep replaced or deleted objects for words. Its
 notes name unread comments, pictures and other omissions. Encrypted legacy files
 are refused.
