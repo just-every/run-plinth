@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        journey: [invoice-corrections, cost-billing, settlements, meetings]
+        journey: [invoice-corrections, cost-billing, settlements, meetings, portfolio]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'

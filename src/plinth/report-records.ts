@@ -1,3 +1,4 @@
+import { portfolioJobs, type PortfolioScope } from './portfolio-scope'
 import { portfolioColumns, portfolioValues } from './portfolio'
 import { scheduleVariance } from './schedule-baseline-model'
 import { jobs } from './store'
@@ -24,7 +25,7 @@ export function reportRecordView(record: FieldRecord, columns: ReportColumn[]): 
  const allowed = new Set(columns.map(column => column.id))
  return { ...record, values: Object.fromEntries(Object.entries(record.values).filter(([id]) => allowed.has(id))) }
 }
-export async function reportRecords(db: D1Database, actor: Actor, scope: ReportRecordScope, definitions?: ReportFieldDefinition[]): Promise<FieldRecord[]> {
+export async function reportRecords(db: D1Database, actor: Actor, scope: ReportRecordScope, definitions?: ReportFieldDefinition[],selection?:PortfolioScope): Promise<FieldRecord[]> {
  need(reportScopeAllowed(actor, scope), 'This report scope is unavailable', 403, 'forbidden')
  if (!definitions) {
   const config = await db.prepare('SELECT data FROM pl_report_config WHERE id=1').first<{data:string}>()
@@ -38,8 +39,8 @@ export async function reportRecords(db: D1Database, actor: Actor, scope: ReportR
   const rows = (await db.prepare(scope === 'customer' ? 'SELECT data FROM pl_customers' : 'SELECT data FROM pl_vendors').all<{data:string}>()).results
   return rows.map(row => { const r = JSON.parse(row.data) as Customer | Vendor; return attach({ id:r.id, record_scope:scope, label:r.name, stage:r.kind, values:{ 'native.kind':r.kind } }) })
  }
- const all = (await jobs(db)).filter(j => actor.role !== 'project_manager' || actor.team?.job_ids.includes(j.id))
- if (scope === 'job') return all.map(j => attach({ id:j.id, job_id:j.id, record_scope:scope, label:j.name, currency:currencyOf(j), stage:j.status, values:{ ...portfolioValues(j), 'native.stage':j.status, 'native.delayed':j.schedule_baselines?.length ? scheduleVariance(j).some(v => (v.forecast_finish_variance_minutes ?? 0) > 0) : null, 'native.contract':{ amount_cents:(j.quotes.find(q=>q.status==='accepted')?.total_cents ?? 0)+j.variations.filter(v=>v.status==='approved').reduce((n,v)=>n+v.amount_cents,0),currency:currencyOf(j) } } }))
+ const captured=await portfolioJobs(db,actor,selection),all=captured.map(r=>r.job)
+ if (scope === 'job') return all.map(j => attach({ id:j.id, job_id:j.id, record_scope:scope, label:j.name, currency:currencyOf(j), stage:j.status, values:{ 'native.stage':j.status, 'native.delayed':j.schedule_baselines?.length ? scheduleVariance(j).some(v => (v.forecast_finish_variance_minutes ?? 0) > 0) : null, 'native.contract':{ amount_cents:(j.quotes.find(q=>q.status==='accepted')?.total_cents ?? 0)+j.variations.filter(v=>v.status==='approved').reduce((n,v)=>n+v.amount_cents,0),currency:currencyOf(j) },...portfolioValues(j,selection,captured.find(r=>r.job.id===j.id)!.captured_at) } }))
  return all.flatMap(j => [
   ...(canView(actor,'estimates') ? j.quotes : []).map(q=>({id:q.id,kind:'quote',label:`${j.name}: quote ${q.revision}`,stage:q.status,amount:q.total_cents})),
   ...(canView(actor,'orders') ? j.orders : []).map(o=>({id:o.id,kind:'order',label:`${j.name}: ${o.description}`,stage:o.status,amount:o.amount_cents})),

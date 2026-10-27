@@ -87,17 +87,10 @@ test('RPT-004 — typed fields, required construction gates, personal/shared del
  } finally {await f.close()}
 })
 
-test('RPT-001 — current portfolio reconciles three jobs to code sources, scopes managers before totals and exports inert CSV and genuine XLSX', async()=>{
- const {costFixture}=await import('./cost-support.mjs'),{execFileSync}=await import('node:child_process')
+test('RPT-001 — historical and sliced portfolio reconciles three jobs to code sources, scopes managers before totals and exports inert CSV and genuine XLSX', async()=>{
+ const {portfolioFixture}=await import('./portfolio-support.mjs'),{execFileSync}=await import('node:child_process')
  const f=await createFixture();try{
-  const fixtures=[]
-  for(let i=0;i<3;i++){
-   const c=await costFixture(f)
-   const source=await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-'+i,dated_on:'2026-10-24',period:'2026-10',cost_code:'01-100',minutes:60*(i+1),hour_cents:2000,burden_bps:1000,employee_reference:'synthetic-plinth-worker-'+i})
-   await c.ok(`/costs/sources/${source.record.id}/approve`)
-   await c.ok('/costs/forecasts',{as_of:'2026-10-24',source_as_of:'Synthetic reviewed current source',codes:[{cost_code:'01-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:2000,outstanding_commitment_cents:0,unbought_cents:1000,risk_cents:0,reference:'synthetic-plinth-labor'},{cost_code:'06-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:100000,unbought_cents:0,risk_cents:0,reference:'synthetic-plinth-materials'}]})
-   fixtures.push(c)
-  }
+  const {fixtures,earlier,capture}=await portfolioFixture(f)
   const api=(path,options={})=>f.json('/api/plinth'+path,{cookie:f.owner,...options})
   const columns=['native.contract','portfolio.original_budget','portfolio.revised_budget','portfolio.committed','portfolio.actual','portfolio.forecast','portfolio.margin','portfolio.billed','portfolio.collected','portfolio.backlog','portfolio.slippage','portfolio.open_decisions','portfolio.as_of','portfolio.forecast_stale']
   const spec={expected_version:0,name:'Current portfolio',sharing:'shared',scope:{record_scope:'job',record_ids:null},filters:[],selected_columns:columns}
@@ -109,8 +102,8 @@ test('RPT-001 — current portfolio reconciles three jobs to code sources, scope
    assert.equal(values['portfolio.actual'].amount_cents,2200*(i+1));assert.equal(values['portfolio.forecast'].amount_cents,103200+2200*i)
    assert.equal(values['portfolio.original_budget'].amount_cents,150000);assert.equal(values['portfolio.revised_budget'].amount_cents,150000)
    assert.equal(values['portfolio.committed'].amount_cents,100000);assert.equal(values['portfolio.margin'].amount_cents,300000-values['portfolio.forecast'].amount_cents)
-   assert.equal(values['portfolio.backlog'].amount_cents,300000);assert.equal(values['portfolio.billed'].amount_cents,0);assert.equal(values['portfolio.collected'].amount_cents,0)
-   assert.equal(values['portfolio.slippage'],null);assert.equal(values['portfolio.forecast_stale'],false);assert.equal(values['portfolio.as_of'],new Date().toISOString().slice(0,10))
+   assert.equal(values['portfolio.backlog'].amount_cents,300000-30000*(i+1));assert.equal(values['portfolio.billed'].amount_cents,30000*(i+1));assert.equal(values['portfolio.collected'].amount_cents,15000*(i+1))
+   assert.equal(values['portfolio.slippage'],1440);assert.equal(values['portfolio.open_decisions'],1);assert.equal(values['portfolio.forecast_stale'],false);assert.match(values['portfolio.as_of'],/^\d{4}-\d{2}-\d{2}$/)
    const source=(await api('/reports/job-sources/'+c.job.id)).value
    assert.equal(source.rows.reduce((n,row)=>n+row.posted_actual_cents,0),values['portfolio.actual'].amount_cents)
    assert.equal(source.rows.flatMap(row=>row.sources.actual).reduce((n,row)=>n+row.amount_cents,0),values['portfolio.actual'].amount_cents)
@@ -118,10 +111,58 @@ test('RPT-001 — current portfolio reconciles three jobs to code sources, scope
    assert.equal(source.source_version,c.job.version)
   }
   assert.equal(owner.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,13200)
+  const query=async portfolio=>{const r=await api('/reports/query',{method:'POST',body:{...spec,portfolio}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value.report}
+  const old=await query({snapshot_id:earlier.id})
+  assert.deepEqual(old.rows.map(r=>[r.values['portfolio.billed'].amount_cents,r.values['portfolio.collected'].amount_cents,r.values['portfolio.slippage'],r.values['portfolio.open_decisions']]),[[0,0,null,0],[0,0,null,0],[0,0,null,0]])
+  assert.equal(old.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,13200)
+  const labor=await query({cost_code:'01-100'})
+  assert.equal(labor.money_totals.find(t=>t.column_id==='native.contract').amount_cents,300000)
+  assert.equal(labor.money_totals.find(t=>t.column_id==='portfolio.original_budget').amount_cents,150000)
+  assert.equal(labor.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,13200)
+  assert.equal(labor.money_totals.find(t=>t.column_id==='portfolio.billed').amount_cents,60000)
+  assert.equal(labor.money_totals.find(t=>t.column_id==='portfolio.collected').amount_cents,30000)
+  assert.equal(labor.money_totals.find(t=>t.column_id==='portfolio.forecast').amount_cents,16200)
+  const trade=await query({trade:'framing'})
+  assert.deepEqual(new Set(trade.rows.map(r=>r.id)),new Set(fixtures.slice(0,2).map(c=>c.job.id)))
+  assert.equal(trade.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,6600)
+  const noTrade=await query({trade:'Roofing'});assert.deepEqual(noTrade.rows,[]);assert.deepEqual(noTrade.money_totals,[])
+  const dated=await query({source_from:'2026-10-24',source_to:'2026-10-24'})
+  assert.equal(dated.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,13200)
+  assert.equal(dated.money_totals.find(t=>t.column_id==='portfolio.collected').amount_cents,0)
+  const collectionDate=await query({source_from:'2026-10-25',source_to:'2026-10-25'})
+  assert.equal(collectionDate.money_totals.find(t=>t.column_id==='portfolio.collected').amount_cents,90000)
+  assert.equal(collectionDate.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,0)
+  assert.equal((await api('/reports/query',{method:'POST',body:{...spec,portfolio:{source_from:'2026-10-25',source_to:'2026-10-24'}}})).status,400)
+  for(const c of fixtures){
+   const source=(await api('/reports/job-sources/'+c.job.id+'?portfolio='+encodeURIComponent(JSON.stringify({cost_code:'01-100'})))).value
+   assert.deepEqual(source.rows.map(r=>r.cost_code),['01-100'])
+   assert.equal(source.rows[0].posted_actual_cents,labor.rows.find(r=>r.id===c.job.id).values['portfolio.actual'].amount_cents)
+   assert.equal(source.rows[0].sources.billing.filter(r=>r.kind==='collected').reduce((n,r)=>n+r.amount_cents,0),labor.rows.find(r=>r.id===c.job.id).values['portfolio.collected'].amount_cents)
+  }
+
   const manager=await f.invite('synthetic-plinth-manager@example.com','Assigned manager','admin')
   const person=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@example.com')
   const assign=async job_ids=>api('/team/'+person.id,{method:'PUT',body:{expected_version:(await api('/team')).value.team.find(p=>p.id===person.id).version??0,role:'project_manager',job_ids,po_limit_cents:0}})
   assert.equal((await assign([fixtures[0].job.id])).status,200)
+  const historical=await capture('Assigned manager and earned billing')
+  const managed=await query({snapshot_id:historical.id,manager_id:person.id})
+  assert.deepEqual(managed.rows.map(r=>r.id),[fixtures[0].job.id])
+  assert.equal(managed.money_totals.find(t=>t.column_id==='portfolio.billed').amount_cents,30000)
+  const historicalSpec={...spec,name:'Historical labor slice',portfolio:{snapshot_id:historical.id,cost_code:'01-100',manager_id:person.id}}
+  const historicView=await api('/reports/views',{method:'POST',body:historicalSpec});assert.equal(historicView.status,201,JSON.stringify(historicView.value))
+  const frozen=await query({snapshot_id:historical.id})
+  await fixtures[0].ok('/variations',{description:'Decision recorded after capture',amount_cents:50})
+  assert.deepEqual(await query({snapshot_id:historical.id}),frozen,'Later source changes cannot rewrite a capture')
+  const oldSource=(await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:earlier.id})))).value
+  assert.equal(oldSource.source_version<fixtures[0].job.version,true)
+  assert.equal(oldSource.rows.reduce((n,r)=>n+r.client_billed_cents,0),0)
+  assert.equal((await api('/reports/snapshots',{cookie:manager,method:'POST',body:{name:'Forbidden capture'}})).status,403)
+  for(const format of ['csv','xlsx','pdf']){
+   const exported=await f.request('/api/plinth/reports/views/'+historicView.value.view.id+'/export.'+format,{cookie:manager})
+   assert.equal(exported.status,200)
+   if(format==='csv'){const text=await exported.text();assert.ok(text.includes(historical.id));assert.ok(text.includes('01-100'));assert.ok(!text.includes(fixtures[1].job.id))}
+  }
+
   r=await api('/reports/views/'+id,{cookie:manager});assert.equal(r.status,200)
   assert.deepEqual(r.value.report.annotation.scope_record_ids,[fixtures[0].job.id]);assert.equal(r.value.report.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,2200)
   assert.equal((await api('/reports/job-sources/'+fixtures[1].job.id,{cookie:manager})).status,404)
@@ -132,7 +173,7 @@ test('RPT-001 — current portfolio reconciles three jobs to code sources, scope
    const extracted=execFileSync('python3',['-c','import io,sys,zipfile,xml.etree.ElementTree as ET; z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())); assert z.testzip() is None; [ET.fromstring(z.read(n)) for n in z.namelist()]; print(z.read("xl/worksheets/sheet1.xml").decode())'],{input:bytes,encoding:'utf8'})
    assert.ok(extracted.includes('Posted actual cost'));assert.ok(extracted.includes(fixtures[0].job.id));assert.ok(!extracted.includes('<f>'));if(cookie===manager)assert.ok(!extracted.includes(fixtures[1].job.id))
   }
-  assert.equal((await assign([])).status,200);assert.equal((await api('/reports/views/'+id,{cookie:manager})).value.report.rows.length,0)
+  assert.equal((await assign([])).status,200);assert.equal((await api('/reports/views/'+historicView.value.view.id,{cookie:manager})).status,404);assert.equal((await api('/reports/snapshots',{cookie:manager})).value.snapshots.length,0);assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:historical.id})),{cookie:manager})).status,404);assert.equal((await api('/reports/views/'+id,{cookie:manager})).value.report.rows.length,0)
   const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()
   for(const options of [{cookie:client},{cookie:undefined,token:agent}])for(const path of ['/reports/views/'+id+'/export.xlsx','/reports/job-sources/'+fixtures[0].job.id])assert.equal((await api(path,options)).status,403)
   r=await api('/roles',{method:'POST',body:{copy_of:'administrator',name:'Report without finances',financial_visible:false}});assert.equal(r.status,201);const role=r.value.role
@@ -141,5 +182,10 @@ test('RPT-001 — current portfolio reconciles three jobs to code sources, scope
   assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id,{cookie:manager})).status,403)
   assert.ok(!(await api('/reports/records?record_scope=job',{cookie:manager})).value.columns.some(c=>c.id==='portfolio.open_decisions'),'Hidden financial decision counts are unavailable before filtering')
   assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],filters:[{column_id:'portfolio.open_decisions',operator:'gt',value:0}]}})).status,400,'A hidden decision count cannot influence query membership')
+  await fixtures[0].read()
+  assert.equal((await api('/jobs/'+fixtures[0].job.id,{method:'DELETE',body:{expected_version:fixtures[0].job.version}})).status,200)
+  assert.equal((await query({snapshot_id:historical.id})).rows.length,2)
+  assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:historical.id})))).status,404)
+
  }finally{await f.close()}
 })

@@ -10,7 +10,7 @@ import { nativeSignIn } from './native-signin.mjs'
 import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
-assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings'].includes(name), 'Choose an installed Billing or Meetings journey')
+assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio'].includes(name), 'Choose an installed Billing or Meetings journey')
 assert.equal(process.env.HOME, userInfo().homedir, 'Browser-driving Node uses the real account HOME')
 const shots = resolve(process.env.PLINTH_SCREENSHOTS_ROOT ?? 'artifacts/installed', name)
 await mkdir(shots, { recursive: true })
@@ -21,14 +21,14 @@ const stop = () => signal('SIGTERM')
 process.once('SIGTERM', stop); process.once('SIGINT', stop)
 try {
  provider = await providerEdge()
- worker = await installedWorker(provider.outboundService, name === 'settlements' ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
+ worker = await installedWorker(provider.outboundService, ['settlements','portfolio'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
  const ownerState = join(scratch, 'owner.json'), clientState = join(scratch, 'client.json')
  Object.assign(process.env, {
   PLINTH_URL: worker.origin, PLINTH_STATE: ownerState, PLINTH_CLIENT_STATE: clientState,
   PLINTH_PROVIDER_EDGE_URL: provider.url, PLINTH_EMAIL_URL: worker.origin,
   PLINTH_MAIL_OUTCOME: 'Accepted by the mail provider; delivery is not confirmed', PLINTH_SCREENSHOTS: shots,
  })
- browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
+ browser = await chromium.launch({ headless: true, executablePath:process.env.PLINTH_CHROMIUM_PATH,args: ['--use-mock-keychain', '--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])] })
  const owner = await browser.newContext(), page = await owner.newPage()
  const post = (path, data) => owner.request.post(worker.origin + path, { maxRedirects: 0, headers: { origin: worker.origin }, data })
  await requireStatus(await post('/auth/bootstrap', { token: worker.bindings.SETUP_TOKEN, displayName: 'Synthetic Plinth builder', returnTo: '/app' }), 303, 'Native installation bootstrap', worker)
