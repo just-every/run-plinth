@@ -76,7 +76,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | COST-005 | done |  |
 | COST-006 | done |  |
 | COST-007 | missing | No receipt capture, OCR proposals or card and bank feed matching exists. |
-| RPT-001 | partial | Current report dates are UTC; cost and forecast totals use the existing committed ledger, unknown economics stay null, stale forecasts are labelled, earned billings preserve gross value and collections use recorded receipts. Remaining: selectable historical as-of snapshots and manager, trade, source-date and cost-code slicing; nonzero schedule slippage, open decisions, earned billings and collections need portfolio assertions. |
+| RPT-001 | done |  |
 | RPT-002 | missing | No estimate productivity and sales reporting workflow exists. |
 | RPT-003 | missing | No scheduled reports and client lender packets workflow exists. |
 | RPT-004 | done |  |
