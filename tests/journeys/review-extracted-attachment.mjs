@@ -47,6 +47,10 @@ export async function reviewExtractedAttachments({ base, page, owner, client, jo
    if (variant.state) assert.equal(result.results[0].extraction.status, variant.state)
    assert.deepEqual(Buffer.from(await (await owner.request.get(base + result.results[0].files[0].href)).body()), variant.bytes)
   }
+  for (const term of variant.absent ?? []) {
+   const excluded = await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/decision-search?` + new URLSearchParams({q:term}))).json()
+   assert.equal(excluded.count,0,'Inactive source content stays absent from saved search')
+  }
   const history = await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/decision-search/transcriptions?` + new URLSearchParams({ source }))).json()
   assert.equal(history.revisions[0].text, generated, 'Actual extracted output, without replacement fixture text, is retained exactly')
   assert.equal((await client.request.get(base + `/api/plinth/jobs/${job.id}/decision-search?` + new URLSearchParams({ q: variant.terms.at(-1) })).then(response => response.json())).count, 0)

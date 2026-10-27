@@ -25,7 +25,11 @@ equations, threaded comments and unsupported pictures can remain unread;
 the draft shows these limitations. Legacy binary Office files have a bounded
 local reader: main Word text and declared footnotes, grouped headers and footers,
 annotations, endnotes and text boxes, saved spreadsheet cell values, and current
-slide text. Its notes name unread comments, pictures and other omissions. Encrypted legacy files are refused.
+slide text, grouped shapes, speaker notes and main, title, notes and handout
+master text. PowerPoint follows the current document references and newest saved
+object mappings; it does not sweep replaced or deleted objects for words. Its
+notes name unread comments, pictures and other omissions. Encrypted legacy files
+are refused.
 
 Multi-page TIFF, RTF code pages and Unicode, BOM UTF-16 plain text, inert HTML
 and SVG stored text also have local readers. TIFF and inline raster pictures use

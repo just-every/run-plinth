@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "6460e2de7555cf7019ded9b69c401266509e3b6edff29e1ad0b9258cc1112624",
+      "sha256": "7709f51a8bfc1d46e44644f1c78407a562ead252238707dfe2a6f2d26419d1f7",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "86a35dded248adbcf2c185be7d8603167b232872ab415fcfb73fb967ab3b1217",
+      "sha256": "03b953594ebc4e7099c84eb7a40c2f1e235bdd9fff650e2bfb8f4851e2d82c4e",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "d01631e1000081f24c1cc1277fc35e75de55c3895a4c92e927d9606877c107ea",
+      "sha256": "80d90fba415b178741f0cbfd1acb3c72ee5b7c585a5a0ad2170879689b0b6b79",
       "executable": false
     },
     "docs/FIELD-TIME.md": {
@@ -3901,7 +3901,19 @@
       "executable": false
     },
     "src/ui/attachment-legacy/preflight.ts": {
-      "sha256": "617aea3fffcd7415c7e8fd45b5d204ff46e7133f6cce691f30bfc2d8818efe48",
+      "sha256": "1d9cddb242a24b2ed7535d16c7365698f0221d89cde274662cbfce51fba36807",
+      "executable": false
+    },
+    "src/ui/attachment-legacy/presentation-graph.ts": {
+      "sha256": "c5032afe79be7b154c91be6d1b22c8c8203e417f12785faa840c384f46f9a473",
+      "executable": false
+    },
+    "src/ui/attachment-legacy/presentation-records.ts": {
+      "sha256": "38dae20382d148aa572c834a17e61f975d54c08067206fe124a29cb73119eaf7",
+      "executable": false
+    },
+    "src/ui/attachment-legacy/presentation-text.ts": {
+      "sha256": "d809ad8a103cc2776109484402624d9871c3384d99a33fdb87613a44e5344665",
       "executable": false
     },
     "src/ui/attachment-legacy/types.ts": {
@@ -3917,7 +3929,7 @@
       "executable": false
     },
     "src/ui/attachment-legacy/worker.ts": {
-      "sha256": "83c93f5f8af999c49ea04ef578e88671ca2034268d82d841dacc9be3c595d586",
+      "sha256": "0bcfbef6dc6102a01011c86911dc06a2fcefa9eb98b42e66f194290ed431e585",
       "executable": false
     },
     "src/ui/attachment-office/archive.ts": {
@@ -4456,6 +4468,10 @@
       "sha256": "c8eeb90e7557cb9eaf9af692508794efcc40903d1d504b8568089df33d32bda2",
       "executable": false
     },
+    "tests/fixtures/legacy-presentation-stories.mjs": {
+      "sha256": "7a411f872e17a4d3058f62169eafce83a59a62dc69fe5d9623d2941c041b5e59",
+      "executable": false
+    },
     "tests/fixtures/legacy-word-stories.mjs": {
       "sha256": "ea8e80ef78dd4e60bd52f182804a884595509b808557a33d122aa3b7e31e45f6",
       "executable": false
@@ -4565,7 +4581,7 @@
       "executable": false
     },
     "tests/journeys/legacy-attachment-search.mjs": {
-      "sha256": "3c16f9634b3c217ded3c1bd317114dcfe9220df4fd195915dcdb07403f949068",
+      "sha256": "07fd97e95195efd91456670f5a032f31b955ed10789cd9e9ec5640263cab10ca",
       "executable": false
     },
     "tests/journeys/meeting-mail.mjs": {
@@ -4617,7 +4633,7 @@
       "executable": false
     },
     "tests/journeys/review-extracted-attachment.mjs": {
-      "sha256": "2fde36c72f5a09f0076b0092c19eeb408fa82fd41a3a935cf6b4f8f2be99a10a",
+      "sha256": "a0894ea1ec9fff0ca798f2737e2fae61282998549e6c06010c8d65673218403b",
       "executable": false
     },
     "tests/journeys/rfis.mjs": {

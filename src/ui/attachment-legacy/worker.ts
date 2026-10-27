@@ -3,6 +3,7 @@ import init, { WasmDocument } from 'office-oxide-wasm/web'
 import wasmUrl from '../../../node_modules/office-oxide-wasm/web/office_oxide_bg.wasm?url'
 import { additionalText } from './ir'
 import { preflight } from './preflight'
+import { presentationText } from './presentation-text'
 import { extractWordStories } from './word-stories'
 import { limitedMemory } from './wasm-memory'
 import { bounded, fail, LegacyError, LIMITS, type Reply, type Request } from './types'
@@ -15,7 +16,14 @@ scope.onmessage = async event => {
  try {
   const { bytes, format } = event.data
   if (!(bytes instanceof ArrayBuffer) || !['doc', 'xls', 'ppt'].includes(format) || bytes.byteLength > 20 * 1024 * 1024) fail('the original or format exceeds the reader boundary.')
-  const source = new Uint8Array(bytes), notes = preflight(source, format)
+  const source = new Uint8Array(bytes), checked = preflight(source, format), notes = checked.notes
+  if (checked.presentation) {
+   scope.postMessage({ progress: 'Reading current PowerPoint slides, notes and masters…' })
+   const result = presentationText(checked.presentation)
+   if (!result.text.trim()) fail('no supported current PowerPoint text was recovered. This does not mean the original is empty.')
+   scope.postMessage({ result: { text: result.text, notes: [...notes, ...result.notes, LIMITS] } })
+   return
+  }
   const stories = format === 'doc' ? extractWordStories(source) : {text:'',notes:[]}
   scope.postMessage({ progress: 'Loading the bundled legacy Office reader…' })
   const url = new URL(wasmUrl, scope.location.href)
