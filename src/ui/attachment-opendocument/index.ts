@@ -23,7 +23,7 @@ export async function extractOpenDocument(file: Blob, name: string, hooks: Offic
   await reader.walk(main[0], kind === 'text' ? 'Document body' : kind === 'spreadsheet' ? 'Workbook' : 'Presentation')
   await reader.styles()
   draft.notes.add('OpenDocument extraction reads stored text, formulas, cached values, notes, comments and supported embedded raster pictures. English OCR is an unverified draft; fields, chart objects, vector artwork, reading order, numbering and visual layout require review.')
-  draft.notes.add('Limits: 20 MiB original, 2,000 ZIP entries, 64 MiB ZIP expansion, 16 MiB per entry, 8 MiB per XML part, 100,000 XML elements per part, depth 256, 40 raster pictures at 8 MiB each and 20 MiB total, 16 megapixels per raster, 100,000 output characters and five minutes under the parent abort signal.')
+  draft.notes.add('OpenDocument limits: 20 MiB original, 64 MiB expanded contents, 40 raster pictures at 8 MiB each and 20 MiB total, 16 megapixels per picture, 100,000 output characters and five minutes. Very complex packages may be refused. Stopping extraction discards its draft.')
   draft.check()
   return draft.result()
  } catch (error) {

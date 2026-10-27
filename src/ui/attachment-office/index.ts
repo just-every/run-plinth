@@ -20,8 +20,8 @@ export async function extractOffice(file: Blob, name: string, hooks: OfficeHooks
   else if (root.localName === 'presentation' && inSpace(root, 'slide')) await extractPresentation(office, main)
   else fail('the main document is not a supported Word document, workbook or presentation.')
   hooks.check()
-  draft.notes.add('Office extraction reads stored XML and supported embedded raster pictures without executing active content or following external links. OCR, reading order, stored alternatives and omitted objects require review against the original.')
-  draft.notes.add('Office limits: 20 MiB compressed, 2,000 ZIP entries, 64 MiB total expansion, 16 MiB per entry, 8 MiB per XML part, 100,000 XML elements per part, nesting depth 256, 40 unique raster pictures. The enclosing text, image and time limits also apply.')
+  draft.notes.add('Office extraction reads stored text and supported embedded raster pictures without executing active content or following external links. OCR, reading order, stored alternatives and omitted objects require review against the original.')
+  draft.notes.add('Office limits: 20 MiB original, 64 MiB expanded contents and 40 unique raster pictures. The displayed text, image and time limits also apply. Very complex packages or unsupported parts may be refused.')
   return draft.result()
  } catch (error) {
   hooks.check()

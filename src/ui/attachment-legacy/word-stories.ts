@@ -105,6 +105,6 @@ export function extractWordStories(source: Uint8Array): { text: string; notes: s
  }
  return { text: bounded(output.join('\n\n')), notes: [
   'Supplementary Word text comes from the original document’s declared text sections and is included beside its main text. Old or unreferenced stored bytes are not searched.',
-  'Headers, footers and note separators are grouped in their declared header subdocument. Individual note anchors, section placement, numbering, field evaluation, font glyphs, layout and tracked-change acceptance are not interpreted. Structural control markers are normalized; pictures and embedded objects are not read or recognized.',
+  'Headers, footers and note separators are grouped in their own text section. Individual note anchors, section placement, numbering, field evaluation, font glyphs, layout and tracked-change acceptance are not interpreted. Formatting marks are normalized; pictures and embedded objects are not read or recognized.',
  ] }
 }

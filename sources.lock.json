@@ -3885,7 +3885,7 @@
       "executable": false
     },
     "src/ui/attachment-formats/tiff.ts": {
-      "sha256": "59dc576d16e7206612c7980bada24aa7711220777b83ed7622293af9ce3b11e3",
+      "sha256": "c17eb0be6d9a6aa4bf2ac0fefebbb69f698f36ba51970b503ce0a3c9d8b07336",
       "executable": false
     },
     "src/ui/attachment-legacy/compound.ts": {
@@ -3905,7 +3905,7 @@
       "executable": false
     },
     "src/ui/attachment-legacy/types.ts": {
-      "sha256": "115479bc5036fc11d6ff78784f468feeec17b2c41440ae9e24702ada828118e7",
+      "sha256": "618455a316a83fb858c2d0abb942cf3a04abcde977b6e5a0babc11a8df171115",
       "executable": false
     },
     "src/ui/attachment-legacy/wasm-memory.ts": {
@@ -3913,7 +3913,7 @@
       "executable": false
     },
     "src/ui/attachment-legacy/word-stories.ts": {
-      "sha256": "58c9ee790c7969f378ef9419bbeedbea55f9c071de57d606808f49b514677f45",
+      "sha256": "f65b38788374e0ac0ed97d271210367435f6aa86f41f6031453f34cf1ac3ffb1",
       "executable": false
     },
     "src/ui/attachment-legacy/worker.ts": {
@@ -3929,7 +3929,7 @@
       "executable": false
     },
     "src/ui/attachment-office/index.ts": {
-      "sha256": "74ad01d9f6bc0bf2b5befbf8cf69be58bff523dd306724011c379b0aba9721b4",
+      "sha256": "6cf9b173a5f47ed07c11458009017f13b068db739b4eb0cc725e909de2109b52",
       "executable": false
     },
     "src/ui/attachment-office/package.ts": {
@@ -3969,7 +3969,7 @@
       "executable": false
     },
     "src/ui/attachment-opendocument/index.ts": {
-      "sha256": "821f1ef0a7ac257d3b2fab56f3282cbb1aabcb5d35d7615b28561fb30bcbd6bc",
+      "sha256": "27e8e48b06feacd952fa3ae9dec1f5f27202bc2e60fec4a72f3e14320d7646b0",
       "executable": false
     },
     "src/ui/attachment-opendocument/package.ts": {
