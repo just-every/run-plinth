@@ -3421,7 +3421,7 @@
       "executable": false
     },
     "src/plinth/report-xlsx.ts": {
-      "sha256": "42153fa068d2803b4a8fee2037545f52f3183b5a375bb981c5198a3ef3830abe",
+      "sha256": "412ac776fcf362ac16f9557d74baf8b9485c45e3a75e4357b7e044fddf970074",
       "executable": false
     },
     "src/plinth/reports.ts": {
@@ -4681,7 +4681,7 @@
       "executable": false
     },
     "tests/journeys/portfolio.mjs": {
-      "sha256": "cd63fe373c2f82d0e0c46caa72265c3221c5f5af4c9386b44dab3f7fd9c3b39a",
+      "sha256": "c52a85d414a3d703b9b456ce74f06618dbc30c908b23301705893768b55c4170",
       "executable": false
     },
     "tests/journeys/products.mjs": {
@@ -4853,7 +4853,7 @@
       "executable": false
     },
     "tests/plinth/reports.test.mjs": {
-      "sha256": "06deb6dff12763c01554ce449bede3eb81ab906b36c9e1b1323db6a44d5a8bc5",
+      "sha256": "eccda16728e8730626a1825a6484aef33e3253a983dec7eb236606ed74693fb4",
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {

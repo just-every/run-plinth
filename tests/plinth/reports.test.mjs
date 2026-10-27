@@ -146,6 +146,9 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   const person=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@example.com')
   const assign=async job_ids=>api('/team/'+person.id,{method:'PUT',body:{expected_version:(await api('/team')).value.team.find(p=>p.id===person.id).version??0,role:'project_manager',job_ids,po_limit_cents:0}})
   assert.equal((await assign([fixtures[0].job.id])).status,200)
+  assert.equal((await api('/reports/snapshots',{cookie:manager,method:'POST',body:{name:'Built-in manager capture refused'}})).status,403,'A built-in manager cannot create a capture')
+  const builtInCapture=await capture('Built-in manager portfolio')
+  assert.deepEqual((await query({snapshot_id:builtInCapture.id,manager_id:person.id})).rows.map(r=>r.id),[fixtures[0].job.id],'Built-in managers retain their captured subset')
   const copiedManager=await api('/roles',{method:'POST',body:{copy_of:'project_manager',name:'Portfolio custom manager'}});assert.equal(copiedManager.status,201)
   const customAssign=async job_ids=>api('/team/'+person.id,{method:'PUT',body:{expected_version:(await api('/team')).value.team.find(p=>p.id===person.id).version,role:'custom',role_id:copiedManager.value.role.id,job_ids}})
   assert.equal((await customAssign([fixtures[0].job.id])).status,200)
@@ -198,6 +201,9 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   assert.equal((await assign([])).status,200);assert.deepEqual((await api('/reports/snapshots')).value.managers.map(m=>m.id),[person.id],'Captured managers remain selectable after their last assignment is removed');assert.deepEqual((await query({snapshot_id:historical.id,manager_id:person.id})).rows.map(r=>r.id),[fixtures[0].job.id]);assert.deepEqual((await query({manager_id:person.id})).rows,[]);assert.equal((await api('/reports/views/'+historicView.value.view.id,{cookie:manager})).status,404);assert.equal((await api('/reports/snapshots',{cookie:manager})).value.snapshots.length,0);assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:historical.id})),{cookie:manager})).status,404);assert.equal((await api('/reports/views/'+id,{cookie:manager})).value.report.rows.length,0)
   const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()
   for(const options of [{cookie:client},{cookie:undefined,token:agent}])for(const path of ['/reports/views/'+id+'/export.xlsx','/reports/job-sources/'+fixtures[0].job.id])assert.equal((await api(path,options)).status,403)
+  const credentials=(await api('/agent-credentials')).value.credentials;assert.equal(credentials.length,1)
+  assert.equal((await api('/agent-credentials/'+credentials[0].id+'/revoke',{method:'POST',body:{}})).status,200)
+  for(const path of ['/reports/views/'+historicView.value.view.id,'/reports/job-sources/'+fixtures[0].job.id])assert.equal((await api(path,{cookie:undefined,token:agent})).status,401,'A revoked bearer cannot read a replayed capture or source download')
   r=await api('/roles',{method:'POST',body:{copy_of:'administrator',name:'Report without finances',financial_visible:false}});assert.equal(r.status,201);const role=r.value.role
   assert.equal((await api('/team/'+person.id,{method:'PUT',body:{expected_version:3,role:'custom',role_id:role.id,job_ids:[]}})).status,200)
   assert.equal((await api('/reports/views/'+id,{cookie:manager})).status,404)
@@ -217,7 +223,12 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   assert.deepEqual(separated.money_totals.filter(t=>t.column_id==='native.contract').map(t=>[t.currency,t.amount_cents]).sort(),[['AUD',100000],['USD',900000]])
   assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],portfolio:{cost_code:'01-100'}}})).status,403)
   const {portfolioAward}=await import('./portfolio-adjustment-support.mjs'),c=fixtures[0]
+  const exportPath='/api/plinth/reports/views/'+historicView.value.view.id+'/export.xlsx'
+  const frozenExport=await f.request(exportPath,{cookie:f.owner});assert.equal(frozenExport.status,200)
+  const frozenBytes=Buffer.from(await frozenExport.arrayBuffer())
   f.setNow(Date.parse('2026-10-28T15:00:00Z'))
+  const replayedExport=await f.request(exportPath,{cookie:f.owner});assert.equal(replayedExport.status,200)
+  assert.deepEqual(Buffer.from(await replayedExport.arrayBuffer()),frozenBytes,'A captured XLSX cannot change when the current UTC date advances')
   const award=await portfolioAward(f,c)
   const budgetQuery=async portfolio=>(await query(portfolio)).rows.find(r=>r.id===c.job.id).values
   assert.equal((await budgetQuery({}))['portfolio.revised_budget'].amount_cents,190000)

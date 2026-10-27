@@ -17,7 +17,7 @@ function zip(files:Record<string,string>):Uint8Array {
 }
 /** Inline string cells never execute formulas; money stays explicitly labelled in integer cents. */
 export function reportXlsx(report:ReportResult):Uint8Array {
- const rows:unknown[][]=[['Scope and filters',JSON.stringify(report.annotation)],['Current report date (UTC)',new Date().toISOString().slice(0,10)],['record_id','record_name','currency',...report.columns.map(c=>c.name+(c.type==='money'?' (currency and integer cents)':''))]]
+ const rows:unknown[][]=[['Scope and filters',JSON.stringify(report.annotation)],['record_id','record_name','currency',...report.columns.map(c=>c.name+(c.type==='money'?' (currency and integer cents)':''))]]
  for(const row of report.rows)rows.push([row.id,row.label,row.currency,...report.columns.map(c=>{const v=row.values[c.id];return v&&typeof v==='object'?`${v.currency} ${v.amount_cents}`:v})])
  for(const total of report.money_totals)rows.push(['Total',total.column_id,total.currency,total.amount_cents,total.count])
  const sheet='<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rows.map((row,i)=>`<row r="${i+1}">`+row.map(v=>typeof v==='number'?`<c><v>${v}</v></c>`:`<c t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`).join('')+'</row>').join('')+'</sheetData></worksheet>'
