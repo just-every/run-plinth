@@ -22,8 +22,19 @@ within those bounds. Linked Word headers, footers, footnotes, endnotes and text
 boxes are included. Spreadsheet formulas and saved values are read without
 recalculation; slide layouts and masters can repeat text. Embedded objects,
 charts, equations, threaded comments and unsupported pictures can remain unread;
-the draft shows these limitations. Legacy binary Office and other formats still
-need manually supplied text. PDF pages with embedded text use
+the draft shows these limitations. Legacy binary Office files have a bounded
+local reader: main-story Word text, saved spreadsheet cell values
+and current slide text. Its notes name unread stories, comments, pictures and
+other omissions. Encrypted legacy files are refused.
+
+Multi-page TIFF, RTF code pages and Unicode, BOM UTF-16 plain text, inert HTML
+and SVG stored text also have local readers. TIFF and inline raster pictures use
+English OCR. Unsupported TIFF layouts and codecs fail explicitly. Scripts are
+never executed; HTML linked resources are not fetched, and SVG external
+references are refused. Markup layout, outlined vector glyphs, embedded objects
+and unsupported parts still require manual inspection and supplied text.
+
+PDF pages with embedded text use
 that text by default; choose **OCR every PDF page** to read the rendered page
 instead. OCR is an unverified draft and can miss handwriting, symbols, numbers,
 layout or reading order. Check it against the complete original.

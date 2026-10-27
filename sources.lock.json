@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f702ad2653a5712a5f2370b96ec1904f07ae65193b57a37804860fbf613d31bb",
+      "sha256": "4622ed2ce0474b68be8a573dc2c2c76a108847fb04e569d00a05f40d7159685d",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "bfc6a9b4efdcfa5cdb7ebe08a8a26de9a742534f608caea37e5fc5790fca22ed",
+      "sha256": "87afa5e201ed12ecf6b4a7283d14ae3d5e80ff0d1a201babf866f16350e6b145",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "e882d38ca81aadb8421704389cc361538e21e5e45c5b6dcc0c405c92c0dccd1d",
+      "sha256": "b9bf8cb833ee909e56454c3442882e9616a06a977a687efa9925541b38567ab3",
       "executable": false
     },
     "docs/FIELD-TIME.md": {
