@@ -41,7 +41,6 @@ function strings(value: unknown, name: string, max: number): string[] {
  need(new Set(ids).size === ids.length, `${name} IDs must be unique`)
  return ids
 }
-const selected_columnsForSnapshot=(input:Input)=>strings(input.selected_columns,'selected_columns',50)
 function availableColumns(columns: ReportColumn[]): void {
  need(columns.length > 0 && columns.length <= 250, 'Supply between 1 and 250 available columns')
  for (const column of columns) { reportIdentity(column.id, 'column id'); text(column.name, 'column name', 120); reportFieldType(column.type) }
@@ -79,17 +78,18 @@ export function parseReportView(input: Input, columns: ReportColumn[], createdBy
  const merged = { ...previous, ...input }, scope = object(merged.scope)
  const portfolio=parsePortfolioScope(merged.portfolio)
  need(!portfolio||scope.record_scope==='job','Portfolio selections require job scope')
- if(portfolio?.snapshot_id)need([...selected_columnsForSnapshot(merged),...(merged.filters as ReportFilter[]??[]).map(f=>f.column_id)].every(id=>id.startsWith('portfolio.')||['native.stage','native.delayed','native.contract'].includes(id)),'Historical portfolio reports cannot mix current custom fields')
  const sharing = merged.sharing
  need(sharing === 'personal' || sharing === 'shared', 'sharing must be personal or shared')
  const selected_columns = strings(merged.selected_columns, 'selected_columns', 50)
  need(selected_columns.length > 0, 'Select at least one column')
  selected_columns.forEach(id => columnFor(columns, id))
+ const filters=parseReportFilters(merged.filters ?? [], columns)
+ if(portfolio?.snapshot_id)need([...selected_columns,...filters.map(f=>f.column_id)].every(id=>id.startsWith('portfolio.')||['native.stage','native.delayed','native.contract'].includes(id)),'Historical portfolio reports cannot mix current custom fields')
  need(scope.record_ids === null || Array.isArray(scope.record_ids), 'scope.record_ids must be an explicit ID list or null for all supplied records')
  return { id: previous?.id ?? (input.id === undefined ? crypto.randomUUID() : reportIdentity(input.id)), name: text(merged.name, 'view name', 120),
   created_by: previous?.created_by ?? text(createdBy, 'creator', 100), sharing,
   scope: { record_scope: reportScope(scope.record_scope), record_ids: scope.record_ids === null ? null : strings(scope.record_ids, 'scope.record_ids', 10000) },
-  filters: parseReportFilters(merged.filters ?? [], columns), selected_columns,...(portfolio?{portfolio}:{}) }
+  filters, selected_columns,...(portfolio?{portfolio}:{}) }
 }
 function matches(actual: ReportFieldValue, filter: ReportFilter): boolean {
  if (filter.operator === 'is_set') return actual !== null

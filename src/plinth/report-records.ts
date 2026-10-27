@@ -1,7 +1,6 @@
 import { portfolioJobs, type PortfolioScope } from './portfolio-scope'
 import { portfolioColumns, portfolioValues } from './portfolio'
 import { scheduleVariance } from './schedule-baseline-model'
-import { jobs } from './store'
 import { currencyOf, need, type Actor, type Job } from './model'
 import type { Customer } from './customer-model'
 import type { Vendor } from './vendor-model'

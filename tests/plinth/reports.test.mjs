@@ -109,6 +109,8 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
    assert.equal(source.rows.flatMap(row=>row.sources.actual).reduce((n,row)=>n+row.amount_cents,0),values['portfolio.actual'].amount_cents)
    assert.equal(source.forecast.codes.reduce((n,row)=>n+row.final_cents,0),values['portfolio.forecast'].amount_cents)
    assert.equal(source.source_version,c.job.version)
+   assert.deepEqual(source.schedule.map(r=>r.forecast_finish_variance_minutes),[1440])
+   assert.deepEqual(source.open_decisions,[{kind:'selection',id:c.job.selections[0].id,cost_code:'01-100',dated_on:c.job.selections[0].revisions[0].prepared_by.at.slice(0,10)}])
   }
   assert.equal(owner.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,13200)
   const query=async portfolio=>{const r=await api('/reports/query',{method:'POST',body:{...spec,portfolio}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value.report}
@@ -179,9 +181,21 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   r=await api('/roles',{method:'POST',body:{copy_of:'administrator',name:'Report without finances',financial_visible:false}});assert.equal(r.status,201);const role=r.value.role
   assert.equal((await api('/team/'+person.id,{method:'PUT',body:{expected_version:2,role:'custom',role_id:role.id,job_ids:[]}})).status,200)
   assert.equal((await api('/reports/views/'+id,{cookie:manager})).status,404)
-  assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id,{cookie:manager})).status,403)
+  const restrictedSource=await api('/reports/job-sources/'+fixtures[0].job.id,{cookie:manager});assert.equal(restrictedSource.status,200)
+  assert.equal(restrictedSource.value.rows,undefined);assert.equal(restrictedSource.value.forecast,null);assert.equal(restrictedSource.value.open_decisions,undefined)
+  assert.ok(!Object.values(restrictedSource.value.values).some(v=>typeof v==='object'&&v!==null))
+  assert.deepEqual(restrictedSource.value.schedule.map(r=>r.forecast_finish_variance_minutes),[1440])
   assert.ok(!(await api('/reports/records?record_scope=job',{cookie:manager})).value.columns.some(c=>c.id==='portfolio.open_decisions'),'Hidden financial decision counts are unavailable before filtering')
   assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],filters:[{column_id:'portfolio.open_decisions',operator:'gt',value:0}]}})).status,400,'A hidden decision count cannot influence query membership')
+  const historicalCsv='external_id,title,client_email,site_address,quote_cents,accepted_on,currency\naud-portfolio,Historic Australian porch,legacy@example.com,Historic site,100000,2025-10-01,AUD\n'
+  let imported=await api('/imports/preview',{method:'POST',body:{csv:historicalCsv}});assert.equal(imported.status,200)
+  imported=await api('/imports/commit',{method:'POST',body:{csv:historicalCsv,fingerprint:imported.value.fingerprint}});assert.equal(imported.status,200)
+  const historicalJob=(await api('/jobs')).value.jobs.find(j=>j.currency==='AUD')
+  const acceptedHistorical=await api('/jobs/'+historicalJob.id+'/quotes/'+historicalJob.quotes[0].id+'/accept',{method:'POST',body:{expected_version:historicalJob.version,method:'email',evidence:'Reviewed historical client acceptance',schedule_choice:{kind:'none',reason:'Historical schedule stays separate'}}})
+  assert.equal(acceptedHistorical.status,200,JSON.stringify(acceptedHistorical.value))
+  const separated=await query({})
+  assert.deepEqual(separated.money_totals.filter(t=>t.column_id==='native.contract').map(t=>[t.currency,t.amount_cents]).sort(),[['AUD',100000],['USD',900000]])
+  assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],portfolio:{cost_code:'01-100'}}})).status,403)
   await fixtures[0].read()
   assert.equal((await api('/jobs/'+fixtures[0].job.id,{method:'DELETE',body:{expected_version:fixtures[0].job.version}})).status,200)
   assert.equal((await query({snapshot_id:historical.id})).rows.length,2)

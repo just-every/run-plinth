@@ -1,5 +1,5 @@
 import { jobs } from './store'
-import { need, object, text, type Actor, type Input, type Job } from './model'
+import { need, object, text, type Actor, type Job } from './model'
 import { localDate } from './remittances'
 export interface PortfolioScope { snapshot_id?:string; manager_id?:string; trade?:string; cost_code?:string; source_from?:string; source_to?:string }
 export function parsePortfolioScope(value:unknown):PortfolioScope|undefined {

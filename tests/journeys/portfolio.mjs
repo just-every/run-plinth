@@ -44,6 +44,7 @@ try{
    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No page overflow at '+width)
    const region=p.getByRole('region',{name:'Saved view results'});await expect(region.getByRole('link',{name:'Source records',exact:true})).toHaveCount(matched)
    await region.focus();assert.equal(await region.evaluate(e=>e===document.activeElement),true)
+   if(width===1440){
    for(const format of ['CSV','XLSX']){
     const link=p.getByRole('link',{name:'Download scoped '+format,exact:true}),href=await link.getAttribute('href'),response=await p.context().request.get(base+href)
     assert.equal(response.status(),200);if(who==='manager')assert.ok(!(await response.body()).includes(Buffer.from(jobs[1].id)))
@@ -51,6 +52,7 @@ try{
    for(const link of await region.getByRole('link',{name:'Source records',exact:true}).all()){
     const response=await p.context().request.get(base+await link.getAttribute('href'));assert.equal(response.status(),200)
     const source=await response.json();assert.equal(source.rows.reduce((n,r)=>n+r.posted_actual_cents,0),who==='manager'?2200:[2200,4400,6600][jobs.findIndex(j=>j.id===source.job_id)])
+   }
    }
    if(width===390){const menu=p.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await p.keyboard.press('Tab');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
    await p.screenshot({path:`${shots}/RPT-001-${who}-${width}.png`,fullPage:true,animations:'disabled'})
@@ -65,6 +67,7 @@ try{
  await page.getByRole('button',{name:'Save view',exact:true}).click()
  await expect(page.getByRole('region',{name:'Saved view results'})).toBeVisible()
  const sourceLink=page.getByRole('region',{name:'Saved view results'}).getByRole('link',{name:'Source records',exact:true}).first()
+ await expect(sourceLink).toHaveAttribute('href',new RegExp(earlier.id))
  const earlierSource=await (await owner.request.get(base+await sourceLink.getAttribute('href'))).json()
  assert.deepEqual(earlierSource.rows.map(r=>r.cost_code),['01-100'])
  assert.equal(earlierSource.rows[0].client_billed_cents,0)

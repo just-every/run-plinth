@@ -1,7 +1,5 @@
-import { portfolioJobs, portfolioManagers, parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
-import { portfolioSources } from './portfolio'
-import { costLedger } from './cost-ledger'
-import { jobs } from './store'
+import { portfolioJobs, parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
+import { portfolioSources, portfolioValues, portfolioScheduleSources, portfolioDecisionSources } from './portfolio'
 import { reportXlsx } from './report-xlsx'
 import { need, object, text, type Actor, type Input } from './model'
 import { readClock, transaction } from './store'
@@ -26,7 +24,7 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
  const office=actor.role==='owner'||actor.role==='admin'
  const canCreate=!actor.permissions||actor.permissions.matrix.reports.create
  const canEdit=!actor.permissions||actor.permissions.matrix.reports.edit
- const checkSelection=(selection?:PortfolioScope)=>{need(!selection?.trade||reportColumns(visibleFields,'job',actor).some(c=>c.id==='native.delayed'),'Trade selection requires schedule visibility',403,'forbidden')}
+ const checkSelection=(selection?:PortfolioScope)=>{need(!selection||!Object.keys(selection).length||reportColumns(visibleFields,'job',actor).some(c=>c.id==='portfolio.actual'),'Portfolio source selection requires financial visibility',403,'forbidden');need(!selection?.trade||reportColumns(visibleFields,'job',actor).some(c=>c.id==='native.delayed'),'Trade selection requires schedule visibility',403,'forbidden')}
  const run=async(view:ReportView)=>{checkSelection(view.portfolio);return queryReport(await reportRecords(db,actor,view.scope.record_scope,config.fields,view.portfolio),reportColumns(visibleFields,view.scope.record_scope,actor),view)}
  if(parts.length===2&&parts[1]==='snapshots'){
   need(reportColumns(visibleFields,'job',actor).some(c=>c.id==='portfolio.actual'),'Financial snapshots are unavailable',403,'forbidden')
@@ -55,12 +53,13 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
  }
  if(parts.length===3&&parts[1]==='job-sources'&&method==='GET'){
   const columns=reportColumns(visibleFields,'job',actor)
-  need(columns.some(c=>c.id==='portfolio.actual'),'Financial source records are unavailable',403,'forbidden')
+  const financial=columns.some(c=>c.id==='portfolio.actual'),schedule=columns.some(c=>c.id==='portfolio.slippage'),decisions=columns.some(c=>c.id==='portfolio.open_decisions')
+  need(financial||schedule||decisions,'Source records are unavailable',403,'forbidden')
   const selection=parsePortfolioScope(url.searchParams.has('portfolio')?JSON.parse(url.searchParams.get('portfolio')!):undefined)
   checkSelection(selection)
   const captured=(await portfolioJobs(db,actor,selection)).find(r=>r.job.id===parts[2]);need(captured,'Job not found',404,'not_found')
   const job=captured.job,ledger=portfolioSources(job,selection)
-  const source={as_of:captured.captured_at,selection:selection??null,job_id:job.id,source_version:job.version,currency:ledger.currency,rows:ledger.rows,forecast:ledger.forecast?{id:ledger.forecast.id,as_of:ledger.forecast.as_of,codes:ledger.forecast.codes,stale:ledger.forecast.stale}:null,label:ledger.label}
+  const source={as_of:captured.captured_at,selection:selection??null,job_id:job.id,source_version:job.version,currency:ledger.currency,values:Object.fromEntries(Object.entries(portfolioValues(job,selection,captured.captured_at)).filter(([id])=>columns.some(c=>c.id===id))),schedule:schedule?portfolioScheduleSources(job,selection):undefined,open_decisions:decisions?portfolioDecisionSources(job,selection):undefined,rows:financial?ledger.rows:undefined,forecast:financial&&ledger.forecast?{id:ledger.forecast.id,as_of:ledger.forecast.as_of,codes:ledger.forecast.codes,stale:ledger.forecast.stale}:null,label:ledger.label}
   await transaction(db,actor,null,[reportAudit(db,actor,'export',null,{job_id:job.id,format:'json',source_version:job.version})])
   return new Response(JSON.stringify(source,null,2),{headers:{...headers,'content-type':'application\u002fjson','content-disposition':'attachment; filename=portfolio-job-sources.json'}})
  }
@@ -75,6 +74,8 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
  const canRead=async(view:ReportView)=> {
   if(!(view.sharing==='shared'||view.created_by===actor.id)||!scopes.includes(view.scope.record_scope))return false
   const columns=reportColumns(visibleFields,view.scope.record_scope,actor),ids=new Set(columns.map(column=>column.id))
+  if(view.portfolio&&Object.keys(view.portfolio).length&&!columns.some(c=>c.id==='portfolio.actual'))return false
+  if(view.portfolio?.trade&&!columns.some(c=>c.id==='native.delayed'))return false
   if(!view.selected_columns.every(id=>ids.has(id))||!view.filters.every(filter=>ids.has(filter.column_id)))return false
   if(view.scope.record_ids!==null){const available=new Set((await recordsFor(view.scope.record_scope)).map(record=>record.id));if(!view.scope.record_ids.every(id=>available.has(id)))return false}
   return true

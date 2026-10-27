@@ -29,6 +29,7 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - run: node src/plinth/contract-docs.mjs check
       - run: pnpm run verify
 
   installed:

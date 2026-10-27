@@ -28,18 +28,29 @@ export function portfolioValues(job: Job,selection?:PortfolioScope,asOf=new Date
  const ledger=portfolioSources(job,selection),currency=currencyOf(job),rows=ledger.rows
  const nullable=(values:(number|null)[])=>values.length&&values.every(n=>n!==null)?sum(values as number[]):null
  const original=nullable(rows.map(r=>r.original_estimate_cents)),revised=nullable(rows.map(r=>r.approved_budget_cents))
- const forecast=ledger.forecast,budget=job.budgets?.at(-1),contract=budget&&rows.some(r=>r.sources.budgets.some(b=>b.id===budget.id))?sum(budget.codes.filter(c=>rows.some(r=>r.cost_code===c.cost_code)).map(c=>c.revenue_cents)):null
+ const forecast=ledger.forecast,budget=job.budgets?.at(-1),contract=budget&&rows.some(r=>r.sources.budgets.some(b=>b.id===budget.id))?sum(budget.codes.filter(c=>rows.some(r=>r.cost_code===c.cost_code)).map(c=>c.revenue_cents)):!selection?.cost_code&&!selection?.source_from&&!selection?.source_to?sum([job.quotes.find(q=>q.status==='accepted')?.total_cents??0,...job.variations.filter(v=>v.status==='approved').map(v=>v.amount_cents)]):null
  const billed=sum(rows.map(r=>r.client_billed_cents)),collected=sum(rows.map(r=>r.client_collected_cents))
  const final=forecast?sum(forecast.codes.map(c=>c.final_cents)):null,margin=forecast?sum(forecast.codes.map(c=>c.margin_cents)):null
  const values:Record<string,number|null>={original_budget:original,revised_budget:revised,committed:sum(rows.map(r=>r.commitment_cents)),actual:sum(rows.map(r=>r.posted_actual_cents)),forecast:final,margin,billed,collected,backlog:contract===null?null:sum([contract,-billed])}
  const result:ReportValues=Object.fromEntries(Object.entries(values).map(([key,value])=>['portfolio.'+key,value===null?null:{currency,amount_cents:value}]))
- const inDate=(date:string)=>!selection?.source_from&&!selection?.source_to||(!selection?.source_from||date>=selection.source_from)&&(!selection?.source_to||date<=selection.source_to)
- const inCode=(code:string)=>!selection?.cost_code||code===selection.cost_code
- const variance=scheduleVariance(job).filter(v=>v.status!=='cancelled'&&inDate(v.forecast_start.slice(0,10))).map(v=>v.forecast_finish_variance_minutes).filter((n):n is number=>n!==null)
+ const variance=portfolioScheduleSources(job,selection).map(v=>v.forecast_finish_variance_minutes).filter((n):n is number=>n!==null)
  result['portfolio.slippage']=variance.length?Math.max(0,...variance):null
- result['portfolio.open_decisions']=(job.selections??[]).filter(s=>{const r=s.revisions.at(-1);return r?.status==='presented'&&inCode(r.cost_code)&&inDate(r.prepared_by.at.slice(0,10))}).length+job.variations.filter(v=>v.status==='draft'&&inDate(v.prepared_by.at.slice(0,10))&&(!selection?.cost_code||v.pricing?.base_lines.some(l=>inCode(l.cost_code??'Unassigned'))||!v.pricing&&inCode('Unassigned'))).length+(job.rfis??[]).filter(r=>!r.resolved&&inCode(r.cost_code??'Unassigned')&&inDate(r.by.at.slice(0,10))).length
+ result['portfolio.open_decisions']=portfolioDecisionSources(job,selection).length
  result['portfolio.as_of']=asOf.slice(0,10)
  result['native.contract']=contract===null?null:{currency,amount_cents:contract}
  result['portfolio.forecast_stale']=forecast?forecast.stale??false:null
  return result
+}
+
+const sourceDate=(date:string,selection?:PortfolioScope)=>(!selection?.source_from||date>=selection.source_from)&&(!selection?.source_to||date<=selection.source_to)
+export function portfolioScheduleSources(job:Job,selection?:PortfolioScope){
+ return scheduleVariance(job).filter(v=>v.status!=='cancelled'&&sourceDate(v.forecast_start.slice(0,10),selection)&&(!selection?.trade||job.schedules.find(s=>s.id===v.task_id)?.trade.toLocaleLowerCase('en-US')===selection.trade.toLocaleLowerCase('en-US')))
+}
+export function portfolioDecisionSources(job:Job,selection?:PortfolioScope){
+ const rows=[
+  ...(job.selections??[]).flatMap(s=>{const r=s.revisions.at(-1);return r?.status==='presented'?[{kind:'selection',id:s.id,cost_code:r.cost_code,dated_on:r.prepared_by.at.slice(0,10)}]:[]}),
+  ...job.variations.filter(v=>v.status==='draft').map(v=>({kind:'variation',id:v.id,cost_code:v.pricing?.base_lines.map(l=>l.cost_code??'Unassigned').join(',')??'Unassigned',dated_on:v.prepared_by.at.slice(0,10)})),
+  ...(job.rfis??[]).filter(r=>!r.resolved).map(r=>({kind:'rfi',id:r.id,cost_code:r.cost_code??'Unassigned',dated_on:r.by.at.slice(0,10)}))
+ ]
+ return rows.filter(r=>sourceDate(r.dated_on,selection)&&(!selection?.cost_code||r.cost_code.split(',').includes(selection.cost_code)))
 }
