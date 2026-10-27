@@ -25,5 +25,5 @@ export async function attachmentTranscription({ base, page, clientPage, owner, c
  assert.deepEqual(Buffer.from(await(await owner.request.get(base+hit.files[0].href)).body()),original)
  await page.getByText('Index metadata',{exact:true}).click();await page.getByText('Supplied attachment text',{exact:true}).click();await page.getByText('Saved revisions (1)',{exact:true}).click();await expect(page.locator('pre').filter({hasText:'ORIGINAL-HEIGHT-723'})).toHaveText(text);await capture(page,'attachment-retained-revision')
  await clientPage.goto(base+`/app?job=${job.id}&tab=Decision%20search`);await clientPage.getByLabel('Search text',{exact:true}).fill('ORIGINAL-HEIGHT-723');await clientPage.getByRole('button',{name:'Search decisions',exact:true}).click();await expect(clientPage.getByText('0 matching records',{exact:true})).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}/decision-search/transcriptions?`+new URLSearchParams({source:hit.source}))).status(),404);assert.equal((await client.request.get(base+hit.files[0].href)).status(),404);await capture(clientPage,'attachment-private-search')
- await attachmentExtraction({base,page,owner,job,capture})
+ await attachmentExtraction({base,page,owner,client,job,capture})
 }

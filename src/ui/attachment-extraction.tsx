@@ -30,14 +30,14 @@ export function AttachmentExtraction({ href, name, onText }: { href: string; nam
    // Password and parser errors may contain source details. Never display library errors verbatim.
    setError(controller.signal.aborted ? (problem instanceof Error && problem.name !== 'AbortError' ? problem.message : 'Extraction stopped. Nothing was copied.')
     : cause instanceof Error && (cause.name === 'PasswordException') ? 'This PDF needs a valid password. Enter it below and extract again.'
-    : cause instanceof Error && /^(Extracted text|Original file|This |PDF page|Browser extraction|Extraction requires|No text|DOCX extraction)/.test(cause.message) ? cause.message
+    : cause instanceof Error && /^(Extracted text|Original file|This |PDF page|Browser extraction|Extraction requires|No text|Office extraction: )/.test(cause.message) ? cause.message
     : 'Extraction failed. The file may be damaged, encrypted, or use unsupported features. Nothing was copied; supply reviewed text manually.')
    setStatus('')
   } finally { window.clearTimeout(timeout); release(); active.current = null; setBusy(false) }
  }
  return <details><summary>Extract text in this browser</summary>
   <p>Read the original locally, then review a draft. File bytes and PDF passwords stay in this browser; OCR resources come from this installation. Nothing is saved by extraction.</p>
-  <p>Limits: 20 MB original, 40 PDF pages, 16 megapixels per image or rendered page, 100,000 text characters, five minutes. OCR reads English.</p>
+  <p>Limits: 20 MB original, 16 megapixels per image or rendered page, 100,000 text characters, five minutes. Every PDF page is read within these limits; an incomplete run copies no draft. OCR reads English.</p>
   <label>PDF password (if needed)<input type="password" autoComplete="off" value={password} disabled={busy} onChange={event => setPassword(event.target.value)}/></label>
   <label><input type="checkbox" checked={everyPage} disabled={busy} onChange={event => setEveryPage(event.target.checked)}/> OCR every PDF page, including pages with embedded text</label>
   <button type="button" className="secondary" disabled={busy} onClick={() => void start()}>Extract draft text</button>

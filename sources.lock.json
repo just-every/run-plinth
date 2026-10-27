@@ -437,7 +437,7 @@
       "executable": false
     },
     "package.json": {
-      "sha256": "a1803de4db2254cfa74429d317681fa40b8232f665580a56f8f40b08d623270c",
+      "sha256": "b0fdc048eb0b6d7ce96d9d7946e5aaf27a25d912f8a85f7cdcde7e78bea77c18",
       "executable": false
     },
     "packaging.json": {
@@ -445,7 +445,7 @@
       "executable": false
     },
     "pnpm-lock.yaml": {
-      "sha256": "ca1912f16ab163edeb9f19af720e6c93354bd01a971d8dec7ea2899dd71b138c",
+      "sha256": "350c96d66a8fbe26e832df973bb688509a283e0b896fc8a3576cdc9a15e52675",
       "executable": false
     },
     "public/apple-touch-icon.png": {
@@ -3833,11 +3833,51 @@
       "executable": false
     },
     "src/ui/attachment-extraction.tsx": {
-      "sha256": "971343b70c9af10537aa24ab8f07d32409853205bd0969993cd628d8ca572912",
+      "sha256": "fbba1ff719c30345b3bd76d0b4375dbd70e85bdf623e2400043606e15ba6763c",
+      "executable": false
+    },
+    "src/ui/attachment-office/archive.ts": {
+      "sha256": "38736d6f76e2bdd73b1210c9f20065b38a437f58f9e80e99c7a0fa08cb9f233c",
+      "executable": false
+    },
+    "src/ui/attachment-office/index.ts": {
+      "sha256": "74ad01d9f6bc0bf2b5befbf8cf69be58bff523dd306724011c379b0aba9721b4",
+      "executable": false
+    },
+    "src/ui/attachment-office/package.ts": {
+      "sha256": "6cd8b6ae23853042089652eb68ea52ec9572a8bb4c42a94b9a30d246684de1cb",
+      "executable": false
+    },
+    "src/ui/attachment-office/pictures.ts": {
+      "sha256": "d61c6b0e4054589db03142cccc60bfb477899e5f48c6d9aead73d48fe85bff07",
+      "executable": false
+    },
+    "src/ui/attachment-office/presentation.ts": {
+      "sha256": "38144b6854010bb9ac06ae06a924adbba4a9bb30552e27138c79759b4b0a476b",
+      "executable": false
+    },
+    "src/ui/attachment-office/spreadsheet.ts": {
+      "sha256": "b09fac8062d37cda9485bf10b0632d97620c6a2ed6162e479de638ed92bcfab4",
+      "executable": false
+    },
+    "src/ui/attachment-office/types.ts": {
+      "sha256": "c9dff8f15a3c60e0bdc8cb6213506ecc0d96d55fed873b84d8c08a9895b68a49",
+      "executable": false
+    },
+    "src/ui/attachment-office/word.ts": {
+      "sha256": "00845cbe1ee25339ccfb0ba10c5086dfc5db6671d7d7c6c14d30fc4f97ea7e81",
+      "executable": false
+    },
+    "src/ui/attachment-office/xml.ts": {
+      "sha256": "59d88b195ddc09d9eb3d904fd786c0ff65990bbbca31023fbb118271bf7078a7",
+      "executable": false
+    },
+    "src/ui/attachment-office/zip-directory.ts": {
+      "sha256": "9d038065155a76d047402bb1937f6008650aa2f065dd4491e5d754e00cf23737",
       "executable": false
     },
     "src/ui/attachment-text.ts": {
-      "sha256": "b4b3ab423d1c6cd1ab4751a3b03a4280acdd5dbbcc044ec1b62c2dc63c67fab2",
+      "sha256": "d99a2fcf84a67401f064407e4fc9d42c4489876dfc72376369d8e84894742548",
       "executable": false
     },
     "src/ui/audit.tsx": {
@@ -4272,8 +4312,20 @@
       "sha256": "6cffca5acb1225ec1a99764e87eaf009b1c1df7355b6f21624cdf90cc45a3b22",
       "executable": false
     },
+    "tests/fixtures/office-documents.mjs": {
+      "sha256": "37f89866c8b8278b3623dcaff28819d76e56099d76718fee35eba07f0e748e23",
+      "executable": false
+    },
+    "tests/fixtures/presentation-document.mjs": {
+      "sha256": "0f182ff06c772afb8588894695abdbc82d2ca3174b29243aff627b2eb00461a6",
+      "executable": false
+    },
     "tests/fixtures/search-document.mjs": {
       "sha256": "161db40b2e9b35064b37e395374df8f3ef90664681ab1ee530aedefdab5a9d33",
+      "executable": false
+    },
+    "tests/fixtures/spreadsheet-document.mjs": {
+      "sha256": "53f9ef624b0a892653e0323c6b1c668d35498cfb613ea92089a1342fdc680909",
       "executable": false
     },
     "tests/fixtures/takeoff-plan.mjs": {
@@ -4285,11 +4337,11 @@
       "executable": false
     },
     "tests/journeys/attachment-extraction.mjs": {
-      "sha256": "e7e09dd003d38b878e28da645b81fe91dcbb06a75c7c1016e0aed5f77a8fc119",
+      "sha256": "22c84075e275ad9959f4a7858dafafc69ef83905b27abf56b055a3fb436b3587",
       "executable": false
     },
     "tests/journeys/attachment-transcription.mjs": {
-      "sha256": "4c4543d6244cb7b07c541237281168f00de925644b5652df043b30d7cbeb2459",
+      "sha256": "51bd32a3406c6c14bc1b35206858f697a74814862d41e9232b810116d0f67bce",
       "executable": false
     },
     "tests/journeys/audit.mjs": {
@@ -4366,6 +4418,10 @@
     },
     "tests/journeys/meetings.mjs": {
       "sha256": "0a14afcb336ff4f46c263a96ddcd5da1ce2bf8a9c9882ab35b80fbc9789d77ac",
+      "executable": false
+    },
+    "tests/journeys/office-attachment-search.mjs": {
+      "sha256": "56973b2d1e3a14ae2b45537ba13f545d14a92a69872913f3f5e1afefb8bfd7b9",
       "executable": false
     },
     "tests/journeys/payments.mjs": {

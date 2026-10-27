@@ -5,7 +5,7 @@ import ocrWorkerUrl from 'tesseract.js/dist/worker.min.js?url'
 import ocrCoreUrl from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url'
 import englishUrl from '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz?url'
 
-const MAX_BYTES = 20 * 1024 * 1024, MAX_PAGES = 40, MAX_PIXELS = 16_000_000, MAX_TEXT = 100_000
+const MAX_BYTES = 20 * 1024 * 1024, MAX_PIXELS = 16_000_000, MAX_TEXT = 100_000
 export type Result = { text: string; notes: string[] }
 export type Run = { signal: AbortSignal; progress: (message: string) => void; cleanup: (() => void)[] }
 
@@ -51,7 +51,14 @@ async function original(href: string, run: Run) {
  return new Blob(parts, { type: response.headers.get('content-type')?.split(';')[0] ?? '' })
 }
 
-async function ocr(run: Run) {
+const ocrWorkers = new WeakMap<Run, Promise<OcrWorker>>()
+function ocr(run: Run) {
+ check(run)
+ let pending = ocrWorkers.get(run)
+ if (!pending) { pending = createOcr(run); ocrWorkers.set(run, pending) }
+ return pending
+}
+async function createOcr(run: Run) {
  run.progress('Loading local English OCR…')
  const { createWorker } = await import('tesseract.js')
  check(run)
@@ -84,7 +91,6 @@ async function pdfText(file: Blob, password: string, everyPage: boolean, run: Ru
  disposeWith(run, () => { void task.destroy() })
  const pdf = await task.promise
  check(run)
- if (pdf.numPages > MAX_PAGES) throw new Error(`This PDF has ${pdf.numPages} pages; browser extraction supports at most 40. No pages were copied.`)
  const parts: string[] = [], empty: number[] = []
  let worker: OcrWorker | undefined, ocrPages = 0
  for (let number = 1; number <= pdf.numPages; number++) {
@@ -147,19 +153,18 @@ async function imageText(file: Blob, run: Run): Promise<Result> {
 async function extract(file: Blob, name: string, password: string, everyPage: boolean, run: Run): Promise<Result> {
  const bytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer())
  if (new TextDecoder().decode(bytes).includes('%PDF-')) return pdfText(file, password, everyPage, run)
- if (/\.docx$/i.test(name) || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-  run.progress('Reading DOCX body text…')
-  const mammoth = await import('mammoth')
+ if (/\.(docx|xlsx|pptx)$/i.test(name) || [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+ ].includes(file.type)) {
+  const { extractOffice } = await import('./attachment-office')
   check(run)
-  const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })
-  if (result.messages.some(message => message.type === 'error')) throw new Error('DOCX extraction reported an error. Supply reviewed text manually.')
-  return { text: boundedText(result.value.trim()), notes: [
-   'DOCX body text only. Images, headers, footers, layout and some embedded objects are not extracted. Check the original for omitted content.',
-   ...result.messages.map(message => message.message),
-  ] }
+  return extractOffice(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
+   recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  }
  if (['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || /\.(png|jpe?g|webp)$/i.test(name)) return imageText(file, run)
- throw new Error('Browser extraction supports PDF, DOCX, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
+ throw new Error('Browser extraction supports PDF, DOCX, XLSX, PPTX, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
 }
 
 

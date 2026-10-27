@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 import { imageDocument, protectedDocument, unsupportedDocument } from '../fixtures/unextractable-documents.mjs'
 import { originalEmail } from './meeting-mail.mjs'
+import { officeAttachmentSearch } from './office-attachment-search.mjs'
 
 /** Real protected, raster-only and compressed originals are read locally before a human saves searchable text. */
-export async function attachmentExtraction({ base, page, owner, job, capture }) {
+export async function attachmentExtraction({ base, page, owner, client, job, capture }) {
  const variants=[
   {name:'protected-review.pdf',mime:'application/pdf',bytes:protectedDocument,term:'synthetic-plinth-protected-9101',pattern:/synthetic-plinth-protected-9101/,password:'synthetic-plinth-9001'},
   {name:'compressed-review.docx',mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',bytes:unsupportedDocument,term:'synthetic-plinth-docx-9102',pattern:/synthetic-plinth-docx-9102/},
@@ -24,4 +25,5 @@ export async function attachmentExtraction({ base, page, owner, job, capture }) 
   await page.getByLabel('Search text',{exact:true}).fill(variant.term);await page.getByRole('button',{name:'Search decisions',exact:true}).click();await expect(page.getByText('1 matching records',{exact:true})).toBeVisible();await expect(page.getByText(/Human-supplied transcription · Revision 1/)).toBeVisible();await capture(page,`attachment-extraction-saved-${index}`)
   const result=await(await owner.request.get(base+`/api/plinth/jobs/${job.id}/decision-search?`+new URLSearchParams({q:variant.term}))).json();assert.equal(result.count,1);assert.deepEqual(Buffer.from(await(await owner.request.get(base+result.results[0].files[0].href)).body()),variant.bytes)
  }
+ await officeAttachmentSearch({base,page,owner,client,job,capture})
 }

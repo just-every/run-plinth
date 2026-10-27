@@ -37,7 +37,7 @@
     "@tanstack/react-start": "1.168.60",
     "@tesseract.js-data/eng": "1.0.0",
     "hono": "4.13.7",
-    "mammoth": "1.13.0",
+    "jszip": "3.10.2",
     "marked": "18.1.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
