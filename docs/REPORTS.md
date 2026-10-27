@@ -1,14 +1,42 @@
-# Current portfolio reports
+# Portfolio sources and historical captures
 
-Open **Jobs → Custom fields and saved views**. Choose Jobs, select the current portfolio columns, and save a personal or shared view. Each reader sees only jobs permitted by their current assignment and feature permissions. Removing an assignment takes effect on the next read or download.
+Open **Custom fields and saved views** in the workspace. **Capture a portfolio
+as of now** retains each current job version, the UTC capture time and assigned
+project managers in one audited transaction. Capture before a reporting close
+and choose that capture under **Portfolio sources and as-of capture** when
+saving a historical view. Captures record what the installation knew then; they
+do not reconstruct an earlier state that was never captured.
 
-The columns include sold contract revenue, original and revised cost budgets, commitments, posted actual costs, the latest reviewed forecast and margin, earned billings, collections, unbilled sold revenue, maximum schedule slippage and open decisions. Unknown budgets and forecasts show **Not set**. A forecast that predates the current job version is marked as requiring review. Monetary totals remain separate by currency and show how many records contributed.
+A saved view retains its capture, project manager, scheduled trade, cost code
+and inclusive source date range. Manager assignment comes from the capture
+when one is selected, otherwise from the current team. Scheduled trade selects
+jobs with that non-cancelled scheduled trade, case-insensitively; this is a job
+subset, not an allocation of all job cost to that trade. Combine a cost code
+with that subset to select the relevant coded sources. Source dates select
+the dates on procurement, posted actuals, earned billings and receipts.
+Budget stock uses its recorded source date and forecast stock its as-of date;
+an absent or out-of-window budget or forecast remains unknown. Undated legacy
+sources are excluded from a date window.
 
-The report date is the current UTC date. These views describe current committed records; historical snapshots and slicing by manager, trade, source date or cost code are not yet available. RPT-001 remains partial.
+Sold revenue and budgets reconcile to selected budget codes. Earned billing
+keeps gross earned value, including retained amounts, and collections use
+recorded receipts rather than claiming independently verified funds. Forecasts
+retain their freshness flag. Open decisions include presented selections,
+draft changes and unresolved RFIs. Schedule slippage is elapsed UTC minutes
+against the original baseline.
 
-A job name opens that job. **Source records** downloads the authorized job's code ledger, including its budget references, procurement records, posted cost entries, billing records and forecast code totals. It excludes supplier document bytes and employee rate details. Financial source downloads require all contributing financial feature permissions.
+**Source records** downloads the same capture and source selection as the view.
+CSV, PDF and XLSX carry the selection and authorized record scope. Currency
+totals remain separate. Current report permissions and project-manager job
+assignments apply on every query and download, including old captures. Job
+erasure removes its captured copies. Capturing is restricted to owners and
+administrators with report creation and full financial source visibility.
+Historical views cannot mix captured native fields with current custom values.
 
-**Download scoped CSV**, **Download scoped PDF** and **Download scoped XLSX** repeat the same saved filters and current job scope. XLSX is an Office Open XML workbook with literal text cells, so user-entered values are not spreadsheet formulas. Money is labelled with currency and integer cents. Export actions are audited.
+Unknown budgets and forecasts show **Not set**; money totals show how many
+records contributed. A job name opens the job. Financial source downloads
+exclude supplier document bytes and employee rate details. XLSX uses literal
+text cells, and CSV neutralizes formula-like text. Export actions are audited.
 
 ## Scheduled reports
 

@@ -1,3 +1,4 @@
+import { parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
 import { need, object, sum, text, type Currency, type Input } from './model'
 import { parseFieldValue, reportFieldType, reportIdentity, reportScope, type ReportColumn, type ReportFieldValue, type ReportMoney, type ReportRecordScope, type ReportValues } from './report-field-model'
 
@@ -12,11 +13,13 @@ export interface ReportView {
  scope: ReportScope
  filters: ReportFilter[]
  selected_columns: string[]
+ portfolio?: PortfolioScope
 }
 /** Records and available columns are supplied by the authorized integration boundary. */
 export interface ReportRecord { id: string; record_scope: ReportRecordScope; label: string; currency?: Currency; values: ReportValues }
 export interface ReportResult {
  annotation: {
+  portfolio?:PortfolioScope
   record_scope: ReportRecordScope
   requested_record_ids: string[] | null
   scope_record_ids: string[]
@@ -73,16 +76,20 @@ export function parseReportView(input: Input, columns: ReportColumn[], createdBy
   need(input.created_by === undefined || input.created_by === previous.created_by, 'View creator cannot change', 409, 'immutable_view')
  } else need(input.created_by === undefined || input.created_by === createdBy, 'View creator must match the supplied creator')
  const merged = { ...previous, ...input }, scope = object(merged.scope)
+ const portfolio=parsePortfolioScope(merged.portfolio)
+ need(!portfolio||scope.record_scope==='job','Portfolio selections require job scope')
  const sharing = merged.sharing
  need(sharing === 'personal' || sharing === 'shared', 'sharing must be personal or shared')
  const selected_columns = strings(merged.selected_columns, 'selected_columns', 50)
  need(selected_columns.length > 0, 'Select at least one column')
  selected_columns.forEach(id => columnFor(columns, id))
+ const filters=parseReportFilters(merged.filters ?? [], columns)
+ if(portfolio?.snapshot_id)need([...selected_columns,...filters.map(f=>f.column_id)].every(id=>id.startsWith('portfolio.')||['native.stage','native.delayed','native.contract'].includes(id)),'Historical portfolio reports cannot mix current custom fields')
  need(scope.record_ids === null || Array.isArray(scope.record_ids), 'scope.record_ids must be an explicit ID list or null for all supplied records')
  return { id: previous?.id ?? (input.id === undefined ? crypto.randomUUID() : reportIdentity(input.id)), name: text(merged.name, 'view name', 120),
   created_by: previous?.created_by ?? text(createdBy, 'creator', 100), sharing,
   scope: { record_scope: reportScope(scope.record_scope), record_ids: scope.record_ids === null ? null : strings(scope.record_ids, 'scope.record_ids', 10000) },
-  filters: parseReportFilters(merged.filters ?? [], columns), selected_columns }
+  filters, selected_columns,...(portfolio?{portfolio}:{}) }
 }
 function matches(actual: ReportFieldValue, filter: ReportFilter): boolean {
  if (filter.operator === 'is_set') return actual !== null
@@ -131,7 +138,7 @@ export function queryReport(records: ReportRecord[], columns: ReportColumn[], vi
   }
   for (const [currency, amounts] of groups) money_totals.push({ column_id: column.id, currency, amount_cents: sum(amounts), count: amounts.length })
  }
- return { annotation: { record_scope: parsed.scope.record_scope, requested_record_ids: requested === null ? null : [...requested], scope_record_ids: scoped.map(record => record.id),
+ return { annotation: { ...(parsed.portfolio?{portfolio:parsed.portfolio}:{}),record_scope: parsed.scope.record_scope, requested_record_ids: requested === null ? null : [...requested], scope_record_ids: scoped.map(record => record.id),
   matched_record_ids: rows.map(record => record.id), scope_count: scoped.length, count: rows.length, filters: parsed.filters, filter_mode: 'all',
   extent: 'Supplied records only; filters and record scope apply. This is not a complete migration or portfolio export.' }, columns: selected, filter_columns: [...new Set(parsed.filters.map(f=>f.column_id))].map(id=>({...columnFor(columns,id)})), rows, money_totals }
 }
@@ -150,6 +157,7 @@ export function reportCsv(report: ReportResult): string {
   ['annotation', 'scope_count', annotation.scope_count], ['annotation', 'count', annotation.count],
   ['annotation', 'filter_mode', annotation.filter_mode], ['annotation', 'filters', JSON.stringify(annotation.filters)],
   ['annotation', 'selected_columns', JSON.stringify(report.columns)],
+  ['annotation','portfolio',JSON.stringify(annotation.portfolio??null)],
  ]
  for (const total of report.money_totals) rows.push(['money_total', total.column_id, total.currency, total.amount_cents, total.count])
  rows.push(['record_id', 'record_name', 'record_currency', ...report.columns.map(column => `${column.name} [${column.id}; ${column.type === 'money' ? 'currency and integer cents' : column.type}]`)])

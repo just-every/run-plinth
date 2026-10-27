@@ -29,7 +29,7 @@ jobs:
       - run: npm install --global pnpm@10.12.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: node scripts/contract-docs.mjs check RPT-003
+      - run: node src/plinth/contract-docs.mjs check
       - run: pnpm run verify
 
   installed:
@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        journey: [invoice-corrections, cost-billing, settlements, meetings, report-packets]
+        journey: [invoice-corrections, cost-billing, settlements, meetings, portfolio, report-packets]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'

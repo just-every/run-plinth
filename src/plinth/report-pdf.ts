@@ -32,6 +32,7 @@ export function reportPdf(report: ReportResult, name: string): Uint8Array<ArrayB
  add(annotation.extent)
  add(`Record scope: ${annotation.record_scope}`)
  add(`Matched records: ${annotation.count}; authorized scoped records: ${annotation.scope_count}`)
+ add('Portfolio sources: '+JSON.stringify(annotation.portfolio??null))
  add(`Filter mode: ${annotation.filter_mode}`)
  add('Characters outside WinAnsi are shown as Unicode escapes. Text values are JSON quoted.')
  add()

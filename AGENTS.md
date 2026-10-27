@@ -27,4 +27,7 @@ Run `rer check` for command contract inspection and `rer verify` for CI-equivale
 
 ## Lander-Regenerate
 
-After changing a clause Status row, run `node scripts/contract-docs.mjs write CLAUSE-ID` then `node scripts/contract-docs.mjs check CLAUSE-ID`, naming every changed clause. This retains other acceptance narratives while generating the selected acceptance entries, contract summary counts and `docs/CLAIMS.md` from `CONTRACT.md`. Regenerate the edition source lock last with `node scripts/edition-authoring/cli.mjs lock`, then run its `check`.
+CONTRACT.md is the acceptance and status source. After changing it, run
+`node src/plinth/contract-docs.mjs write`, then
+`node src/plinth/contract-docs.mjs check`. Commit the generated ACCEPTANCE.md
+and docs/CLAIMS.md together, then regenerate the edition source lock last.
