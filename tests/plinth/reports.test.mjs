@@ -89,7 +89,7 @@ test('RPT-004 — typed fields, required construction gates, personal/shared del
 
 test('RPT-001 — historical and sliced portfolio reconciles three jobs to code sources, scopes managers before totals and exports inert CSV and genuine XLSX', async()=>{
  const {portfolioFixture}=await import('./portfolio-support.mjs'),{execFileSync}=await import('node:child_process')
- const f=await createFixture();try{
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')});try{
   const {fixtures,earlier,capture}=await portfolioFixture(f)
   const api=(path,options={})=>f.json('/api/plinth'+path,{cookie:f.owner,...options})
   const columns=['native.contract','portfolio.original_budget','portfolio.revised_budget','portfolio.committed','portfolio.actual','portfolio.forecast','portfolio.margin','portfolio.billed','portfolio.collected','portfolio.backlog','portfolio.slippage','portfolio.open_decisions','portfolio.as_of','portfolio.forecast_stale']
@@ -103,7 +103,7 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
    assert.equal(values['portfolio.original_budget'].amount_cents,150000);assert.equal(values['portfolio.revised_budget'].amount_cents,150000)
    assert.equal(values['portfolio.committed'].amount_cents,100000);assert.equal(values['portfolio.margin'].amount_cents,300000-values['portfolio.forecast'].amount_cents)
    assert.equal(values['portfolio.backlog'].amount_cents,300000-30000*(i+1));assert.equal(values['portfolio.billed'].amount_cents,30000*(i+1));assert.equal(values['portfolio.collected'].amount_cents,15000*(i+1))
-   assert.equal(values['portfolio.slippage'],1440);assert.equal(values['portfolio.open_decisions'],1);assert.equal(values['portfolio.forecast_stale'],false);assert.match(values['portfolio.as_of'],/^\d{4}-\d{2}-\d{2}$/)
+   assert.equal(values['portfolio.slippage'],1440);assert.equal(values['portfolio.open_decisions'],1);assert.equal(values['portfolio.forecast_stale'],false);assert.equal(values['portfolio.as_of'],'2026-10-27')
    const source=(await api('/reports/job-sources/'+c.job.id)).value
    assert.equal(source.rows.reduce((n,row)=>n+row.posted_actual_cents,0),values['portfolio.actual'].amount_cents)
    assert.equal(source.rows.flatMap(row=>row.sources.actual).reduce((n,row)=>n+row.amount_cents,0),values['portfolio.actual'].amount_cents)
@@ -146,12 +146,26 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   const person=(await api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@example.com')
   const assign=async job_ids=>api('/team/'+person.id,{method:'PUT',body:{expected_version:(await api('/team')).value.team.find(p=>p.id===person.id).version??0,role:'project_manager',job_ids,po_limit_cents:0}})
   assert.equal((await assign([fixtures[0].job.id])).status,200)
+  const copiedManager=await api('/roles',{method:'POST',body:{copy_of:'project_manager',name:'Portfolio custom manager'}});assert.equal(copiedManager.status,201)
+  const customAssign=async job_ids=>api('/team/'+person.id,{method:'PUT',body:{expected_version:(await api('/team')).value.team.find(p=>p.id===person.id).version,role:'custom',role_id:copiedManager.value.role.id,job_ids}})
+  assert.equal((await customAssign([fixtures[0].job.id])).status,200)
+  const currentCustom=await query({manager_id:person.id})
+  assert.deepEqual(currentCustom.rows.map(r=>r.id),[fixtures[0].job.id],'A copied manager role retains current manager membership')
+  assert.equal(currentCustom.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,2200)
   const historical=await capture('Assigned manager and earned billing')
   const managed=await query({snapshot_id:historical.id,manager_id:person.id})
   assert.deepEqual(managed.rows.map(r=>r.id),[fixtures[0].job.id])
   assert.equal(managed.money_totals.find(t=>t.column_id==='portfolio.billed').amount_cents,30000)
   const historicalSpec={...spec,name:'Historical labor slice',portfolio:{snapshot_id:historical.id,cost_code:'01-100',manager_id:person.id}}
   const historicView=await api('/reports/views',{method:'POST',body:historicalSpec});assert.equal(historicView.status,201,JSON.stringify(historicView.value))
+  const field=await api('/reports/fields',{method:'POST',body:{expected_version:0,id:'portfolio.review_note',record_scope:'job',name:'Reviewed note',type:'text',required_at_stages:[]}});assert.equal(field.status,201)
+  assert.equal((await api('/reports/fields',{method:'POST',body:{expected_version:1,id:'portfolio.actual',record_scope:'job',name:'Override cost',type:'money',required_at_stages:[]}})).status,400,'A custom field cannot replace a built-in money column')
+  const customSpec={...spec,portfolio:{snapshot_id:historical.id},selected_columns:['portfolio.review_note']}
+  assert.equal((await api('/reports/query',{method:'POST',body:customSpec})).status,400,'A prefix does not make a current custom field historical')
+  const currentNote=await api('/reports/values/job/'+fixtures[0].job.id,{method:'PUT',body:{expected_version:0,values:{'portfolio.review_note':'Changed after capture'}}});assert.equal(currentNote.status,200)
+  assert.equal((await api('/reports/query',{method:'POST',body:customSpec})).status,400,'Editing a custom field cannot make a capture expose current values')
+  assert.equal((await api('/reports/query',{method:'POST',body:{...customSpec,selected_columns:['native.stage'],filters:[{column_id:'portfolio.review_note',operator:'is_set'}]}})).status,400,'Historical filters also reject current custom fields')
+  assert.equal((await api('/reports/query',{method:'POST',body:{...customSpec,portfolio:{}}})).value.report.rows.find(r=>r.id===fixtures[0].job.id).values['portfolio.review_note'],'Changed after capture','Current custom fields remain usable')
   const frozen=await query({snapshot_id:historical.id})
   await fixtures[0].ok('/variations',{description:'Decision recorded after capture',amount_cents:50})
   assert.deepEqual(await query({snapshot_id:historical.id}),frozen,'Later source changes cannot rewrite a capture')
@@ -168,18 +182,24 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   r=await api('/reports/views/'+id,{cookie:manager});assert.equal(r.status,200)
   assert.deepEqual(r.value.report.annotation.scope_record_ids,[fixtures[0].job.id]);assert.equal(r.value.report.money_totals.find(t=>t.column_id==='portfolio.actual').amount_cents,2200)
   assert.equal((await api('/reports/job-sources/'+fixtures[1].job.id,{cookie:manager})).status,404)
+  const totalIds=['native.contract','portfolio.original_budget','portfolio.revised_budget','portfolio.committed','portfolio.actual','portfolio.forecast','portfolio.margin','portfolio.billed','portfolio.collected','portfolio.backlog']
+  const expectedTotals=cookie=>totalIds.map((id,i)=>[id,'USD',(cookie===f.owner?[900000,450000,450000,300000,13200,316200,583800,180000,90000,720000]:[300000,150000,150000,100000,2200,103200,196800,30000,15000,270000])[i],cookie===f.owner?3:1])
   for(const cookie of [f.owner,manager]){
    const csv=await (await f.request(`/api/plinth/reports/views/${id}/export.csv`,{cookie})).text();assert.ok(csv.includes('portfolio.actual'));if(cookie===manager)assert.ok(!csv.includes(fixtures[1].job.id))
+   const csvRows=JSON.parse(execFileSync('python3',['-c','import csv,io,json,sys; print(json.dumps(list(csv.reader(io.StringIO(sys.stdin.read())))))'],{input:csv,encoding:'utf8'}))
+   assert.deepEqual(csvRows.filter(r=>r[0]==='money_total').map(r=>[r[1],r[2],Number(r[3]),Number(r[4])]),expectedTotals(cookie),'CSV totals independently reconcile all exported money columns')
    const response=await f.request(`/api/plinth/reports/views/${id}/export.xlsx`,{cookie});assert.equal(response.status,200)
    const bytes=Buffer.from(await response.arrayBuffer())
    const extracted=execFileSync('python3',['-c','import io,sys,zipfile,xml.etree.ElementTree as ET; z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())); assert z.testzip() is None; [ET.fromstring(z.read(n)) for n in z.namelist()]; print(z.read("xl/worksheets/sheet1.xml").decode())'],{input:bytes,encoding:'utf8'})
+   const xlsxRows=JSON.parse(execFileSync('python3',['-c',`import json,sys,xml.etree.ElementTree as ET; root=ET.fromstring(sys.stdin.read()); ns={'s':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}; print(json.dumps([[ ''.join(c.itertext()) for c in r] for r in root.findall('.//s:row',ns)]))`],{input:extracted,encoding:'utf8'}))
+   assert.deepEqual(xlsxRows.filter(r=>r[0]==='Total').map(r=>[r[1],r[2],Number(r[3]),Number(r[4])]),expectedTotals(cookie),'XLSX totals independently reconcile all exported money columns')
    assert.ok(extracted.includes('Posted actual cost'));assert.ok(extracted.includes(fixtures[0].job.id));assert.ok(!extracted.includes('<f>'));if(cookie===manager)assert.ok(!extracted.includes(fixtures[1].job.id))
   }
-  assert.equal((await assign([])).status,200);assert.equal((await api('/reports/views/'+historicView.value.view.id,{cookie:manager})).status,404);assert.equal((await api('/reports/snapshots',{cookie:manager})).value.snapshots.length,0);assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:historical.id})),{cookie:manager})).status,404);assert.equal((await api('/reports/views/'+id,{cookie:manager})).value.report.rows.length,0)
+  assert.equal((await assign([])).status,200);assert.deepEqual((await api('/reports/snapshots')).value.managers.map(m=>m.id),[person.id],'Captured managers remain selectable after their last assignment is removed');assert.deepEqual((await query({snapshot_id:historical.id,manager_id:person.id})).rows.map(r=>r.id),[fixtures[0].job.id]);assert.deepEqual((await query({manager_id:person.id})).rows,[]);assert.equal((await api('/reports/views/'+historicView.value.view.id,{cookie:manager})).status,404);assert.equal((await api('/reports/snapshots',{cookie:manager})).value.snapshots.length,0);assert.equal((await api('/reports/job-sources/'+fixtures[0].job.id+'?portfolio='+encodeURIComponent(JSON.stringify({snapshot_id:historical.id})),{cookie:manager})).status,404);assert.equal((await api('/reports/views/'+id,{cookie:manager})).value.report.rows.length,0)
   const client=await f.invite('synthetic-plinth-client@example.com'),agent=await f.agent()
   for(const options of [{cookie:client},{cookie:undefined,token:agent}])for(const path of ['/reports/views/'+id+'/export.xlsx','/reports/job-sources/'+fixtures[0].job.id])assert.equal((await api(path,options)).status,403)
   r=await api('/roles',{method:'POST',body:{copy_of:'administrator',name:'Report without finances',financial_visible:false}});assert.equal(r.status,201);const role=r.value.role
-  assert.equal((await api('/team/'+person.id,{method:'PUT',body:{expected_version:2,role:'custom',role_id:role.id,job_ids:[]}})).status,200)
+  assert.equal((await api('/team/'+person.id,{method:'PUT',body:{expected_version:3,role:'custom',role_id:role.id,job_ids:[]}})).status,200)
   assert.equal((await api('/reports/views/'+id,{cookie:manager})).status,404)
   const restrictedSource=await api('/reports/job-sources/'+fixtures[0].job.id,{cookie:manager});assert.equal(restrictedSource.status,200)
   assert.equal(restrictedSource.value.rows,undefined);assert.equal(restrictedSource.value.forecast,null);assert.equal(restrictedSource.value.open_decisions,undefined)
@@ -196,6 +216,33 @@ test('RPT-001 — historical and sliced portfolio reconciles three jobs to code 
   const separated=await query({})
   assert.deepEqual(separated.money_totals.filter(t=>t.column_id==='native.contract').map(t=>[t.currency,t.amount_cents]).sort(),[['AUD',100000],['USD',900000]])
   assert.equal((await api('/reports/query',{cookie:manager,method:'POST',body:{...spec,selected_columns:['native.stage'],portfolio:{cost_code:'01-100'}}})).status,403)
+  const {portfolioAward}=await import('./portfolio-adjustment-support.mjs'),c=fixtures[0]
+  f.setNow(Date.parse('2026-10-28T15:00:00Z'))
+  const award=await portfolioAward(f,c)
+  const budgetQuery=async portfolio=>(await query(portfolio)).rows.find(r=>r.id===c.job.id).values
+  assert.equal((await budgetQuery({}))['portfolio.revised_budget'].amount_cents,190000)
+  assert.equal((await budgetQuery({source_from:'2026-10-27',source_to:'2026-10-27'}))['portfolio.revised_budget'].amount_cents,150000,'Later award adjustment is excluded from the base date')
+  assert.equal((await budgetQuery({source_from:'2026-10-27',source_to:'2026-10-28'}))['portfolio.revised_budget'].amount_cents,190000,'Inclusive range includes base and award')
+  assert.equal((await budgetQuery({source_from:'2026-10-28',source_to:'2026-10-28'}))['portfolio.revised_budget'],null,'An adjustment alone cannot invent an excluded frozen base')
+  const adjusted=await capture('Awarded internal budget'),adjustedBefore=await query({snapshot_id:adjusted.id})
+  const adjustmentSource=(await api('/reports/job-sources/'+c.job.id+'?portfolio='+encodeURIComponent(JSON.stringify({source_from:'2026-10-27',source_to:'2026-10-28'})))).value
+  assert.deepEqual(adjustmentSource.rows.find(r=>r.cost_code==='06-100').sources.budget_adjustments.map(a=>[a.kind,a.dated_on,a.line.delta_cents]),[['award','2026-10-28',40000]])
+  const baseSource=(await api('/reports/job-sources/'+c.job.id+'?portfolio='+encodeURIComponent(JSON.stringify({source_to:'2026-10-27'})))).value
+  assert.deepEqual(baseSource.rows.find(r=>r.cost_code==='06-100').sources.budget_adjustments,[])
+  f.setNow(Date.parse('2026-10-29T15:00:00Z'));await award.cancel()
+  assert.equal((await budgetQuery({}))['portfolio.revised_budget'].amount_cents,150000)
+  assert.deepEqual(await query({snapshot_id:adjusted.id}),adjustedBefore,'A later cancellation never rewrites a captured adjusted budget')
+  const reversed=(await api('/reports/job-sources/'+c.job.id)).value.rows.find(r=>r.cost_code==='06-100')
+  assert.deepEqual(reversed.sources.budget_adjustments.map(a=>[a.kind,a.dated_on,a.line.delta_cents]),[['award','2026-10-28',40000],['cancellation','2026-10-29',-40000]])
+  assert.equal(reversed.approved_budget_cents,100000)
+  f.setNow(Date.parse('2026-10-30T15:00:00Z'))
+  const rate=(await c.api('/pricing-rates',{jurisdiction:'Synthetic portfolio change',kind:'sales',percent:'0',effective_on:'2026-01-01',reference:'synthetic-plinth-portfolio-tax',human_reviewed:true})).value.rate
+  const change={description:'Approved extra framing',direction:'charge',basis:'sell',as_of:'2026-10-30',lines:[{id:'extra',description:'Extra framing',cost_code:'06-100',phase:'Framing',category:'material',quantity:'1',unit:'lot',cost_unit_cents:5000,unit_cents:10000}],rules:[],tax:{rate_id:rate.id,taxable_line_ids:['extra']}}
+  const preview=await c.ok('/variation-pricing/preview',change);await c.ok('/variation-pricing/apply',{...change,digest:preview.preview.digest})
+  assert.equal((await c.act('/variations/'+c.job.variations.at(-1).id+'/approve',{},client)).status,200);await c.read()
+  const revision=await budgetQuery({})
+  assert.equal(revision['portfolio.original_budget'].amount_cents,150000);assert.equal(revision['portfolio.revised_budget'].amount_cents,155000);assert.equal(revision['native.contract'].amount_cents,310000)
+  assert.deepEqual(await query({snapshot_id:adjusted.id}),adjustedBefore)
   await fixtures[0].read()
   assert.equal((await api('/jobs/'+fixtures[0].job.id,{method:'DELETE',body:{expected_version:fixtures[0].job.version}})).status,200)
   assert.equal((await query({snapshot_id:historical.id})).rows.length,2)

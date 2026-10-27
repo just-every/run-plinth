@@ -76,7 +76,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | COST-005 | done |  |
 | COST-006 | done |  |
 | COST-007 | missing | No receipt capture, OCR proposals or card and bank feed matching exists. |
-| RPT-001 | done |  |
+| RPT-001 | partial | Gate findings corrected through the named HTTP assertions: custom project managers returned empty current and historical manager slices; editing a custom portfolio.* field changed an old capture’s output; past managers disappeared from historical filter choices after reassignment. Fresh mutation and installed browser proof is still required, followed by exact-candidate Verify, complete publication scan and guarded landing. |
 | RPT-002 | missing | No estimate productivity and sales reporting workflow exists. |
 | RPT-003 | partial | Default ADOPTED pending CT approval: only the owner grants a named active native account recurring access to one job packet; lenders use the current ROLE-004 assigned-job Reader preset or a ROLE-006 custom copy with report and financial visibility; the schedule never widens that grant. Optional email carries a signed-in download link, never the attachment. Current identity, assignment, portal features and receiving installation authority are rechecked; revocation requires a new grant, and uncertain or refused sends are never retried automatically. Reports use explicit 09:00 UTC schedules, anchored monthly dates and latest-occurrence catch-up. CT must approve these recipient, consent and delivery defaults before DONE. Provider acceptance does not prove recipient delivery or professional certification. |
 | RPT-004 | done |  |

@@ -27,6 +27,8 @@ try{
  else {const url=new URL(entrance),hash=new URLSearchParams(url.hash.slice(1));hash.set('as',email);hash.set('next',`/auth/dev/enter?as=${encodeURIComponent(email)}&returnTo=/app`);url.hash=hash.toString();await mp.goto(url.href);await mp.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))}
  const person=(await call('/api/plinth/team')).value.team.find(p=>p.email===email)
  assert.equal((await call('/api/plinth/team/'+person.id,{method:'PUT',body:{expected_version:0,role:'project_manager',job_ids:[jobs[0].id],po_limit_cents:0}})).status,200)
+ const custom=await call('/api/plinth/roles',{method:'POST',body:{copy_of:'project_manager',name:'Portfolio manager'}});assert.equal(custom.status,201)
+ assert.equal((await call('/api/plinth/team/'+person.id,{method:'PUT',body:{expected_version:1,role:'custom',role_id:custom.value.role.id,job_ids:[jobs[0].id]}})).status,200)
  const captured=await call('/api/plinth/reports/snapshots',{method:'POST',body:{name:'Reviewed portfolio as of October 27'}});assert.equal(captured.status,201)
  await page.goto(base+'/app');await page.locator('summary',{hasText:'Custom fields and saved views'}).click()
  await page.getByLabel('View name',{exact:true}).fill('Historical portfolio proof')
@@ -55,6 +57,8 @@ try{
    }
    }
    if(width===390){const menu=p.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await p.keyboard.press('Tab');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
+   const defects=await p.locator('details.card').filter({has:p.locator('summary',{hasText:'Custom fields and saved views'})}).evaluate(root=>[...root.querySelectorAll('*')].filter(e=>e.getClientRects().length).flatMap(e=>{const s=getComputedStyle(e),text=[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim());const borders=[s.borderTopWidth,s.borderRightWidth,s.borderBottomWidth,s.borderLeftWidth].map(parseFloat);return [...(text&&parseFloat(s.fontSize)<13?['small text '+e.tagName]:[]),...(parseFloat(s.borderRadius)>0&&borders.some(v=>v>0)&&borders.some(v=>v===0)?['one sided border '+e.tagName]:[])]}))
+   assert.deepEqual(defects,[],'Report controls meet readable text and complete rounded border rules')
    await p.screenshot({path:`${shots}/RPT-001-${who}-${width}.png`,fullPage:true,animations:'disabled'})
   }
  }
@@ -76,6 +80,17 @@ try{
  await mp.goto(base+'/app');await mp.locator('summary',{hasText:'Custom fields and saved views'}).click();await mp.getByRole('button',{name:'Historical portfolio proof · shared',exact:true}).click()
  await capture(mp,'manager',1,1)
  await expect(mp.getByRole('region',{name:'Saved view results'}).getByText('Cedar porch',{exact:true})).toHaveCount(0)
+ assert.equal((await call('/api/plinth/team/'+person.id,{method:'PUT',body:{expected_version:2,role:'project_manager',job_ids:[],po_limit_cents:0}})).status,200)
+ await page.reload();await page.locator('summary',{hasText:'Custom fields and saved views'}).click()
+ await page.locator('summary',{hasText:'Portfolio sources and as-of capture'}).click()
+ await page.locator('select[name="snapshot_id"]').selectOption(captured.value.snapshot.id)
+ await page.locator('select[name="manager_id"]').selectOption(person.id)
+ await page.getByLabel('View name',{exact:true}).fill('Past manager capture')
+ for(const box of await page.locator('input[name="columns"]').all())await box.uncheck()
+ for(const id of ['portfolio.actual','portfolio.as_of'])await page.locator(`input[name="columns"][value="${id}"]`).check()
+ await page.getByRole('button',{name:'Save view',exact:true}).click()
+ await capture(page,'past-manager',1,1)
+ assert.equal((await call('/api/plinth/reports/snapshots',{},manager)).value.snapshots.length,0,'Revoked assignments fence historical choices')
  await owner.close();await manager.close()
  console.log('RPT-001 PASS: historical owner and manager portfolio, source reconciliation, CSV and XLSX, keyboard access and icon tooltip at 1440 and 390')
 }finally{await browser.close()}

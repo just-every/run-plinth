@@ -1,3 +1,4 @@
+import { portfolioColumns } from './portfolio-columns'
 import { DomainError, find, need, object, stamp, text, type Actor, type Input, type Job } from './model'
 import { readClock, transaction } from './store'
 import { parseFieldDefinition, parseFieldValues, requireFieldsAtStage, validateFieldDefinitions, type ReportFieldDefinition, type ReportRecordScope } from './report-field-model'
@@ -15,7 +16,7 @@ export async function saveField(db: D1Database, actor: Actor, input: Input) {
  const clock=await readClock(db), config=await fieldConfig(db)
  need(input.expected_version===config.version,'Field definitions changed; reload',409,'stale_version')
  const previous=input.id===undefined?undefined:config.fields.find(f=>f.id===input.id), field=parseFieldDefinition(input,previous)
- need(!field.id.startsWith('native.'),'native. is reserved for built-in report columns')
+ need(!field.id.startsWith('native.')&&!portfolioColumns.some(column=>column.id===field.id),'Built-in report column IDs are reserved')
  const fields=[...config.fields.filter(f=>f.id!==field.id),field];validateFieldDefinitions(fields)
  await transaction(db,actor,null,[db.prepare('INSERT INTO pl_report_config(id,version,data) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,data=excluded.data').bind(config.version+1,JSON.stringify(fields)),reportAudit(db,actor,'field',previous,field)],clock)
  return {version:config.version+1,fields}

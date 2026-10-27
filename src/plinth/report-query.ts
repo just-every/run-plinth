@@ -1,3 +1,4 @@
+import { historicalPortfolioColumn } from './portfolio-columns'
 import { parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
 import { need, object, sum, text, type Currency, type Input } from './model'
 import { parseFieldValue, reportFieldType, reportIdentity, reportScope, type ReportColumn, type ReportFieldValue, type ReportMoney, type ReportRecordScope, type ReportValues } from './report-field-model'
@@ -84,7 +85,7 @@ export function parseReportView(input: Input, columns: ReportColumn[], createdBy
  need(selected_columns.length > 0, 'Select at least one column')
  selected_columns.forEach(id => columnFor(columns, id))
  const filters=parseReportFilters(merged.filters ?? [], columns)
- if(portfolio?.snapshot_id)need([...selected_columns,...filters.map(f=>f.column_id)].every(id=>id.startsWith('portfolio.')||['native.stage','native.delayed','native.contract'].includes(id)),'Historical portfolio reports cannot mix current custom fields')
+ if(portfolio?.snapshot_id)need([...selected_columns,...filters.map(f=>f.column_id)].every(historicalPortfolioColumn),'Historical portfolio reports cannot mix current custom fields')
  need(scope.record_ids === null || Array.isArray(scope.record_ids), 'scope.record_ids must be an explicit ID list or null for all supplied records')
  return { id: previous?.id ?? (input.id === undefined ? crypto.randomUUID() : reportIdentity(input.id)), name: text(merged.name, 'view name', 120),
   created_by: previous?.created_by ?? text(createdBy, 'creator', 100), sharing,

@@ -29,9 +29,9 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
  if(parts.length===2&&parts[1]==='snapshots'){
   need(reportColumns(visibleFields,'job',actor).some(c=>c.id==='portfolio.actual'),'Financial snapshots are unavailable',403,'forbidden')
   if(method==='GET'){
-   const authorized=new Set((await recordsFor('job')).map(r=>r.id)),rows=(await db.prepare('SELECT snapshot_id,job_id,name,captured_at FROM pl_portfolio_snapshots ORDER BY captured_at DESC,rowid DESC').all<{snapshot_id:string;job_id:string;name:string;captured_at:string}>()).results
+   const authorized=new Set((await recordsFor('job')).map(r=>r.id)),rows=(await db.prepare('SELECT snapshot_id,job_id,name,captured_at,data FROM pl_portfolio_snapshots ORDER BY captured_at DESC,rowid DESC').all<{snapshot_id:string;job_id:string;name:string;captured_at:string;data:string}>()).results
    const snapshots=[...new Map(rows.filter(r=>authorized.has(r.job_id)).map(r=>[r.snapshot_id,{id:r.snapshot_id,name:r.name,captured_at:r.captured_at}])).values()]
-   const available=await portfolioJobs(db,actor),assigned=new Set(available.flatMap(r=>r.manager_ids))
+   const available=await portfolioJobs(db,actor),assigned=new Set([...available.flatMap(r=>r.manager_ids),...rows.filter(r=>authorized.has(r.job_id)).flatMap(r=>(JSON.parse(r.data) as {manager_ids:string[]}).manager_ids)])
    const people=(await db.prepare("SELECT id,display_name FROM oa_operators WHERE status='active'").all<{id:string;display_name:string}>()).results
    return json({snapshots,managers:people.filter(p=>assigned.has(p.id)).map(p=>({id:p.id,name:p.display_name}))})
   }

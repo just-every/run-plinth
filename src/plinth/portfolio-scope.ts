@@ -1,4 +1,5 @@
 import { jobs } from './store'
+import type { TeamGrant } from './team'
 import { need, object, text, type Actor, type Job } from './model'
 import { localDate } from './remittances'
 export interface PortfolioScope { snapshot_id?:string; manager_id?:string; trade?:string; cost_code?:string; source_from?:string; source_to?:string }
@@ -13,7 +14,7 @@ export function parsePortfolioScope(value:unknown):PortfolioScope|undefined {
 }
 export async function portfolioManagers(db:D1Database) {
  const rows=(await db.prepare('SELECT operator_id,data FROM pl_team').all<{operator_id:string;data:string}>()).results
- return rows.map(r=>({id:r.operator_id,...JSON.parse(r.data) as {role:string;job_ids:string[]}})).filter(r=>r.role==='project_manager')
+ return rows.map(r=>({id:r.operator_id,...JSON.parse(r.data) as TeamGrant})).filter(r=>r.role==='project_manager'||r.role==='custom'&&r.base==='project_manager')
 }
 export async function portfolioJobs(db:D1Database,actor:Actor,selection?:PortfolioScope) {
  const current=(await jobs(db)).filter(j=>actor.role!=='project_manager'||actor.team?.job_ids.includes(j.id))

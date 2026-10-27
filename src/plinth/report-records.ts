@@ -33,7 +33,7 @@ export async function reportRecords(db: D1Database, actor: Actor, scope: ReportR
  const columns = reportColumns(definitions, scope, actor)
  const saved = (await db.prepare('SELECT record_id,version,stage,data FROM pl_report_values WHERE record_scope=?').bind(scope).all<{record_id:string;version:number;stage:string;data:string}>()).results
  const values = new Map(saved.map(s => [s.record_id, s]))
- const attach = (r: Omit<FieldRecord,'version'>): FieldRecord => { const saved = values.get(r.id); return reportRecordView({ ...r, stage: saved?.stage ?? r.stage, version: saved?.version ?? 0, values: { ...r.values, 'native.custom_stage':saved?.stage??null, ...JSON.parse(saved?.data ?? '{}') as ReportValues } }, columns) }
+ const attach = (r: Omit<FieldRecord,'version'>): FieldRecord => { const saved = selection?.snapshot_id ? undefined : values.get(r.id); return reportRecordView({ ...r, stage: saved?.stage ?? r.stage, version: saved?.version ?? 0, values: { ...r.values, 'native.custom_stage':saved?.stage??null, ...JSON.parse(saved?.data ?? '{}') as ReportValues } }, columns) }
  if (scope === 'customer' || scope === 'vendor') {
   const rows = (await db.prepare(scope === 'customer' ? 'SELECT data FROM pl_customers' : 'SELECT data FROM pl_vendors').all<{data:string}>()).results
   return rows.map(row => { const r = JSON.parse(row.data) as Customer | Vendor; return attach({ id:r.id, record_scope:scope, label:r.name, stage:r.kind, values:{ 'native.kind':r.kind } }) })

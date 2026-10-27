@@ -16,7 +16,9 @@ with that subset to select the relevant coded sources. Source dates select
 the dates on procurement, posted actuals, earned billings and receipts.
 Budget stock uses its recorded source date and forecast stock its as-of date;
 an absent or out-of-window budget or forecast remains unknown. Undated legacy
-sources are excluded from a date window.
+sources are excluded from a date window. Bid cost adjustments and cancellations
+use their own approval dates and appear beside the frozen budget sources; an
+out-of-window frozen base remains unknown even when an adjustment qualifies.
 
 Sold revenue and budgets reconcile to selected budget codes. Earned billing
 keeps gross earned value, including retained amounts, and collections use
@@ -31,7 +33,10 @@ totals remain separate. Current report permissions and project-manager job
 assignments apply on every query and download, including old captures. Job
 erasure removes its captured copies. Capturing is restricted to owners and
 administrators with report creation and full financial source visibility.
-Historical views cannot mix captured native fields with current custom values.
+Historical views cannot mix captured native fields with current custom values,
+including custom fields whose IDs begin with `portfolio.`. Copied manager roles
+retain manager membership. Managers recorded in accessible captures remain
+selectable after reassignment; current job grants still fence every capture.
 
 Unknown budgets and forecasts show **Not set**; money totals show how many
 records contributed. A job name opens the job. Financial source downloads
