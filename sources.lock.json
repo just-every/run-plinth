@@ -3913,7 +3913,7 @@
       "executable": false
     },
     "src/ui/attachment-legacy/word-stories.ts": {
-      "sha256": "9f7ab5768b2ff603f467f9c5bd02d0b251229fc980e50ac0b7369c4a7c3b51fd",
+      "sha256": "58c9ee790c7969f378ef9419bbeedbea55f9c071de57d606808f49b514677f45",
       "executable": false
     },
     "src/ui/attachment-legacy/worker.ts": {

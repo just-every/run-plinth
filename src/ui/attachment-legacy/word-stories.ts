@@ -104,7 +104,7 @@ export function extractWordStories(source: Uint8Array): { text: string; notes: s
   if (cleaned) output.push(`${stories[story].label}\n${cleaned}`)
  }
  return { text: bounded(output.join('\n\n')), notes: [
-  'Supplementary Word text is read only from FIB-declared story ranges in the selected CLX piece table. Main-body text is supplied separately by the legacy reader; old and unreferenced stream bytes are not scanned.',
+  'Supplementary Word text comes from the original document’s declared text sections and is included beside its main text. Old or unreferenced stored bytes are not searched.',
   'Headers, footers and note separators are grouped in their declared header subdocument. Individual note anchors, section placement, numbering, field evaluation, font glyphs, layout and tracked-change acceptance are not interpreted. Structural control markers are normalized; pictures and embedded objects are not read or recognized.',
  ] }
 }
