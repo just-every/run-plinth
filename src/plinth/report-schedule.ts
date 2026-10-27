@@ -120,13 +120,13 @@ export async function dispatchReportSchedules(original:Bindings,now:number){
    if(suppressed)outcome={status:'suppressed',label:'Optional report notice suppressed; no message sent'}
    else if(!sender||!env.MAIL_FROM)outcome={status:'unconfigured',label:'Mail is not configured; nothing was sent'}
    else{
+    const optional=await optionalNotice(env,s.recipient_email),link=new URL('/api/plinth/report-schedules/'+s.id+'/downloads/'+delivery.id,env.AUTH_ORIGIN).href
     const current=await loadWarrantyJob(env.DB,job.id) as ReportJob|null,currentSchedule=current?.report_schedules?.find(r=>r.id===s.id),fresh=current&&currentSchedule?await guards(env.DB,current,currentSchedule):null
     need(current&&fresh,'Report authority changed',409,'conflict');await checkWarrantySend(env.DB,current,await readClock(env.DB),fresh)
-    const optional=await optionalNotice(env,s.recipient_email),link=new URL('/api/plinth/report-schedules/'+s.id+'/downloads/'+delivery.id,env.AUTH_ORIGIN).href
     const message=await sender.send({deliveryId:delivery.id,from:env.MAIL_FROM,to:[s.recipient_email],subject:'Your scheduled Plinth '+(s.kind==='digest'?'manager digest':'draw packet'),text:'Sign in to download your permission-scoped report: '+link+(optional?.text??''),html:'<p><a href="'+link+'">Sign in to download your scheduled report</a></p>',headers:{},...(optional?.unsubscribe?{unsubscribe:optional.unsubscribe}:{})})
     outcome=statusOf(message);if('providerMessageId' in message)providerId=String(message.providerMessageId)
    }
-  }catch{outcome={status:'unknown',label:'Provider outcome unknown. No automatic resend.'}}
+  }catch(error){outcome=error instanceof DomainError&&error.code==='conflict'?{status:'cancelled',label:'Report authority changed; no message was sent'}:{status:'unknown',label:'Provider outcome unknown. No automatic resend.'}}
   const current=await loadWarrantyJob(env.DB,job.id) as ReportJob|null
   if(current){const finished=structuredClone(current),entry=finished.report_schedules?.find(r=>r.id===s.id)?.deliveries.find(d=>d.id===delivery.id);if(entry){Object.assign(entry,outcome,...(providerId?[{provider_message_id:providerId}]:[]));try{await save(env.DB,current,finished,[])}catch(error){if(!(error instanceof DomainError&&error.code==='conflict'))throw error}}}
  }

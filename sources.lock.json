@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "297d989050622f37bff4d63f35a95140c9c6cdf148fa488dd6e3db8a5bc68646",
+      "sha256": "8b839d52a3b63081fad89d04933aa475674f9a47a709c561a6c468b47bae5654",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -729,7 +729,7 @@
       "executable": false
     },
     "scripts/contract-docs.mjs": {
-      "sha256": "c44ad1d3678c9612e824d89b12f345067fade3f9b2f881a7ef20f86d1d894c8d",
+      "sha256": "fc838a3edb4e8d56759d1097d7782d91a5b58333a309019ce038791bf003ece1",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -3401,7 +3401,7 @@
       "executable": false
     },
     "src/plinth/report-schedule.ts": {
-      "sha256": "0f113183480dc109b7672df2bf91857740d2ac667bbe904a5c8cec64be684b99",
+      "sha256": "efea1b002601881dd8e8f82344776d1c7eac26cd316d39b80e83b6508b71159b",
       "executable": false
     },
     "src/plinth/report-store.ts": {

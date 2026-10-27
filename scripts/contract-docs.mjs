@@ -21,7 +21,7 @@ for(const clause of selected){
  const entry='- **'+clause.id+' — '+clause.title+'.** **Status:** '+clause.status+'. '+proof+' **Current evidence:** '+(row[4]||'No implementation evidence.')+(row[5]?' **Remaining:** '+row[5]:'')
  acceptance=acceptance.slice(0,start)+entry+acceptance.slice(stop)
 }
-const claims='# Plinth contract status\n\nGenerated from CONTRACT.md by the seed contract document generator. Acceptance and Status remain in CONTRACT.md. Partial rows retain all stated gaps.\n\n| Clause | Status | Evidence | Gap |\n| --- | --- | --- | --- |\n'+rows.map(row=>'| '+[row[0],row[3],row[4],row[5]].join(' | ')+' |').join('\n')+'\n'
+const claims='# Plinth contract status\n\nGenerated from CONTRACT.md by the seed contract document generator. CONTRACT.md retains every acceptance sentence, Evidence cell and Gap. Partial means the linked Gap is still owed.\n\n| Clause | Status | Evidence and Gap |\n| --- | --- | --- |\n'+rows.map(row=>'| '+row[0]+' | '+row[3]+' | [Contract source](../CONTRACT.md#status) |').join('\n')+'\n'
 for(const [path,content] of [['CONTRACT.md',source],['ACCEPTANCE.md',acceptance],['docs/CLAIMS.md',claims]]){
  if(mode==='write')writeFileSync(path,content)
  else if(!existsSync(path)||readFileSync(path,'utf8')!==content)throw Error('Stale generated document: '+path)
