@@ -133,6 +133,11 @@ async function pdfText(file: Blob, password: string, everyPage: boolean, run: Ru
 }
 
 async function imageText(file: Blob, run: Run): Promise<Result> {
+ if (['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+  const { rasterSize } = await import('./attachment-formats/raster')
+  rasterSize(new Uint8Array(await file.arrayBuffer()), file.type)
+  check(run)
+ }
  const image = await createImageBitmap(file)
  try {
   if (image.width * image.height > MAX_PIXELS) throw new Error('This image exceeds the 16 megapixel OCR limit.')
@@ -163,8 +168,14 @@ async function extract(file: Blob, name: string, password: string, everyPage: bo
   return extractOffice(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
    recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  }
+ const legacy = await import('./attachment-legacy')
+ if (legacy.handlesLegacy(name, file.type)) return legacy.extractLegacy(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
+  recognizeImage: async image => (await imageText(image, run)).text, boundedText })
+ const other = await import('./attachment-formats')
+ if (other.handlesOther(name, file.type)) return other.extractOther(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
+  recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  if (['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || /\.(png|jpe?g|webp)$/i.test(name)) return imageText(file, run)
- throw new Error('Browser extraction supports PDF, DOCX, XLSX, PPTX, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
+ throw new Error('Browser extraction supports PDF, modern and legacy Office files, TIFF, RTF, encoded text, HTML, SVG, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
 }
 
 

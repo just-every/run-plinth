@@ -3,6 +3,8 @@ import { expect } from '@playwright/test'
 import { imageDocument, protectedDocument, unsupportedDocument } from '../fixtures/unextractable-documents.mjs'
 import { originalEmail } from './meeting-mail.mjs'
 import { officeAttachmentSearch } from './office-attachment-search.mjs'
+import { otherAttachmentSearch } from './other-attachment-search.mjs'
+import { legacyAttachmentSearch } from './legacy-attachment-search.mjs'
 
 /** Real protected, raster-only and compressed originals are read locally before a human saves searchable text. */
 export async function attachmentExtraction({ base, page, owner, client, job, capture }) {
@@ -26,4 +28,6 @@ export async function attachmentExtraction({ base, page, owner, client, job, cap
   const result=await(await owner.request.get(base+`/api/plinth/jobs/${job.id}/decision-search?`+new URLSearchParams({q:variant.term}))).json();assert.equal(result.count,1);assert.deepEqual(Buffer.from(await(await owner.request.get(base+result.results[0].files[0].href)).body()),variant.bytes)
  }
  await officeAttachmentSearch({base,page,owner,client,job,capture})
+ await otherAttachmentSearch({base,page,owner,client,job,capture})
+ await legacyAttachmentSearch({base,page,owner,client,job,capture})
 }
