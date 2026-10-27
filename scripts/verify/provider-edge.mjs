@@ -4,12 +4,14 @@ import { stripeEdge, intent } from '../../tests/plinth/payment-fixture.mjs'
 
 // Only external provider records live here. No application responses are replaced.
 export async function providerEdge() {
+ let refuseNext=false
  const messages = [], stripe = stripeEdge()
  const outboundService = async request => {
   if (new URL(request.url).origin === 'https://api.stripe.com') return stripe.handler(request)
   assert.equal(request.url, 'https://api.resend.com/emails', 'Unexpected Worker egress')
   assert.equal(request.method, 'POST')
-  messages.push(await request.json())
+  const message=await request.json();messages.push(message)
+  if(refuseNext&&message.subject.startsWith('Your scheduled Plinth')){refuseNext=false;return Response.json({message:'Synthetic provider refusal'},{status:422})}
   return Response.json({ id: `synthetic-plinth-${messages.length}` })
  }
  const latest = email => messages.findLast(message => message.to.includes(email))
@@ -21,6 +23,7 @@ export async function providerEdge() {
    assert.equal(request.method, 'POST')
    const chunks = []; for await (const chunk of request) chunks.push(chunk)
    const body = JSON.parse(Buffer.concat(chunks).toString())
+   if(url.pathname==='/mail/refuse-next'){refuseNext=true;return reply(200,{configured:true})}
    if (url.pathname === '/auth/link') {
     const message = messages.findLast(message => message.to.includes(body.email) && /\/auth\/confirm\?/.test(message.text))
     const link = message?.text.match(/https?:\/\/[^\s<>]+/g)?.find(value => new URL(value).pathname === '/auth/confirm')

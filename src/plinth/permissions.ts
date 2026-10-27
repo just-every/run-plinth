@@ -16,7 +16,7 @@ const feature: Record<string, Feature> = {
  diary: 'logs', time: 'time',
  'meeting-inbox': 'documents', rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
  payments: 'invoices', invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
- reports: 'reports', audit: 'reports', holds: 'reports',
+ 'report-schedules':'reports', reports: 'reports', audit: 'reports', holds: 'reports',
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
 }
 /** Verbs that decide, issue, send or publish rather than edit. */

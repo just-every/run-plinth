@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "7bbee46e395eee3a48187710a2a435daf321f4637bbbd2c381c92d226e04ce6c",
+      "sha256": "3aae5a0a6e983cffa3a9eab9f2ac88cc207f2d0c49c495c87be93a2f639a0ddb",
       "executable": false
     },
     ".gitignore": {
@@ -941,7 +941,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "2fb0b275c14677e32f6f9468e3facbf731149613d129b992a15f4c51310b67c4",
+      "sha256": "9236bbe6add1707e62ebb929bc9bcc27a2f44facfab091869003d2a80b571b53",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -949,7 +949,7 @@
       "executable": false
     },
     "scripts/verify/provider-edge.mjs": {
-      "sha256": "4488baf7cc72e032cf787e6a827bf377e8b6e79dcc30db1d869adcb675481242",
+      "sha256": "e37be087997b42f6d05827404add03447c6f72eccbf401f3e060f4cce9cc2596",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -3141,7 +3141,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "9e8e71b4b28a54c7a074eb107a6464190ed0f3caecc0f08736e8a4f46896f888",
+      "sha256": "86fb39d0994925ce9945ed10e49de2a741c3b273469e2fc4ec743a1eda5796c3",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3301,7 +3301,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "5e8a59b8acc1a521e585ed36a7615e0ea5091252f498c3dd29cd78da09e1c105",
+      "sha256": "e1582ccdcdb170cc02d9e2c8c81423f6d4de522adf45eae3adf39cb679f1c726",
       "executable": false
     },
     "src/plinth/portal-features.ts": {
@@ -3376,6 +3376,10 @@
       "sha256": "5363b83b81347c84a2762a728bd0a38a9bd84382f5a7721a3e3bbb0f713fe632",
       "executable": false
     },
+    "src/plinth/report-packet.ts": {
+      "sha256": "f09f26f1ab057b575c22b7aa7cc20db416851ad346e2f2e684d1be6aef0fcd6d",
+      "executable": false
+    },
     "src/plinth/report-pdf.ts": {
       "sha256": "2a722478300bbf5b6787c1e6df6a93bacbfc8460fe76054af965874214d0da8b",
       "executable": false
@@ -3386,6 +3390,10 @@
     },
     "src/plinth/report-records.ts": {
       "sha256": "3bd258b3af24c84fabfb36d1da0099f2315600f641dd6f6d21b20450a11e7d97",
+      "executable": false
+    },
+    "src/plinth/report-schedule.ts": {
+      "sha256": "15c380e633dd2c8d2c605a8c5bb9f9e00c974999dadcd02921a6088004a3e36c",
       "executable": false
     },
     "src/plinth/report-store.ts": {
@@ -3485,7 +3493,7 @@
       "executable": false
     },
     "src/plinth/scheduled.ts": {
-      "sha256": "ea0f06588e8517b1f6df2ae2af86097a555b6ce31295b108e7261d8a5ae16033",
+      "sha256": "7e1a217811a13c0a9b20d6899c7b5dc99ea16b260c10199bffd003880ede1f81",
       "executable": false
     },
     "src/plinth/scope-contacts.ts": {
@@ -4276,6 +4284,10 @@
       "sha256": "dd3bc90ebe9f7961612f6a00af05237b6454166bc17754f51d32fc1f7f981d2c",
       "executable": false
     },
+    "src/ui/report-schedules.tsx": {
+      "sha256": "31862f873c965907f3b22dddb34fe6c4882ee1e7bd71308ef699b9029db3dba8",
+      "executable": false
+    },
     "src/ui/report-values.tsx": {
       "sha256": "76f428e774ca641b8af22ef84fd346e27d1f01d8b1d54796747a22d837c1d3fc",
       "executable": false
@@ -4441,7 +4453,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "8937b502b66ec6be11fedb0b8f40507249e182deca98e8f7edcbd7bb3a616923",
+      "sha256": "5dc1b486cd00bd40e1626405f31bde51f778deb6e571e5506e0583eeb5d6da7a",
       "executable": false
     },
     "test-budget.json": {
@@ -4660,6 +4672,10 @@
       "sha256": "ec8b54cb56512f211dd13fb411d17f9b8f37965fe757a46f4dffc0780eed3921",
       "executable": false
     },
+    "tests/journeys/report-packets.mjs": {
+      "sha256": "1494ce8da560cde520f62c49a492218593df4b202fef9142f5219119665cfcc4",
+      "executable": false
+    },
     "tests/journeys/retainage.mjs": {
       "sha256": "81d401046a25bfa91a50a6c6b9d45951b64a9bfc3b270e4b9ba62d6fa0f82edc",
       "executable": false
@@ -4804,8 +4820,12 @@
       "sha256": "5405b67ac9e75e593e195aa810e42bb944075a9e8621102d72131e4836592dcd",
       "executable": false
     },
+    "tests/plinth/report-schedule-support.mjs": {
+      "sha256": "1c59a822cb0ad4121d9fee1159475abd8faa3e162832d0a9791cc397595f3bc6",
+      "executable": false
+    },
     "tests/plinth/reports.test.mjs": {
-      "sha256": "ff844818d8334f800fa6227676dc1605cd6d718cf6b956172308c1022a61e94d",
+      "sha256": "76dc3c810f24c450c138d33b67d21f2c96fd8d011082f2c5392012c1ac6fa38b",
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {
