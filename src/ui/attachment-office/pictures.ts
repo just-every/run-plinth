@@ -1,13 +1,15 @@
 import type { OfficePackage } from './package'
 import { fail } from './types'
+import { extractChart } from './charts'
 import { storedText } from './xml'
 
 const rasterTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif' }
-const unsupportedRelations = new Set(['oleObject', 'package', 'chart', 'diagramData', 'audio', 'video', 'control', 'aFChunk', 'altChunk', 'subDocument'])
+const unsupportedRelations = new Set(['oleObject', 'package', 'diagramData', 'audio', 'video', 'control', 'aFChunk', 'altChunk', 'subDocument'])
 
 export class Pictures {
  private recognized = new Map<string, Promise<string>>()
  private visited = new Set<string>()
+ private charts = new Set<string>()
  constructor(private office: OfficePackage) {}
  async from(part: string, label: string, drawingText = false) {
   const { draft, archive } = this.office
@@ -26,6 +28,15 @@ export class Pictures {
    if (relation.external) continue
    if (unsupportedRelations.has(relation.kind)) draft.notes.add(`Unsupported embedded content in ${label}: ${relation.kind}. Its contents were not extracted.`)
    if (['drawing', 'vmlDrawing'].includes(relation.kind)) { await this.from(relation.target, label, true); continue }
+   if (relation.kind === 'chart') {
+    if (!this.charts.has(relation.target)) {
+     if (this.charts.size >= 40) fail('more than 40 chart parts are unsupported.')
+     this.charts.add(relation.target)
+     await extractChart(this.office, relation.target, `${label} chart`)
+     await this.from(relation.target, label)
+    }
+    continue
+   }
    if (relation.kind !== 'image') continue
    const extension = relation.target.split('.').at(-1)?.toLowerCase() ?? '', type = rasterTypes[extension]
    if (!type) { draft.notes.add(`An unsupported picture format in ${label} was not read: ${extension || 'unknown'}.`); continue }

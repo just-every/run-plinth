@@ -5,6 +5,7 @@ import { originalEmail } from './meeting-mail.mjs'
 import { officeAttachmentSearch } from './office-attachment-search.mjs'
 import { otherAttachmentSearch } from './other-attachment-search.mjs'
 import { legacyAttachmentSearch } from './legacy-attachment-search.mjs'
+import { openAttachmentSearch } from './open-attachment-search.mjs'
 
 /** Real protected, raster-only and compressed originals are read locally before a human saves searchable text. */
 export async function attachmentExtraction({ base, page, owner, client, job, capture }) {
@@ -30,4 +31,5 @@ export async function attachmentExtraction({ base, page, owner, client, job, cap
  await officeAttachmentSearch({base,page,owner,client,job,capture})
  await otherAttachmentSearch({base,page,owner,client,job,capture})
  await legacyAttachmentSearch({base,page,owner,client,job,capture})
+ await openAttachmentSearch({base,page,owner,client,job,capture})
 }

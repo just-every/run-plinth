@@ -30,7 +30,7 @@ export function AttachmentExtraction({ href, name, onText }: { href: string; nam
    // Password and parser errors may contain source details. Never display library errors verbatim.
    setError(controller.signal.aborted ? (problem instanceof Error && problem.name !== 'AbortError' ? problem.message : 'Extraction stopped. Nothing was copied.')
     : cause instanceof Error && (cause.name === 'PasswordException') ? 'This PDF needs a valid password. Enter it below and extract again.'
-    : cause instanceof Error && /^(Extracted text|Original file|This |PDF page|Browser extraction|Extraction requires|No text|Office extraction: |File extraction: |Legacy extraction: )/.test(cause.message) ? cause.message
+    : cause instanceof Error && /^(Extracted text|Original file|This |PDF page|Browser extraction|Extraction requires|No text|Office extraction: |File extraction: |Legacy extraction: |OpenDocument extraction: )/.test(cause.message) ? cause.message
     : 'Extraction failed. The file may be damaged, encrypted, or use unsupported features. Nothing was copied; supply reviewed text manually.')
    setStatus('')
   } finally { window.clearTimeout(timeout); release(); active.current = null; setBusy(false) }

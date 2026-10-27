@@ -73,7 +73,7 @@ export class OfficePackage {
  audit() {
   const names = [...this.archive.entries.keys()]
   if (names.some(name => /(?:^|\/)embeddings\//i.test(name))) this.draft.notes.add('Embedded objects and embedded documents were not opened or extracted.')
-  if (names.some(name => /(?:chart|diagram|pivotTable|pivotCache|slicer|externalLink|activeX|vbaProject)/i.test(name))) this.draft.notes.add('Charts, diagrams, pivots, external data, controls and macros are not evaluated or rendered; their visible content may be absent.')
+  if (names.some(name => /(?:chart|diagram|pivotTable|pivotCache|slicer|externalLink|activeX|vbaProject)/i.test(name))) this.draft.notes.add('Stored classic chart labels and cached values are read without recalculation. Charts are not rendered; diagrams, pivots, external data, controls, macros and uncached content may remain unread.')
   if (names.some(name => /\.(?:emf|wmf|svg|eps)$/i.test(name))) this.draft.notes.add('Vector pictures are unsupported. Their visible content was not read.')
  }
 }

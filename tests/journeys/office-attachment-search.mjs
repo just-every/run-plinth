@@ -1,3 +1,4 @@
+import { chartDocument, chartTerms } from '../fixtures/chart-document.mjs'
 import { wordDocument, wordTerms } from '../fixtures/office-documents.mjs'
 import { searchDocument } from '../fixtures/search-document.mjs'
 import { spreadsheetDocument, sheetTerms } from '../fixtures/spreadsheet-document.mjs'
@@ -16,6 +17,7 @@ export async function officeAttachmentSearch({ base, page, owner, client, job, c
   { name: 'complete-site-stories.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', bytes: await wordDocument(await image('WIRING CLEARANCE 48 INCHES')), terms: [...wordTerms, 'WIRING'], state: 'unsupported' },
   { name: 'stored-site-cells.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', bytes: await spreadsheetDocument(await image('FRAMING CLEARANCE 48 INCHES')), terms: sheetTerms, state: 'unsupported' },
   { name: 'stored-site-slides.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', bytes: await presentationDocument(await image('VENTILATION CLEARANCE 48 INCHES')), terms: slideTerms, state: 'unsupported' },
+  { name: 'stored-site-chart.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', bytes: await chartDocument(), terms: chartTerms, state: 'unsupported' },
   { name: 'extended-source.pdf', mime: 'application/pdf', bytes: searchDocument(Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`)), terms: ['synthetic-plinth-extended-page-001-9209', 'synthetic-plinth-extended-page-101-9209', 'synthetic-plinth-extended-page-201-9209'], required: Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`), state: 'limited' },
  ]
  await reviewExtractedAttachments({base,page,owner,client,job,capture,variants,capturePrefix:'attachment-office'})

@@ -88,7 +88,7 @@ export function preflight(bytes: Uint8Array, format: LegacyFormat): string[] {
  else if (format === 'xls') spreadsheet(cfb)
  else presentation(cfb)
  return ['The local reader does not execute macros, follow external links, recognize image text or recursively extract embedded OLE payloads.',
-  ...(format === 'doc' ? ['This reader extracts the Word main story only. Headers, footers, footnotes, endnotes, comments, tracked-change interpretation and text boxes are not supported.'] : []),
+  ...(format === 'doc' ? ['This reader combines main Word text with declared footnotes, grouped headers and footers, annotations, endnotes and text boxes. Individual anchors, fields, layout, tracked-change acceptance, images and embedded objects are not interpreted.'] : []),
   ...(format === 'xls' ? ['This reader extracts stored Excel cell values and cached formula results. Formatting, formula expressions, comments, chart content, drawings and embedded objects are not fully read. Cached results are not recalculated.'] : []),
   ...(format === 'ppt' ? ['This reader extracts current slide text and text exposed by its structured model. Separate notes slides, masters, comments, charts and embedded objects are not fully read.'] : []),
  ]

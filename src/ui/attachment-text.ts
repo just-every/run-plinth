@@ -168,6 +168,9 @@ async function extract(file: Blob, name: string, password: string, everyPage: bo
   return extractOffice(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
    recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  }
+ const openDocument = await import('./attachment-opendocument')
+ if (openDocument.handlesOpenDocument(name, file.type)) return openDocument.extractOpenDocument(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
+  recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  const legacy = await import('./attachment-legacy')
  if (legacy.handlesLegacy(name, file.type)) return legacy.extractLegacy(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
   recognizeImage: async image => (await imageText(image, run)).text, boundedText })
@@ -175,7 +178,7 @@ async function extract(file: Blob, name: string, password: string, everyPage: bo
  if (other.handlesOther(name, file.type)) return other.extractOther(file, name, { signal: run.signal, check: () => check(run), progress: run.progress,
   recognizeImage: async image => (await imageText(image, run)).text, boundedText })
  if (['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || /\.(png|jpe?g|webp)$/i.test(name)) return imageText(file, run)
- throw new Error('Browser extraction supports PDF, modern and legacy Office files, TIFF, RTF, encoded text, HTML, SVG, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
+ throw new Error('Browser extraction supports PDF, modern and legacy Office files, OpenDocument packages, TIFF, RTF, encoded text, HTML, SVG, PNG, JPEG and WebP. Supply other formats as reviewed text manually.')
 }
 
 

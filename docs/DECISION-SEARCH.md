@@ -21,11 +21,11 @@ originals fail visibly without copying partial output. Every PDF page is read
 within those bounds. Linked Word headers, footers, footnotes, endnotes and text
 boxes are included. Spreadsheet formulas and saved values are read without
 recalculation; slide layouts and masters can repeat text. Embedded objects,
-charts, equations, threaded comments and unsupported pictures can remain unread;
+equations, threaded comments and unsupported pictures can remain unread;
 the draft shows these limitations. Legacy binary Office files have a bounded
-local reader: main-story Word text, saved spreadsheet cell values
-and current slide text. Its notes name unread stories, comments, pictures and
-other omissions. Encrypted legacy files are refused.
+local reader: main Word text and declared footnotes, grouped headers and footers,
+annotations, endnotes and text boxes, saved spreadsheet cell values, and current
+slide text. Its notes name unread comments, pictures and other omissions. Encrypted legacy files are refused.
 
 Multi-page TIFF, RTF code pages and Unicode, BOM UTF-16 plain text, inert HTML
 and SVG stored text also have local readers. TIFF and inline raster pictures use
@@ -33,6 +33,13 @@ English OCR. Unsupported TIFF layouts and codecs fail explicitly. Scripts are
 never executed; HTML linked resources are not fetched, and SVG external
 references are refused. Markup layout, outlined vector glyphs, embedded objects
 and unsupported parts still require manual inspection and supplied text.
+
+Classic Office charts contribute saved titles, labels, raw cache values and
+formulas. They are not recalculated or rendered; caches can be stale. OpenDocument
+text, spreadsheets and presentations also include stored tables, formulas,
+values, comments, notes, headers, footers and supported embedded raster pictures.
+Encrypted OpenDocument packages are refused. None of these readers executes
+macros, refreshes linked data or opens embedded document payloads.
 
 PDF pages with embedded text use
 that text by default; choose **OCR every PDF page** to read the rendered page
