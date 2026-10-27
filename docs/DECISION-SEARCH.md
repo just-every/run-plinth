@@ -11,13 +11,19 @@ original content was searched. Download the original to inspect it.
 Under **Index metadata → Supplied attachment text**, a signed-in owner or
 administrator can supply text for the exact original. **Extract text in this
 browser** can prepare a draft from English raster images, rendered PDF pages,
-embedded PDF text, a PDF unlocked with its password, or DOCX body text. File
+embedded PDF text, a PDF unlocked with its password, or modern Word, Excel and
+PowerPoint packages including linked stories, notes, comments and raster pictures. File
 bytes and PDF passwords stay in the browser; pinned OCR resources come from the
 installation. The password is cleared when extraction starts and is never saved.
 
 Extraction is bounded by the limits shown in the panel. Unsupported or oversized
-originals fail visibly without copying partial output. DOCX headers, footers,
-images and some embedded objects are omitted. PDF pages with embedded text use
+originals fail visibly without copying partial output. Every PDF page is read
+within those bounds. Linked Word headers, footers, footnotes, endnotes and text
+boxes are included. Spreadsheet formulas and saved values are read without
+recalculation; slide layouts and masters can repeat text. Embedded objects,
+charts, equations, threaded comments and unsupported pictures can remain unread;
+the draft shows these limitations. Legacy binary Office and other formats still
+need manually supplied text. PDF pages with embedded text use
 that text by default; choose **OCR every PDF page** to read the rendered page
 instead. OCR is an unverified draft and can miss handwriting, symbols, numbers,
 layout or reading order. Check it against the complete original.
