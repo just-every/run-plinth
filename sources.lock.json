@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "326a0a51082f0db287272300a7451c3e5fc71adfe37a645ca94867a25531c505",
+      "sha256": "29448e29813e33ac41f3dccc47fe2787546d79ef8fc978bf5a1ffa2aa4597473",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "6921f5b856a07c3ce4a5dec0a632659dae0834201685c340fce95159557bd760",
+      "sha256": "d3b8ed182437e2536f52b1ac8e9d129e3b0ca04a448655a4e369b4e788268e8b",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "a3dfb92063645c1e31f43bc3b0d0728a7420ad79878df9787bdf18fc430eb337",
+      "sha256": "77e2fd088aeddde9685a6f7f1f59748ddb7a94694662ac5b7a16467a8dcc2b47",
       "executable": false
     },
     "docs/FIELD-TIME.md": {
@@ -3901,7 +3901,7 @@
       "executable": false
     },
     "src/ui/attachment-legacy/preflight.ts": {
-      "sha256": "fb7df145327a94ec78fb3c4e7fc2ed2515c3999bd2ed6fae8a00cb83621f16e7",
+      "sha256": "eff3c57a561152216deca35229ac05676b06bfe58b5ebf61d0d97f4a343f7940",
       "executable": false
     },
     "src/ui/attachment-legacy/presentation-graph.ts": {
@@ -3916,16 +3916,24 @@
       "sha256": "d809ad8a103cc2776109484402624d9871c3384d99a33fdb87613a44e5344665",
       "executable": false
     },
+    "src/ui/attachment-legacy/spreadsheet-chart-records.ts": {
+      "sha256": "4e3b3f313b10c2e6efa1cf7b8fca78e79b1b85df5e9fe7a3752200492d9205db",
+      "executable": false
+    },
+    "src/ui/attachment-legacy/spreadsheet-charts.ts": {
+      "sha256": "5b40e27d775dfcf9ed849530d86937d0d6bf0b5bdb70462fc4bd56fbb2e54abb",
+      "executable": false
+    },
     "src/ui/attachment-legacy/spreadsheet-comments.ts": {
-      "sha256": "0458ed8df7e13942104ad06e5fc4dc3c6477e21f88d9b894346861297a0d1fd8",
+      "sha256": "0cbb7f40665a75655df971cc6646672d2d9e055f6a6ecac0a8882de997d87cd2",
       "executable": false
     },
     "src/ui/attachment-legacy/spreadsheet-drawings.ts": {
-      "sha256": "1c557be6e09630458197a2276432acfa368b607907d297f5c5dcad49af1c8038",
+      "sha256": "9a8e9c49795b4856552fc51a110dc5eb920cef9687c1a3d08a79aa54b56a6155",
       "executable": false
     },
     "src/ui/attachment-legacy/spreadsheet-records.ts": {
-      "sha256": "c4e398fc3ce5a9ba46a821ed6d1c9954914cd0cf64bec2372cc24d7414d59d8c",
+      "sha256": "b9d37497a2eb31239fd3acaf8801bd8efd62284e0725b5a9a072e65ae96c1e0e",
       "executable": false
     },
     "src/ui/attachment-legacy/spreadsheet-source.ts": {
@@ -4488,6 +4496,10 @@
       "sha256": "7a411f872e17a4d3058f62169eafce83a59a62dc69fe5d9623d2941c041b5e59",
       "executable": false
     },
+    "tests/fixtures/legacy-spreadsheet-charts.mjs": {
+      "sha256": "3dc6c5a556f3ab99cbe482f18e83562e4911e792397cff7a58e653a00d462422",
+      "executable": false
+    },
     "tests/fixtures/legacy-spreadsheet-comments.mjs": {
       "sha256": "c7edbe8dc97a581c37bf5baf8f0d32e4d89bc71f5daca4e9692301d4167f043d",
       "executable": false
@@ -4601,7 +4613,7 @@
       "executable": false
     },
     "tests/journeys/legacy-attachment-search.mjs": {
-      "sha256": "910a9835c45f92d611de38d3ceb27ab4c198972c0daca942e5e93004e0c0342f",
+      "sha256": "832ef3b236049e1f5bdd04d22a9027bb67664f32d7ccf168038bfb3ecf6a1171",
       "executable": false
     },
     "tests/journeys/meeting-mail.mjs": {

@@ -1,3 +1,4 @@
+import { legacySpreadsheetCharts } from '../fixtures/legacy-spreadsheet-charts.mjs'
 import { legacySpreadsheetComments } from '../fixtures/legacy-spreadsheet-comments.mjs'
 import { legacyPresentationStories } from '../fixtures/legacy-presentation-stories.mjs'
 import { legacyWordStories } from '../fixtures/legacy-word-stories.mjs'
@@ -12,5 +13,6 @@ export async function legacyAttachmentSearch(context) {
  variants.push({name:'damaged-site-original.doc',mime:'application/msword',bytes:Buffer.from('synthetic-plinth-damaged-9414'),terms:['synthetic-plinth-damaged-9414'],state:'unsupported',denial:'Legacy extraction:'})
  variants.push({...legacyPresentationStories(),state:'unsupported'})
  variants.push({...legacySpreadsheetComments(),state:'unsupported'})
+ variants.push({...legacySpreadsheetCharts(),state:'unsupported'})
  await reviewExtractedAttachments({...context,variants,capturePrefix:'attachment-legacy'})
 }

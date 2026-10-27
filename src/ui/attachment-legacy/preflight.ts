@@ -44,6 +44,6 @@ export function preflight(bytes: Uint8Array, format: LegacyFormat) {
  const comments = format === 'xls' ? spreadsheetComments(bytes) : undefined
  return { presentation, comments, notes: ['The local reader does not execute macros, follow external links, recognize image text or recursively extract embedded OLE payloads.',
   ...(format === 'doc' ? ['This reader combines main Word text with declared footnotes, grouped headers and footers, annotations, endnotes and text boxes. Individual anchors, fields, layout, tracked-change acceptance, images and embedded objects are not interpreted.'] : []),
-  ...(format === 'xls' ? ['This reader extracts stored Excel cell values, cached formula results and anchored current worksheet comments. Formatting, formula expressions, chart content, other drawings and embedded objects are not fully read. Cached results are not recalculated.'] : []),
+  ...(format === 'xls' ? ['This reader extracts stored Excel cell values, cached formula results, anchored worksheet comments and supported current chart text and saved data caches. Formatting, formula expressions, linked chart data, other drawings and embedded objects are not fully read. Saved results are not recalculated.'] : []),
  ] }
 }

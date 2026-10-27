@@ -43,10 +43,15 @@ never executed; HTML linked resources are not fetched, and SVG external
 references are refused. Markup layout, outlined vector glyphs, embedded objects
 and unsupported parts still require manual inspection and supplied text.
 
-Classic Office charts contribute saved titles, labels, raw cache values and
+Modern Office charts contribute saved titles, labels, raw cache values and
 formulas. They are not recalculated or rendered; caches can be stale. OpenDocument
 text, spreadsheets and presentations also include stored tables, formulas,
 values, comments, notes, headers, footers and supported embedded raster pictures.
+Binary Excel charts also contribute current embedded-chart and chart-sheet
+titles, series names, attached labels and saved category and numeric caches.
+Unlisted and deleted charts, loose text records and revision streams are
+excluded. Linked data, formula evaluation, generated labels, rich chart text and
+visual layout remain unread. Saved caches can be stale.
 Encrypted OpenDocument packages are refused. None of these readers executes
 macros, refreshes linked data or opens embedded document payloads.
 

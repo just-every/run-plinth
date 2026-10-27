@@ -3,6 +3,7 @@ import { fail } from './types'
 import { spreadsheetSource } from './spreadsheet-source'
 export type Biff = { type: number; data: Uint8Array; start: number; end: number }
 export type Sheet = { name: string; hidden: number; records: Biff[] }
+export type ChartScope = Sheet & { object?: Biff; parent?: Biff[] }
 export const u16 = (b: Uint8Array, n: number) => new DataView(b.buffer, b.byteOffset, b.byteLength).getUint16(n, true)
 export const u32 = (b: Uint8Array, n: number) => new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(n, true)
 export function checkedText(text: string): string {
@@ -41,7 +42,7 @@ export function workbook(source: Uint8Array) {
  const bof = (r: Biff, kind: number) => { if (r.type !== 0x0809 || r.data.length < 16 || u16(r.data, 0) !== 0x0600 || u16(r.data, 2) !== kind) fail('a declared BIFF8 Excel substream is invalid.') }
  const globals: Biff[] = []; let at = 0; const first = record(at); bof(first, 5); globals.push(first); at = first.end
  while (true) { const r = record(at); globals.push(r); at = r.end; if (r.type === 0x0809) fail('the Excel globals contain a nested substream.'); if (r.type === 10) break }
- const globalEnd = at, sheets: Sheet[] = [], starts = new Set<number>(), names = new Set<string>(), ranges: { bound: Biff; start: number; end: number }[] = []
+ const globalEnd = at, sheets: Sheet[] = [], charts: ChartScope[] = [], starts = new Set<number>(), names = new Set<string>(), ranges: { bound: Biff; records: Biff[] }[] = []
  for (const bound of globals.filter(r => r.type === 0x0085)) {
   const b = bound.data
   if (b.length < 8) fail('a declared Excel sheet is truncated.')
@@ -50,14 +51,24 @@ export function workbook(source: Uint8Array) {
   starts.add(start); names.add(name.toLowerCase())
   if (kind !== 0 && kind !== 2 && kind !== 1 && kind !== 6) fail('the declared Excel sheet kind is unsupported.')
   const root = record(start); bof(root, kind === 2 ? 0x20 : kind === 1 ? 0x40 : kind === 6 ? 6 : 0x10)
-  const records: Biff[] = []; let cursor = root.end, depth = 1
-  while (depth) {
+  const records: Biff[] = []; let cursor = root.end
+  while (true) {
    const r = record(cursor); cursor = r.end
-   if (r.type === 0x0809) { if (r.data.length < 16 || u16(r.data, 0) !== 0x0600 || u16(r.data, 2) !== 0x20 || ++depth > 16) fail('an Excel nested substream is unsupported.'); continue }
-   if (r.type === 10) { depth--; continue }
-   if (depth === 1) records.push(r)
+   if (r.type === 0x0809) {
+    bof(r, 0x20)
+    if (kind !== 0) fail('an Excel chart is nested outside a worksheet.')
+    let objectIndex = records.length - 1
+    while (records[objectIndex]?.type === 0x003c) objectIndex--
+    const object = records[objectIndex]
+    if (object?.type !== 0x005d) fail('an embedded Excel chart has no owning object.')
+    const chart: Biff[] = []
+    while (true) { const item = record(cursor); cursor = item.end; if (item.type === 0x0809) fail('an Excel chart contains a nested substream.'); if (item.type === 10) break; chart.push(item) }
+    charts.push({ name, hidden, records: chart, object, parent: records }); continue
+   }
+   if (r.type === 10) { if (kind !== 2) ranges.push({ bound, records: [root, ...records, r] }); break }
+   records.push(r)
   }
-  ranges.push({ bound, start, end: cursor })
+  if (kind === 2) charts.push({ name, hidden, records })
   if (kind === 0) {
    const ws = records.filter(r => r.type === 0x0081)
    if (ws.length > 1 || ws.some(r => r.data.length !== 2)) fail('Excel worksheet properties are ambiguous.')
@@ -68,11 +79,16 @@ export function workbook(source: Uint8Array) {
  // Record-start membership alone cannot detect a malicious offset into a payload.
  const intervals = [...occupied].map(start => [start, start + 4 + u16(bytes, start + 2)]).sort((a, b) => a[0]! - b[0]!)
  for (let n = 1; n < intervals.length; n++) if (intervals[n]![0]! < intervals[n - 1]![1]!) fail('current Excel record ranges overlap.')
- const size = globalEnd + ranges.reduce((sum, r) => sum + r.end - r.start, 0), current = new Uint8Array(size)
- current.set(bytes.subarray(0, globalEnd)); let position = globalEnd
- for (const range of ranges) {
-  new DataView(current.buffer).setUint32(range.bound.start + 4, position, true)
-  current.set(bytes.subarray(range.start, range.end), position); position += range.end - range.start
+ // WASM scans loose nested cache records as cells. Give it only non-chart current
+ // sheet records; chart semantics are decoded separately from the original scopes.
+ const retained = globals.filter(r => r.type !== 0x0085 || r.data[5] !== 2), globalSize = retained.reduce((sum, r) => sum + r.end - r.start, 0)
+ const size = globalSize + ranges.reduce((sum, r) => sum + r.records.reduce((n, v) => n + v.end - v.start, 0), 0), current = new Uint8Array(size)
+ let position = 0, sheetPosition = globalSize
+ for (const r of retained) {
+  current.set(bytes.subarray(r.start, r.end), position)
+  if (r.type === 0x0085) { const range = ranges.find(range => range.bound === r)!; new DataView(current.buffer).setUint32(position + 4, sheetPosition, true); sheetPosition += range.records.reduce((n, v) => n + v.end - v.start, 0) }
+  position += r.end - r.start
  }
- return { sheets, source: spreadsheetSource(current) }
+ for (const range of ranges) for (const r of range.records) { current.set(bytes.subarray(r.start, r.end), position); position += r.end - r.start }
+ return { sheets, charts, source: spreadsheetSource(current) }
 }

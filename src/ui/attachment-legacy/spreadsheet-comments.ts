@@ -1,6 +1,7 @@
 import { bounded, fail } from './types'
 import { workbook, unicode, checkedText, u16, type Biff } from './spreadsheet-records'
 import { commentShapes } from './spreadsheet-drawings'
+import { spreadsheetCharts } from './spreadsheet-charts'
 /** MS-XLS 2.4.329: text and formatting are separate immediate Continue sets. */
 function txo(records: Biff[], index: number): string {
  const b = records[index]!.data
@@ -32,7 +33,7 @@ function txo(records: Biff[], index: number): string {
  return checkedText(text)
 }
 export function spreadsheetComments(source: Uint8Array): { text: string; notes: string[]; source: Uint8Array<ArrayBuffer> } {
- const { sheets, source: current } = workbook(source), parts: string[] = []; let total = 0
+ const { sheets, charts, source: current } = workbook(source), parts: string[] = []; let total = 0
  for (const sheet of sheets) {
   const shapes = commentShapes(sheet.records), seen = new Set<number>(), cells = new Set<string>()
   for (const record of sheet.records) if (record.type === 0x001c) {
@@ -51,5 +52,6 @@ export function spreadsheetComments(source: Uint8Array): { text: string; notes: 
    parts.push(part)
   }
  }
- return { source: current, text: bounded(parts.join('\n\n')), notes: ['Cell values come only from sheets listed in the current workbook. Unlisted sheet records and revision-history streams are excluded. Comments come from current worksheet cells and their matching active drawing notes. Rich formatting, layout and chart content are not extracted.'] }
+ const chartText = spreadsheetCharts(charts)
+ return { source: current, text: bounded([...parts, chartText.text].filter(Boolean).join('\n\n')), notes: ['Cell values come only from current non-chart sheet records. Unlisted sheets, loose chart records and revision-history streams are excluded. Comments come from current worksheet cells and their matching active drawing notes. Rich formatting and layout are not extracted.', ...chartText.notes] }
 }
