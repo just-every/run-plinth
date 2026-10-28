@@ -9,6 +9,7 @@ import { wallClock, zonedInstant, nextDate } from './time-zone'
 import { sovSources, prepareSov } from './sov'
 import { approveVariation } from './quotes'
 import { reviseBudget } from './budget'
+import { configureRetainage } from './retainage'
 import { prepareClaim } from './claims'
 import { invoiceAction } from './invoices'
 import type { ChangeJob, ChangeSigner, SignedChange } from './signed-change-model'
@@ -26,7 +27,10 @@ async function currentSigner(db: D1Database, job: Job, saved: ChangeSigner, side
  need(row,'A designated signer is no longer active; prepare a new document',409,'change_signer')
  const actor=await personActor(db,{...row,displayName:row.display_name},{method:'POST',path:'/api/plinth/jobs/'+job.id+'/signed-changes'})
  if(side==='builder'){changeOffice(actor);need(!actor.team||actor.team.job_ids.includes(job.id),'Builder is no longer assigned',409,'change_signer')}
- else need(actor.role==='member'&&await clientAccess(db,job,actor.email),'Client signer is no longer assigned',409,'change_signer')
+ else {
+  need(actor.role==='member'&&await clientAccess(db,job,actor.email),'Client signer is no longer assigned',409,'change_signer')
+  actor.client_job_id=job.id
+ }
  need(canonical(signer(actor))===canonical(saved),'Signer authority changed; prepare a new document',409,'change_signer')
  return actor
 }
@@ -102,16 +106,26 @@ export async function actSignedChange(db: D1Database, job: Job, actor: Actor, ro
   // The exact signed document is the only approval door for this variation.
   approveVariation(job,client,v.id,undefined,true);reviseBudget(job,actor,v);enqueueContinuity(job,actor,job.budgets!.at(-1)!)
   const assignments=object(input.code_assignments??{});const sov=prepareSov(job,actor,{code_assignments:assignments})
+  if(input.retainage!==undefined){need(job.retainage,'This job has no existing retainage plan',409,'retainage_required');configureRetainage(job,actor,object(input.retainage))}
   const plan={calendar:row.schedule.calendar,tasks:row.schedule.tasks}
   const preview=await previewSchedule(job,actor,plan,all)
   need(canonical(preview.tasks.map(({prepared_by,revision,updated_at,...t})=>t))===canonical(row.schedule.tasks.map(({prepared_by,revision,updated_at,...t})=>t)),'Reviewed schedule changed',409,'change_schedule')
   await publishSchedule(job,actor,{...plan,digest:preview.digest},all)
-  const billing=object(input.billing),claim=prepareClaim(job,actor,{description:'Draft billing for signed change: '+row.document.scope,...billing})
-  need(claim.sov,'A coded draft billing application is required');linkContinuityClaim(job,claim)
-  const invoice=await invoiceAction(db,job,actor,{kind:'milestone',source_application_id:claim.id,recipient_email:client.email,description:'Signed change: '+row.document.scope,due_on:billing.due_on,terms:billing.terms})
-  row.application={by:stamp(actor),budget_revision:job.budgets!.at(-1)!.revision,sov_revision:sov.revision,claim_id:claim.id,invoice_id:invoice.record.id};row.status='applied'
+  const billing=object(input.billing),application={by:stamp(actor),budget_revision:job.budgets!.at(-1)!.revision,sov_revision:sov.revision}
+  let writes:D1PreparedStatement[]=[]
+  if(billing.defer===true){
+   need(v.amount_cents<0,'Only an approved credit may defer billing in this application',409,'change_billing')
+   need(billing.lines===undefined,'Deferred credit billing cannot also claim earned work')
+   row.application={...application,billing_deferred:{reason:text(billing.reason,'Reason for deferring credit billing',2000)}}
+  }else{
+   const claim=prepareClaim(job,actor,{description:'Draft billing for signed change: '+row.document.scope,...billing})
+   need(claim.sov,'A coded draft billing application is required');linkContinuityClaim(job,claim)
+   const invoice=await invoiceAction(db,job,actor,{kind:'milestone',source_application_id:claim.id,recipient_email:client.email,description:'Signed change: '+row.document.scope,due_on:billing.due_on,terms:billing.terms})
+   row.application={...application,claim_id:claim.id,invoice_id:invoice.record.id};writes=invoice.writes
+  }
+  row.status='applied'
   recordApproval(job,actor,'signed-change.apply',row,{document_digest:row.digest,...row.application})
-  return invoice.writes
+  return writes
  }else need(false,'Unknown signed change action',404,'not_found')
  return signerGuards(db,row)
 }

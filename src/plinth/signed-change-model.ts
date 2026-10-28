@@ -16,6 +16,6 @@ export interface SignedChange {
  digest: string; source_digest: string; private_terms: Variation; schedule: SchedulePreview
  signatures: {side: 'builder' | 'client'; document_digest: string; name: string; statement: string; signed_by: Stamp}[]
  history: {kind: string; reason: string; by: Stamp}[]
- application?: {by: Stamp; budget_revision: number; sov_revision: number; claim_id: string; invoice_id: string}
+ application?: {by: Stamp; budget_revision: number; sov_revision: number; claim_id?: string; invoice_id?: string; billing_deferred?: {reason: string}}
 }
 export type ChangeJob = Job & {signed_changes?: SignedChange[]}

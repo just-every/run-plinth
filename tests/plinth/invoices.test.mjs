@@ -540,12 +540,13 @@ test('BILL-004 — approved actuals bill once with reviewed tax, fee categories,
 })
 
 test('Signed change application reconciles native budget and SOV once, publishes reviewed dates and links unissued billing drafts',async()=>{
- const {signedChangeFixture}=await import('./signed-change-support.mjs'),f=await createFixture()
+ const {signedChangeFixture,changeAddress,retainedChange,changeContact,allowanceCredit}=await import('./signed-change-support.mjs'),f=await createFixture()
  try{
   const c=await signedChangeFixture(f),variation=await c.priced(),row=await c.present(),before=structuredClone(c.job),artifact=(await c.api('/jobs/'+c.job.id+'/signed-changes/'+row.id+'/document.json',undefined,c.client)).value
   await c.sign(row);await c.sign(row,c.client,'Synthetic change client')
   const signedState=structuredClone(c.job),input={digest:row.digest,confirm:true,...c.billing(row)},path='/signed-changes/'+row.id+'/apply'
   assert.equal((await c.act(path,input,c.client)).status,403)
+  assert.equal((await c.act(path,{...input,billing:{defer:true,reason:'Unsupported charge deferral'}})).value.error,'change_billing')
   assert.equal((await c.act(path,{...input,billing:{...input.billing,lines:[]}})).status,400)
   await c.read();assert.deepEqual(c.job,signedState,'An invalid billing application changes no record or history');assert.deepEqual(c.job.budgets,before.budgets);assert.deepEqual(c.job.schedules,before.schedules);assert.equal(c.job.variations[0].status,'draft')
   await c.ok(path,input)
@@ -570,5 +571,51 @@ test('Signed change application reconciles native budget and SOV once, publishes
   await c.ok('/invoices/'+invoice.id+'/send',{confirm:true});assert.equal(c.job.invoices[0].delivery.status,'accepted');assert.equal(f.messages.length,beforeSend+1)
   const delivered=f.messages.at(-1);for(const privateCost of ['cost_unit_cents','cost_total_cents','45000','$450.00'])assert.ok(!delivered.text.includes(privateCost),'Client invoice email keeps private costs out')
   assert.equal((await c.act('/invoices/'+invoice.id+'/send',{confirm:true})).status,409);assert.equal(f.messages.length,beforeSend+1,'Invoice-send replay cannot send another email')
+
+  const retained=await signedChangeFixture(f,{tag:'retained',clientEmail:changeAddress('retained')})
+  const plan=structuredClone(await retainedChange(retained));await retained.priced();const retainedRow=await retained.present()
+  await retained.sign(retainedRow);await retained.sign(retainedRow,retained.client,'Synthetic change client')
+  const retainedPath='/signed-changes/'+retainedRow.id+'/apply',retainedInput={digest:retainedRow.digest,confirm:true,...retained.billing(retainedRow)},retainedBefore=structuredClone(retained.job)
+  assert.equal((await retained.act(retainedPath,retainedInput)).value.error,'retainage_rule_required')
+  const extension={...plan,rules:[...plan.rules,{line_id:'variation:'+retainedRow.variation_id,work_bps:1000,stored_bps:500}]}
+  assert.equal((await retained.act(retainedPath,{...retainedInput,retainage:{...extension,rules:extension.rules.map(r=>({...r,work_bps:0}))}})).value.error,'retainage_immutable')
+  await retained.read();assert.deepEqual(retained.job,retainedBefore,'Missing or rewritten retainage terms never partially apply a signed change')
+  await retained.ok(retainedPath,{...retainedInput,retainage:extension})
+  const retainedApplied=(await retained.list()).changes[0],retainedClaim=retained.job.claims.find(c=>c.id===retainedApplied.application.claim_id),retainedInvoice=retained.job.invoices.find(i=>i.id===retainedApplied.application.invoice_id)
+  assert.deepEqual(retained.job.retainage.plan.rules,extension.rules);assert.deepEqual(retained.job.retainage.plan.milestones,plan.milestones);assert.equal(retained.job.retainage.plan.revision,2)
+  assert.equal(retainedClaim.sov.retainage.current_withheld_cents,11000);assert.equal(retainedInvoice.sources.retainage.current.current_net_cents,99000)
+  assert.equal(retainedInvoice.status,'draft');assert.equal(retained.job.budgets[1].contract_cents,330000);assert.equal(retained.job.sov[1].contract_cents,330000)
+  assert.ok(retained.job.approvals.some(a=>a.kind==='retainage_plan'&&a.snapshot.revision===2))
+  const retainedAfter=structuredClone(retained.job);assert.equal((await retained.act(retainedPath,{...retainedInput,retainage:extension})).status,409);await retained.read();assert.deepEqual(retained.job,retainedAfter)
+  await retained.ok('/claims/'+retainedClaim.id+'/approve');await retained.ok('/claims/'+retainedClaim.id+'/issue');await retained.ok('/invoices/'+retainedInvoice.id+'/issue')
+  assert.equal(retained.job.invoices[0].issued.withheld_cents,11000);assert.equal(retained.job.invoices[0].issued.payable_cents,99000)
+
+  const household=await signedChangeFixture(f,{tag:'household',clientEmail:changeAddress('original-household')})
+  const contact=await changeContact(f,household);await household.priced();const householdRow=await household.present(undefined,{client_id:contact.person.id})
+  await household.sign(householdRow);await household.sign(householdRow,contact.cookie,'Synthetic household signer')
+  await household.ok('/signed-changes/'+householdRow.id+'/apply',{digest:householdRow.digest,confirm:true,...household.billing(householdRow)})
+  assert.equal(household.job.variations[0].approved_by.id,contact.person.id);assert.equal(household.job.invoices[0].recipient_email,changeAddress('household-contact'));assert.equal(household.job.budgets[1].contract_cents,330000)
+  const revokedContact=await signedChangeFixture(f,{tag:'removed-contact',clientEmail:changeAddress('original-removed')})
+  const removed=await changeContact(f,revokedContact,changeAddress('removed-contact'));await revokedContact.priced();const removedRow=await revokedContact.present(undefined,{client_id:removed.person.id})
+  await revokedContact.sign(removedRow);await revokedContact.sign(removedRow,removed.cookie,'Synthetic household signer')
+  const updated=await revokedContact.api('/customers/'+removed.customer.id+'/contacts/contact',{expected_version:removed.customer.version,email:changeAddress('replacement-contact')});assert.equal(updated.status,200)
+  const revokedBefore=structuredClone(revokedContact.job);assert.equal((await revokedContact.act('/signed-changes/'+removedRow.id+'/apply',{digest:removedRow.digest,confirm:true,...revokedContact.billing(removedRow)})).value.error,'change_signer');await revokedContact.read();assert.deepEqual(revokedContact.job,revokedBefore)
+
+  const credit=await signedChangeFixture(f,{tag:'credit',clientEmail:changeAddress('under-allowance'),allowance:50000})
+  await allowanceCredit(credit);const creditRow=await credit.present();await credit.sign(creditRow);await credit.sign(creditRow,credit.client,'Synthetic change client')
+  const creditBefore=structuredClone(credit.job),creditPath='/signed-changes/'+creditRow.id+'/apply',creditInput={digest:creditRow.digest,confirm:true,...credit.billing(creditRow)}
+  assert.equal((await credit.act(creditPath,creditInput)).value.error,'sov_credit')
+  creditInput.billing.lines[1].completed_cents=-22000
+  assert.equal((await credit.act(creditPath,creditInput)).value.error,'claim_balance');await credit.read();assert.deepEqual(credit.job,creditBefore,'A credit does not invent earned work or create a negative pay app')
+  const creditApply={digest:creditRow.digest,confirm:true,code_assignments:{['variation:'+creditRow.variation_id]:'06-100'},billing:{defer:true,reason:'No earned work yet; include the approved credit in the next reviewed pay app'}}
+  await credit.ok(creditPath,creditApply)
+  const creditApplied=(await credit.list()).changes[0],creditAfter=structuredClone(credit.job)
+  assert.equal(creditApplied.status,'applied');assert.equal(creditApplied.application.billing_deferred.reason,creditApply.billing.reason);assert.equal(creditApplied.application.claim_id,undefined);assert.equal(creditApplied.application.invoice_id,undefined)
+  assert.deepEqual(credit.job.budgets[0],creditBefore.budgets[0]);assert.equal(credit.job.budgets[1].contract_cents,198000);assert.equal(credit.job.sov[1].contract_cents,198000);assert.equal(credit.job.sov[1].lines[1].scheduled_cents,-22000);assert.equal(credit.job.schedules[0].end,'2026-11-09T12:00:00.000Z');assert.equal(credit.job.claims.length,0);assert.equal(credit.job.invoices?.length??0,0)
+  assert.equal((await credit.act(creditPath,creditApply)).status,409);await credit.read();assert.deepEqual(credit.job,creditAfter,'Replay cannot repeat a deferred credit application')
+  const later=(await credit.ok('/claims',{description:'Later reviewed earned work with full credit',lines:[{line_id:'quote:base',completed_cents:55000,stored_cents:0,evidence:'Reviewed installed original work'},{line_id:'variation:'+creditRow.variation_id,completed_cents:-22000,stored_cents:0,evidence:'Exact signed allowance credit'}]})).record
+  assert.equal(later.cumulative_cents,33000);await credit.ok('/claims/'+later.id+'/approve');await credit.ok('/claims/'+later.id+'/issue')
+  const creditedInvoice=(await credit.ok('/invoices',{kind:'milestone',source_application_id:later.id,recipient_email:changeAddress('under-allowance'),description:'Reviewed work less signed credit',due_on:'2026-12-01',terms:'Approved progress less full allowance credit'})).record
+  assert.equal(creditedInvoice.amount_cents,33000);assert.equal(creditedInvoice.lines.find(l=>l.source_id===creditRow.variation_id).gross_cents,-22000);assert.equal(creditedInvoice.lines.find(l=>l.source_id===creditRow.variation_id).tax_cents,-2000)
  }finally{await f.close()}
 })

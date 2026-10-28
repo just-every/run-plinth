@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
-import { signedChangeFixture, changeAddress } from '../plinth/signed-change-support.mjs'
+import { signedChangeFixture, changeAddress, retainedChange, changeContact, allowanceCredit } from '../plinth/signed-change-support.mjs'
 import { nativeSignIn } from '../../scripts/verify/native-signin.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS,state=process.env.PLINTH_STATE,clientState=process.env.PLINTH_CLIENT_STATE
 assert.ok(base&&shots&&state&&clientState,'Use the disposable installed Worker and native sign-in')
@@ -67,6 +67,40 @@ try{
  const revoked=await signedChangeFixture(f,{clientEmail:changeAddress('installed-revoked'),tag:'revoked-installed'});await revoked.priced();const rr=await revoked.present();await revoked.sign(rr);await revoked.sign(rr,revoked.client,'Synthetic change client')
  assert.equal((await call('/auth/operator/status',{method:'POST',body:{operatorId:rr.client.id,status:'inactive'}})).status,200)
  assert.ok([403,409].includes((await revoked.act('/signed-changes/'+rr.id+'/apply',{digest:rr.digest,confirm:true,...revoked.billing(rr)})).status));await revoked.read();assert.equal(revoked.job.budgets.length,1)
+ const retained=await signedChangeFixture(f,{clientEmail:changeAddress('retained-installed'),tag:'retained-installed'})
+ const retention=structuredClone(await retainedChange(retained)),contact=await changeContact(f,retained,changeAddress('household-installed'))
+ await retained.priced();const retainedRow=await retained.present(undefined,{client_id:contact.person.id})
+ await retained.sign(retainedRow);await retained.sign(retainedRow,contact.cookie,'Synthetic household signer')
+ await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app?job='+retained.job.id+'&tab=Changes')
+ const retainedRegion=page.getByRole('article',{name:'Signed change: Added window with five days of impact'})
+ await retainedRegion.locator('summary').filter({hasText:/^Review downstream application$/}).click()
+ await retainedRegion.getByLabel('Work retainage percent',{exact:true}).fill('10');await retainedRegion.getByLabel('Stored material retainage percent',{exact:true}).fill('5')
+ await retainedRegion.getByLabel('Draft billing evidence and review basis',{exact:true}).fill('Review retained household window milestone')
+ await retainedRegion.getByLabel('Draft invoice due date',{exact:true}).fill('2026-12-01');await retainedRegion.getByLabel('Draft invoice terms',{exact:true}).fill('Retain ten percent of reviewed work')
+ for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`${shots}/CLIENT-004-retainage-review-${width}.png`,fullPage:true,animations:'disabled'})}
+ await page.setViewportSize({width:1440,height:1000})
+ await retainedRegion.getByRole('checkbox',{name:/I reviewed the exact signed dates/}).check();await retainedRegion.getByRole('button',{name:'Apply signed change and prepare billing drafts',exact:true}).click()
+ await expect(retainedRegion).toContainText('Applied once · Budget revision 2 · SOV revision 2')
+ await retained.read();const retainedApplied=(await retained.list()).changes[0],retainedClaim=retained.job.claims.find(c=>c.id===retainedApplied.application.claim_id),retainedInvoice=retained.job.invoices.find(i=>i.id===retainedApplied.application.invoice_id)
+ assert.equal(retained.job.variations[0].approved_by.id,contact.person.id);assert.equal(retainedInvoice.recipient_email,changeAddress('household-installed'));assert.equal(retainedClaim.sov.retainage.current_withheld_cents,11000);assert.equal(retainedInvoice.sources.retainage.current.current_net_cents,99000)
+ assert.deepEqual(retained.job.retainage.plan.rules[0],retention.rules[0]);assert.deepEqual(retained.job.retainage.plan.milestones,retention.milestones)
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`${shots}/CLIENT-004-retained-household-${width}.png`,fullPage:true,animations:'disabled'})}
+ const credit=await signedChangeFixture(f,{clientEmail:changeAddress('credit-installed'),tag:'credit-installed',allowance:50000})
+ await allowanceCredit(credit);const creditRow=await credit.present();await credit.sign(creditRow);await credit.sign(creditRow,credit.client,'Synthetic change client')
+ await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app?job='+credit.job.id+'&tab=Changes')
+ const creditRegion=page.getByRole('article',{name:'Signed change: '+creditRow.document.scope})
+ await creditRegion.locator('summary').filter({hasText:/^Review downstream application$/}).click()
+ await creditRegion.getByRole('checkbox',{name:'Apply credit now and bill later',exact:true}).check()
+ await expect(creditRegion.getByLabel('Draft invoice due date',{exact:true})).toHaveCount(0)
+ await creditRegion.getByLabel('Reason for deferring credit billing',{exact:true}).fill('No earned work yet; bill the full signed credit with later progress')
+ for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`${shots}/CLIENT-004-credit-review-${width}.png`,fullPage:true,animations:'disabled'})}
+ await page.setViewportSize({width:1440,height:1000})
+ await creditRegion.getByRole('checkbox',{name:/I reviewed the exact signed dates/}).check()
+ await creditRegion.getByRole('button',{name:'Apply signed change and prepare billing drafts',exact:true}).click()
+ await expect(creditRegion).toContainText('Credit billing deferred: No earned work yet')
+ await credit.read();assert.equal(credit.job.budgets[1].contract_cents,198000);assert.equal(credit.job.sov[1].lines[1].scheduled_cents,-22000);assert.equal(credit.job.claims.length,0);assert.equal(credit.job.invoices?.length??0,0);assert.equal(credit.job.schedules[0].end,'2026-11-09T12:00:00.000Z')
+ const creditAfter=structuredClone(credit.job);assert.equal((await credit.act('/signed-changes/'+creditRow.id+'/apply',{digest:creditRow.digest,confirm:true,code_assignments:{['variation:'+creditRow.variation_id]:'06-100'},billing:{defer:true,reason:'Replay'}})).status,409);await credit.read();assert.deepEqual(credit.job,creditAfter)
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`${shots}/CLIENT-004-applied-allowance-credit-${width}.png`,fullPage:true,animations:'disabled'})}
  for(const context of contexts.values())await context.close()
- console.log('CLIENT-004 PASS: exact builder and client signatures, five-day document, private costs, separately reviewed once-only budget, schedule and SOV application, linked draft and separately issued invoice with explicit provider-edge email, decline, changed source and revoked signer refusals; screens at 1440 and 390')
+ console.log('CLIENT-004 PASS: exact builder and client signatures, five-day document, private costs, separately reviewed once-only budget, schedule and SOV application, linked draft and separately issued invoice with explicit provider-edge email, decline, changed source and revoked signer refusals; retained household-contact application and standalone allowance credit deferral; screens at 1440 and 390')
 }finally{await browser.close()}

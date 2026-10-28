@@ -23,3 +23,27 @@ export async function signedChangeFixture(f, {clientEmail=changeAddress('change-
  const billing=row=>({code_assignments:{['variation:'+row.variation_id]:'08-500'},billing:{lines:[{line_id:'quote:base',completed_cents:0,stored_cents:0,evidence:'Original scope not in this draft'},{line_id:'variation:'+row.variation_id,completed_cents:110000,stored_cents:0,evidence:'Proposed signed-window milestone; not certified complete'}],due_on:'2026-12-01',terms:'Review completion and issue separately'}})
  return {api,read,act,ok,priced,present,list,sign,billing,client,rate,get job(){return job}}
 }
+
+/** An explicit extension of existing withholding terms, reviewed only on application. */
+export async function retainedChange(c) {
+ await c.ok('/retainage',{contract_reference:'Synthetic reviewed retention terms',rules:[{line_id:'quote:base',work_bps:1000,stored_bps:500}],milestones:[{id:'complete',name:'Reviewed completion',completion_requirements:[],waiver_requirements:[],final:false}]})
+ return c.job.retainage.plan
+}
+/** A household contact has a current job grant independently of its original client. */
+export async function changeContact(f,c,email=changeAddress('household-contact')) {
+ const before=(await c.list()).clients, cookie=await f.invite(email,'Synthetic household signer')
+ const r=await c.api('/customers',{name:'Synthetic household',kind:'household',contacts:[{id:'contact',name:'Synthetic household signer',email}],owner_contact_ids:['contact'],billing_contact_ids:['contact'],properties:[{id:'site',label:'Job site',address:'123 Synthetic Street'}]})
+ assert.equal(r.status,201);const customer=r.value.customer
+ await c.ok('/customer',{customer_id:customer.id,property_id:'site',client_contact_ids:['contact']})
+ return {cookie,customer,person:(await c.list()).clients.find(p=>!before.some(old=>old.id===p.id))}
+}
+/** Under-allowance source includes its exact reviewed tax and five-day impact. */
+export async function allowanceCredit(c) {
+ const selection=(await c.ok('/selections',{room:'Kitchen',category:'Window',allowance_cents:50000,cost_code:'06-100',decision_on:'2026-11-04',lead_days:5,options:[{name:'Less costly window',specifications:'Reviewed under allowance',supplier:'Synthetic supplier',price_cents:28000}]})).record,revision=selection.revisions[0]
+ await c.ok('/selections/'+selection.id+'/present',{revision_id:revision.id})
+ await c.ok('/selections/'+selection.id+'/sign',{revision_id:revision.id,option_id:revision.options[0].id,statement:'I choose this exact window',confirm:true},c.client)
+ const input={selection_id:selection.id,revision_id:revision.id,schedule_days:5,impact_reference:'Reviewed five calendar days',impacts_reviewed:true,basis:'sell',as_of:'2026-10-28',lines:[{id:'credit',description:'Under allowance credit',cost_code:'06-100',phase:'Remodel',category:'material',quantity:'1',unit:'each',unit_cents:20000,cost_unit_cents:10000}],rules:[],tax:{rate_id:c.rate.id,taxable_line_ids:['credit']}}
+ const preview=(await c.ok('/allowance-changes/preview',input)).preview
+ await c.ok('/allowance-changes/apply',{...input,digest:preview.digest})
+ return c.job.variations.at(-1)
+}
