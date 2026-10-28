@@ -1,3 +1,4 @@
+import { inventoryFixture } from './inventory-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
 import { stripeEdge, intent } from './payment-fixture.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -159,6 +160,15 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     r=await f.json(`/api/plinth/subcontractor-portal/${job.id}/compliance`,{method:'POST',cookie:portalContact,body:{...portalInput,expected_version:job.version,kind:'license',issuer:'Synthetic state licensing authority',effective_on:'2026-01-01',expires_on:'2099-12-31'}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     const archivePortal=structuredClone(job.portal_submissions),portalCompliance=archivePortal.find(s=>s.kind==='compliance')
     r=await f.json(`/api/plinth/jobs/${job.id}/portal-policy`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,disabled:{client:['photos'],subcontractor:['bills']},reason:'Archived owner access restriction'}});assert.equal(r.status,200);job=r.value.job
+    const stockArchive=await inventoryFixture(f)
+    let stockResult=await stockArchive.act('receive',stockArchive.receive);assert.equal(stockResult.status,200)
+    const stockLot=stockResult.value.lots[0]
+    stockResult=await stockArchive.act('transfer',{lot_id:stockLot.id,quantity:'2',dated_on:'2026-10-28',reference:'Synthetic archived transfer',target_job_id:stockArchive.target.job.id,target_version:stockArchive.target.job.version,location:'Synthetic receiving rack',cost_code:'06-100'});assert.equal(stockResult.status,200)
+    stockResult=await stockArchive.act('install',{lot_id:stockLot.id,quantity:'1',dated_on:'2026-10-29',reference:'Synthetic archived installation'});assert.equal(stockResult.status,200)
+    stockResult=await stockArchive.act('return',{lot_id:stockLot.id,quantity:'1',condition:'damaged',dated_on:'2026-10-29',reference:'Synthetic archived damaged return'});assert.equal(stockResult.status,200)
+    stockResult=await stockArchive.act('equipment',{equipment:'Synthetic archive lift',location:'Synthetic rack',cost_code:'06-100',from:'2026-10-29',through:'2026-10-30',reference:'Synthetic archived equipment dates'});assert.equal(stockResult.status,200)
+    stockResult=await stockArchive.act('claim-review',{claim_id:stockResult.value.claims[0].id,forecast_impact_cents:20000,reason:'Synthetic archived forecast review',confirm:true});assert.equal(stockResult.status,200)
+    const stockStates=await Promise.all([stockArchive.source.job.id,stockArchive.target.job.id].map(async id=>JSON.parse((await f.db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(id).first()).data).site_inventory))
     // COST-001..006 share this same private archive and erasure journey.
     const c=await costFixture(f)
     let costResponse=await c.ok('/costs/bills',c.bill());await c.ok(`/costs/bills/${costResponse.record.id}/review`,{reason:'Archive reviewed original'});await c.ok(`/costs/bills/${costResponse.record.id}/post`)
@@ -225,6 +235,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits'].includes(table.name)),'INT-009 and INT-014 live receiver and standing-grant authority are excluded from restoration')
       assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
     }
+    for(const exported of [original,restored])for(const [index,id]of [stockArchive.source.job.id,stockArchive.target.job.id].entries()){
+      const state=JSON.parse(rows(exported).find(r=>r.table==='pl_jobs'&&r.row.id===id).row.data).site_inventory
+      assert.deepEqual(state,stockStates[index],'FIELD-005 exact ticket bytes, quantities, values, both transfer sides, installation, damaged return, reviewed claim and equipment dates survive native CLI recovery')
+    }
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
@@ -280,6 +294,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
+    const stockNow=(await f.json(`/api/plinth/jobs/${stockArchive.source.job.id}/inventory`,{cookie})).value
+    assert.equal((await f.request(`/api/plinth/jobs/${stockArchive.source.job.id}`,{method:'DELETE',cookie,body:{expected_version:stockNow.version}})).status,200)
+    assert.equal((await f.request(`/api/plinth/jobs/${stockArchive.source.job.id}/inventory/tickets/${stockLot.receipt_id}`,{cookie})).status,404)
+    assert.equal((await f.request(`/api/plinth/jobs/${stockArchive.source.job.id}/inventory/receive`,{method:'POST',cookie,body:{expected_version:stockNow.version,operation_id:'synthetic-plinth-erased-replay',...stockArchive.receive}})).status,404,'Erased custody cannot be recreated by replaying an old capture')
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))

@@ -1,3 +1,4 @@
+import { SiteInventory } from './site-inventory'
 import { Invoices } from './invoices'
 import { SovBilling, SovSummary } from './sov'
 import { fulfillment } from '../plinth/purchase-order-model'
@@ -6,8 +7,9 @@ import { Badge, Action, cents, dateTime, Download, Field, Form, money } from './
 import type { JobProps } from './job'
 import type { Claim, Reconciliation } from '../plinth/model'
 
-export function Orders({job,manager,mutate}: JobProps) {
-  return <div className="split"><section className="card"><div className="card-head"><h2>Purchase orders</h2><span className="muted">{money(job.orders.filter(o => o.status === 'issued').reduce((sum,o) => sum+o.amount_cents,0), job.currency)} committed</span></div>
+export function Orders(props: JobProps) {
+ const {job,manager,mutate}=props
+  return <><div className="split"><section className="card"><div className="card-head"><h2>Purchase orders</h2><span className="muted">{money(job.orders.filter(o => o.status === 'issued').reduce((sum,o) => sum+o.amount_cents,0), job.currency)} committed</span></div>
     {job.orders.length === 0 && <p className="empty">No purchase orders yet.</p>}
     <ol className="rows">{job.orders.map(o => { const state = fulfillment(o), received = state.received_cents; return <li className={`row${o.status === 'draft' ? ' is-waiting' : ''}`} key={o.id}><div className="row-main"><strong>{o.supplier}</strong><span className="muted">{o.description}</span>
       <div className="meter" role="img" aria-label={`${money(received, job.currency)} of ${money(o.amount_cents, job.currency)} received`}><span style={{width:`${Math.round(received / o.amount_cents * 100)}%`}} /></div><span className="muted">Received: {money(received, job.currency)}</span>
@@ -18,7 +20,7 @@ export function Orders({job,manager,mutate}: JobProps) {
       {manager && o.status === 'issued' && received < o.amount_cents && o.lines && <div className="inline-form"><Form submit="Record line receipt" action={async f => mutate('/orders/'+o.id+'/receive',{lines:o.lines!.filter(l => f.get('q-'+l.id)).map(l => ({line_id:l.id,quantity:String(f.get('q-'+l.id))})),reference:f.get('reference')})}><div className="fields">{o.lines.map(l => <Field key={l.id} label={`${l.description} (${l.unit})`} name={'q-'+l.id} inputMode="decimal" required={false} />)}<Field label="Delivery ticket or receipt reference" name="reference" /></div></Form></div>}
       {manager && o.status === 'issued' && received < o.amount_cents && !o.lines && <div className="inline-form"><Form submit="Record supplier receipt" action={async f => mutate('/orders/'+o.id+'/receive',{amount_cents:cents(f.get('amount')),reference:f.get('reference')})}><div className="fields"><Field label="Received value" name="amount" inputMode="decimal" /><Field label="Delivery ticket or receipt reference" name="reference" /></div></Form></div>}
     </div><div className="row-end"><strong className="amount">{money(o.amount_cents, job.currency)}</strong><Badge>{o.status}</Badge></div></li> })}</ol></section>
-    {manager && <aside className="card side"><h2>Prepare a purchase order</h2><p className="card-lead">Issuing records your commitment. Send the approved order to your supplier through your usual channel.</p><Form submit="Prepare purchase order" action={async f => mutate('/orders',{supplier:f.get('supplier'),description:f.get('description'),amount_cents:cents(f.get('amount'))})}><Field label="Supplier" name="supplier" /><label>Goods or services<textarea name="description" required rows={3} /></label><Field label="Order amount" name="amount" inputMode="decimal" /></Form></aside>}</div>
+    {manager && <aside className="card side"><h2>Prepare a purchase order</h2><p className="card-lead">Issuing records your commitment. Send the approved order to your supplier through your usual channel.</p><Form submit="Prepare purchase order" action={async f => mutate('/orders',{supplier:f.get('supplier'),description:f.get('description'),amount_cents:cents(f.get('amount'))})}><Field label="Supplier" name="supplier" /><label>Goods or services<textarea name="description" required rows={3} /></label><Field label="Order amount" name="amount" inputMode="decimal" /></Form></aside>}</div><SiteInventory {...props}/></>
 }
 const values: [keyof Reconciliation,string][] = [['base_cents','Accepted quote'],['variation_cents','Approved change orders'],['contract_cents','Current contract'],['previous_cents','Previously billed'],['cumulative_cents','Billed to date'],['current_cents','This pay app'],['remaining_cents','Balance to finish'],['commitments_cents','Supplier commitments'],['received_cents','Supplier receipts'],['outstanding_cents','Outstanding orders']]
 function csv(claim: Claim) {
