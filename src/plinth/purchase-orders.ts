@@ -23,7 +23,7 @@ export function orderAction(job: Job, actor: Actor, id: string, action: string, 
   }
   case 'return': {
    need(inventoryReturn || !job.site_inventory?.lots.some(l=>l.order_id===row.id), 'Use the inventory return door for located stock',409,'inventory_return')
-   const quantities = lineQuantities(row, input.lines, 'return'), back = { id: crypto.randomUUID(), ...quantities, reason: text(input.reason, 'return reason', 1000), reference: text(input.reference, 'return reference', 300), recorded_by: stamp(actor) }
+   const quantities = lineQuantities(row, input.lines, 'return'), back = { id: crypto.randomUUID(), ...quantities, reason: text(input.reason, 'return reason', 1000), reference: text(input.reference, 'return reference', 300), recorded_by: stamp(actor),...(input.returned_on===undefined?{}:{returned_on:day(input.returned_on,'Return date')}) }
    ;(row.returns ??= []).push(back); log(job, actor, 'return', row, back); break
   }
   case 'cancel': {

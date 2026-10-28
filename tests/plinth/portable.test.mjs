@@ -170,6 +170,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     stockResult=await stockArchive.act('return',{lot_id:stockLot.id,quantity:'1',condition:'damaged',dated_on:'2026-10-29',reference:'Synthetic archived damaged return'});assert.equal(stockResult.status,200)
     stockResult=await stockArchive.act('equipment',{equipment:'Synthetic archive lift',location:'Synthetic rack',cost_code:'06-100',from:'2026-10-29',through:'2026-10-30',reference:'Synthetic archived equipment dates'});assert.equal(stockResult.status,200)
     stockResult=await stockArchive.act('claim-review',{claim_id:stockResult.value.claims[0].id,forecast_impact_cents:20000,reason:'Synthetic archived forecast review',confirm:true});assert.equal(stockResult.status,200)
+    stockResult=await stockArchive.act('claim-adjust',{claim_id:stockResult.value.claims[0].id,forecast_impact_cents:10000,reason:'Synthetic partial replacement reduces remaining exposure',confirm:true});assert.equal(stockResult.status,200)
     const stockStates=await Promise.all([stockArchive.source.job.id,stockArchive.target.job.id].map(async id=>JSON.parse((await f.db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(id).first()).data).site_inventory))
     // COST-001..006 share this same private archive and erasure journey.
     const c=await costFixture(f)

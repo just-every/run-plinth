@@ -5,7 +5,7 @@ import { cents, DomainError, find, need, object, stamp, sum, text, type Actor, t
 export interface PoLine { id: string; description: string; cost_code: string; quantity: string; unit: string; unit_cents: number; total_cents: number }
 export interface LineQuantity { line_id: string; quantity: string }
 export type PoSource = { kind: 'award'; subcontract_id: string } | { kind: 'budget'; cost_code: string } | { kind: 'selection'; selection_id: string; revision_id: string }
-export interface PoReturn { id: string; lines: LineQuantity[]; amount_cents: number; reason: string; reference: string; recorded_by: Stamp }
+export interface PoReturn { returned_on?: string; id: string; lines: LineQuantity[]; amount_cents: number; reason: string; reference: string; recorded_by: Stamp }
 export interface PoShipment { id: string; carrier: string; tracking: string; freight_cents: number; shipped_on: string; recorded_by: Stamp }
 export interface PoAmendment { id: string; revision: number; reason: string; previous: { lines: PoLine[]; amount_cents: number; promised_on?: string }; proposed: { lines: PoLine[]; amount_cents: number; promised_on?: string }; budget_impact_cents: number; date_impact_days: number; status: 'pending' | 'approved'; prepared_by: Stamp; approved_by?: Stamp }
 export interface PoFulfillment { delivery_status: 'draft' | 'issued' | 'acknowledged' | 'shipped' | 'partially_received' | 'received' | 'cancelled'; commitment_cents: number; received_cents: number; returned_cents: number; outstanding_cents: number; freight_cents: number; lines: { line_id: string; ordered: string; received: string; returned: string; outstanding: string }[] }

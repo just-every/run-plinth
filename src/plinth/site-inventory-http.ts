@@ -24,7 +24,7 @@ export async function inventoryResponse(request:Request,original:Bindings,body:(
  if(parts[5]==='receive')record=await receiveStock(job,actor,input)
  else if(parts[5]==='install'||parts[5]==='return')record=moveStock(job,actor,input,parts[5])
  else if(parts[5]==='equipment')record=allocateEquipment(job,actor,input,await jobs(env.DB))
- else if(parts[5]==='claim-review'){costAccess(actor,new Request(new URL('/api/plinth/jobs/'+job.id+'/costs/forecasts',request.url),{method:'POST'}));record=reviewClaim(job,actor,input)}
+ else if(['claim-review','claim-adjust'].includes(parts[5]!)){costAccess(actor,new Request(new URL('/api/plinth/jobs/'+job.id+'/costs/forecasts',request.url),{method:'POST'}));record=reviewClaim(job,actor,input,parts[5]==='claim-adjust')}
  else if(parts[5]==='transfer'){
   scoped(String(input.target_job_id));const before=await jobOf(env.DB,actor,String(input.target_job_id));active(before);need(input.target_version===before.version,'Destination changed. Reload before transferring stock.',409,'stale_version')
   const target=structuredClone(before);inventoryOperation(target,input);record=moveStock(job,actor,input,'transfer',target)

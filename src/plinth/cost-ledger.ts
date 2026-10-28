@@ -9,7 +9,7 @@ export function procurement(job:Job){
   const lines=o.lines?.length?o.lines.map(l=>({code:l.cost_code,amount:l.total_cents,id:l.id,rate:l.unit_cents})):[{code:o.source?.kind==='budget'?o.source.cost_code:'Unassigned',amount:o.amount_cents,id:'legacy',rate:0}]
   const stamp=o.issued_by?.at.slice(0,10)??null
   for(const l of lines)rows.push({order_id:o.id,cost_code:l.code,amount_cents:o.status==='cancelled'?0:l.amount,kind:'commitment',dated_on:stamp,period:stamp?.slice(0,7)??null,reference:o.description})
-  for(const r of [...o.receipts,...(o.returns??[]).map(r=>({...r,amount_cents:-r.amount_cents}))]){
+  for(const r of [...o.receipts,...(o.returns??[]).map(r=>({...r,received_on:r.returned_on,amount_cents:-r.amount_cents}))]){
    const weights=lines.map(l=>r.lines?.length?(()=>{const [n,f='']=String(r.lines.find(q=>q.line_id===l.id)?.quantity??'0').split('.');return (BigInt(n!)*1000n+BigInt(f.padEnd(3,'0')))*BigInt(l.rate)})():l.amount),amounts=allocate(r.amount_cents,weights)
    const date=('received_on' in r?r.received_on:undefined)??r.recorded_by.at.slice(0,10)
    lines.forEach((l,i)=>{if(amounts[i])rows.push({order_id:o.id,receipt_id:r.id,cost_code:l.code,amount_cents:amounts[i]!,kind:'receipt',dated_on:date,period:costs(job).finance_periods?.[r.id]??date.slice(0,7),reference:r.reference})})

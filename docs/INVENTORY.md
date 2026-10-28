@@ -1,0 +1,15 @@
+# Job inventory
+
+Open **Purchasing → Site inventory** on an active job. An itemized, issued purchase order supplies the material, unit, cost code and original commitment. Existing partial value receipts remain available in Purchase orders.
+
+Expand **Receive into stock**, record the stock location and arrival date, and attach the exact delivery ticket original (PDF, PNG, JPEG or CSV, up to 1 MB). Enter delivered and damaged quantities separately. The optional expected delivery quantity describes this delivery, rather than the entire order. Damage and a short delivery prepare an attributed supplier discrepancy claim. Preparing a claim does not send it or assume a supplier credit.
+
+Usable stock and damaged stock have separate quantities and values. Open a lot's **Record stock movement** to install usable material, transfer it to another authorized active job, or return material to the supplier. A transfer requires current access to both jobs, a destination location and an accepted destination cost code. Both custody records commit together. Insufficient stock, changed versions, unauthorized jobs and repeated operation identities write neither side. Damaged material cannot be installed or transferred. Return transferred stock to its originating job before making a supplier return.
+
+Delivery originals stay with their receiving job and remain available through **Download delivery ticket original**. Movement history records quantities, value, dates, references and the acting person. Supplier returns retain the original return date. If that accounting period is closed, expand **Closed period adjustment** and provide an open posting month and the late evidence; the closed snapshot remains fixed.
+
+Use **Allocate equipment** for a named piece of equipment, its location, cost code and inclusive start and end dates. A piece already allocated during any of those dates cannot be allocated again on another job. Recording an allocation does not create a rental expense or certify physical use.
+
+An authorized Purchasing reviewer who also has forecast creation authority reviews each claim's remaining cost exposure. The forecast lists that reviewed exposure separately from existing commitments, remaining labor, unbought costs and other risk. Every current claim amount must be reviewed again when preparing a forecast. **Adjust remaining exposure** appends a reasoned human adjustment when a replacement or resolution changes the remaining exposure; the original review and earlier forecasts remain fixed. No order price, commitment, supplier credit, payment or external accounting posting changes automatically.
+
+Private stock, delivery originals and claims follow current Purchasing authority. Client job views and search do not expose them. Native archives preserve the ticket bytes, both sides of transfers, installations, returns, equipment dates and claim review history. Erasing the receiving job removes its custody record and originals; the later erasure journal fences restoration of an older archive. Minimal transfer references in the other job do not grant access to an erased original.

@@ -16,6 +16,11 @@ test('FIELD-005 — a supplier discrepancy needs an immutable human review and c
   r=await forecast({inventory_claims:[{claim_id:claim.id,forecast_impact_cents:20000}]});assert.equal(r.status,200,JSON.stringify(r.value));assert.deepEqual([r.value.record.final_cents,r.value.record.remaining_cents,r.value.ledger.rows[0].commitment_cents,r.value.ledger.rows[0].received_cents],[120000,120000,100000,50000]);assert.equal(r.value.record.assumptions.codes[0].inventory_impact_cents,20000)
   assert.equal(r.value.record.assumptions.inventory_claims[0].receipt_id,claim.receipt_id)
   assert.equal((await c.api(`/jobs/${c.source.job.id}/inventory/claim-review`,{expected_version:r.value.version,operation_id:'synthetic-plinth-rereview',claim_id:claim.id,forecast_impact_cents:0,reason:'Rewrite previous review',confirm:true})).value.error,'immutable')
+  const previous=structuredClone(r.value.record),originalReview=(await c.read()).value.claims[0].review
+  const adjusted=await c.api(`/jobs/${c.source.job.id}/inventory/claim-adjust`,{expected_version:r.value.version,operation_id:'synthetic-plinth-exposure-resolved',claim_id:claim.id,forecast_impact_cents:0,reason:'Supplier replacement now confirmed inside existing commitment; no extra exposure',confirm:true});assert.equal(adjusted.status,200);assert.deepEqual(adjusted.value.claims[0].review,originalReview);assert.equal(adjusted.value.claims[0].adjustments[0].forecast_impact_cents,0)
+  assert.equal((await forecast({inventory_claims:[{claim_id:claim.id,forecast_impact_cents:20000}]})).value.error,'inventory_forecast_stale')
+  r=await forecast({inventory_claims:[{claim_id:claim.id,forecast_impact_cents:0}]});assert.equal(r.status,200);assert.equal(r.value.record.final_cents,100000);const history=(await c.api(`/jobs/${c.source.job.id}/costs/forecasts`)).value.forecasts;assert.deepEqual({...history[0],stale:undefined},{...previous,stale:undefined});assert.equal(history[0].assumptions.inventory_claims[0].review.forecast_impact_cents,20000)
+
  }finally{await f.close()}
 })
 
