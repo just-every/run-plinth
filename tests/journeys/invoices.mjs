@@ -16,9 +16,10 @@ try {
   if(new URL(entry.url()).pathname==='/setup'){await entry.getByLabel('Your name',{exact:true}).fill('Local builder');await entry.getByRole('checkbox').check();await entry.getByRole('button',{name:'Finish setup',exact:true}).click();await entry.waitForURL(u=>u.pathname!=='/setup')}
  }
  const req=async(path,body,context=owner)=>{const r=await context.request.fetch(base+'/api/plinth'+path,{method:body===undefined?'GET':'POST',headers:{origin:base,'content-type':'application/json'},...(body===undefined?{}:{data:body})});const value=await r.json();assert.ok(r.ok(),`${path}: ${r.status()} ${JSON.stringify(value)}`);return value}
+ const clientEmail=(await (await client.request.get(base+'/auth/session')).json()).operator.email
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1100});await clientPage.setViewportSize({width,height:1100})
-  let job=(await req('/jobs',{name:`Maple Street whole-home renovation, kitchen, laundry, accessible entry and long household name · invoices ${width} · ${Date.now()}`,client_email:'client@dev.localhost',address:'2480 Maple Street, Burlington, VT 05401',time_zone:'America/New_York'})).job
+  let job=(await req('/jobs',{name:`Maple Street whole-home renovation, kitchen, laundry, accessible entry and long household name · invoices ${width} · ${Date.now()}`,client_email:clientEmail,address:'2480 Maple Street, Burlington, VT 05401',time_zone:'America/New_York'})).job
   const read=async()=>job=(await req(`/jobs/${job.id}`)).job
   const act=async(path,body={})=>{const result=await req(`/jobs/${job.id}${path}`,{expected_version:job.version,...body});if(result.job)job=result.job;return result}
   await act('/quotes',{lines:[{id:'framing',description:'Framing materials and installation',cost_code:'06-100',phase:'Remodel',category:'material',quantity:'1',unit:'job',unit_cents:18000000,cost_unit_cents:12000000},{id:'labor',description:'Whole-home remodeling labor',cost_code:'01-100',phase:'Remodel',category:'labor',quantity:'1',unit:'job',unit_cents:30000000,cost_unit_cents:21000000}]})
@@ -33,7 +34,7 @@ try {
   const prepare=async(kind,description)=>{
    const form=page.getByRole('heading',{name:'Create a draft invoice',exact:true}).locator('..')
    await form.locator('select[name=kind]').selectOption(kind);await form.getByLabel('Invoice description',{exact:true}).fill(description)
-   await form.getByLabel('Invoice due date',{exact:true}).fill('2026-11-20');await form.getByLabel('Invoice payment terms',{exact:true}).fill('Bank/check within 14 days; retainage per signed agreement')
+   await form.getByLabel('Invoice due date',{exact:true}).fill('2026-11-20');await form.getByLabel('Invoice payment terms',{exact:true}).fill('Bank or check within 14 days; retainage per signed agreement')
    if(kind==='deposit')await form.getByLabel('Deposit request (USD)',{exact:true}).fill('48000');else await form.locator('select[name=source_application_id]').selectOption(app.id)
    if(width===1440&&kind==='deposit'){
     const amount=form.getByLabel('Deposit request (USD)',{exact:true})
@@ -50,7 +51,7 @@ try {
     await expect(form.getByRole('alert')).toBeFocused()
     await expect(form.getByLabel('Invoice description',{exact:true})).toHaveValue(description)
     await expect(form.getByLabel('Invoice due date',{exact:true})).toHaveValue('2026-11-20')
-    await expect(form.getByLabel('Invoice payment terms',{exact:true})).toHaveValue('Bank/check within 14 days; retainage per signed agreement')
+    await expect(form.getByLabel('Invoice payment terms',{exact:true})).toHaveValue('Bank or check within 14 days; retainage per signed agreement')
     await expect(amount).toHaveValue('48000')
     await expect(form.getByLabel('Authorized billing email',{exact:true})).toHaveValue(job.client_email)
     assert.equal((await req('/jobs/'+job.id)).job.invoices.length,0,'Failed invoice request changes no balance or invoice')
@@ -77,7 +78,7 @@ try {
    assert.ok((await totals.ariaSnapshot()).includes('columnheader'))
    await captureOffice(page,shots,'billing-populated-totals',totals)
    await page.setViewportSize({width:390,height:1100});await totals.focus()
-   await page.keyboard.press('End')
+   await page.keyboard.press('ArrowRight')
    await expect.poll(()=>totals.evaluate(element=>element.scrollLeft)).toBeGreaterThan(0)
    await page.setViewportSize({width,height:1100})
   }
@@ -113,11 +114,12 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`BILL-006 history ${width} fits`)
   const shot=async(contextPage,name,target)=>{await target.scrollIntoViewIfNeeded();assert.equal(await contextPage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`BILL-002 ${name} ${width} fits`);await contextPage.screenshot({path:`${shots}/BILL-002-${name}-${width}.png`,animations:'disabled'})}
   await shot(page,'activity',milestone.record.locator('summary').first());await milestone.record.locator('summary').first().click();await shot(page,'ledger',page.getByRole('heading',{name:'Invoices and deposits',exact:true}))
-  await clientPage.goto(base+`/app?job=${job.id}&tab=Billing`);const clientInvoice=clientPage.locator('#invoice-'+milestone.invoice.id);await clientInvoice.locator('summary').first().click();await clientInvoice.getByLabel('Invoice acknowledgment statement',{exact:true}).fill('I acknowledge the exact framing invoice; payment is recorded separately');await clientInvoice.getByRole('checkbox').check();await clientInvoice.getByRole('button',{name:'Acknowledge this invoice',exact:true}).click();await expect(clientInvoice.getByText(/Client acknowledged by/)).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}/receivables`)).status(),403);assert.equal(await clientPage.getByText('Office-only remittance source statement',{exact:false}).count(),0);await shot(clientPage,'client',clientInvoice.locator('summary').first());assert.equal(await clientPage.getByText('Private single-invoice bank return correspondence',{exact:false}).count(),0);await read();assert.equal(job.invoices.find(i=>i.id===milestone.invoice.id).balance.due_cents,8700000)
+  await clientPage.goto(base+`/app?job=${job.id}&tab=Billing`);const clientInvoice=clientPage.locator('#invoice-'+milestone.invoice.id);await clientInvoice.locator('summary').first().click();await clientInvoice.getByLabel('Invoice acknowledgment statement',{exact:true}).fill('I acknowledge the exact framing invoice; payment is recorded separately');await clientInvoice.getByRole('form',{name:'Acknowledge this invoice',exact:true}).getByRole('checkbox').check();await clientInvoice.getByRole('button',{name:'Acknowledge this invoice',exact:true}).click();await expect(clientInvoice.getByText(/Client acknowledged by/)).toBeVisible();assert.equal((await client.request.get(base+`/api/plinth/jobs/${job.id}/receivables`)).status(),403);assert.equal(await clientPage.getByText('Office-only remittance source statement',{exact:false}).count(),0);await shot(clientPage,'client',clientInvoice.locator('summary').first());assert.equal(await clientPage.getByText('Private single-invoice bank return correspondence',{exact:false}).count(),0);await read();assert.equal(job.invoices.find(i=>i.id===milestone.invoice.id).balance.due_cents,8700000)
   const document=await client.newPage();await document.setViewportSize({width,height:1100});await document.goto(base+`/api/plinth/jobs/${job.id}/invoices/${milestone.invoice.id}/document.html`);await document.getByRole('heading',{name:'Invoice '+original.number,exact:true}).waitFor();assert.equal(await document.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'BILL-002 original invoice fits the phone page');await document.screenshot({path:`${shots}/BILL-002-original-${width}.png`,animations:'disabled'});await document.close()
  }
  const site=process.env.PLINTH_SITE;assert.ok(site);await page.goto(site+'/contract');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByText('BILL-006',{exact:true}).first().scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-contract-${width}.png`,animations:'disabled'})}
  await page.goto(site+'/docs/agent-commands');for(const width of [1440,390]){await page.setViewportSize({width,height:1100});await page.getByRole('heading',{name:'Recorded remittances and current receivables (BILL-006, partial)',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/BILL-006-commands-${width}.png`,animations:'disabled'})}
+ console.log('OPS-001 office Billing recovery PASS: retained invoice drafts, associated validation, request timing, populated keyboard-scrollable totals, issued-record focus and reloads')
  console.log('BILL-006 recorded allocation, direct/deposit receipt returns, history and aging passed at 1440/390; BILL-002 native owner/client Billing journey passed at 1440/390: issue, suppressed mail, recorded bank receipts, partial deposit allocation, liability, net balance, acknowledgment and immutable invoice')
  await owner.close();await client.close()
 } finally {await browser.close()}

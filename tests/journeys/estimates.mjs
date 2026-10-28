@@ -45,6 +45,12 @@ try {
   await input('Cost category', index).selectOption(spec.category)
   if (spec.group) { await input('Alternate group', index).fill(spec.group); await input('Alternate option', index).fill(spec.option) }
  }
+ const addLine = page.getByRole('button', { name: 'Add estimate line', exact: true })
+ await addLine.focus(); await page.keyboard.press('Enter')
+ await expect(input('Description', 8)).toBeFocused()
+ await input('Description', 8).fill('Temporary line removed before preparing the revision')
+ await page.getByRole('button', { name: 'Remove line 8', exact: true }).focus(); await page.keyboard.press('Enter')
+ await expect(input('Description', 7)).toBeFocused()
  await page.getByLabel('Selected option: Floor finish', { exact: true }).selectOption('Oak')
  await page.getByLabel('Inclusions (one per line)', { exact: true }).fill('Install and protect finishes')
  await page.getByLabel('Exclusions (one per line)', { exact: true }).fill('Unforeseen concealed defects')
@@ -70,8 +76,8 @@ try {
  await captureOffice(page, shots, 'quote-retained-estimate', measured)
  await measured.getByRole('button', { name: 'Prepare measured estimate revision', exact: true }).focus()
  await page.keyboard.press('Enter')
- await failed.close()
  await expect(page.getByRole('heading', { name: 'Quote 1', exact: true })).toBeVisible()
+ await failed.close()
  await page.reload()
  await expect(page.getByRole('cell', { name: /^Trim measured in inches/ })).toBeVisible()
  job = (await (await context.request.get(base + '/api/plinth/jobs/' + job.id)).json()).job
@@ -131,6 +137,7 @@ try {
  assert.ok(!JSON.stringify(visible).includes('cost_unit_cents') && !JSON.stringify(visible).includes('cost_total_cents'))
  assert.equal((await clientContext.request.get(`${base}/api/plinth/jobs/${job.id}/quotes/${second.id}/cost-codes.json`)).status(), 403)
  await capture('client-selling-scope', clientPage)
+ console.log('OPS-001 office Quote recovery PASS: keyboard line focus, associated validation, retained measured lines, original PDF recovery and reloads')
  console.log('EST-001 browser journey passed at 1440 and 390: five cost categories, exact fractional measurement/conversion, selected finish, revised quantities/scope comparison, cost-code JSON/CSV and fixed accepted selling terms')
  await context.close(); await clientContext.close()
 } finally { await browser.close() }
