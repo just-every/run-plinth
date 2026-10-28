@@ -377,8 +377,8 @@ RPT-002 is judged from the source and assertions in the current candidate. The e
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 49 | 28 | 46 | 123 |
-| All | 63 | 28 | 46 | 137 |
+| Target and push further | 49 | 29 | 45 | 123 |
+| All | 63 | 29 | 45 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -482,7 +482,7 @@ RPT-002 is judged from the source and assertions in the current candidate. The e
 | `INT-010` | Gusto time and payroll actuals | target | missing |  | No gusto time and payroll actuals workflow exists. |
 | `INT-011` | Zapier and owner workflow integrations | target | missing |  | No zapier and owner workflow integrations workflow exists. |
 | `INT-012` | Autodesk Docs and BIM Collaborate handoff | target | missing |  | No autodesk docs and bim collaborate handoff workflow exists. |
-| `AUTO-001` | Owner-controlled follow-up rules | target | missing |  | No owner-controlled follow-up rules workflow exists. |
+| `AUTO-001` | Owner-controlled follow-up rules | target | partial | `tests/plinth/domain.test.mjs` — “Owner follow-up previews retain revisions, respect current consent and authority, and stop resolved work without side effects” proves separate estimate, selection and collection configuration, retained revisions, dated event and scheduled previews, stable source and step identities, quiet hours, review limits, current grants, consent, opt-out, pause, resolution, erasure and no preview writes or provider calls. `docs/FOLLOW-UP-RULES.md` documents the native preview boundary. | Actual notice delivery, once-only dispatch history, per-recipient NOTIFY-001 channel choices and required-notice routing, provider outcomes, and bid, RFI, confirmation and warranty rule integrations remain owed. Adopted conservative default under the standing scope policy: owner-only configuration and preview, recipient-owned preview consent off by default, escalation only to the configuring owner, no automatic outbound or financial action; scoped delegation and provider boundaries remain unproved. NOTIFY-001 retains configured mail, Twilio sender, APNs and FCM prerequisites; INT-007 retains its current policy and hosted catch-all and webhook requirements. AUTO-003 retains FIELD-002 approval-screen prerequisites; AUTO-004 retains PAY-001 receipt notice and BILL-006 processor and accounting reconciliation prerequisites. |
 | `AUTO-002` | Sale and approved-change workflow continuity | target | done | `src/plinth/continuity-model.ts`; `src/plinth/continuity.ts`; `src/plinth/continuity-notice.ts`; `src/plinth/http.ts`; `src/plinth/budget.ts`; `src/plinth/quotes.ts`; `src/ui/continuity.tsx`; `tests/plinth/domain.test.mjs`; `tests/plinth/selections.test.mjs`; `tests/plinth/portable.test.mjs` |  |
 | `AUTO-003` | Field actuals forecast and billing refresh | target | missing |  | No field actuals forecast and billing refresh workflow exists. |
 | `AUTO-004` | Receipts and collection closure | target | missing |  | No receipts and collection closure workflow exists. |

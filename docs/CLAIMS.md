@@ -104,7 +104,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | INT-010 | missing | No gusto time and payroll actuals workflow exists. |
 | INT-011 | missing | No zapier and owner workflow integrations workflow exists. |
 | INT-012 | missing | No autodesk docs and bim collaborate handoff workflow exists. |
-| AUTO-001 | missing | No owner-controlled follow-up rules workflow exists. |
+| AUTO-001 | partial | Actual notice delivery, once-only dispatch history, per-recipient NOTIFY-001 channel choices and required-notice routing, provider outcomes, and bid, RFI, confirmation and warranty rule integrations remain owed. Adopted conservative default under the standing scope policy: owner-only configuration and preview, recipient-owned preview consent off by default, escalation only to the configuring owner, no automatic outbound or financial action; scoped delegation and provider boundaries remain unproved. NOTIFY-001 retains configured mail, Twilio sender, APNs and FCM prerequisites; INT-007 retains its current policy and hosted catch-all and webhook requirements. AUTO-003 retains FIELD-002 approval-screen prerequisites; AUTO-004 retains PAY-001 receipt notice and BILL-006 processor and accounting reconciliation prerequisites. |
 | AUTO-002 | done |  |
 | AUTO-003 | missing | No field actuals forecast and billing refresh workflow exists. |
 | AUTO-004 | missing | No receipts and collection closure workflow exists. |

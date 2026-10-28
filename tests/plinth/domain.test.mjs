@@ -880,3 +880,62 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
  }finally{await f.close()}
 })
+
+test('Owner follow-up previews retain revisions, respect current consent and authority, and stop resolved work without side effects',async()=>{
+ const {followupFixture,followupAddress}=await import('./followup-support.mjs')
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await followupFixture(f),{estimate,active,config}=c
+  for(const [job,kind] of [[estimate,'estimate'],[active,'selection'],[active,'collection']])await job.act('/followup-rules',{...config,kind,...(kind==='collection'?{mode:'scheduled',starts_on:'2026-10-29'}:{})})
+  const oldRevision=structuredClone(estimate.job.followup.rules[0].revisions[0])
+  await estimate.act('/followup-rules',{...config,kind:'estimate',reason:'Reviewed a second time'})
+  assert.deepEqual(estimate.job.followup.rules[0].revisions[0],oldRevision)
+  assert.equal(estimate.job.followup.rules[0].revisions.length,2)
+  const foreign=await f.invite(followupAddress(2),'Unrelated client'),admin=await f.invite(followupAddress(3),'Synthetic administrator','admin'),agent=await f.agent()
+  const root='/api/plinth/jobs/'+estimate.job.id
+  const snapshot=await estimate.read(),calls=f.messages.length
+  for(const cookie of [c.client,foreign,admin]){
+   for(const suffix of ['/followup-rules','/followup-rules/preview?as_of=2026-10-30T15:00:00Z'])assert.equal((await f.json(root+suffix,{cookie})).status,403)
+   assert.equal((await f.json(root+'/followup-rules',{method:'POST',cookie,body:{...config,kind:'estimate',expected_version:snapshot.version}})).status,403)
+  }
+  assert.equal((await f.json(root+'/followup-rules',{token:agent})).status,403)
+  assert.equal((await f.json(root+'/followup-consent',{method:'POST',cookie:foreign,body:{kind:'estimate',allowed:true,confirm:true,expected_version:snapshot.version}})).status,404)
+  assert.equal((await f.json(root+'/followup-rules',{method:'POST',cookie:f.owner,body:{...config,kind:'estimate',expected_version:snapshot.version-1}})).status,409)
+  assert.deepEqual(await estimate.read(),snapshot);assert.equal(f.messages.length,calls)
+  const early=await c.preview(estimate,'2026-10-27T15:00:00Z')
+  assert.equal(early.actions.filter(a=>a.status==='eligible').length,1);assert.equal(early.actions[1].reason,'Step not due')
+  assert.equal((await c.preview(active,'2026-10-28T15:00:00Z')).actions.find(a=>a.source_id===c.invoice.id).reason,'Sequence not started')
+  assert.ok((await c.preview(active,'2026-10-30T15:00:00Z')).actions.some(a=>a.source_id===c.invoice.id&&a.status==='eligible'))
+  const before=await active.read(),beforeRules=await estimate.read(),beforeCalls=f.messages.length
+  const preview=await c.preview(active)
+  assert.equal(preview.actions.filter(a=>a.status==='eligible').length,3)
+  assert.equal(new Set(preview.actions.map(a=>a.key)).size,preview.actions.length)
+  assert.deepEqual(await c.preview(active),preview)
+  assert.equal((await f.json('/api/plinth/jobs/'+active.job.id+'/followup-rules/preview',{method:'POST',cookie:f.owner,body:{}})).status,405)
+  assert.deepEqual(await active.read(),before);assert.deepEqual(await estimate.read(),beforeRules);assert.equal(f.messages.length,beforeCalls,'Preview never sends mail or instructions')
+  assert.ok((await c.preview(estimate,'2026-10-30T02:00:00Z')).actions.every(a=>a.reason==='Recipient quiet hours'))
+  assert.ok((await c.preview(estimate,'2027-01-01T15:00:00Z')).actions.every(a=>a.reason==='Stop date passed'))
+  await estimate.act('/followup-rules',{...config,kind:'estimate',approval_limit_cents:1})
+  assert.ok((await c.preview(estimate)).actions.every(a=>a.reason==='Amount exceeds owner review limit'))
+  await estimate.act('/followup-rules',{...config,kind:'estimate',paused:true})
+  assert.ok((await c.preview(estimate)).actions.every(a=>a.reason==='Rule paused'))
+  await estimate.act('/followup-rules',{...config,kind:'estimate'})
+  await c.consent(estimate,'estimate',false,c.client)
+  assert.ok((await c.preview(estimate)).actions.every(a=>a.reason==='Recipient opted out; sequence stopped'))
+  // Escalation concerns outstanding work only; a client opt-out does not authorize another client notice.
+  await estimate.act('/quotes/'+estimate.job.quotes.at(-1).id+'/accept',{method:'signed',evidence:'Synthetic client accepted',schedule_choice:{kind:'none',reason:'Permit pending'}})
+  assert.ok((await c.preview(estimate)).actions.every(a=>a.reason==='Source resolved or held'))
+  await active.act('/selections/'+c.choice.id+'/sign',{revision_id:c.choice.revisions[0].id,option_id:c.choice.revisions[0].options[0].id,statement:'I approve this exact option',confirm:true},c.client)
+  await active.act('/invoices/'+c.invoice.id+'/receipt',{amount_cents:10000,received_on:'2026-10-30',method:'bank',reference:'synthetic-plinth-receipt-1',confirm:true})
+  assert.ok((await c.preview(active)).actions.every(a=>a.reason==='Source resolved or held'),'Resolved choice and paid collection never escalate')
+  await active.act('/portal-policy',{disabled:{client:['billing','selections'],subcontractor:[]},reason:'Owner revoked portal features'})
+  // New outstanding sources must still recheck recipient grants.
+  const next=(await active.act('/selections',{room:'Bath',category:'Fixtures',allowance_cents:1000,cost_code:'22-100',decision_on:'2026-10-28',lead_days:1,options:[{name:'Basin',supplier:'Synthetic supplier',specifications:'Reviewed white basin',price_cents:1000}]})).record
+  await active.act('/selections/'+next.id+'/present',{revision_id:next.revisions[0].id})
+  assert.equal((await c.preview(active)).actions.find(a=>a.source_id===next.id&&!a.escalation).reason,'Recipient has no current access')
+  const clientJob=(await f.json('/api/plinth/jobs/'+active.job.id,{cookie:c.client})).value.job;assert.equal(clientJob.followup,undefined,'Private configuration and other people consent never leave the owner door')
+  const erasedId=active.job.id
+  assert.equal((await f.json('/api/plinth/jobs/'+erasedId,{method:'DELETE',cookie:f.owner,body:{expected_version:active.job.version}})).status,200)
+  assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)
+ }finally{await f.close()}
+})

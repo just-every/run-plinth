@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "616ba7786fa2747aa68fd171183ab176956d2cf609ec3246af92dc243e8dd6e3",
+      "sha256": "d5d43cbd682d6421381ed0c66259f5967b8550c3214e9e1cb28944c35129d404",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "bb6fbe388d2f606ddd59dd6c5823885f049c0bc4b491ceb5d24a73ff2ce9e16f",
+      "sha256": "962de25e7466359b72e93c3c279a34aaf22dee25a0d168f28eb7f2b2667c9c58",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "6f3689727c8c859835c13e7f986cde5998f730a9733edd0cb49d6340d5aab5d2",
+      "sha256": "7705bbeef1d812bf15b3aa260b9ffeecce1cefc74952aee5aa9494f8da4030d2",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -182,6 +182,10 @@
     },
     "docs/FIELD-TIME.md": {
       "sha256": "10b1bdabba76ac1d5362f53e72a8553774f9a9ea7b000734c36da4dbcf3a14fe",
+      "executable": false
+    },
+    "docs/FOLLOW-UP-RULES.md": {
+      "sha256": "00dc12b49a2aa5d94323649210d2da427bb732c6887a0b7dcb14f2f9760cf2b9",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -3168,6 +3172,14 @@
       "sha256": "bd3deede5ac74e6aff79845c18296e0379f9c2117408cb865dfe5e6538086a95",
       "executable": false
     },
+    "src/plinth/followup-model.ts": {
+      "sha256": "fe14af078ff249ae52e1e27f08ef345245c1b2cfc508bd28610b913357baa068",
+      "executable": false
+    },
+    "src/plinth/followup-rules.ts": {
+      "sha256": "f20e84fd9bf4ff2e7340fe8c1cd85696cad762e00da1d1a375ef3d0ffce44c85",
+      "executable": false
+    },
     "src/plinth/handover-actions.ts": {
       "sha256": "d13ed059ae66e8ae6c33fa5da2550c5df0188392501480d453bd93763ac2e308",
       "executable": false
@@ -3185,7 +3197,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "06a01284e477168d4eb2e51c2285ab4f04877e09351edf67be73bdff042cfd81",
+      "sha256": "07c8965cb05c17e4b8e50538ca08e4f4c45301611d99a771cbb15cde37acd3c6",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3309,7 +3321,7 @@
       "executable": false
     },
     "src/plinth/model.ts": {
-      "sha256": "cedc0778842c5f067d104c5d6e599d1b4512eef87d438bd4e423375840f3cb58",
+      "sha256": "336a93ad92c71f317124a8b54019959c90ff5315d9b14a851868993c973f0b73",
       "executable": false
     },
     "src/plinth/operations.ts": {
@@ -4264,6 +4276,10 @@
       "sha256": "1bf88c224a8e373b34b40306673ff9e7e9e93ba730c565235aef736617361d85",
       "executable": false
     },
+    "src/ui/followup-rules.tsx": {
+      "sha256": "9a9b3bc65f64eaacaad37e5dd9725d75b20955b436419a9f7eb3a2418faf5af9",
+      "executable": false
+    },
     "src/ui/gantt.tsx": {
       "sha256": "bf02d8342c6ace10f84c73ce48a943723765df6a16e55a3e5ac01a6eccbbbb58",
       "executable": false
@@ -4313,7 +4329,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "2a117d817057a7ad615b7219688cdd7ed34f5f156137f71087a98b1d67687db3",
+      "sha256": "443657afca786adda63055ec2ce490bcda5d726a74e236fcc634618cb6b03e46",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -4565,7 +4581,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "bc1c14dbd6a51183f11f00bd1d2687d11ee2428b01dcf80674719c17cd8e22f3",
+      "sha256": "cea3d158e9dc37dda79a7cfa6893dd150688d5b2d237db377b08c0ba37ef080d",
       "executable": false
     },
     "test-budget.json": {
@@ -4913,11 +4929,15 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "e8ae0da5f5f861573d6ff9a4b818cf97fdd3f66c43c15337444be89ccefab4b1",
+      "sha256": "2b0855965a4f57afd27dcfa53315d5bffa3006358575279da9f183c5d942718a",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
       "sha256": "558d6fc07d7b46237600f5f2e253e782ccc857b21c3096f5a5a8ee7f75aad252",
+      "executable": false
+    },
+    "tests/plinth/followup-support.mjs": {
+      "sha256": "8b32c8c323dc97989c46c2f679958bf608ffaa4253c97fee51b47ebde51f878c",
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
