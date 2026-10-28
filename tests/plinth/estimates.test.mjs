@@ -356,3 +356,40 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   const pending=(await first.report('lessons',{...input,catalog_version:2,reason:'Pending lesson awaiting a current catalog review'})).record;await c.call('/estimate-catalog/'+c.assembly.id,{expected_version:2,name:c.assembly.name,reason:'Separately reviewed catalog change',value:{...definition,parts:definition.parts.map((p,i)=>i===0?{...p,productivity:'3'}:p)}});const rejected=await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${pending.id}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:first.job.version,confirm:true}});assert.equal(rejected.status,409);assert.equal(rejected.value.error,'stale_catalog');assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id).version,3)
  }finally{await f.close()}
 })
+
+test('Measured kitchen layouts retain sources and revisions, export dimensions and adopt reviewed drafts without changing signed economics',async()=>{
+ const {seedRoomLayout,layoutEmail,layoutPng}=await import('./room-layout-support.mjs'),{createActiveJob}=await import('./helpers.mjs'),f=await createFixture({now:Date.parse('2026-10-28T15:00:00Z')})
+ try{
+  const client=await f.invite(layoutEmail('layout-client')),admin=await f.invite(layoutEmail('layout-admin'),'Layout administrator','admin'),agent=await f.agent()
+  const c=await seedRoomLayout(f,await createActiveJob(f,'Measured kitchen contract',layoutEmail('layout-client'),100000),{client}),root=c.root+'/room-layouts/'+c.layout.id
+  assert.equal(c.layout.revisions.length,1);const first=structuredClone(c.layout.revisions[0]),economics=structuredClone(c.job)
+  const model=await f.json(root+'/'+first.id+'/model.json',{cookie:f.owner});assert.equal(model.status,200);assert.equal(model.value.measures.area_m2,12);assert.equal(model.value.measures.perimeter_m,14);assert.deepEqual(model.value.measures.walls.map(w=>w.net_run_m),[3.1,3,2.8,3])
+  for(const [u,bytes] of c.layout.underlays.map((u,i)=>[u,i?layoutPng:c.original])){const download=await f.request(root+'/files/'+u.document.id,{cookie:f.owner});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),bytes)}
+  for(const cookie of [client,admin])for(const path of [root.split('/').slice(0,-1).join('/'),root+'/'+first.id+'/model.json',root+'/'+first.id+'/drawing.pdf',root+'/files/'+c.layout.underlays[0].document.id])assert.equal((await f.request(path,{cookie})).status,403)
+  assert.equal((await f.request(root+'/'+first.id+'/model.json',{token:agent})).status,403)
+  const snapshot=structuredClone(c.job)
+  assert.equal((await c.act('/room-layouts/'+c.layout.id+'/revise',{...c.g,base_revision_id:first.id},{cookie:client})).status,403)
+  assert.equal((await c.act('/room-layouts/'+c.layout.id+'/revise',{...c.g,base_revision_id:'synthetic-plinth-stale'})).status,409)
+  assert.equal((await c.act('/room-layouts/'+c.layout.id+'/revise',{...c.g,base_revision_id:first.id,reconstructed:false})).status,400)
+  const crossing=[{x:0,y:0},{x:4,y:3},{x:4,y:0},{x:0,y:3}];assert.equal((await c.act('/room-layouts/'+c.layout.id+'/revise',{...c.g,points:crossing,base_revision_id:first.id})).status,400)
+  assert.equal((await c.act('/room-layouts/'+c.layout.id+'/revise',{...c.g,openings:[{...c.g.openings[0],width:9}],base_revision_id:first.id})).status,400)
+  await c.read();assert.deepEqual(c.job,snapshot,'Refused edits leave job history and sources unchanged')
+  const preview1=(await c.act('/room-layouts/'+c.layout.id+'/preview',{revision_id:first.id})).value
+  const moved={...c.g,points:[{x:0,y:0},{x:5,y:0},{x:5,y:3},{x:0,y:3}],reason:'Move east wall one metre after field review'}
+  await c.ok('/room-layouts/'+c.layout.id+'/revise',{...moved,base_revision_id:first.id});await c.refresh();const second=c.layout.revisions[1]
+  assert.deepEqual(c.layout.revisions[0],first);const review=await c.act('/room-layouts/'+c.layout.id+'/preview',{revision_id:second.id});assert.equal(review.status,200)
+  assert.equal(review.value.comparison.before.area_m2,12);assert.equal(review.value.comparison.after.area_m2,15);assert.equal(review.value.comparison.after.perimeter_m,16);assert.equal(review.value.comparison.area_change_m2,3);assert.deepEqual(review.value.comparison.wall_changes.map(w=>[w.before,w.after]),[[4,5],[3,3],[4,5],[3,3]])
+  assert.equal(review.value.comparison.selection_changes[0].source_status,'signed')
+  assert.equal((await c.act('/room-layouts/'+c.layout.id+'/adopt',{revision_id:second.id,digest:preview1.digest,confirm:true})).status,409)
+  const pdfResponse=await f.request(root+'/'+second.id+'/drawing.pdf',{cookie:f.owner});assert.equal(pdfResponse.status,200);const pdfBytes=new Uint8Array(await pdfResponse.arrayBuffer());const {getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs'),pdf=await getDocument({data:pdfBytes,useSystemFonts:true}).promise;try{const page=await pdf.getPage(1),text=(await page.getTextContent()).items.map(i=>i.str).join(' ');assert.match(text,/Area 15 sq m; perimeter 16 m/);assert.match(text,/W1: 5 m/);assert.match(text,/door 0.9 x 2.1 m/);assert.match(text,/Oak base cabinet 0.9 x 0.6 m/);assert.ok((await page.getOperatorList()).fnArray.length>40,'Export contains actual vector drawing commands')}finally{await pdf.loadingTask.destroy()}
+  const noEffects=structuredClone(c.job);await c.ok('/room-layouts/'+c.layout.id+'/adopt',{revision_id:second.id,digest:review.value.digest,confirm:true});await c.refresh()
+  assert.deepEqual(c.job.quotes,economics.quotes);assert.deepEqual(c.job.budgets,economics.budgets);assert.deepEqual(c.job.selections[0],economics.selections[0]);assert.equal(c.job.selections.at(-1).revisions[0].status,'draft');assert.equal(c.job.takeoff.at(-1).measurements[0].kind,'area');assert.equal(c.layout.adoptions[0].selection_ids.length,1)
+  assert.deepEqual(c.job.orders,noEffects.orders);assert.deepEqual(c.job.schedules,noEffects.schedules);assert.equal((await c.act('/room-layouts/'+c.layout.id+'/adopt',{revision_id:second.id,digest:review.value.digest,confirm:true})).status,409)
+  const portable=(await f.json(root+'/'+second.id+'/model.json',{cookie:f.owner})).value
+  await c.ok('/room-layouts/'+c.layout.id+'/import',{model:portable,base_revision_id:second.id,reason:'Owner reviewed portable round trip',reconstructed:true});await c.refresh();const third=c.layout.revisions[2];assert.deepEqual(third.points,second.points);assert.deepEqual(third.openings,second.openings);assert.deepEqual(third.placements,second.placements)
+  const foreign=await createActiveJob(f,'Independent second job',layoutEmail('second-layout'));assert.equal((await f.request('/api/plinth/jobs/'+foreign.id+'/room-layouts/'+c.layout.id+'/'+third.id+'/model.json',{cookie:f.owner})).status,404)
+  const clientJob=(await f.json(c.root,{cookie:client})).value.job;assert.ok(!JSON.stringify(clientJob).includes('room-layout'));assert.equal(clientJob.room_layouts,undefined)
+  const revoked=await f.json('/api/plinth/agent-credentials',{cookie:f.owner});const credential=revoked.value.credentials[0];assert.equal((await f.json('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200);assert.equal((await f.request(root+'/'+third.id+'/drawing.pdf',{token:agent})).status,401)
+  await c.read();const deleted=await f.request(c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}});assert.equal(deleted.status,200);assert.equal((await f.request(root+'/'+third.id+'/model.json',{cookie:f.owner})).status,404);assert.equal((await f.request(root+'/files/'+c.layout.underlays[0].document.id,{cookie:f.owner})).status,404)
+ }finally{await f.close()}
+})

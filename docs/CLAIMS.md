@@ -115,7 +115,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | CARE-003 | done |  |
 | CARE-004 | done |  |
 | CARE-005 | partial | Native HTTP closure and sharing and isolation acceptance is proven. Missing: installed client and builder withdrawal and not-covered resolution and acknowledgment screens and both complete 1440/390 journeys, including permission failures. BLOCKED on 12ui design authorization from br and owner; this run is expressly forbidden to build new UI. CARE-002 entry-screen sharing labels remain required. |
-| DESIGN-001 | missing | No measured floor plans and editable room layouts workflow exists. |
+| DESIGN-001 | partial | Installed browser and CLI archive proof pending. Linked 3D walkthroughs, permissioned client presentations and comments, and external grants remain owed under ROLE-003 and ROLE-006 policy boundaries, including RL-104 job narrowing. Imported drawings remain historical underlays until manually reconstructed. Layout approval provides no professional certification or release authority; BOUND-002 retains unsigned, unverified, rejected, expired and mismatched evidence holds. |
 | MOVE-001 | partial | Accepted-job CSV custody exists; source-specific full-job maps and comprehensive coverage reports are absent. |
 | MOVE-002 | missing | No buildertrend live-job migration workflow exists. |
 | MOVE-003 | missing | No procore project and financial migration workflow exists. |

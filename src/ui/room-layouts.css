@@ -1,0 +1,11 @@
+.room-layouts { min-width: 0; font-size: 14px; }
+.room-layouts details { margin: 1rem 0; }
+.room-layouts summary { cursor: pointer; font-size: 14px; padding: .6rem 0; }
+.room-layouts fieldset { min-width: 0; }
+.room-layouts input, .room-layouts select { min-width: 0; max-width: 100%; }
+.room-layouts p, .room-layouts li, .room-layouts a { overflow-wrap: anywhere; }
+.room-layouts .layout-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 1rem; }
+.room-layouts .layout-fields fieldset { border: 1px solid #c8cecd; border-radius: 8px; padding: .75rem; }
+.room-layout-plan { display: block; width: 100%; max-width: 700px; color: #233f4b; background: #fff; border: 1px solid #c8cecd; border-radius: 8px; margin: 1rem 0; }
+.room-layouts .check { display: flex; gap: .6rem; align-items: start; }
+.room-layouts .check input { width: auto; }

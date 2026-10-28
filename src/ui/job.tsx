@@ -1,3 +1,4 @@
+import { RoomLayouts } from './room-layouts'
 import { FollowupPreferences } from './followup-rules'
 import { PlanWorkspace } from './plans'
 import { Submittals } from './submittals'
@@ -70,7 +71,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
     {!sectionAllowed(open)?<p role="alert" className="notice">This feature is not available for your access.</p>:<div className="job-body">
       {open !== 'Schedule' && !limited(role) && <DecisionStrip job={job} manager={manager} go={setSection} />}
       {open === 'Financial review' && <FinancialAccess {...props}/>}
-      {open === 'Plans' && <PlanWorkspace jobId={job.id}/>}
+      {open === 'Plans' && <>{role==='owner'&&<RoomLayouts jobId={job.id} onChange={refresh}/>}<PlanWorkspace jobId={job.id}/></>}
       {open === 'Quote' && <Quotes {...props} />}
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}

@@ -1,3 +1,4 @@
+import { roomLayoutResponse } from './room-layouts'
 import { signedChangeResponse } from './signed-change-http'
 import { followupResponse } from './followup-rules'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
@@ -105,7 +106,7 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
+ job={...job,room_layouts:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.')&&!a.kind.startsWith('room-layout.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
@@ -156,6 +157,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  const tradePortal=await tradePortalResponse(request,env,actor,parts,body);if(tradePortal)return tradePortal
  const resource=await resourceResponse(request,env.DB,actor,parts,body);if(resource)return resource
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
+ const layouts=await roomLayoutResponse(request,env,actor,parts,body);if(layouts)return layouts
  const signedChanges=await signedChangeResponse(request,env,actor,parts,body);if(signedChanges)return signedChanges
  const followup=await followupResponse(request,env,actor,parts,body);if(followup)return followup
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
