@@ -23,7 +23,7 @@ export interface SatisfactionSurvey {
  review_permission?: {allowed:boolean;url:string;by:Stamp}
  permission_history: {allowed:boolean;url:string;by:Stamp}[]
  review_request?: SurveyDelivery
- follow_up?: {todo_id:string;assignee_id:string}
+ follow_up?: {todo_id:string;assignee_id:string;assignee_name:string}
 }
 export interface SatisfactionState {
  settings?: SurveySettings; settings_history: SurveySettings[]; consents: SurveyConsent[]; surveys: SatisfactionSurvey[]

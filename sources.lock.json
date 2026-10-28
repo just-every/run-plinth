@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4fe70755725adcc1625b90d3701b275f521fdd8c417e4174a98bfc49d2d8c1f8",
+      "sha256": "18da7a13e7b87e564e8ff90027aca5682767f7f5df11a4fd10311d8b7eaf3995",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "71b39ce0ef108a35752158623986ddef2a2b4b7579c8f8be2e4e69b246763939",
+      "sha256": "caf96757d17db23ad01fa8e64a6045b2b8b3a0f7d6a4dd6191d2e4b958e2800e",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "4839c7f93331a4b80955188025a038f526d2fba98eac5cc988506f91cdb67553",
+      "sha256": "8cc5edfe3d0faad5c83c5882eb9fb47fdcce46690d84e5a4a72cfea915631475",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -3473,7 +3473,7 @@
       "executable": false
     },
     "src/plinth/satisfaction-model.ts": {
-      "sha256": "68da20832e3a6a562eb5c6e92984147738d43968f7068bdd2a322567b69612e9",
+      "sha256": "399609151362a50dbaf87e2d9a8911efbea1d6cc25c46b192240aca1d60ad10f",
       "executable": false
     },
     "src/plinth/satisfaction-report.ts": {
@@ -3481,7 +3481,7 @@
       "executable": false
     },
     "src/plinth/satisfaction.ts": {
-      "sha256": "0a7109f8ecc985cf112942cfbd85b5c811574cfba62aea664bc604a8bdd979f6",
+      "sha256": "67602d66ef73661554a376e7c0c420e0446b774133f67e690941fc7d9dfe1e6e",
       "executable": false
     },
     "src/plinth/schedule-baseline-model.ts": {
@@ -4345,7 +4345,7 @@
       "executable": false
     },
     "src/ui/satisfaction.tsx": {
-      "sha256": "57286581926f9566777225b9acd01171a39253396fb0ea4d90846d38a1920c1d",
+      "sha256": "06f54981b1dfc0857d5ab5d49b1b8d31cc5086a1a50a8964b240e4dc56aff559",
       "executable": false
     },
     "src/ui/schedule-baseline-forms.tsx": {
@@ -4917,7 +4917,7 @@
       "executable": false
     },
     "tests/plinth/warranties.test.mjs": {
-      "sha256": "d96f794ecb49e789646d425711fa012bde98b6cd6b7057b69c85bef8f1b98f30",
+      "sha256": "988953c4d989a1f20301e21beb8b2a840f11b8d24de0f6ca7f058320599ce742",
       "executable": false
     },
     "tests/site.test.mjs": {

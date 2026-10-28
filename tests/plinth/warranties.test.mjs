@@ -353,7 +353,10 @@ test('CARE-004 — two completed jobs retain configurable high and low survey re
   const a=await surveyJob(f,'Synthetic Plinth first job',surveyAddress(401),first),b=await surveyJob(f,'Synthetic Plinth second job',surveyAddress(402),second)
   const team=(await a.call('/team')).value.team,manager=team.find(p=>p.email===surveyAddress(404)),worker=team.find(p=>p.email===surveyAddress(405))
   for(const [person,role] of [[manager,'project_manager'],[worker,'crew']])assert.equal((await a.call('/team/'+person.id,{expected_version:0,role,job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
-  for(const [j,n,trade] of [[a,406,'Plumbing'],[b,407,'Electrical']]){await j.read();await createReleasedScope(f,j.job,surveyAddress(n),trade);await j.read()}
+  for(const [j,n,trade] of [[a,406,'Plumbing'],[b,407,'Electrical']]){
+   await j.read();const released=await createReleasedScope(f,j.job,surveyAddress(n),trade);await j.read()
+   if(j===a){const secondScope=await j.ok('/subcontracts',{vendor_id:released.vendor.id,trade,scope:'Synthetic second scope for the same company and trade',contact_ids:released.scope.contact_ids,awarded_on:'2026-10-21'});await j.ok('/subcontracts/'+secondScope.id+'/release')}
+  }
   for(const [j,cookie,address] of [[a,first,surveyAddress(401)],[b,second,surveyAddress(402)]]){
    assert.equal((await j.act('/satisfaction/consent',{email_surveys:true})).status,403,'Owner cannot impersonate client consent')
    assert.equal((await j.act('/satisfaction/settings',surveySettings,pm)).status,403)
@@ -416,6 +419,17 @@ test('CARE-004 — two completed jobs retain configurable high and low survey re
   assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,200)
   assert.equal((await a.call('/jobs/'+b.job.id+'/satisfaction',undefined,customCookie)).status,404)
   assert.deepEqual((await a.call('/reports/satisfaction',undefined,customCookie)).value.responses.map(r=>r.job_id),[a.job.id])
+  assert.equal((await a.call('/team/'+manager.id,{expected_version:2,role:'project_manager',job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  await b.read();const document=b.job.handover.documents[0],replacement=await b.ok('/handover/packages',{title:'Synthetic later closeout',documents:[{document_id:document.id,revision_id:document.revisions[0].id}]})
+  await b.ok('/handover/packages/'+replacement.id+'/complete',{digest:replacement.digest,confirm:true,client_safe:true,statement:'Builder completed later closeout'})
+  await b.ok('/handover/packages/'+replacement.id+'/accept',{digest:replacement.digest,confirm:true,exception_ids:[],statement:'Client accepts later closeout'},second)
+  const fallbackSent=await b.ok('/satisfaction/send',{source_kind:'handover',source_id:replacement.id,recipient_email:surveyAddress(402),follow_up_id:manager.id,confirm:true}),fallbackSurvey=fallbackSent.surveys.at(-1)
+  assert.equal((await a.call('/team/'+manager.id,{expected_version:3,role:'project_manager',job_ids:[a.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  await b.ok('/satisfaction/'+fallbackSurvey.id+'/respond',{score:2,answers:['Synthetic later answer'],comment:'Synthetic callback after manager removal'},second)
+  const assigned=(await b.survey()).surveys.at(-1).follow_up
+  const actualOwner=(await a.call('/team')).value.team.find(p=>p.role==='owner')
+  assert.equal(assigned.assignee_id,actualOwner.id);assert.equal(assigned.assignee_name,actualOwner.name)
+  const fallbackTasks=(await b.call('/jobs/'+b.job.id+'/todos')).value.todos;assert.equal(fallbackTasks.find(t=>t.id===assigned.todo_id).items[0].assignee.email,actualOwner.email)
  }finally{await f.close()}
 })
 

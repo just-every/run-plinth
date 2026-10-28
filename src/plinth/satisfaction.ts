@@ -26,7 +26,7 @@ async function context(db:D1Database,job:Job,source:SatisfactionSurvey['source']
  return {
   managers:team.filter(r=>r.grant.role==='project_manager').map(r=>({id:r.operator_id,name:r.display_name})),
   crew:team.filter(r=>['crew','superintendent'].includes(r.grant.role)).map(r=>({id:r.operator_id,name:r.display_name})),
-  subs:(job.subcontracts??[]).filter(s=>source.kind==='warranty'?s.id===visit?.assignment.subcontract_id:s.status==='released').map(s=>({id:s.vendor_id,name:s.vendor_name,trade:s.trade})),
+  subs:[...new Map((job.subcontracts??[]).filter(s=>source.kind==='warranty'?s.id===visit?.assignment.subcontract_id:s.status==='released').map(s=>[s.vendor_id+':'+s.trade.toLocaleLowerCase('en-US'),{id:s.vendor_id,name:s.vendor_name,trade:s.trade}])).values()],
  }
 }
 function source(job:Job,input:Input):SatisfactionSurvey['source'] {
@@ -105,7 +105,7 @@ export async function satisfactionResponse(request:Request,env:Bindings,actor:Ac
      // If the named manager has left, assign the active owner instead; no low response loses its follow-up.
      const owner=current??await env.DB.prepare("SELECT id,email FROM oa_operators WHERE role='owner' AND status='active'").first<{id:string;email:string}>();need(owner,'An active office follow-up owner is required',409,'assignee_grant')
      const todo=createTodo({title:'Satisfaction follow-up: '+survey.settings.title,notes:`Survey ${survey.id}: ${survey.response.score} of 10. ${survey.response.comment}`,due_at:new Date(Date.now()+86400000).toISOString(),priority:'high',tags:['satisfaction'],items:[{title:'Contact the client about their satisfaction response',assignee:{kind:'office',email:owner.email}}]},actor,job)
-     await validateAssignees(env.DB,todo,job);(job.todos??=[]).push(todo);survey.follow_up={todo_id:todo.id,assignee_id:owner.id}
+     await validateAssignees(env.DB,todo,job);(job.todos??=[]).push(todo);const assigned=(await env.DB.prepare('SELECT display_name FROM oa_operators WHERE id=?').bind(owner.id).first<{display_name:string}>())!;survey.follow_up={todo_id:todo.id,assignee_id:owner.id,assignee_name:assigned.display_name}
     }
    } else {
     need(typeof input.allowed==='boolean','Explicitly choose public review permission')
