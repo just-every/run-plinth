@@ -1,3 +1,4 @@
+import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
 import { followupResponse } from './followup-rules'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
@@ -105,12 +106,12 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
+ job={...job,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
- if(actor.role!=='owner'){job={...job};delete job.followup}
+ if(actor.role!=='owner'){job={...job,room_boards:undefined};delete job.followup}
  job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('plans.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
@@ -163,6 +164,12 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}
+ if(parts[2]==='room-boards'&&method==='GET'){
+  requireOwner(actor)
+  if(parts.length===3)return json({version:previous.version,boards:previous.room_boards??[]})
+  if((parts.length===5||parts.length===6)&&parts[3]==='files'&&(!parts[5]||parts[5]==='geometry'))return roomBoardFile(env.DB,previous,actor,parts[4]!,parts[5]==='geometry',new URL(request.url).searchParams.get('download')==='1')
+  return json({error:'not_found'},404)
+ }
  if(parts[2]==='submittals'&&method==='GET'){
   submittalAccess(actor,previous)
   if(parts.length===3)return json({version:previous.version,person_id:actor.id,manage:actor.role==='owner',register:previous.submittals??[],reviewers:await submittalReviewers(env.DB,previous),orders:previous.orders})
@@ -244,7 +251,8 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ if(category==='room-boards'&&(parts.length===3||parts.length===5)){const result=await roomBoardAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
  else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
  else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
