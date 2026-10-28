@@ -108,12 +108,13 @@ not claimed.
 
 ## Coded estimate workbooks
 
-The owner can also upload a UTF-8 CSV or an XLSX under **Coded estimate workbook**.
+The owner can also upload UTF-8 CSV, BIFF8 XLS or XLSX under **Coded estimate workbook**.
 This creates a separate quoting job with an inert coded estimate. It remains
 visible only to the owner until the owner records native quote acceptance. It does not
 replace a native job, accept a quote, post actual costs or adopt financial
-opening balances. Legacy XLS, catalogs, time and expense costs, supplier bill
-matching, SOV and opening balances remain outside this import door.
+opening balances. Dated catalog rates and native time and expense drafts use the
+explicit import types described below. Supplier bill matching, SOV and financial
+opening balances remain outside this import door.
 
 Inspect the file, choose one worksheet, and map column letters to source row id,
 description, code, phase, category, quantity, measurement unit and selling rate
@@ -169,3 +170,50 @@ new native job. A restored journal grants no credentials or automatic execution.
 Limits are 256 KiB of original file bytes, ten worksheets, 100 data rows per
 worksheet, 100 columns, 200 package parts and 2 MB of declared expanded XLSX
 content. Unsupported and encrypted packages are refused explicitly.
+
+### Legacy Excel and dated catalog rates
+
+Move in also accepts bounded BIFF8 XLS originals. Current worksheet cells include
+shared strings, continued strings, numeric and compact numeric cells, and reviewed
+numeric formula caches. Arithmetic and SUM expressions are recorded, never
+recalculated. Unsupported versions, encrypted originals, macro sheets, external
+links, unsupported formula tokens and absent numeric caches produce explicit
+refusals or row diagnostics. Original downloads retain the uploaded compound file.
+
+Choose **Dated catalog rates** to map source identifiers, descriptions, cost codes,
+units, selling cents, cost cents, vendors, effective dates and source references.
+Each row is one dated USD rate, so its unit and rate unit must agree. The preview
+compares the sum of displayed rates; that sum is not an estimate. Approval creates
+new rates for the ordinary native assembly and template estimator. Existing rate
+revisions and accepted estimates remain fixed. Undo preserves a catalog group
+once a native record depends on one of its rates, or a rate has been edited.
+
+### Time and expense drafts
+
+Choose **Time and expense drafts**, load accepted jobs and select the destination.
+Map `id`, `description`, `code`, `quantity`, `unit`, `unit_cents`, `kind`,
+`dated_on`, `period`, `reference` and `employee_reference`. `rate_unit` is optional.
+Kinds are `time` and `expense`. Map time units to `hour` or `minute`; the quantity
+must resolve exactly to whole native minutes. Expenses use the exact extended
+amount from the mapped decimal quantity and integer cent rate. Codes must already
+exist in the destination's accepted budget. Source references cannot duplicate
+native sources or other rows in the same upload.
+
+Preview and approval bind the destination version as well as the original file,
+mapping and row resolutions. Import prepares native sources without posting an
+actual cost or changing accepted estimates, budgets, SOV or payments. Ordinary
+Job costs approval still requires the configured reviewer separation and an open
+posting period. All imported rows share one retained original; their original
+links download identical bytes. Replay creates no second source or posting. Undo
+preserves native work; job erasure retires the related source custody and prevents
+replay from restoring it.
+
+The workbook HTTP doors use the same inspect, preview and commit sequence above.
+Set `mapping.purpose` to `catalog` or `costs`; the default remains `estimate`.
+For costs also provide `job_id` and `expected_version`. Carry `reviewed_at` from
+the preview response into commit, together with its fingerprint. A changed
+mapping, source or destination requires another preview.
+
+Supplier-bill matching, imported SOV and financial opening balances are not
+implemented. Supplied-ledger reconciliation remains required before financial
+opening adoption; importing draft cost sources does not adopt opening balances.

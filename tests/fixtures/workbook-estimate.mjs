@@ -16,3 +16,16 @@ export async function estimateWorkbook({missingCache=false,unsupported=false,mac
 }
 export const workbookMapping={sheet:'Estimate',columns:Object.fromEntries(headers.map((h,i)=>[h==='cost_code'?'code':h,String.fromCharCode(65+i)])),codes:{FRAME:'06-100',BOARD:'09-200'},units:{feet:'ft',sheets:'sheet'},currency:'USD',duplicates:'skip-identical',reviewed_formulas:true,excluded_rows:{'5':'Invalid source code held for correction'}}
 export const workbookInput=async(options)=>({...await estimateWorkbook(options),title:'Synthetic coded estimate',client_email:['workbook','dev.localhost'].join('@'),address:'Synthetic site',mapping:structuredClone(workbookMapping)})
+
+export function catalogInput(tag='synthetic-plinth-catalog-1',supplied) {
+ const headers=['id','description','code','unit','unit_cents','cost_unit_cents','vendor','effective_on','reference']
+ const rows=[headers,...(supplied??[[tag+'-frame','Framing rate','FRAME','feet','101','79','Synthetic supply','2026-10-01',tag+'-quote'],[tag+'-board','Board rate','BOARD','sheets','333','201','Synthetic supply','2026-10-01',tag+'-quote']])]
+ const csv=rows.map(row=>row.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n')+'\r\n'
+ return {name:tag+'.csv',base64:Buffer.from(csv).toString('base64'),title:'Synthetic dated rates',mapping:{purpose:'catalog',sheet:'CSV',columns:Object.fromEntries(headers.map((h,i)=>[h,String.fromCharCode(65+i)])),codes:{FRAME:'06-100',BOARD:'09-200'},units:{feet:'ft',sheets:'sheet'},currency:'USD',duplicates:'reject',reviewed_formulas:false,excluded_rows:{}}}
+}
+
+export function costInput(job,tag='synthetic-plinth-costs-1') {
+ const headers=['id','description','code','quantity','unit','unit_cents','kind','dated_on','period','reference','employee_reference']
+ const csv=[headers,[tag+'-time','Reviewed framing time','TIME','1.25','hours','10001','time','2026-10-01','2026-10',tag+'-time-sheet','synthetic-plinth-worker'],[tag+'-expense','Reviewed supplies','EXPENSE','1','each','5000','expense','2026-10-01','2026-10',tag+'-receipt','synthetic-plinth-worker']].map(row=>row.map(v=>'"'+v+'"').join(',')).join('\r\n')+'\r\n'
+ return {name:tag+'.csv',base64:Buffer.from(csv).toString('base64'),title:'Synthetic reviewed time and expenses',job_id:job.id,expected_version:job.version,mapping:{purpose:'costs',sheet:'CSV',columns:Object.fromEntries(headers.map((h,i)=>[h,String.fromCharCode(65+i)])),codes:{TIME:'06-100',EXPENSE:'09-200'},units:{hours:'hour',each:'each'},currency:'USD',duplicates:'reject',reviewed_formulas:false,excluded_rows:{}}}
+}
