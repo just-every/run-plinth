@@ -38,7 +38,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
- if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':parts[4]==='review'||parts[4]==='release'?'approve':parts.length===3?'create':'edit',financial:true}
+ if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':['review','release','notify'].includes(parts[4]??'')?'approve':parts.length===3?'create':'edit',financial:true}
  const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = feature[category]
  if (!area) return null
  const verbs = rest.slice(1).filter(part => !isId(part)), verb = verbs.at(-1) ?? ''

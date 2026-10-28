@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 
 /** One native rejected and resubmitted package, reused by procurement and archive journeys. */
-export async function submittalFixture(f, initial) {
+export async function submittalFixture(f, initial, {notify=false}={}) {
  let job=initial
  const root='/api/plinth/jobs/'+job.id
  const act=async(path,body={})=>{
@@ -18,9 +18,11 @@ export async function submittalFixture(f, initial) {
  const first=row.cycles[0]
  await act('/submittals/'+row.id+'/annotate',{cycle_id:first.id,file_id:first.attachments[0].id,page:1,text:'Glazing performance does not match the specified schedule'})
  row=await act('/submittals/'+row.id+'/review',{cycle_id:first.id,disposition:'rejected',comment:'Replace the glazing specification and resubmit',confirm:true})
+ if(notify)row=await act('/submittals/'+row.id+'/notify',{cycle_id:first.id,product_reference:first.product_reference,to:order.vendor_email,confirm:true})
  row=await act('/submittals/'+row.id+'/resubmit',{cycle_id:first.id,...submission('Window W1 version two',revised)})
  const second=row.cycles[1]
  row=await act('/submittals/'+row.id+'/review',{cycle_id:second.id,disposition:'approved',comment:'Revised low-e glazing matches W1',confirm:true})
+ if(notify)row=await act('/submittals/'+row.id+'/notify',{cycle_id:second.id,product_reference:second.product_reference,to:order.vendor_email,confirm:true})
  await act('/submittals/'+row.id+'/release',{cycle_id:second.id,order_id:order.id,product_reference:second.product_reference,confirm:true})
  return {get job(){return job},row,order,original,revised,act,submission}
 }
