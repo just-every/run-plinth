@@ -22,17 +22,17 @@ function Geometry({ points, kind, color, label, width }: { points: Point[]; kind
   </g>
 }
 
-export function TakeoffViewer({ jobId, revision, points, mode, calibrations, measurements, onPoint, editable }: {
-  jobId: string; revision: DrawingRevision; points: Point[]; mode: string; calibrations: Calibration[]; measurements: TakeoffMeasurement[]; onPoint: (point: Point) => void; editable: boolean
+export function TakeoffViewer({ jobId, revision, points, mode, calibrations, measurements, onPoint, editable, sourceUrl }: {
+  sourceUrl?: string; jobId: string; revision: DrawingRevision; points: Point[]; mode: string; calibrations: Calibration[]; measurements: TakeoffMeasurement[]; onPoint: (point: Point) => void; editable: boolean
 }) {
   const host = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
   const [document, setDocument] = useState<PDFDocumentProxy>(), [width, setWidth] = useState(0), [error, setError] = useState(''), [rendered, setRendered] = useState(false), [retry, setRetry] = useState(0)
   useEffect(() => {
     let disposed = false, loaded: PDFDocumentProxy | undefined
     setDocument(undefined); setRendered(false); setError('')
-    openDrawing(drawingUrl(jobId, revision)).then(pdf => { loaded = pdf; if (disposed) void pdf.loadingTask.destroy(); else setDocument(pdf) }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Could not open PDF.') })
+    openDrawing(sourceUrl ?? drawingUrl(jobId, revision)).then(pdf => { loaded = pdf; if (disposed) void pdf.loadingTask.destroy(); else setDocument(pdf) }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Could not open PDF.') })
     return () => { disposed = true; void loaded?.loadingTask.destroy() }
-  }, [jobId, revision.document.id, retry])
+  }, [jobId, revision.document.id, sourceUrl, retry])
   useEffect(() => {
     if (!host.current) return
     const observer = new ResizeObserver(entries => setWidth(entries[0]!.contentRect.width))
@@ -56,7 +56,7 @@ export function TakeoffViewer({ jobId, revision, points, mode, calibrations, mea
   }, [document, width, revision.page, revision.width, revision.height])
   const strokeWidth = Math.max(1, revision.width / Math.max(width, 1) * 2)
   return <section aria-label={`Drawing revision ${revision.revision}, page ${revision.page}`}>
-    <p>{rendered ? 'PDF ready. Choose points on the drawing or enter coordinates below.' : error ? 'PDF unavailable.' : 'Rendering PDF…'}</p>
+    <p>{rendered ? editable ? 'PDF ready. Choose points on the drawing or enter coordinates below.' : 'PDF ready.' : error ? 'PDF unavailable.' : 'Rendering PDF…'}</p>
     {error && <p role="alert" className="error">{error} <button type="button" onClick={() => setRetry(value => value + 1)}>Retry PDF</button></p>}
     <div ref={host} style={{ position: 'relative', width: '100%', maxWidth: revision.width, aspectRatio: `${revision.width} / ${revision.height}`, background: '#fff', overflow: 'hidden' }}>
       <canvas ref={canvas} aria-label={`Original drawing: ${revision.document.name}, page ${revision.page}`} style={{ display: 'block', width: '100%', height: '100%' }} />
