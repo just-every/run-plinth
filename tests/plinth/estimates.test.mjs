@@ -397,5 +397,17 @@ test('Room boards retain original geometry, finish revisions and exact signed so
   assert.equal((await f.request(root+'/room-boards/files/'+file.id,{cookie:f.owner})).status,404)
   assert.equal((await f.json(root+'/room-boards',{method:'POST',cookie:f.owner,body:{...input,expected_version:job.version}})).status,404)
   assert.equal((await f.db.prepare('SELECT count(*) n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
+  const modelBytes=roomFiles().find(f=>f.name.endsWith('.obj')).bytes
+  const large=Buffer.concat([modelBytes,Buffer.from('#'),Buffer.alloc(2_000_000-modelBytes.length-1,32)])
+  const manyFiles=Array.from({length:8},(_,i)=>({name:`synthetic-plinth-${i}.obj`,base64:(i===0?large:modelBytes).toString('base64')}))
+  const otherBoard=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),files:manyFiles,expected_version:other.version}});assert.equal(otherBoard.status,200)
+  const expanded=await f.json(`/api/plinth/jobs/${other.id}/room-boards/${otherBoard.value.record.id}/revise`,{method:'POST',cookie:f.owner,body:{...roomInput(),files:manyFiles.slice(1),expected_version:otherBoard.value.job.version,base_revision_id:otherBoard.value.record.revisions[0].id}});assert.equal(expanded.status,200)
+  assert.equal(expanded.value.record.revisions.at(-1).files.length,15)
+  const erasedMany=await f.json(`/api/plinth/jobs/${other.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:expanded.value.job.version}});assert.equal(erasedMany.status,200,'Exact byte guards permit erasure with many originals and a large model')
+  assert.equal((await f.db.prepare('SELECT count(*) n FROM pl_attachments WHERE job_id=?').bind(other.id).first()).n,0)
+  const otherFile=otherBoard.value.record.revisions[0].files[0].id
+  assert.equal((await f.request('/auth/signout',{method:'POST',cookie:f.owner,body:{}})).status,204)
+  assert.equal((await f.request(`/api/plinth/jobs/${other.id}/room-boards/files/${otherFile}`,{cookie:f.owner})).status,401,'A revoked owner session cannot reopen an original')
+  assert.equal((await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{expected_version:otherBoard.value.job.version,...roomInput()}})).status,401,'A revoked session cannot replay a new board capture')
  }finally{await f.close()}
 })
