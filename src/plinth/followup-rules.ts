@@ -20,6 +20,7 @@ const kindOf=(input:unknown)=>{need(kinds.includes(input as FollowupKind),'Choos
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'cache-control':'private, no-store'}})
 const instant=(value:unknown)=>{need(typeof value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,3})?)?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&Number.isFinite(Date.parse(value)),'Choose a dated preview instant with a time zone');return Date.parse(value)}
 const clockTime=(value:unknown)=>{need(typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value),'Quiet hours use HH:MM');return value}
+const quietAt=(at:number,q:{time_zone:string;quiet_start:string;quiet_end:string})=>{const local=wallClock(at,q.time_zone),hhmm=String(local.hour).padStart(2,'0')+':'+String(local.minute).padStart(2,'0');return q.quiet_start<q.quiet_end?hhmm>=q.quiet_start&&hhmm<q.quiet_end:hhmm>=q.quiet_start||hhmm<q.quiet_end}
 export async function currentRecipient(db:D1Database,job:Job,id:string,kind:FollowupKind){
  const p=await db.prepare("SELECT id,email,display_name,role FROM oa_operators WHERE id=? AND status='active'").bind(id).first<{id:string;email:string;display_name:string;role:string}>()
  if(!p)return null
@@ -68,8 +69,7 @@ export async function followupPreview(db:D1Database,job:Job,asOf:number,ignoreAt
      const p=await currentRecipient(db,job,id,rule.kind)
      const consent=state(job).consents.findLast(c=>c.person_id===id&&c.kind===rule.kind)
      const key=[rule.id,source.id,source.revision,step.id,id].join(':')
-     const q=consent?.quiet_start?consent:r,wall=wallClock(asOf,q.time_zone!),hhmm=String(wall.hour).padStart(2,'0')+':'+String(wall.minute).padStart(2,'0')
-     const quiet=q.quiet_start!<q.quiet_end!?hhmm>=q.quiet_start!&&hhmm<q.quiet_end!:hhmm>=q.quiet_start!||hhmm<q.quiet_end!
+     const quiet=quietAt(asOf,r)||!!consent?.quiet_start&&quietAt(asOf,{quiet_start:consent.quiet_start,quiet_end:consent.quiet_end!,time_zone:consent.time_zone!})
      const attempted=state(job).attempts?.some(a=>a.key===key&&a.id!==ignoreAttempt)
      const suppressed=p?await suppression(db,p.email):null
      const reason=r.paused?'Rule paused':r.generation!==generation||!owner||owner.role!=='owner'||r.authority_version!==undefined&&r.authority_version!==owner.version?'Owner authority changed; review the rule again':!source.outstanding?'Source resolved or held':optedOut?'Recipient opted out; sequence stopped':local.date<r.starts_on?'Sequence not started':local.date>r.stop_on?'Stop date passed':due_on>local.date?'Step not due':source.amount_cents>r.approval_limit_cents?'Amount exceeds owner review limit':!p?'Recipient has no current access':!consent?.allowed?'Recipient consent is off':suppressed&&!r.required?'Mailbox suppression requires owned follow-up':attempted?'Step already reserved; inspect history':quiet?'Recipient quiet hours':'Prospective action only; nothing sent'

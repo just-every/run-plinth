@@ -993,6 +993,7 @@ test('Owner follow-up delivery reserves each live source step once, honors recip
   await c.active.act('/invoices/'+invoice.id+'/issue')
   await configure(c.active,'collection',{required:true,required_reason:'An issued invoice remains outstanding',steps:[{after_days:0,label:'Required collection',escalate:false}]})
   await consent(c.active,'collection','off',c.client,{quiet_start:'08:00',quiet_end:'17:00',time_zone:'America/Chicago'})
+  assert.equal((await c.preview(c.active,'2026-10-31T02:00:00Z')).actions.find(a=>a.source_id===invoice.id).reason,'Recipient quiet hours','Recipient preferences cannot shorten the owner rule quiet hours')
   const beforeQuiet=notices().length;await run(c.active);assert.equal(notices().length,beforeQuiet)
   await consent(c.active,'collection','off',c.client)
   await run(c.active);assert.equal(notices().length,beforeQuiet+1)

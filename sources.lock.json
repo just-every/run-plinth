@@ -185,7 +185,7 @@
       "executable": false
     },
     "docs/FOLLOW-UP-RULES.md": {
-      "sha256": "8b81dc817877aa6e37e8c28c6b5e631340be151df6aceda56721d38e6f91095b",
+      "sha256": "1b6a6db4c3b3a2cfcd8883b7194a250e2db61397ca7fb0ba19d42c75f067bd49",
       "executable": false
     },
     "docs/GETTING-STARTED.md": {
@@ -3181,7 +3181,7 @@
       "executable": false
     },
     "src/plinth/followup-rules.ts": {
-      "sha256": "37e9989779edf6442d5170d04881edb1ce083d9aea2f8a972226e00551ba14c6",
+      "sha256": "77a1625e83886e59ac78ee0416d542e201905a2a5562cb5073b33ed1ebd769f4",
       "executable": false
     },
     "src/plinth/followup-sources.ts": {
@@ -4941,7 +4941,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "51e25462c9be7042ae4657fdbb3e277fce3ed3c73b06f43f0e81a7987903b0ba",
+      "sha256": "b2c39a5dfe5e726a0b910f66e7938f46238d3bafd7b938c3fa89f0b5b56b6476",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {

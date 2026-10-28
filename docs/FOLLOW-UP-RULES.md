@@ -10,7 +10,9 @@ ordered steps, start and stop dates, and an event or scheduled trigger.
 A recipient enables or withdraws their own consent in the job's follow-up Settings.
 The default is off. Existing preview consent alone authorizes no delivery. A person
 separately chooses email or off and their own quiet hours for that sequence. Each
-choice appends an attributed preference revision.
+choice appends an attributed preference revision. Both the owner rule and the
+recipient quiet window must permit a delivery; a personal choice never shortens
+the rule window.
 
 An event sequence starts at estimate preparation, selection presentation or an issued
 invoice's due date. A scheduled sequence starts at the later of its configured start
