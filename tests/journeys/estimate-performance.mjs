@@ -18,7 +18,8 @@ try{
  const c=await performanceFixture({owner:'owner',json:call,invite}),first=c.jobs[0],second=c.jobs[1]
  const historicalQuotes=structuredClone(first.job.quotes),before=(await call(`/api/plinth/jobs/${first.job.id}/costs`)).value
  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app');await page.locator('summary').filter({hasText:/^Estimate productivity and sales$/}).click()
- await expect(page.getByText('Synthetic Plinth builder: 2 won · 1 lost · 1 open · Win rate 66.6667%',{exact:true})).toBeVisible()
+ await expect(page.getByText('Synthetic Plinth builder: 1 won · 1 lost · 1 open · Win rate 50%',{exact:true})).toBeVisible()
+ await expect(page.getByText('Synthetic cost preparer: 1 won · 0 lost · 0 open · Win rate 100%',{exact:true})).toBeVisible()
  const firstRegion=page.getByRole('region',{name:first.job.name+' productivity'}),secondRegion=page.getByRole('region',{name:second.job.name+' productivity'})
  const labor=firstRegion.getByRole('row').filter({hasText:'06-100'}),other=secondRegion.getByRole('row').filter({hasText:'06-100'})
  await expect(labor.getByRole('cell').nth(1)).toHaveText('$60.00');await expect(labor.getByRole('cell').nth(2)).toHaveText('$60.00');await expect(labor.getByRole('cell').nth(8)).toHaveText('5')
@@ -31,12 +32,14 @@ try{
   await page.getByLabel('Catalog record',{exact:true}).selectOption(entry.id)
   await page.getByRole('checkbox',{name:second.job.name+' · USD',exact:true}).check()
   await page.getByLabel('Lesson reason',{exact:true}).fill(reason)
-  await page.getByLabel('Proposed catalog definition',{exact:true}).fill(JSON.stringify(value,null,2))
+  if(entry.kind==='assembly')await page.getByLabel('Production units per rate unit 1',{exact:true}).fill(value.parts[0].productivity)
+  else await page.getByLabel('Default dimension: walls',{exact:true}).fill(value.dimensions.walls)
   await page.getByRole('button',{name:'Propose reviewed lesson',exact:true}).click()
   await expect(page.getByText(reason,{exact:false}).first()).toBeVisible()
   await page.getByRole('button',{name:'Review proposed revision',exact:true}).last().click()
   const review=page.getByRole('region',{name:'Catalog lesson review'})
-  await expect(review).toBeVisible();await expect(review.locator('pre')).toContainText(entry.kind==='assembly'?'"productivity": "4"':'"walls": "14"')
+  await expect(review).toBeVisible();await expect(review.getByText(entry.kind==='assembly'?'Production units per rate unit: 4':'walls: 14',{exact:true})).toBeVisible()
+  if(entry.kind==='assembly'){for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await review.screenshot({path:`${shots}/RPT-002-review-${width}.png`,animations:'disabled'})}await page.setViewportSize({width:1440,height:1000})}
   await review.getByRole('checkbox').check();await review.getByRole('button',{name:'Approve for new estimates only',exact:true}).click()
   await expect(review).toHaveCount(0)
  }

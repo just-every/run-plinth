@@ -17,7 +17,7 @@ export async function performanceFixture(f){
   const act=async(path,body={},cookie=f.owner)=>{const r=await call(`/jobs/${job.id}`+path,{expected_version:job.version,...body},cookie);await read();return r}
   const report=async(action,body={})=>{const r=await call(`/reports/performance/jobs/${job.id}/${action}`,{expected_version:job.version,...body});await read();return r}
   const dimensions={walls:i===1?'12':'10'},input={template_id:template.id,as_of:'2026-10-20',dimensions}
-  const preview=await act('/estimate-template/preview',input);await act('/estimate-template/apply',{...input,digest:preview.preview.digest})
+  const preview=await act('/estimate-template/preview',input);await act('/estimate-template/apply',{...input,digest:preview.preview.digest},i===1?reviewer:f.owner)
   if(i<2){
    await act(`/quotes/${job.quotes.at(-1).id}/accept`,{method:'signed',evidence:'Native signed proposal '+i,schedule_choice:{kind:'none',reason:'Schedule recorded separately'}})
    await act('/schedules',{trade:'Framing',description:'Frame walls',start:`2026-10-${20+i}T08:00:00Z`,end:`2026-10-${20+i}T12:00:00Z`});const task=job.schedules.at(-1)

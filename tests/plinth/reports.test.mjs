@@ -304,11 +304,12 @@ test('Completed estimates reconcile source-linked productivity, native outcomes 
   assert.equal(b.estimated_cost_cents,7200);assert.equal(b.actual_cost_cents,9000);assert.equal(b.estimated_minutes,144);assert.equal(b.approved_minutes,180);assert.equal(b.installed_quantity,12);assert.equal(b.actual_units_per_hour,4)
   assert.equal(a.source.time_ids.length,1);assert.equal(a.source.production.length,1);assert.equal(a.source.actuals.reduce((n,e)=>n+e.amount_cents,0),6000);assert.equal(a.source.quote_id,c.jobs[0].job.quotes.at(-1).id)
   const unknown=first.rows.find(r=>r.cost_code==='06-200');assert.equal(unknown.installed_quantity,null);assert.equal(unknown.actual_units_per_hour,null);assert.equal(unknown.unknown,'Production denominator unknown')
-  assert.equal(report.estimators.length,1);assert.deepEqual(Object.fromEntries(['won','lost','open','win_rate'].map(k=>[k,report.estimators[0][k]])),{won:2,lost:1,open:1,win_rate:2/3})
+  assert.equal(report.estimators.length,2);const ownerOutcomes=report.estimators.find(e=>e.id===c.jobs[0].job.quotes.at(-1).prepared_by.id),otherOutcomes=report.estimators.find(e=>e.id===c.jobs[1].job.quotes.at(-1).prepared_by.id);assert.deepEqual(Object.fromEntries(['won','lost','open','win_rate'].map(k=>[k,ownerOutcomes[k]])),{won:1,lost:1,open:1,win_rate:0.5});assert.deepEqual(Object.fromEntries(['won','lost','open','win_rate'].map(k=>[k,otherOutcomes[k]])),{won:1,lost:0,open:0,win_rate:1})
   assert.equal(report.jobs.find(j=>j.id===c.jobs[2].job.id).sales.evidence,'Native client correspondence 2');assert.equal(first.sales.evidence,'Native signed proposal 0')
   assert.deepEqual(report.pipeline.find(p=>p.stage==='won'),{currency:'USD',stage:'won',count:2,amount_cents:29700})
   const open=c.jobs[3];for(const stage of ['qualified','estimating','negotiating','submitted','lost']){await open.report('sales',{quote_id:open.job.quotes.at(-1).id,stage,reason:'Reviewed pipeline stage '+stage,evidence:'Native correspondence '+stage,confirm:true});const current=await c.call('/reports/performance');assert.equal(current.jobs.find(j=>j.id===open.job.id).sales.stage,stage);assert.equal(current.pipeline.find(p=>p.stage===stage).count,stage==='lost'?2:1)}
   const stages=(await c.call('/reports/performance')).jobs.find(j=>j.id===open.job.id).sales.history;assert.deepEqual(stages.map(s=>s.stage),['submitted','qualified','estimating','negotiating','submitted','lost']);assert.equal(stages[0].evidence,'Native client correspondence 3')
+  const request={template_id:c.template.id,as_of:'2026-10-20',dimensions:{walls:'11'}},reprice=await open.act('/estimate-template/preview',request);await open.act('/estimate-template/apply',{...request,digest:reprice.preview.digest});const renewed=(await c.call('/reports/performance')).jobs.find(j=>j.id===open.job.id);assert.equal(renewed.sales.stage,'estimating');assert.equal(renewed.sales.evidence,null);assert.equal(renewed.sales.history.at(-1).stage,'lost')
   assert.equal((await f.json(`/api/plinth/reports/performance/jobs/${first.id}/sales`,{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[0].job.version,quote_id:c.jobs[0].job.quotes.at(-1).id,stage:'lost',reason:'Invalid downgrade',evidence:'invalid',confirm:true}})).status,409)
   const agent=await f.agent(),client=await f.invite(performanceAddress('performance-client'))
   for(const auth of [{},{token:agent},{cookie:client}])assert.ok([401,403].includes((await f.json('/api/plinth/reports/performance',auth)).status))
@@ -320,6 +321,15 @@ test('Completed estimates reconcile source-linked productivity, native outcomes 
   r=await f.json('/api/plinth/roles/'+role.id,{method:'PUT',cookie:f.owner,body:{expected_version:role.version,name:role.name,financial_visible:false}});assert.equal(r.status,200)
   assert.equal((await f.json('/api/plinth/reports/performance',{cookie:admin})).status,403)
   const publicJob=(await f.json('/api/plinth/jobs/'+first.id,{cookie:client})).value.job;assert.equal(publicJob.estimate_performance,undefined);assert.ok(!JSON.stringify(publicJob).includes('Reviewed finished job'))
+  const proposed=(await c.jobs[0].report('lessons',{catalog_id:c.assembly.id,catalog_version:1,source_job_ids:[first.id,second.id],reason:'Private comparison lesson',value:c.assembly.revisions[0].value})).record
+  r=await f.json('/api/plinth/roles/'+role.id,{method:'PUT',cookie:f.owner,body:{expected_version:2,name:role.name,financial_visible:true}});assert.equal(r.status,200)
+  const privateDownload=await f.json('/api/plinth/reports/performance/jobs/'+first.id,{cookie:admin});assert.equal(privateDownload.status,200);assert.deepEqual(privateDownload.value.performance.lessons,[])
+  const toErase=c.jobs[1].job;r=await f.json('/api/plinth/jobs/'+second.id,{method:'DELETE',cookie:f.owner,body:{expected_version:toErase.version}});assert.equal(r.status,200)
+  const erasedReport=await c.call('/reports/performance');assert.ok(!erasedReport.jobs.some(j=>j.id===second.id));assert.deepEqual(erasedReport.lessons,[])
+  const replay=await f.json(`/api/plinth/reports/performance/jobs/${first.id}/lessons/${proposed.id}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[0].job.version,confirm:true}});assert.equal(replay.status,404)
+  assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id).version,1)
+  const credentials=(await c.call('/agent-credentials')).credentials;assert.equal(credentials.length,1);await c.call(`/agent-credentials/${credentials[0].id}/revoke`,{});assert.equal((await f.json('/api/plinth/reports/performance',{token:agent})).status,401)
+
   assert.equal((await f.json('/api/plinth/reports/performance/jobs/'+c.jobs[3].job.id+'/complete',{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[3].job.version,completed_on:'2026-10-23',evidence:'No actual completion',confirm:true}})).status,409)
  }finally{await f.close()}
 })

@@ -332,7 +332,7 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   const approve=(body,cookie=f.owner)=>f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${lesson.id}/approve`,{method:'POST',cookie,body:{expected_version:first.job.version,...body}})
   assert.equal((await approve({confirm:false})).status,400)
   const agent=await f.agent();assert.equal((await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons`,{method:'POST',token:agent,body:{expected_version:first.job.version,...input}})).status,403)
-  const approved=await approve({confirm:true});assert.equal(approved.status,200,JSON.stringify(approved.value));await first.read()
+  const decisions=await Promise.all([approve({confirm:true}),approve({confirm:true})]);assert.deepEqual(decisions.map(r=>r.status).sort(),[200,409]);const approved=decisions.find(r=>r.status===200);assert.equal(approved.status,200,JSON.stringify(approved.value));await first.read()
   assert.equal(approved.value.record.approved.catalog_version,2);assert.equal((await approve({confirm:true})).status,409)
   const catalog=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id);assert.equal(catalog.revisions.length,2);assert.equal(catalog.revisions[0].value.parts[0].productivity,'5');assert.equal(catalog.revisions[1].value.parts[0].productivity,'4')
   assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
@@ -348,7 +348,10 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.template.id).version,1)
   const fresh=(await first.report('lessons',{catalog_id:c.template.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Reviewed current completed source jobs',value:templateValue})).record
   const confirmed=await first.report(`lessons/${fresh.id}/approve`,{confirm:true});assert.equal(confirmed.record.approved.catalog_version,2)
+  const revisedTemplate=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.template.id);assert.equal(revisedTemplate.revisions[1].value.dimensions.walls,'14');assert.equal(revisedTemplate.revisions[0].value.dimensions.walls,'10')
+  const defaultPreview=await newer.act('/estimate-template/preview',{template_id:c.template.id,as_of:'2026-10-20'});assert.equal(defaultPreview.preview.proposal.cost_total_cents,11900)
   assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
   const audit=(await c.call(`/audit?job_id=${first.job.id}&q=estimate.performance.lessons.approve`)).events;assert.equal(audit.length,2);assert.ok(audit.every(e=>e.actor_role==='owner'&&e.subject_kind==='estimate_performance'));assert.ok(audit.some(e=>e.subject_id===lesson.id))
+  const pending=(await first.report('lessons',{...input,catalog_version:2,reason:'Pending lesson awaiting a current catalog review'})).record;await c.call('/estimate-catalog/'+c.assembly.id,{expected_version:2,name:c.assembly.name,reason:'Separately reviewed catalog change',value:{...definition,parts:definition.parts.map((p,i)=>i===0?{...p,productivity:'3'}:p)}});const rejected=await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${pending.id}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:first.job.version,confirm:true}});assert.equal(rejected.status,409);assert.equal(rejected.value.error,'stale_catalog');assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id).version,3)
  }finally{await f.close()}
 })
