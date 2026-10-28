@@ -3401,7 +3401,7 @@
       "executable": false
     },
     "src/plinth/cost-http.ts": {
-      "sha256": "cc37586cbd70abe33d2ea6c5cfc6843806ce6ca8b205641ff44279d79c2e25ab",
+      "sha256": "e340ca7ecc1c442420d67795ad1872595f53f7af9b22b904d9fe53351c83c2eb",
       "executable": false
     },
     "src/plinth/cost-labor.ts": {
@@ -3409,7 +3409,7 @@
       "executable": false
     },
     "src/plinth/cost-ledger.ts": {
-      "sha256": "4fd07300341d044482d1689a9f9d20afe3aeb2c0ed5081a3b479ad746ced8d96",
+      "sha256": "3d27e1f6532d0091d2484132e67ae07e20d197a59528c63f87c22d27b4741391",
       "executable": false
     },
     "src/plinth/cost-model.ts": {
@@ -3417,7 +3417,7 @@
       "executable": false
     },
     "src/plinth/cost-periods.ts": {
-      "sha256": "e749b337a6961fc09606fda57632f89212c9e556a503b06f1e56f37b592c2a13",
+      "sha256": "7fefd423c80be4f7cda11aadc01bed67af1c0e60b72470002b6b4efcf559d2de",
       "executable": false
     },
     "src/plinth/cost-transfer.ts": {
@@ -3666,6 +3666,10 @@
     },
     "src/plinth/model.ts": {
       "sha256": "b2e82be6014b3640005b72ebbfb7080122a72f34a3b6d38ccb7c1e5315a6e9ac",
+      "executable": false
+    },
+    "src/plinth/opening-export.ts": {
+      "sha256": "4d34a9ea8307d2635994644c0cf7d295b6a989ff6312e939baa5a87198aea53f",
       "executable": false
     },
     "src/plinth/operations.ts": {
@@ -4165,7 +4169,7 @@
       "executable": false
     },
     "src/plinth/workbook-opening.ts": {
-      "sha256": "106b86e84833a508af791ac90247fc093b4fe9b6098fd52684c9f2821dc44984",
+      "sha256": "acdbd74556e44b38e2c42e7ee53e12d4ee1c45409c4bae6dc1928b778b2250ad",
       "executable": false
     },
     "src/plinth/workbook-xls.ts": {
@@ -5433,7 +5437,7 @@
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
-      "sha256": "f30b298f28a0d5c37909f435ccc59a088ae84ebc0ca890e39f4b28d143d9c9e6",
+      "sha256": "6e269b8a6912c855c2932f898f107e46d8d915f7435e0aea79e023eb9cb082c0",
       "executable": false
     },
     "tests/plinth/payment-fixture.mjs": {
@@ -5449,7 +5453,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "09064729e88e39d2ba53453d2d694c037c761991b05a1ac4784594739aca30e5",
+      "sha256": "8284b05c5e8747e5260bf6566dabf0047c282306ffc6b8605cd2831539b315c7",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

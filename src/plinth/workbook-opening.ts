@@ -11,7 +11,7 @@ import {reconcile} from './claims'
 import {sourceTax,share} from './invoice-pricing'
 import {lienPacket} from './lien-waiver-model'
 import {costWorkbookDigest} from './workbook-costs'
-export interface OpeningBalance {id:string;as_of:string;source_sha256:string;ledger_sha256:string;reviewed_by:Stamp;rows:OpeningRow[];provenance:unknown;ledger_provenance:unknown}
+export interface OpeningBalance {id:string;as_of:string;posting_period:string;source_sha256:string;ledger_sha256:string;reviewed_by:Stamp;rows:OpeningRow[];provenance:unknown;ledger_provenance:unknown}
 const mime=(name:string)=>/\.xls$/i.test(name)?'application/vnd.ms-excel':/\.xlsx$/i.test(name)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/csv'
 export async function openingWorkbook(book:Workbook,input:Record<string,unknown>,previous:Job,actor:Actor){
  active(previous);usdOnly(previous);need(input.expected_version===previous.version,'Job changed; preview opening balances again',409,'stale_version')
@@ -44,15 +44,16 @@ export async function openingWorkbook(book:Workbook,input:Record<string,unknown>
    need(row.retainage_cents<=Math.max(0,row.actual_cents),'Supplier retainage exceeds its opening actual cost')
    if(row.actual_cents)state.entries.push({id:id+'-actual-'+sha256(row.native_line_id).slice(0,12),source_id:id,source_line_id:row.id,source_kind:'opening',cost_code:row.cost_code,amount_cents:cents(row.actual_cents,'Opening actual',true),dated_on:as_of,period:posting_period,matches:[],by})
   }
-  state.opening={id,as_of,source_sha256:book.hash,ledger_sha256:ledger.hash,reviewed_by:by,rows:source.rows,provenance:source.provenance,ledger_provenance:comparison.provenance}
+  state.opening={id,as_of,posting_period,source_sha256:book.hash,ledger_sha256:ledger.hash,reviewed_by:by,rows:source.rows,provenance:source.provenance,ledger_provenance:comparison.provenance}
   if(app){app.prepared_by=by;const claim:Claim={id:'opening-progress-'+sha256(id).slice(0,32),description:'Owner-reviewed historical opening progress',cumulative_cents:gross,status:'exported',prepared_by:by,approved_by:by,exported_by:by,sov:app,reconciliation:reconcile(job,gross),imported_opening:{id,source_sha256:book.hash,ledger_sha256:ledger.hash,as_of}}
-   claim.export={format:'plinth-progress-claim-v1',purpose:'Reviewed historical opening position from supplied records. Not a new invoice or payment request.',job_id:job.id,job_name:job.name,claim_id:claim.id,description:claim.description,reconciliation:structuredClone(claim.reconciliation),approved_by:by,lien_waivers:lienPacket(job.subcontracts??[],as_of),sov:structuredClone(app)};job.claims.push(claim)
+   claim.export={format:'plinth-progress-claim-v1',purpose:'Reviewed historical opening position from supplied records. Not a new invoice or payment request.',job_id:job.id,job_name:job.name,claim_id:claim.id,description:claim.description,reconciliation:structuredClone(claim.reconciliation),approved_by:by,lien_waivers:lienPacket(job.subcontracts??[],as_of),sov:structuredClone(app)};job.claims.push(claim);(state.finance_periods??={})[claim.id]=posting_period
   }
   const original=await document({name:book.name,mime:mime(book.name),base64:book.base64})
   ;(state.workbook_imports??=[]).push({id,before_version:previous.version,before_job_json:canonicalJson(previous as unknown as Json),input_digest:costWorkbookDigest(input),document:original,mapping:source.mapping,provenance:source.provenance,source_ids:[],bill_ids:[]})
   job.approvals.push({id:id+'-approval',kind:'move.opening.adopt',subject_id:id,revision:1,prepared_by:by,approved_by:by,decision:'approved',snapshot:{as_of,source_sha256:book.hash,ledger_sha256:ledger.hash,totals,rows:source.rows}})
   job.version=previous.version+1
  }
+ need(canonicalJson(job as unknown as Json).length<=8_000_000,'Imported opening history is too large')
  const payload={draft,target_job:job,expected_version:previous.version} as unknown as Json
  const bundle:SourceBundle={diagnostics:[],artifacts:[book,ledger].map(b=>({name:b.name,sha256:b.hash,size:b.size,original:{status:'available',base64:b.base64}})),records:[{namespace:'accepted-jobs-csv',kind:'cost-workbook',sourceId:'opening:'+book.hash+':'+ledger.hash+':'+previous.id,payload,payloadHash:sha256(canonicalJson(payload)),artifactHash:book.hash,location:{artifact:book.name,pointer:String(source.mapping.sheet)}},{namespace:'accepted-jobs-csv',kind:'opening-ledger',sourceId:'opening-ledger:'+ledger.hash+':'+previous.id,payload:{target_job:{id:previous.id},rows:comparison.rows,provenance:comparison.provenance} as unknown as Json,payloadHash:sha256(canonicalJson({target_job:{id:previous.id},rows:comparison.rows,provenance:comparison.provenance} as unknown as Json)),artifactHash:ledger.hash,location:{artifact:ledger.name,pointer:String(comparison.mapping.sheet)}}]}
  return {draft,source:bundle,canAdopt:source.rows.length>0&&diagnostics.every(d=>d.resolved)}
