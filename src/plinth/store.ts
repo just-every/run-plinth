@@ -15,3 +15,14 @@ export async function transaction(db:D1Database,actor:Actor,job:Job|null,writes:
 export async function insertJob(db:D1Database,actor:Actor,job:Job,clock?:number){const data=JSON.stringify(job);await transaction(db,actor,null,[db.prepare('INSERT INTO pl_jobs(id,version,data) VALUES(?,?,?)').bind(job.id,job.version,data)],clock,{job_id:job.id,version_after:job.version,after_ref:await jobRef(data)});return job}
 export async function saveJob(db:D1Database,actor:Actor,previous:Job,next:Job,writes:D1PreparedStatement[]=[],clock?:number){next.version=previous.version+1;const data=JSON.stringify(next);need(data.length<=8_000_000,'Job history is too large');await transaction(db,actor,previous,[db.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(next.version,data,next.id,previous.version),...writes,...connectorEvents(db,actor,next)],clock,{job_id:next.id,version_before:previous.version,version_after:next.version,before_ref:await jobRef(JSON.stringify(previous)),after_ref:await jobRef(data)});return next}
 export async function readClock(db:D1Database){return (await db.prepare('SELECT version FROM pl_clock WHERE id=1').first<{version:number}>())!.version}
+
+/** Inventory custody changes both jobs under the same current authority and global write fence. */
+export async function saveJobs(db:D1Database,actor:Actor,changes:{previous:Job;next:Job}[],clock:number){
+ need(new Set(changes.map(c=>c.previous.id)).size===changes.length,'A transaction names each job once')
+ const writes:D1PreparedStatement[]=[]
+ for(const {previous,next} of changes){
+  next.version=previous.version+1;const data=JSON.stringify(next);need(data.length<=8_000_000,'Job history is too large')
+  writes.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(previous.id,previous.version),db.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(next.version,data,next.id,previous.version),auditStatement(db,actor,{job_id:next.id,version_before:previous.version,version_after:next.version,before_ref:await jobRef(JSON.stringify(previous)),after_ref:await jobRef(data)}),...connectorEvents(db,actor,next))
+ }
+ await transaction(db,actor,null,writes,clock,{action:'inventory.transfer'})
+}

@@ -1,3 +1,4 @@
+import { inventoryResponse } from './site-inventory-http'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
 import { satisfactionResponse } from './satisfaction'
@@ -103,7 +104,7 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,site_inventory:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -116,6 +117,7 @@ function display(job:Job,actor:Actor):any {
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
 async function handle(request:Request,original:Bindings):Promise<Response>{const env=runtimeBindings(original),actor=await authorize(request,env),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
+ const stock=await inventoryResponse(request,env,body);if(stock)return stock
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned
  const connections=await connectorsResponse(request,env,actor,parts,body);if(connections)return connections
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}

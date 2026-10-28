@@ -2,6 +2,40 @@ import { submittalFixture } from './submittal-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createFixture } from './helpers.mjs'
+import { inventoryFixture, ticket } from './inventory-support.mjs'
+
+test('FIELD-005 — delivery originals, segregated damage, atomic authorized transfers, installation, supplier returns and equipment dates preserve PO economics',async()=>{
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')});try{
+  const c=await inventoryFixture(f),agent=await f.agent(),client=await f.invite('client@dev.localhost'),manager=await f.invite('synthetic-plinth-manager@dev.localhost','Synthetic manager','admin')
+  const original=(await c.api(`/jobs/${c.source.job.id}/orders/${c.order.id}/document`)).value
+  let r=await c.act('receive',c.receive);assert.equal(r.status,200,JSON.stringify(r.value));const receipt=r.value.record,lot=r.value.lots[0]
+  assert.deepEqual([lot.received_quantity,lot.good_quantity,lot.damaged_quantity,lot.good_cents,lot.damaged_cents,lot.location,lot.cost_code],['5','4','1',40000,10000,'North covered rack','06-100'])
+  assert.equal(r.value.claims.length,1);assert.deepEqual([r.value.claims[0].damaged,r.value.claims[0].short,r.value.claims[0].exposure_cents],['1','1',20000]);assert.equal(r.value.claims[0].review,undefined)
+  const bytes=await f.request(`/api/plinth/jobs/${c.source.job.id}/inventory/tickets/${receipt.id}`,{cookie:f.owner});assert.equal(bytes.status,200);assert.equal(Buffer.from(await bytes.arrayBuffer()).toString('base64'),ticket.base64);assert.equal(bytes.headers.get('x-content-sha256'),r.value.tickets[0].document.checksum)
+  const team=(await c.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@dev.localhost')
+  assert.equal((await f.json(`/api/plinth/team/${team.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[c.source.job.id],po_limit_cents:100000}})).status,200)
+  const transfer={lot_id:lot.id,quantity:'2',dated_on:'2026-10-28',reference:'Synthetic stock transfer',target_job_id:c.target.job.id,target_version:c.target.job.version,cost_code:'06-100',location:'South locked rack'}
+  const before=(await c.read()).value,targetBefore=(await c.read(c.target.job.id)).value
+  for(const options of [{...transfer,quantity:'5'},{...transfer,condition:'damaged'},{...transfer,target_version:c.target.job.version-1}])assert.equal((await c.act('transfer',options)).status,409)
+  assert.equal((await c.act('transfer',transfer,manager)).status,404,'An assigned manager needs both jobs')
+  for(const [cookie,token]of [[client,undefined],[f.owner,agent]])assert.equal((await c.act('transfer',transfer,cookie,token)).status,403)
+  assert.deepEqual((await c.read()).value,before);assert.deepEqual((await c.read(c.target.job.id)).value,targetBefore,'Refused transfers write neither side')
+  r=await c.act('transfer',transfer);assert.equal(r.status,200,JSON.stringify(r.value));const incoming=r.value.record
+  assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].transferred_quantity,r.value.lots[0].good_cents],['2','2',20000]);const destination=(await c.read(c.target.job.id)).value
+  assert.deepEqual([destination.lots[0].good_quantity,destination.lots[0].location,destination.lots[0].good_cents],['2','South locked rack',20000]);assert.equal(destination.movements[0].transfer_id,r.value.movements.at(-1).transfer_id)
+  const installBody={expected_version:destination.version,operation_id:'synthetic-plinth-install',lot_id:incoming.id,quantity:'1.5',dated_on:'2026-10-29',reference:'Synthetic installation record'}
+  r=await c.api(`/jobs/${c.target.job.id}/inventory/install`,installBody);assert.equal(r.status,200);assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].installed_quantity,r.value.lots[0].good_cents,r.value.movements.at(-1).amount_cents],['0.5','1.5',5000,15000]);assert.equal((await c.api(`/jobs/${c.target.job.id}/inventory/install`,{...installBody,expected_version:r.value.version})).value.error,'inventory_replay')
+  assert.equal((await c.act('install',{lot_id:lot.id,quantity:'1',condition:'damaged',dated_on:'2026-10-28',reference:'Unsafe damage installation'})).value.error,'damaged_stock')
+  r=await c.act('return',{lot_id:lot.id,quantity:'1',condition:'damaged',dated_on:'2026-10-28',reference:'Synthetic damage return'});assert.equal(r.status,200,JSON.stringify(r.value));assert.deepEqual([r.value.lots[0].damaged_quantity,r.value.lots[0].returned_quantity,r.value.orders[0].received_cents,r.value.orders[0].returned_cents,r.value.orders[0].outstanding_cents],['0','1',40000,10000,60000])
+  assert.deepEqual((await c.api(`/jobs/${c.source.job.id}/orders/${c.order.id}/document`)).value,original,'Custody never rewrites the issued PO')
+  r=await c.act('equipment',{equipment:'Synthetic lift',location:'North slab',cost_code:'06-100',from:'2026-10-28',through:'2026-10-30',reference:'Synthetic dated allocation'});assert.equal(r.status,200);assert.deepEqual([r.value.equipment[0].from,r.value.equipment[0].through],['2026-10-28','2026-10-30'])
+  const current=(await c.read(c.target.job.id)).value
+  assert.equal((await c.api(`/jobs/${c.target.job.id}/inventory/equipment`,{expected_version:current.version,operation_id:'synthetic-plinth-conflict',equipment:'Synthetic lift',location:'South slab',cost_code:'06-100',from:'2026-10-30',through:'2026-11-01',reference:'Overlapping date'})).value.error,'equipment_conflict')
+  for(const path of [`/jobs/${c.source.job.id}/inventory`,`/jobs/${c.source.job.id}/inventory/tickets/${receipt.id}`])assert.equal((await f.request('/api/plinth'+path,{cookie:client})).status,403)
+  const projection=(await c.api(`/jobs/${c.source.job.id}`,undefined,client)).value;assert.ok(!JSON.stringify(projection).includes('North covered rack'));assert.equal(projection.job.site_inventory,undefined)
+  const generic=(await c.api(`/jobs/${c.source.job.id}`)).value.job;assert.ok(generic.approvals.some(a=>a.kind==='inventory.transfer-out'&&a.approved_by.role==='owner'))
+ }finally{await f.close()}
+})
 
 test('SUB-005 — itemized cost-coded vendor PO from the budget: acknowledgment, changed promise, shipment, partial receipt, damage return, reviewed amendment, cancellation and reconciliation', async () => {
  const f = await createFixture()

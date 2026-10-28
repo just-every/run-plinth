@@ -6,7 +6,7 @@ const headers = { 'cache-control': 'private, no-store', 'x-content-type-options'
 const issued = (job: Job, id: string) => { const row = find(job.orders, id); need(row.status === 'issued', 'Only an issued, open PO records fulfillment', 409, 'order_state'); return row }
 const log = (job: Job, actor: Actor, kind: string, row: Order, snapshot: unknown) => recordApproval(job, actor, `purchase_order.${kind}`, { id: row.id, prepared_by: row.prepared_by }, snapshot)
 /** Staff record what the vendor said or did, with its source; Plinth never claims it contacted the vendor. */
-export function orderAction(job: Job, actor: Actor, id: string, action: string, input: Input): Order {
+export function orderAction(job: Job, actor: Actor, id: string, action: string, input: Input, inventoryReturn = false): Order {
  requireJobManager(actor, action === 'amend')
  const row = action === 'cancel' ? find(job.orders, id) : issued(job, id)
  switch (action) {
@@ -22,6 +22,7 @@ export function orderAction(job: Job, actor: Actor, id: string, action: string, 
    ;(row.shipments ??= []).push(shipment); log(job, actor, 'ship', row, shipment); break
   }
   case 'return': {
+   need(inventoryReturn || !job.site_inventory?.lots.some(l=>l.order_id===row.id), 'Use the inventory return door for located stock',409,'inventory_return')
    const quantities = lineQuantities(row, input.lines, 'return'), back = { id: crypto.randomUUID(), ...quantities, reason: text(input.reason, 'return reason', 1000), reference: text(input.reference, 'return reference', 300), recorded_by: stamp(actor) }
    ;(row.returns ??= []).push(back); log(job, actor, 'return', row, back); break
   }
