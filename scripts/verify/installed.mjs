@@ -11,7 +11,7 @@ import { nativeSignIn } from './native-signin.mjs'
 import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
-assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name), 'Choose an installed product journey')
+assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards', 'office', 'workbook-import'].includes(name), 'Choose an installed product journey')
 assert.equal(process.env.HOME, userInfo().homedir, 'Browser-driving Node uses the real account HOME')
 const shots = resolve(process.env.PLINTH_SCREENSHOTS_ROOT ?? 'artifacts/installed', name)
 await mkdir(shots, { recursive: true })
@@ -22,7 +22,7 @@ const stop = () => signal('SIGTERM')
 process.once('SIGTERM', stop); process.once('SIGINT', stop)
 try {
  provider = await providerEdge()
- worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
+ worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules', 'signed-changes', 'room-boards', 'office', 'workbook-import'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
  if (name === 'office') {
   const root = resolve('./dist/site')
   site = createServer(async (request, response) => {

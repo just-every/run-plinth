@@ -1,3 +1,4 @@
+import { workbookInput } from '../fixtures/workbook-estimate.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
 import { stripeEdge, intent } from './payment-fixture.mjs'
@@ -93,6 +94,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const csv=await readFile(new URL('../fixtures/import-accepted-jobs.csv',import.meta.url),'utf8')
     const preview=await f.json('/api/plinth/imports/preview',{method:'POST',cookie:f.owner,body:{csv}});assert.equal(preview.status,200)
     r=await f.json('/api/plinth/imports/commit',{method:'POST',cookie:f.owner,body:{csv,fingerprint:preview.value.fingerprint}});assert.equal(r.status,200)
+    const workbook=await workbookInput({tag:'synthetic-plinth-archive'}),workbookReview=await f.json('/api/plinth/imports/workbook/preview',{method:'POST',cookie:f.owner,body:workbook});assert.equal(workbookReview.status,200)
+    const workbookCommit=await f.json('/api/plinth/imports/workbook/commit',{method:'POST',cookie:f.owner,body:{...workbook,fingerprint:workbookReview.value.fingerprint}});assert.equal(workbookCommit.status,200,JSON.stringify(workbookCommit.value))
+    const workbookJob=(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs.find(j=>j.import_evidence?.artifact_sha256===workbookReview.value.draft.artifact_sha256)
+    assert.equal(workbookJob.quotes[0].total_cents,669);assert.equal(workbookJob.quotes[0].cost_total_cents,449)
     r=await f.json(`/api/plinth/jobs/${job.id}/calendar`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,action:'rotate'}});assert.equal(r.status,200);const feedPath=r.value.urlPath
     const catalog=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'rate',name:'Archive wallboard rate',reason:'Reviewed vendor quote',value:{vendor:'Cascade Supply',effective_on:'2026-10-01',unit:'square feet',cost_cents:125,sell_cents:200,reference:'CS-1042'}}});assert.equal(catalog.status,201)
     const taxRate=await f.json('/api/plinth/pricing-rates',{method:'POST',cookie:f.owner,body:{effective_on:'2026-10-01',jurisdiction:'Synthetic archive jurisdiction',kind:'sales',percent:'7.5',reference:'Reviewed archive fixture rate schedule',human_reviewed:true}});assert.equal(taxRate.status,201)
@@ -241,7 +246,11 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       assert.deepEqual(Object.keys(field.location_choices[0]).sort(),['by','consent','employee_id','inside','reminder'])
     }
     const receiver=await createFixture({persistTo:destination,ownerCookie:cookie})
-    try{const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
+    const signIn=await receiver.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@'),returnTo:'/app'}});assert.equal(signIn.status,202)
+    const confirmationUrl=receiver.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).map(value=>new URL(value)).find(url=>url.pathname==='/auth/confirm')
+    const confirmation=await receiver.request('/auth/confirm',{method:'POST',body:{token:confirmationUrl.searchParams.get('token')}});assert.equal(confirmation.status,303)
+    const restoredOwner=confirmation.headers.get('set-cookie').split(';')[0];receiver.messages.length=0
+    try{const recoveredWorkbook=await receiver.json('/api/plinth/jobs/'+workbookJob.id,{cookie:restoredOwner});assert.equal(recoveredWorkbook.status,200);assert.deepEqual(recoveredWorkbook.value.job.quotes,workbookJob.quotes);assert.deepEqual(recoveredWorkbook.value.job.import_evidence,workbookJob.import_evidence);const retained=await receiver.json('/api/plinth/imports/'+workbookCommit.value.job.id+'/originals',{cookie:restoredOwner});assert.equal(retained.status,200);assert.equal(retained.value.originals[0].original.base64,workbook.base64);const outcome=await (await receiver.mf.getWorker()).scheduled({scheduledTime:new Date('2031-01-31T10:00:00Z'),cron:'0 * * * *'});assert.equal(outcome.outcome,'ok');assert.equal(receiver.messages.length,0,'AUTO-002 / CARE-003 restored pending reminders remain inert until an office person reconfirms the agreement under receiving authority')}finally{await receiver.close()}
     for(const exported of [original,restored]){
       for(const value of ['synthetic-plinth-private-path','synthetic-plinth-private-query'])assert.ok(!JSON.stringify(exported).includes(value),'OPS-002 endpoint paths and query credentials never enter a recovery archive')
       assert.deepEqual(rows(exported).find(item=>item.table==='pl_connector_bindings'&&item.row.id===connector.value.subscription.id).row,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:JSON.stringify([job.id]),event_types:JSON.stringify(['job.updated']),revoked_at:null},'OPS-002 inert connector scope survives private CLI recovery')

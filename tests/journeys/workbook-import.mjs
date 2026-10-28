@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict'
+import {mkdir} from 'node:fs/promises'
+import {chromium,expect} from '@playwright/test'
+import {workbookInput} from '../fixtures/workbook-estimate.mjs'
+const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS,state=process.env.PLINTH_STATE
+assert.ok(base&&shots&&state,'Use the installed application with native sign-in')
+await mkdir(shots,{recursive:true})
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLINTH_CHROMIUM_PATH,args:['--use-mock-keychain','--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])]})
+try{
+ const owner=await browser.newContext({storageState:state}),page=await owner.newPage()
+ const call=async(path,body,method=body===undefined?'GET':'POST')=>{const r=await owner.request.fetch(base+'/api/plinth'+path,{method,headers:{origin:base},...(body===undefined?{}:{data:body})});return{status:r.status(),value:await r.json()}}
+ // Existing accepted economics must remain unchanged while the workbook becomes an independent draft.
+ let prior=await call('/jobs',{name:'Synthetic accepted economics',client_email:['prior','dev.localhost'].join('@')});assert.equal(prior.status,201)
+ let job=prior.value.job
+ const post=async(path,body)=>{const r=await call(`/jobs/${job.id}${path}`,{expected_version:job.version,...body});assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job}
+ await post('/quotes',{lines:[{description:'Signed existing contract',quantity:'1',unit_cents:120000}]})
+ await post(`/quotes/${job.quotes[0].id}/accept`,{method:'signed',evidence:'Synthetic signed contract',schedule_choice:{kind:'none',reason:'Plan separately'}})
+ const economics=structuredClone({quotes:job.quotes,budgets:job.budgets,sov:job.sov})
+ const input=await workbookInput()
+ await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/app')
+ await page.getByRole('button',{name:'Move in',exact:true}).click()
+ const surface=page.getByRole('region',{name:'Coded estimate workbook'})
+ await surface.getByLabel('Estimate workbook',{exact:true}).setInputFiles({name:input.name,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(input.base64,'base64')})
+ const inspection=page.waitForResponse(r=>r.url().endsWith('/imports/workbook/inspect'),{timeout:10000})
+ await surface.getByRole('button',{name:'Inspect workbook',exact:true}).click()
+ const inspected=await inspection;assert.equal(inspected.status(),200,JSON.stringify(await inspected.json()))
+ await expect(surface.getByRole('combobox',{name:'Worksheet',exact:true})).toBeVisible()
+ assert.equal(await surface.getByRole('combobox',{name:'Worksheet',exact:true}).locator('option').count(),2)
+ await surface.getByLabel('Imported estimate title',{exact:true}).fill(input.title)
+ await surface.getByLabel('Draft client email',{exact:true}).fill(input.client_email)
+ await surface.getByLabel('Draft site address',{exact:true}).fill(input.address)
+ await surface.getByLabel('Code mappings',{exact:true}).fill('FRAME=06-100\nBOARD=09-200')
+ await surface.getByLabel('Unit mappings',{exact:true}).fill('feet=ft\nsheets=sheet')
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('Review the cached formula values before adopting',{exact:false})).toBeVisible()
+ await expect(surface.getByRole('button',{name:'Adopt coded draft once',exact:true})).toHaveCount(0)
+ await surface.getByRole('combobox',{name:'Duplicate rows',exact:true}).selectOption('skip-identical')
+ await surface.getByLabel('Excluded rows and reasons',{exact:true}).fill('5=Invalid source code held for correction')
+ await surface.getByRole('checkbox',{name:'I reviewed the cached formula values',exact:false}).check()
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('2 coded lines · Selling $6.69 · Cost $4.49',{exact:true})).toBeVisible()
+ await expect(surface.getByText('Source rows before omissions: Selling $14.22 · Cost $9.47',{exact:true})).toBeVisible()
+ await surface.getByText('Source cell provenance',{exact:true}).click()
+ await expect(surface.getByText('Quantity · Estimate!F3 · 1.25 · Cached formula: 5/4',{exact:true})).toBeVisible()
+ // Assert behaviour once; capture the same changed screens at both release widths.
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000})
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal page overflow')
+  if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
+  await page.screenshot({path:`${shots}/workbook-preview-${width}.png`,fullPage:true,animations:'disabled'})
+ }
+ await page.setViewportSize({width:1440,height:1000})
+ // Editing the mapping removes the old approval; the public door also refuses the stale digest.
+ const reviewed=await call('/imports/workbook/preview',input);assert.equal(reviewed.status,200)
+ await surface.getByRole('combobox',{name:'Currency',exact:true}).selectOption('AUD')
+ await expect(surface.getByText('2 coded lines · Selling $6.69 · Cost $4.49',{exact:true})).toHaveCount(0)
+ assert.equal((await call('/imports/workbook/commit',{...input,mapping:{...input.mapping,currency:'AUD'},fingerprint:reviewed.value.fingerprint})).status,409)
+ await surface.getByRole('combobox',{name:'Currency',exact:true}).selectOption('USD')
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await surface.getByRole('checkbox',{name:'Approve this exact file, mapping and row resolution',exact:true}).check()
+ await surface.getByRole('button',{name:'Adopt coded draft once',exact:true}).click()
+ await expect(surface.getByText('Coded estimate imported as a draft.',{exact:false})).toBeVisible()
+ const jobs=(await call('/jobs')).value.jobs,imported=jobs.find(j=>j.name===input.title),quote=imported.quotes[0]
+ assert.equal(imported.status,'quoting');assert.equal(quote.status,'draft');assert.equal(quote.total_cents,669);assert.equal(quote.cost_total_cents,449)
+ const exported=await call(`/jobs/${imported.id}/quotes/${quote.id}/cost-codes.json`);assert.equal(exported.status,200)
+ assert.equal(exported.value.total_cents,669);assert.equal(exported.value.cost_total_cents,449)
+ const csv=await owner.request.get(base+`/api/plinth/jobs/${imported.id}/quotes/${quote.id}/cost-codes.csv`);assert.equal(csv.status(),200)
+ const table=(await csv.text()).trim().split('\r\n').map(row=>[...row.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g)].map(m=>m[1].replaceAll('""','"'))),[headers,...rows]=table,records=rows.map(row=>Object.fromEntries(headers.map((h,i)=>[h,row[i]]))),details=records.filter(r=>r.row_type==='line')
+ assert.deepEqual(details.map(r=>r.quantity),['2.5','1.25']);assert.equal(details.reduce((sum,r)=>sum+Number(r.total_cents),0),669);assert.equal(details.reduce((sum,r)=>sum+Number(r.cost_total_cents),0),449)
+ const download=page.waitForEvent('download');await surface.getByRole('button',{name:'Download retained original',exact:true}).click();const file=await download,stream=await file.createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString('base64'),input.base64)
+ const replay=await call('/imports/workbook/commit',{...input,fingerprint:reviewed.value.fingerprint});assert.equal(replay.status,200);assert.equal((await call('/jobs')).value.jobs.length,jobs.length)
+ const unchanged=(await call('/jobs/'+job.id)).value.job;assert.deepEqual({quotes:unchanged.quotes,budgets:unchanged.budgets,sov:unchanged.sov},economics)
+ for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`${shots}/workbook-adopted-${width}.png`,fullPage:true,animations:'disabled'})}
+ await owner.close()
+ console.log('Workbook import PASS: native upload, two sheets, coded fractional preview and exports, cache review and invalid-row resolution, stale mapping refusal, exact originals, replay and unchanged accepted economics; screens 1440 and 390')
+}finally{await browser.close()}

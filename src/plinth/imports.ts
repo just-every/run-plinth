@@ -9,6 +9,7 @@ import { DomainError, need } from './model.ts'
 import { acceptedJobsSource, IMPORT_LIMITS } from './import-source.ts'
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
+import { readWorkbook, workbookInspection, workbookSource } from './workbook-import.ts'
 import { auditStatement } from './audit.ts'
 
 const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
@@ -69,6 +70,20 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
     requireOwner(actor)
     const context = importContext(env.DB, actor)
     const route = path.slice('/api/plinth/imports'.length)
+    if (request.method === 'POST' && ['/workbook/inspect','/workbook/preview','/workbook/commit'].includes(route)) {
+      const input = await body(request), book = await readWorkbook(input)
+      if (route === '/workbook/inspect') return respond(workbookInspection(book))
+      const { source, draft, canAdopt } = workbookSource(book,input)
+      const plan = await planD1Import(source,acceptedJobsMapping(actor),context)
+      if (route === '/workbook/preview') return respond({draft,canAdopt,fingerprint:plan.fingerprint,source:workbookInspection(book)})
+      need(input.fingerprint === plan.fingerprint, 'The workbook or mapping changed. Preview and approve again.',409,'REVIEW_FINGERPRINT_MISMATCH')
+      need(canAdopt,'Resolve every rejected row or explicitly exclude it with a reason before adoption',409,'workbook_diagnostics')
+      const approved = {...context,reviewedFingerprint:plan.fingerprint,operationKey:`workbook:${book.hash}`}
+      const created = await createD1ImportJob(plan,approved)
+      const job = created.state === 'queued' || created.state === 'applying' ? await applyD1ImportBatches(created.id,approved) : created
+      await env.DB.batch([auditStatement(env.DB,actor,{detail:{job_id:job.id,fingerprint:plan.fingerprint}})])
+      return respond({job})
+    }
     if (request.method === 'GET' && (route === '' || route === '/')) return respond({ jobs: await journal(context) })
     if (request.method === 'GET' && route === '/erasure-journal') return respond({ entries: await readD1ErasureJournal(context) })
     if (request.method === 'POST' && (route === '/preview' || route === '/commit')) {
