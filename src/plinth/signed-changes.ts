@@ -46,6 +46,7 @@ function shift(value: string, days: number, zone: string) {
 }
 export async function prepareSignedChange(db: D1Database, job: Job, actor: Actor, input: Input, all: Job[]) {
  changeOffice(actor);active(job);usdOnly(job)
+ need(!job.schedules.some(t=>t.status==='draft'),'Review and publish existing draft tasks before presenting a signed change',409,'change_schedule')
  const v=find(job.variations,text(input.variation_id,'Reviewed priced change',100))
  need(v.status==='draft'&&v.pricing?.approved_by&&v.pricing.tax.rate.human_reviewed&&v.pricing.tax.rate.approved_by,'Prepare a human-reviewed priced change and tax source first',409,'change_pricing')
  need(v.pricing.base_lines.filter(l=>l.included!==false).every(l=>l.cost_total_cents!==undefined),'Record the private cost of every included line before signing',409,'change_costs')
@@ -63,6 +64,7 @@ export async function prepareSignedChange(db: D1Database, job: Job, actor: Actor
  const plan={calendar,tasks:job.schedules.map(t=>({...t,start:affected.has(t.id)?shift(t.start,days,zone):t.start,duration_minutes:t.duration_minutes??workingMinutes(Date.parse(t.start),Date.parse(t.end),calendar)}))}
  const schedule=await previewSchedule(job,actor,plan,all)
  need(!schedule.conflicts.length&&!schedule.blockers.length,'Resolve schedule conflicts and prerequisites before presenting this change',409,'change_schedule')
+ need(schedule.tasks.every(t=>{const before=find(job.schedules,t.id);return affected.has(t.id)||before.start===t.start&&before.end===t.end&&before.status===t.status}),'Review existing task dates first; this document can change only its named affected work',409,'change_schedule')
  need(schedule.completion_before&&schedule.completion_after,'An existing completion date is required',409,'change_schedule')
  const before=wallClock(Date.parse(schedule.completion_before),zone).date,after=wallClock(Date.parse(schedule.completion_after),zone).date
  need(Math.round((Date.parse(after)-Date.parse(before))/86400000)===days,'The reviewed calendar must reconcile extra calendar days to revised completion; revise the task plan',409,'change_schedule')

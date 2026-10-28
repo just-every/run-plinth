@@ -988,6 +988,11 @@ test('Signed window changes freeze two exact consents, private costs and calenda
   await a.sign(allowanceRow);await a.sign(allowanceRow,a.client,'Synthetic change client')
   await a.ok('/selections/'+selection.id+'/revise',{...terms,options:[{...terms.options[0],price_cents:171000}]})
   assert.equal((await a.act('/signed-changes/'+allowanceRow.id+'/apply',{digest:allowanceRow.digest,confirm:true,...a.billing(allowanceRow)})).value.error,'change_sources');assert.equal(a.job.budgets.length,1)
+  const g=await signedChangeFixture(f,{tag:'unpublished',clientEmail:changeAddress('unpublished-client')});await g.priced()
+  assert.equal((await g.act('/schedules',{trade:'Synthetic draft crew',description:'Unreviewed unrelated work',start:'2026-11-03T08:00:00Z',end:'2026-11-03T12:00:00Z'},undefined,agent)).status,200);await g.read();assert.equal(g.job.schedules[1].status,'draft')
+  const unpublishedBefore=structuredClone(g.job),unpublishedClients=(await g.list()).clients
+  const unpublishedDecision=await g.act('/signed-changes',{variation_id:g.job.variations[0].id,client_id:unpublishedClients[0].id,task_ids:[g.job.schedules[0].id],extra_days:5})
+  assert.equal(unpublishedDecision.status,409,'A signed change must not implicitly book unrelated draft tasks');await g.read();assert.deepEqual(g.job,unpublishedBefore)
   const b=await signedChangeFixture(f,{tag:'builder-revoked',clientEmail:changeAddress('builder-revoked-client')}),builder=await f.invite(changeAddress('builder-revoked'),'Synthetic change builder','admin');await b.priced();const available=await b.list()
   const builderRow=(await b.ok('/signed-changes',{variation_id:b.job.variations[0].id,client_id:available.clients[0].id,task_ids:[b.job.schedules[0].id],extra_days:5},builder)).record
   await b.sign(builderRow,builder,'Synthetic change builder');await b.sign(builderRow,b.client,'Synthetic change client')

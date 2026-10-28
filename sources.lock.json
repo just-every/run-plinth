@@ -265,7 +265,7 @@
       "executable": false
     },
     "docs/SIGNED-CHANGES.md": {
-      "sha256": "e1876644f3c2a0d21ace5f8e64a411418735bd6ca53dfc84dbffb63999cefd70",
+      "sha256": "2c71ca50d2fbe4cbc2c7eebb88e1189427b41beb1e536a5eda82f2756758e5db",
       "executable": false
     },
     "docs/SUBMITTALS.md": {
@@ -3965,7 +3965,7 @@
       "executable": false
     },
     "src/plinth/signed-changes.ts": {
-      "sha256": "28c2f587ca533f0b558cbec4436839c0f8402d0a86df9baf7268567e450fb7fc",
+      "sha256": "45b83adbcc915103fd2828480aaa5bdae3025d72e24f30b3259bb81c9297c4e4",
       "executable": false
     },
     "src/plinth/site-contacts.ts": {
@@ -5289,7 +5289,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "644684ecda606aa7d5604babaa86e828e165edf337876a1861d37dd3ada24c0a",
+      "sha256": "f83b75f00add83b7d4726df53adb235fac27ce3d5e7ed68a1e4d9053ef354022",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
