@@ -21,8 +21,9 @@ export function acceptQuote(job:Job,actor:Actor,id:string,input:Input) {
 /** A proposed term never changes the contract until the actual client confirms it. */
 export function prepareVariation(job:Job,actor:Actor,input:Input):Variation {requireJobManager(actor,true);active(job);const row={id:crypto.randomUUID(),revision:1,description:text(input.description,'description',4000),amount_cents:cents(input.amount_cents,'amount_cents',true),status:'draft' as const,prepared_by:stamp(actor)};need(row.amount_cents!==0,'A change order must change the contract amount');job.variations.push(row);return row}
 /** carried_over names where and when the client signed a change order that moved in from another system. */
-export function approveVariation(job:Job,actor:Actor,id:string,carried_over?:string) {
+export function approveVariation(job:Job,actor:Actor,id:string,carried_over?:string,signedDocument=false) {
  need(actor.role==='member'&&(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'The client assigned to this job must approve this change order',403,'client_required');active(job);const row=find(job.variations,id);need(row.status==='draft','Change order already approved and immutable',409,'immutable')
+ need(signedDocument||!job.signed_changes?.some(c=>c.variation_id===id),'Use the exact signed change document and separate builder application',409,'signed_change_required')
  assertAllowanceChange(job,row);assertRfiChange(job,row)
  const base=find(job.quotes,job.quotes.find(q=>q.status==='accepted')!.id).total_cents
  need(sum([base,...job.variations.filter(v=>v.status==='approved').map(v=>v.amount_cents),row.amount_cents])>=Math.max(0,...job.claims.filter(c=>c.status!=='draft').map(c=>c.cumulative_cents)),'This change order would reduce the contract below billed pay apps',409,'contract_balance')

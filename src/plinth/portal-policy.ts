@@ -23,7 +23,7 @@ export function portalPolicy(job: Job, actor: Actor, input: Input) {
 }
 /** All existing direct client routes use the same feature as their job projection. */
 export function clientRouteFeature(category:string):string|undefined {
- const routes: Record<string,string> = {quotes:'contracts',selections:'selections','allowance-changes':'selections','decision-files':'selections',variations:'changes',schedules:'schedule',calendar:'schedule',diary:'photos',invoices:'billing',claims:'billing',remittances:'billing',todos:'todos',handover:'handover',punch:'punch',rfis:'rfis','rfi-files':'rfis'}
+ const routes: Record<string,string> = {quotes:'contracts',selections:'selections','allowance-changes':'selections','decision-files':'selections','signed-changes':'changes',variations:'changes',schedules:'schedule',calendar:'schedule',diary:'photos',invoices:'billing',claims:'billing',remittances:'billing',todos:'todos',handover:'handover',punch:'punch',rfis:'rfis','rfi-files':'rfis'}
  return Object.hasOwn(routes, category) ? routes[category] : undefined
 }
 export function clientPolicyProjection<T extends Job>(shown:T,source:Job):T {
