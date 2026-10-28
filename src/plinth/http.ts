@@ -152,7 +152,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}
  if(parts[2]==='submittals'&&method==='GET'){
-  submittalAccess(actor)
+  submittalAccess(actor,previous)
   if(parts.length===3)return json({version:previous.version,person_id:actor.id,manage:actor.role==='owner',register:previous.submittals??[],reviewers:await submittalReviewers(env.DB,previous),orders:previous.orders})
   if(parts.length===5&&parts[3]==='files')return submittalFile(env.DB,previous,actor,parts[4]!)
   return json({error:'not_found'},404)
@@ -197,7 +197,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
   const html=parts[4]==='application.html';return new Response(html?applicationDocument(app,claim):sovCsv(app),{headers:{...headers,'content-type':html?'text/html; charset=utf-8':'text/csv; charset=utf-8',...(html?{'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"}:{'content-disposition':'attachment; filename=plinth-sov-application.csv'})}})
  }
  if(parts.length===5&&parts[2]==='claims'&&parts[4]==='packet'&&method==='GET')return packetResponse(env.DB,previous,actor,parts[3]!)
- if(parts[2]==='orders'&&(parts.length===4||parts.length===5&&parts[4]==='document')&&method==='GET')return orderResponse(previous,actor,parts[3]!,parts.length===5)
+ if(parts[2]==='orders'&&(parts.length===4||parts.length===5&&parts[4]==='document')&&method==='GET'){if(parts.length===5){const order=previous.orders.find(o=>o.id===parts[3]);need(order,'Order not found',404,'not_found');await requireSubmittalGate(env.DB,previous,order,false,actor)}return orderResponse(previous,actor,parts[3]!,parts.length===5)}
  if(parts.length===4&&parts[2]==='lien-waiver-files'&&method==='GET')return releaseFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='schedule-documents'&&method==='GET')return constraintFile(env.DB,previous,actor,parts[3])
  if(parts.length===4&&parts[2]==='takeoff-files'&&method==='GET')return takeoffFile(env.DB,previous,actor,parts[3]!)
@@ -271,7 +271,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(JSON.stringify(previous.schedules)!==JSON.stringify(job.schedules))await requireResources(env.DB,job,await jobs(env.DB),actor)
  enforceCostPeriods(previous,job,actor,input)
  refreshCostExceptions(job)
- if(category==='orders'&&['issue','approve-amendment','receive','ship'].includes(action??''))await requireSubmittalGate(env.DB,job,job.orders.find(o=>o.id===id)!)
+ if(category==='orders'&&['issue','approve-amendment','receive','ship'].includes(action??''))await requireSubmittalGate(env.DB,job,job.orders.find(o=>o.id===id)!,false,actor)
  await saveJob(env.DB,actor,previous,job,writes,clock)
  if(actor.role==='member'&&category==='invoices')record=invoiceProjection(job,actor).find(invoice=>invoice.id===id)
  if(actor.role==='member'&&category==='selections')record=selectionProjection(job,true).find(s=>s.id===id)

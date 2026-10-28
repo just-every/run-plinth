@@ -60,7 +60,7 @@ try{
   await page.setViewportSize({width,height:1000});await panel.scrollIntoViewIfNeeded()
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Submittal workspace fits the viewport')
   if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible');await panel.scrollIntoViewIfNeeded()}
-  await panel.screenshot({path:`${shots}/DOC-004-${label}-${width}.png`,animations:'disabled'})
+  await page.screenshot({path:`${shots}/DOC-004-${label}-${width}.png`,fullPage:true,animations:'disabled'})
  }}
  await capture('rejected')
  await page.setViewportSize({width:1440,height:1000})

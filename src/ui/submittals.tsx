@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Submittal, SubmittalView } from '../plinth/submittal-model'
 import type { JobProps } from './job'
 import { api, Badge, Field, Form } from './shared'
@@ -6,6 +6,7 @@ import { api, Badge, Field, Form } from './shared'
 const disposition = (value: string) => value === 'revise_resubmit' ? 'Revise and resubmit' : value
 export function Submittals({ job, refresh }: Pick<JobProps,'job'|'refresh'>) {
  const [data,setData] = useState<SubmittalView>(), [error,setError] = useState('')
+ const registration=useRef<HTMLDetailsElement>(null)
  const root = `/jobs/${job.id}/submittals`
  const load = async () => { const result = await api(root); setData(result); setError('') }
  useEffect(() => { void load().catch(e => { setData(undefined); setError(e.message) }) }, [job.id,job.version])
@@ -18,14 +19,15 @@ export function Submittals({ job, refresh }: Pick<JobProps,'job'|'refresh'>) {
   <h2>Submittal register</h2><p>Review the exact vendor package before releasing its product and purchase commitment. A new cycle holds procurement until it is approved and selected.</p>
   {!data.register.length&&<p>No submittals registered.</p>}
   {data.register.map(row => <SubmittalRecord key={row.id} row={row} data={data} jobId={job.id} mutate={mutate}/>)}
-  {data.manage&&<details><summary>Register a required submittal</summary>
-   <SubmittalSubmission data={data} submit="Submit vendor package" action={body=>mutate('',body)}/>
+  {data.manage&&<details ref={registration}><summary>Register a required submittal</summary>
+   <SubmittalSubmission data={data} submit="Submit vendor package" action={async body=>{await mutate('',body);if(registration.current)registration.current.open=false}}/>
   </details>}
  </section>
 }
 type Mutate = (path:string, body:Record<string,unknown>)=>Promise<void>
 function SubmittalRecord({row,data,jobId,mutate}:{row:Submittal;data:SubmittalView;jobId:string;mutate:Mutate}) {
  const current = row.cycles.at(-1)!, order = data.orders.find(o=>o.id===row.order_id)!, release = order.submittal_release
+ const resubmission=useRef<HTMLDetailsElement>(null)
  return <article className="record" aria-label={row.title}>
   <h3>{row.title}</h3><p>Commitment: {order.description} · {order.supplier}</p>
   {row.cycles.map(cycle => <section key={cycle.id} aria-label={'Review cycle '+cycle.revision}>
@@ -53,13 +55,13 @@ function SubmittalRecord({row,data,jobId,mutate}:{row:Submittal;data:SubmittalVi
    <Field label="Exact approved product and version" name="product_reference" defaultValue={current.product_reference}/>
    <label><input name="confirm" type="checkbox" required/> Release only this exact product for this commitment.</label>
   </Form>}
-  {data.manage&&<details><summary>Resubmit a new vendor version</summary><SubmittalSubmission data={data} row={row} submit="Resubmit vendor package" action={body=>mutate(`/${row.id}/resubmit`,{cycle_id:current.id,...body})}/></details>}
+  {data.manage&&<details ref={resubmission}><summary>Resubmit a new vendor version</summary><SubmittalSubmission data={data} row={row} submit="Resubmit vendor package" action={async body=>{await mutate(`/${row.id}/resubmit`,{cycle_id:current.id,...body});if(resubmission.current)resubmission.current.open=false}}/></details>}
   <p>Supplier notification is not sent by this review. Send the reviewed originals and disposition through your authorized supplier channel.</p>
  </article>
 }
 function SubmittalSubmission({data,row,submit,action}:{data:SubmittalView;row?:Submittal;submit:string;action:(body:Record<string,unknown>)=>Promise<void>}) {
  const [files,setFiles] = useState<File[]>([]), current=row?.cycles.at(-1)
- return <Form reset={false} submit={submit} action={async f=>{
+ return <Form submit={submit} action={async f=>{
   const attachments=[]
   for(const file of files){const bytes=new Uint8Array(await file.arrayBuffer());let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);attachments.push({name:file.name,mime:file.type,base64:btoa(raw)})}
   await action({...(row?{}:{title:f.get('title'),order_id:f.get('order_id')}),product_reference:f.get('product_reference'),required_on:f.get('required_on'),specified_scope:f.get('specified_scope'),reviewer_id:f.get('reviewer_id'),deviates:f.get('deviates')==='on',deviation:f.get('deviation'),attachments})

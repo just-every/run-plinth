@@ -32,8 +32,9 @@ async function currentReviewer(db: D1Database, job: Job, cycle: SubmittalCycle) 
  need(current && sameAuthority(current, cycle.reviewer), 'The designated reviewer authority changed; submit a new review cycle', 409, 'submittal_authority')
  return current
 }
-export function submittalAccess(actor: Actor) {
+export function submittalAccess(actor: Actor, job: Job) {
  requireJobManager(actor)
+ need(!actor.permissions || actor.team?.job_ids.includes(job.id), 'Submittal job not found', 404, 'not_found')
  need(!actor.permissions || actor.permissions.financial && actor.permissions.matrix.orders.view && actor.permissions.matrix.documents.view, 'Submittals require current document and financial order visibility', 403, 'forbidden')
 }
 async function submitCycle(db: D1Database, job: Job, actor: Actor, row: Submittal, input: Input) {
@@ -51,7 +52,7 @@ async function submitCycle(db: D1Database, job: Job, actor: Actor, row: Submitta
  return files.writes
 }
 export async function submittalAction(db: D1Database, job: Job, actor: Actor, input: Input, id?: string, action?: string) {
- submittalAccess(actor)
+ submittalAccess(actor, job)
  let row: Submittal, writes: D1PreparedStatement[] = []
  if (!id || action === 'resubmit' || action === 'release') need(actor.role === 'owner', 'Only the owner registers, routes or releases a required submittal', 403, 'forbidden')
  if (!id) {
@@ -97,9 +98,10 @@ export async function submittalAction(db: D1Database, job: Job, actor: Actor, in
  return { record: row, writes }
 }
 /** Every procurement effect checks the register, so omitting a release token cannot bypass a required review. */
-export async function requireSubmittalGate(db: D1Database, job: Job, order: Order, proposed = false) {
+export async function requireSubmittalGate(db: D1Database, job: Job, order: Order, proposed = false, actor?: Actor) {
  const row = submittalFor(job, order)
  if (!row) { need(!order.submittal_release, 'The submittal register entry is missing', 409, 'submittal_missing'); return }
+ need(!actor?.permissions || actor.team?.job_ids.includes(job.id), 'Submittal job not found', 404, 'not_found')
  const cycle = row.cycles.at(-1)!, release = order.submittal_release
  need(cycle.decision?.disposition === 'approved', 'The current submittal must be approved before procurement release', 409, 'submittal_unapproved')
  need(release?.submittal_id === row.id && release.cycle_id === cycle.id && release.product_reference === cycle.product_reference, 'Select the exact current approved vendor version before release', 409, 'submittal_version')
@@ -107,7 +109,7 @@ export async function requireSubmittalGate(db: D1Database, job: Job, order: Orde
  await currentReviewer(db, job, cycle)
 }
 export async function submittalFile(db: D1Database, job: Job, actor: Actor, id: string) {
- submittalAccess(actor)
+ submittalAccess(actor, job)
  const files = (job.submittals ?? []).flatMap(s => s.cycles.flatMap(c => c.attachments))
  return decisionDownload(db, job, files, id)
 }
