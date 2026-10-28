@@ -316,7 +316,7 @@ test('Completed estimates reconcile source-linked productivity, native outcomes 
   const admin=await f.invite(performanceAddress('performance-scoped'),'Scoped reviewer','admin'),team=(await c.call('/team')).team,person=team.find(p=>p.email===performanceAddress('performance-scoped'))
   let r=await f.json('/api/plinth/roles',{method:'POST',cookie:f.owner,body:{name:'Scoped performance manager',copy_of:'project_manager'}});assert.equal(r.status,201);let role=r.value.role
   r=await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:role.id,job_ids:[first.id],po_limit_cents:0}});assert.equal(r.status,200)
-  let scoped=await f.json('/api/plinth/reports/performance',{cookie:admin});assert.equal(scoped.status,200);assert.deepEqual(scoped.value.jobs.map(j=>j.id),[first.id]);assert.equal(scoped.value.estimators[0].win_rate,1);assert.equal(scoped.value.estimators[0].lost,0)
+  let scoped=await f.json('/api/plinth/reports/performance',{cookie:admin});assert.equal(scoped.status,200);assert.deepEqual(scoped.value.jobs.map(j=>j.id),[first.id]);assert.deepEqual(scoped.value.catalog,[],'A scoped project manager cannot read the private company catalog through a report');assert.equal(scoped.value.estimators[0].win_rate,1);assert.equal(scoped.value.estimators[0].lost,0)
   assert.equal((await f.json('/api/plinth/reports/performance/jobs/'+second.id,{cookie:admin})).status,404)
   r=await f.json('/api/plinth/roles/'+role.id,{method:'PUT',cookie:f.owner,body:{expected_version:role.version,name:role.name,financial_visible:false}});assert.equal(r.status,200)
   assert.equal((await f.json('/api/plinth/reports/performance',{cookie:admin})).status,403)

@@ -1,3 +1,4 @@
+import { requireRateAccess } from './auth'
 import { wallClock } from './time-zone'
 import { auditStatement } from './audit'
 import { catalogValue, date } from './catalog-input'
@@ -60,16 +61,17 @@ export type PerformanceJob=ReturnType<typeof performanceJob>
 export async function performanceResponse(request:Request,db:D1Database,actor:Actor,parts:string[],body:(r:Request)=>Promise<Input>):Promise<Response|null>{
  if(parts[0]!=='reports'||parts[1]!=='performance')return null
  access(actor,request.method!=='GET')
+ const canPropose=actor.role==='owner'||actor.role==='admin'
  const clock=await readClock(db),catalog=await entries(db),available=(await jobs(db)).filter(j=>allowed(actor,j)),mapped=available.map(j=>performanceJob(j,catalog))
  if(parts.length===2&&request.method==='GET'){
   const estimators=[...new Set(mapped.flatMap(j=>j.sales.estimator?[j.sales.estimator.id]:[]))].map(id=>{const records=mapped.filter(j=>j.sales.estimator?.id===id),won=records.filter(j=>j.sales.stage==='won').length,lost=records.filter(j=>j.sales.stage==='lost').length;return {id,name:records[0]!.sales.estimator!.name,won,lost,open:records.length-won-lost,win_rate:won+lost?won/(won+lost):null,job_ids:records.map(j=>j.id)}})
   const lessons=available.flatMap(j=>state(j).lessons.filter(l=>l.sources.every(s=>available.some(a=>a.id===s.id))).map(l=>({...l,job_id:j.id})))
   const pipeline=[...new Set(mapped.map(j=>j.currency+':'+j.sales.stage))].map(key=>{const rows=mapped.filter(j=>j.currency+':'+j.sales.stage===key);return {currency:rows[0]!.currency,stage:rows[0]!.sales.stage,count:rows.length,amount_cents:rows.every(j=>j.sales.amount_cents!==null)?sum(rows.map(j=>j.sales.amount_cents!)):null}})
-  return json({as_of:new Date(Date.now()).toISOString(),jobs:mapped,pipeline,estimators,lessons,catalog:catalog.filter(e=>e.kind!=='rate'),can_edit:!actor.permissions||actor.permissions.matrix.reports.edit,can_approve:(actor.role==='owner'||actor.role==='admin')&&(!actor.permissions||actor.permissions.matrix.estimates.edit&&actor.permissions.matrix.reports.approve),label:'Native source records under current grants. Unknown production is never zero. Won quotes use recorded client acceptance; lost outcomes are attributed office evidence.'})
+  return json({as_of:new Date(Date.now()).toISOString(),jobs:mapped,pipeline,estimators,lessons:canPropose?lessons:[],catalog:canPropose?catalog.filter(e=>e.kind!=='rate'):[],can_propose:canPropose,can_edit:!actor.permissions||actor.permissions.matrix.reports.edit,can_approve:(actor.role==='owner'||actor.role==='admin')&&(!actor.permissions||actor.permissions.matrix.estimates.edit&&actor.permissions.matrix.reports.approve),label:'Native source records under current grants. Unknown production is never zero. Won quotes use recorded client acceptance; lost outcomes are attributed office evidence.'})
  }
  need(parts[2]==='jobs'&&parts[3]&&parts.length>=4,'Unknown performance route',404,'not_found')
  const previous=await jobOf(db,actor,parts[3]!);need(allowed(actor,previous),'Job not found',404,'not_found')
- if(request.method==='GET'&&parts.length===4)return json({job:performanceJob(previous,catalog),performance:{...state(previous),lessons:state(previous).lessons.filter(l=>l.sources.every(s=>available.some(j=>j.id===s.id)))}})
+ if(request.method==='GET'&&parts.length===4)return json({job:performanceJob(previous,catalog),performance:{...state(previous),lessons:canPropose?state(previous).lessons.filter(l=>l.sources.every(s=>available.some(j=>j.id===s.id))):[]}})
  need(request.method==='POST','Method not allowed',405)
  const input=await body(request);need(input.expected_version===previous.version,'Job changed; reload the performance report',409,'stale_version')
  const job=structuredClone(previous),value=state(job);let record:unknown,writes:D1PreparedStatement[]=[]
@@ -83,6 +85,7 @@ export async function performanceResponse(request:Request,db:D1Database,actor:Ac
   const completed_on=date(input.completed_on);need(tasks.every(t=>wallClock(Date.parse(latestActual(job,t.id)!.actual_finish!),job.time_zone??'UTC').date<=completed_on),'Completion date precedes recorded work')
   record=value.completion={completed_on,evidence:text(input.evidence,'Completion evidence',2000),by:stamp(actor)}
  }else if(parts[4]==='lessons'&&parts.length===5){
+  requireRateAccess(actor,'GET')
   need(value.completion,'Lessons require a completed source job',409,'completion_state')
   const entry=await catalogEntry(db,text(input.catalog_id,'Catalog id',80));need(entry.kind==='assembly'||entry.kind==='template','Propose an assembly or template revision')
   need(input.catalog_version===entry.version,'Catalog changed; review again',409,'stale_catalog')
@@ -104,5 +107,5 @@ export async function performanceResponse(request:Request,db:D1Database,actor:Ac
  recordApproval(job,actor,'estimate.performance.'+parts.slice(4).filter(p=>p==='sales'||p==='complete'||p==='lessons'||p==='approve').join('.'),{id:typeof record==='object'&&record&&'id' in record?String(record.id):job.id,prepared_by:stamp(actor)},record)
  writes.push(auditStatement(db,actor,{kind:'financial',action:'estimate.performance.'+parts[4]+(parts[6]?'.'+parts[6]:''),job_id:job.id,subject_kind:'estimate_performance',subject_id:record&&typeof record==='object'&&'id' in record?String(record.id):job.id,detail:{source_version:previous.version}}))
  await saveJob(db,actor,previous,job,writes,clock)
- return json({record,job:performanceJob(job,catalog),performance:value})
+ return json({record,job:performanceJob(job,catalog),performance:{...value,lessons:canPropose?value.lessons:[]}})
 }
