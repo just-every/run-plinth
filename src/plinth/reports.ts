@@ -1,3 +1,4 @@
+import { performanceResponse } from './estimate-performance'
 import { satisfactionReport } from './satisfaction-report'
 import { portfolioJobs, parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
 import { portfolioSources, portfolioValues, portfolioScheduleSources, portfolioDecisionSources } from './portfolio'
@@ -13,6 +14,7 @@ const headers={'cache-control':'private, no-store','x-content-type-options':'nos
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 export async function reportsResponse(request:Request,db:D1Database,actor:Actor,parts:string[],body:(r:Request)=>Promise<Input>):Promise<Response|null> {
  if(parts[0]!=='reports')return null
+ const performance=await performanceResponse(request,db,actor,parts,body);if(performance)return performance
  need(['owner','admin','project_manager'].includes(actor.role),'Custom fields, queries and exports are office-only',403,'forbidden')
  if(parts.length===2&&parts[1]==='satisfaction'&&request.method==='GET')return json(await satisfactionReport(db,actor))
  const method=request.method, url=new URL(request.url), config=await fieldConfig(db)

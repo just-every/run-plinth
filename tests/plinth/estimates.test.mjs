@@ -320,3 +320,34 @@ test('EST-004 — calibrated multi-sheet PDF lengths areas counts and deducted o
   const safe=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:client})).value.job;assert.equal(safe.takeoff,undefined);assert.ok(!JSON.stringify(safe).includes('takeoff_source'))
  }finally{await f.close()}
 })
+
+test('Reviewed completed-job lessons revise assemblies and templates only for new estimates and preserve historical costs',async()=>{
+ const {performanceFixture,performanceAddress}=await import('./performance-support.mjs'),f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await performanceFixture(f),first=c.jobs[0],second=c.jobs[1],history=structuredClone(first.job.quotes),before=(await c.call(`/jobs/${first.job.id}/costs`))
+  const definition=structuredClone(c.assembly.revisions[0].value);definition.parts[0].productivity='4'
+  const input={catalog_id:c.assembly.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Two completed wall jobs support four feet per approved hour',value:definition}
+  const proposed=await first.report('lessons',input),lesson=proposed.record
+  assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id).version,1)
+  const approve=(body,cookie=f.owner)=>f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${lesson.id}/approve`,{method:'POST',cookie,body:{expected_version:first.job.version,...body}})
+  assert.equal((await approve({confirm:false})).status,400)
+  const agent=await f.agent();assert.equal((await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons`,{method:'POST',token:agent,body:{expected_version:first.job.version,...input}})).status,403)
+  const approved=await approve({confirm:true});assert.equal(approved.status,200,JSON.stringify(approved.value));await first.read()
+  assert.equal(approved.value.record.approved.catalog_version,2);assert.equal((await approve({confirm:true})).status,409)
+  const catalog=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id);assert.equal(catalog.revisions.length,2);assert.equal(catalog.revisions[0].value.parts[0].productivity,'5');assert.equal(catalog.revisions[1].value.parts[0].productivity,'4')
+  assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
+  const newer=c.jobs[3],request={template_id:c.template.id,as_of:'2026-10-20',dimensions:{walls:'10'}},preview=await newer.act('/estimate-template/preview',request)
+  assert.equal(preview.preview.proposal.lines.find(l=>l.cost_code==='06-100').cost_total_cents,7500)
+  assert.equal((await f.json(`/api/plinth/jobs/${first.job.id}/estimate-template/apply`,{method:'POST',cookie:f.owner,body:{expected_version:first.job.version,...request,digest:preview.preview.digest}})).status,409)
+  const templateValue=structuredClone(c.template.revisions[0].value);templateValue.dimensions.walls='14'
+  const templateLesson=(await first.report('lessons',{catalog_id:c.template.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Reviewed default wall dimension for future estimates',value:templateValue})).record
+  const staleVersion=first.job.version
+  await second.act('/costs/sources',{kind:'time',reference:'synthetic-plinth-late-unapproved',employee_reference:'synthetic-plinth-worker-late',dated_on:'2026-10-24',period:'2026-10',cost_code:'06-100',minutes:10,hour_cents:3000,burden_bps:0},c.reviewer)
+  const stale=await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${templateLesson.id}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:staleVersion,confirm:true}});assert.equal(stale.status,409)
+  assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.template.id).version,1)
+  const fresh=(await first.report('lessons',{catalog_id:c.template.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Reviewed current completed source jobs',value:templateValue})).record
+  const confirmed=await first.report(`lessons/${fresh.id}/approve`,{confirm:true});assert.equal(confirmed.record.approved.catalog_version,2)
+  assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
+  const audit=(await c.call(`/audit?job_id=${first.job.id}&q=estimate.performance`)).events;assert.ok(audit.length>0)
+ }finally{await f.close()}
+})
