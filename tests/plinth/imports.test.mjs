@@ -131,6 +131,13 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
   const adopted=await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint});assert.equal(adopted.status,200,JSON.stringify(adopted.value));assert.equal(adopted.value.job.state,'completed')
   const imported=(await jobs())[0],quote=imported.quotes[0]
   for(const cookie of [client,admin]){assert.equal((await f.request('/api/plinth/jobs/'+imported.id,{cookie})).status,404);assert.deepEqual((await f.json('/api/plinth/jobs',{cookie})).value.jobs,[])}
+  for(const scope of ['job','financial']){
+   const visible=await f.json('/api/plinth/reports/records?record_scope='+scope,{cookie:f.owner});assert.equal(visible.status,200);assert.ok(visible.value.records.some(r=>r.job_id===imported.id))
+   const hidden=await f.json('/api/plinth/reports/records?record_scope='+scope,{cookie:admin});assert.equal(hidden.status,200);assert.deepEqual(hidden.value.records,[])
+  }
+  const hiddenPerformance=await f.json('/api/plinth/reports/performance',{cookie:admin});assert.equal(hiddenPerformance.status,200);assert.deepEqual(hiddenPerformance.value.jobs,[])
+  const hiddenBids=await f.json('/api/plinth/bids',{cookie:admin});assert.equal(hiddenBids.status,200);assert.deepEqual(hiddenBids.value.sources,[])
+  assert.equal((await f.request('/api/plinth/bid-comparisons/'+imported.id,{cookie:admin})).status,404)
   assert.equal(imported.status,'quoting');assert.equal(quote.status,'draft');assert.equal(quote.lines.length,2);assert.equal(quote.lines[1].quantity,'1.25');assert.deepEqual(imported.approvals,[])
   assert.equal((await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint})).value.job.id,adopted.value.job.id);assert.equal((await jobs()).length,1)
   const changed={...input,title:'Different title'},changedPreview=await call('/workbook/preview',changed)
