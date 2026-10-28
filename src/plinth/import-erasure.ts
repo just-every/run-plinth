@@ -25,6 +25,7 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
     { sql: 'DELETE FROM pl_mail_files WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_mail_messages WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_attachments WHERE job_id=?', params: [job.id] },
+    { sql: 'DELETE FROM pl_job_document_files WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_lien_waiver_files WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_jobs WHERE id=?', params: [job.id] },
     { sql: "INSERT INTO pl_erased_jobs(job_id,erased_at) VALUES(?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params: [job.id] },
