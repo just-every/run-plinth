@@ -20,6 +20,17 @@ test('FIELD-005 — delivery originals, segregated damage, atomic authorized tra
   assert.equal((await c.act('transfer',transfer,manager)).status,404,'An assigned manager needs both jobs')
   for(const [cookie,token]of [[client,undefined],[f.owner,agent]])assert.equal((await c.act('transfer',transfer,cookie,token)).status,403)
   assert.deepEqual((await c.read()).value,before);assert.deepEqual((await c.read(c.target.job.id)).value,targetBefore,'Refused transfers write neither side')
+  for(const [name,permissions,financial,scope]of [['Synthetic inventory clerk',{orders:{approve:false}},true,[c.source.job.id,c.target.job.id]],['Synthetic hidden financials',{},false,[c.source.job.id,c.target.job.id]],['Synthetic scoped manager',{},true,[c.source.job.id]]]){
+   const role=(await c.api('/roles',{copy_of:'project_manager',name,permissions,financial_visible:financial})).value.role
+   const teamVersion=(await c.api('/team')).value.team.find(p=>p.id===team.id).version
+   assert.equal((await f.json(`/api/plinth/team/${team.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:teamVersion,role:'custom',role_id:role.id,job_ids:scope}})).status,200)
+   assert.equal((await c.act('transfer',transfer,manager)).status,scope.length===1?404:403,'Custom approval, financial visibility and both job assignments are independent')
+  }
+  const credential=(await c.api('/agent-credentials')).value.credentials.find(r=>!r.revoked_at)
+  assert.equal((await c.api(`/agent-credentials/${credential.id}/revoke`,{})).status,200)
+  assert.equal((await c.act('transfer',transfer,f.owner,agent)).status,401,'A revoked credential cannot move stock')
+  assert.deepEqual((await c.read()).value,before);assert.deepEqual((await c.read(c.target.job.id)).value,targetBefore)
+
   r=await c.act('transfer',transfer);assert.equal(r.status,200,JSON.stringify(r.value));const incoming=r.value.record
   assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].transferred_quantity,r.value.lots[0].good_cents],['2','2',20000]);const destination=(await c.read(c.target.job.id)).value
   assert.deepEqual([destination.lots[0].good_quantity,destination.lots[0].location,destination.lots[0].good_cents],['2','South locked rack',20000]);assert.equal(destination.movements[0].transfer_id,r.value.movements.at(-1).transfer_id)
