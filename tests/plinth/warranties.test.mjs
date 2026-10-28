@@ -344,3 +344,67 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   }
  }finally{await f.close()}
 })
+
+test('CARE-004 — two completed jobs retain configurable high and low survey responses, assigned follow-up, manager and trade reports and separate ungated review permission',async()=>{
+ const {surveyJob,surveyAddress,surveySettings}=await import('./satisfaction-support.mjs')
+ const f=await createFixture()
+ try{
+  const first=await f.invite(surveyAddress(401),'Synthetic high-score client'),second=await f.invite(surveyAddress(402),'Synthetic low-score client'),foreign=await f.invite(surveyAddress(403),'Synthetic unrelated client'),pm=await f.invite(surveyAddress(404),'Synthetic project manager','admin'),crew=await f.invite(surveyAddress(405),'Synthetic crew lead','admin'),agent=await f.agent()
+  const a=await surveyJob(f,'Synthetic Plinth first job',surveyAddress(401),first),b=await surveyJob(f,'Synthetic Plinth second job',surveyAddress(402),second)
+  const team=(await a.call('/team')).value.team,manager=team.find(p=>p.email===surveyAddress(404)),worker=team.find(p=>p.email===surveyAddress(405))
+  for(const [person,role] of [[manager,'project_manager'],[worker,'crew']])assert.equal((await a.call('/team/'+person.id,{expected_version:0,role,job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  for(const [j,n,trade] of [[a,406,'Plumbing'],[b,407,'Electrical']]){await j.read();await createReleasedScope(f,j.job,surveyAddress(n),trade);await j.read()}
+  for(const [j,cookie,address] of [[a,first,surveyAddress(401)],[b,second,surveyAddress(402)]]){
+   assert.equal((await j.act('/satisfaction/consent',{email_surveys:true})).status,403,'Owner cannot impersonate client consent')
+   assert.equal((await j.act('/satisfaction/settings',surveySettings,pm)).status,403)
+   await j.ok('/satisfaction/settings',surveySettings)
+   const send={...j.source,recipient_email:address,follow_up_id:manager.id,confirm:true}
+   assert.equal((await j.act('/satisfaction/send',send)).status,403,'No survey without client email consent')
+   await j.ok('/satisfaction/consent',{email_surveys:true},cookie)
+   assert.equal((await j.act('/satisfaction/send',{...send,confirm:false})).status,400)
+   assert.equal((await j.act('/satisfaction/send',{...send,source_id:'synthetic-plinth-missing'})).status,409)
+   assert.equal((await j.act('/satisfaction/send',send,pm)).status,403)
+   assert.equal((await j.act('/satisfaction/send',send,cookie)).status,403)
+   const r=await j.ok('/satisfaction/send',send);assert.equal(r.surveys.length,1);assert.equal(r.surveys[0].invitation.status,'accepted')
+   assert.equal((await j.act('/satisfaction/send',send)).status,409,'Source and recipient cannot be resent')
+   const row=r.surveys[0];assert.deepEqual(row.settings.questions,surveySettings.questions);assert.deepEqual(row.context.managers,[{id:manager.id,name:'Synthetic project manager'}]);assert.deepEqual(row.context.crew,[{id:worker.id,name:'Synthetic crew lead'}])
+   await j.ok('/satisfaction/settings',{...surveySettings,questions:['Later questions cannot replace a sent survey'],review_url:'https://www.houzz.com/pro/synthetic-plinth-401'})
+   assert.deepEqual((await j.survey()).surveys[0].settings,row.settings,'Sent survey retains its exact configuration')
+   assert.equal((await j.act('/satisfaction/'+row.id+'/respond',{score:8,answers:['Good','Good']},foreign)).status,404)
+  }
+  const sa=(await a.survey()).surveys[0],sb=(await b.survey()).surveys[0]
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:0,answers:['Good','Good']},first)).status,400)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:9,answers:['Only one answer']},first)).status,400)
+  await a.ok('/satisfaction/'+sa.id+'/respond',{score:9,answers:['Clear updates','Excellent finish'],comment:'Synthetic positive feedback'},first)
+  await b.ok('/satisfaction/'+sb.id+'/respond',{score:3,answers:['Updates arrived late','Finish needs attention'],comment:'Synthetic unresolved trim defect'},second)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:1,answers:['Replacement','Replacement']},first)).status,409)
+  const ar=(await a.survey()).surveys[0],br=(await b.survey()).surveys[0]
+  assert.equal(ar.response.score,9);assert.equal(ar.follow_up,undefined);assert.equal(br.response.score,3);assert.equal(br.response.comment,'Synthetic unresolved trim defect');assert.equal(br.follow_up.assignee_id,manager.id)
+  const tasks=await a.call('/jobs/'+b.job.id+'/todos',undefined,pm);assert.equal(tasks.status,200);const follow=tasks.value.todos.find(t=>t.id===br.follow_up.todo_id);assert.ok(follow);assert.equal(follow.items[0].assignee.email,manager.email);assert.equal(follow.items[0].completed,false);assert.ok(follow.notes.includes(br.response.comment))
+  const report=(await a.call('/reports/satisfaction')).value
+  assert.deepEqual(report.managers.map(r=>({id:r.id,count:r.count,average:r.average_score,low:r.low_scores})),[{id:manager.id,count:2,average:6,low:1}])
+  assert.deepEqual(report.trades.map(r=>[r.trade,r.count,r.average_score]).sort(),[['Electrical',1,3],['Plumbing',1,9]])
+  assert.equal(report.crew[0].count,2);assert.equal(report.crew[0].average_score,6)
+  const records=(await a.call('/reports/records?record_scope=job')).value.records
+  assert.equal(records.find(r=>r.id===a.job.id).values['native.satisfaction_count'],1);assert.equal(records.find(r=>r.id===b.job.id).values['native.satisfaction_score'],3)
+  assert.equal((await a.call('/reports/satisfaction',undefined,first)).status,403)
+  const before=f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).length
+  assert.equal((await b.act('/satisfaction/'+sb.id+'/request-review',{confirm:true})).status,403)
+  await a.ok('/satisfaction/'+sa.id+'/review-permission',{allowed:true},first)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/request-review',{confirm:false})).status,400)
+  await a.ok('/satisfaction/'+sa.id+'/request-review',{confirm:true})
+  const reviews=f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).slice(before)
+  assert.equal(reviews.length,1);assert.deepEqual(reviews[0].to,[surveyAddress(401)]);assert.ok(reviews[0].text.includes(surveySettings.review_url));assert.ok(!reviews[0].text.includes('houzz'))
+  await b.ok('/satisfaction/'+sb.id+'/review-permission',{allowed:true},second)
+  await b.ok('/satisfaction/'+sb.id+'/request-review',{confirm:true})
+  assert.equal(f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).length,before+2,'A low score is equally eligible after permission')
+  assert.equal((await b.act('/satisfaction/'+sb.id+'/request-review',{confirm:true})).status,409)
+  await a.read();assert.equal((await f.json('/api/plinth/jobs/'+a.job.id+'/satisfaction',{token:agent})).status,403)
+  assert.equal((await f.json('/api/plinth/reports/satisfaction',{token:agent})).status,403)
+  const view=(await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,first)).value
+  assert.equal(view.surveys.length,1);assert.equal(view.surveys[0].context,undefined);assert.equal(view.surveys[0].follow_up,undefined);assert.equal(view.consents,undefined)
+  await a.call('/team/'+manager.id,{expected_version:1,role:'project_manager',job_ids:[a.job.id],po_limit_cents:0},f.owner,'PUT')
+  const narrowed=(await a.call('/reports/satisfaction',undefined,pm)).value
+  assert.deepEqual(narrowed.responses.map(r=>r.job_id),[a.job.id]);assert.equal(narrowed.managers[0].count,1);assert.equal(narrowed.managers[0].average_score,9)
+ }finally{await f.close()}
+})
