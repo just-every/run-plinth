@@ -39,7 +39,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
  if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':parts[4]==='review'||parts[4]==='release'?'approve':parts.length===3?'create':'edit',financial:true}
- const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = feature[category]
+ const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = Object.hasOwn(feature, category) ? feature[category] : undefined
  if (!area) return null
  const verbs = rest.slice(1).filter(part => !isId(part)), verb = verbs.at(-1) ?? ''
  const financial = (['estimates', 'budgets', 'bills', 'orders', 'changes', 'selections', 'invoices'] as Feature[]).includes(area)

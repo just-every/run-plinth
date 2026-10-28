@@ -465,3 +465,21 @@ test('ROLE-004 — assigned bookkeeper enters and recodes a bill for a separate 
   assert.equal((await assign('Bookkeeper', 'bookkeeper', [], 1)).status, 200); assert.equal((await api(`/jobs/${c.job.id}/costs/bills`, { cookie: clerk })).status, 404)
  } finally { await f.close() }
 })
+
+test('ROLE-006 — inherited preset names receive the unknown-name refusal without binding content; registered copies still work', async () => {
+ const f = await createFixture()
+ try {
+  const admin = await f.invite('synthetic-plinth-admin@example.com', 'Role editor', 'admin')
+  const expected = JSON.stringify({ error: 'invalid', message: 'Copy one of administrator, project_manager, estimator, superintendent, crew, bookkeeper or reader' })
+  for (const copy_of of ['unknown-preset', 'constructor', '__proto__', 'hasOwnProperty']) {
+   const response = await f.request('/api/plinth/roles', { method: 'POST', cookie: admin, body: { copy_of, name: 'Synthetic role' } })
+   const body = await response.text()
+   // Only booleans and status codes enter assertion diagnostics, never response bodies.
+   assert.equal(response.status, 400, `${copy_of} receives the unknown-preset status`)
+   assert.ok(body === expected, `${copy_of} returns only the fixed validation error, with no binding or environment content`)
+  }
+  const created = await f.json('/api/plinth/roles', { method: 'POST', cookie: admin, body: { copy_of: 'crew', name: 'Synthetic registered copy' } })
+  assert.equal(created.status, 201)
+  assert.ok(created.value.role.copy_of === 'crew' && created.value.role.permissions.time.create === true, 'The registered preset keeps its permissions')
+ } finally { await f.close() }
+})

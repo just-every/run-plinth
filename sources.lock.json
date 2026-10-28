@@ -3357,7 +3357,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "b5798a865bcede7a5fff63f127f073f574b2b2b97fbfe050b2e922618bcf81e8",
+      "sha256": "20f2c686e1900282459ff88fb416cbd68e2644f810dd034e9e6a6e56c09517b5",
       "executable": false
     },
     "src/plinth/plan-access.ts": {
@@ -3381,7 +3381,7 @@
       "executable": false
     },
     "src/plinth/portal-policy.ts": {
-      "sha256": "61aeea94942ed806dcf107c4f91cdd62f87b367628822320cd30e9719c77cdd3",
+      "sha256": "fea1eb564b60b04dbf55aaee52c3f08bafcd6a1a79363ebd8cb31f18a853c614",
       "executable": false
     },
     "src/plinth/portfolio-scope.ts": {
@@ -3509,7 +3509,7 @@
       "executable": false
     },
     "src/plinth/role-model.ts": {
-      "sha256": "6c9094dfdf8177ebbc71db57197db49b1c953da389934c521ead098c5f54533a",
+      "sha256": "b80db5bd167f486363541bf84b4d35007104fe552b72c7ac68242106a5422bd1",
       "executable": false
     },
     "src/plinth/role-store.ts": {
@@ -3521,7 +3521,7 @@
       "executable": false
     },
     "src/plinth/roles.ts": {
-      "sha256": "4f629232b3d07281e11b8daffb122239d7431799f906973d8e5e06e6e089b213",
+      "sha256": "d9358726f34e4569272aa58b5d2b508d82b068ff2874b120643cdf980fe6b272",
       "executable": false
     },
     "src/plinth/satisfaction-mail.ts": {
@@ -3725,7 +3725,7 @@
       "executable": false
     },
     "src/plinth/us-conventions.ts": {
-      "sha256": "fed7b396de4d6faf9153dccb8c042337cbbdcd3df41e544edfb9810693a3873f",
+      "sha256": "da990bf5a4619501753e43e54e68834790f6fd6f9014b47554f6b13b20c79fdf",
       "executable": false
     },
     "src/plinth/variation-pricing.ts": {
@@ -4997,7 +4997,7 @@
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {
-      "sha256": "f759092b1e8b51567e9aba8ca01a9800038e2b4afd2cc936048a05725dffe11a",
+      "sha256": "5143cea9d75cbee37116c557e3cbfc1992cea2c0d403462e862e53f236942426",
       "executable": false
     },
     "tests/plinth/satisfaction-support.mjs": {
