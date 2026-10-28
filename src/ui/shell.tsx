@@ -12,7 +12,7 @@ type RailProps = { view: View; role: string; roleName?: string; me?: Me; jobs: {
 export function Rail({ view, role, roleName, me, jobs, selected, open, onView, onJob, onClose }: RailProps) {
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
   const item = (to: View, icon: IconName, label: string, badge?: number) => <li><button aria-current={view === to && (to !== 'jobs' || !selected) ? 'page' : undefined} className={view === to ? 'is-active' : undefined} onClick={() => onView(to)}><Icon name={icon} />{label}{badge !== undefined && <span className="rail-count">{badge}</span>}</button></li>
-  return <aside className={`rail${open ? ' is-open' : ''}`} aria-label="Workspace">
+  return <aside className={`rail${open ? ' is-open' : ''}`} aria-label="Workspace" role={open ? 'dialog' : undefined} aria-modal={open ? true : undefined}>
     <div className="rail-top"><a className="lockup" href="/app"><img src="/brand/mark.svg" alt="" /><span data-rer-name>Plinth</span></a><button className="icon-button rail-close" aria-label="Close menu" data-tip="Close menu" onClick={onClose}><Icon name="close" /></button></div>
     <ul className="rail-nav">
       {item('jobs', 'folder', 'Jobs', jobs.length)}
@@ -47,5 +47,5 @@ export function TopBar({ query, onQuery, onMenu, onNew, manager }: { query: stri
 }
 
 export function Page({ title, lead, aside, children }: { title: string; lead?: ReactNode; aside?: ReactNode; children?: ReactNode }) {
-  return <div className="page"><header className="page-head"><div><h1>{title}</h1>{lead && <p className="page-lead">{lead}</p>}</div>{aside}</header>{children}</div>
+  return <div className="page"><header className="page-head"><div><h1 tabIndex={-1}>{title}</h1>{lead && <p className="page-lead">{lead}</p>}</div>{aside}</header>{children}</div>
 }
