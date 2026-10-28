@@ -13,7 +13,7 @@ export function prepareSchedule(job:Job,actor:Actor,input:Input,all:Job[]) {
 
  const row:Schedule={...allocations(input),...travelFields(input),id:crypto.randomUUID(),trade:text(input.trade,'trade',200),start:scheduleTime(input,'start'),end:scheduleTime(input,'end'),description:text(input.description,'description',1000),status:'draft',prepared_by:stamp(actor)}
  need(row.end>row.start,'Schedule must end after it starts');job.schedules.push(row)
- if(actor.role!=='agent')approveSchedule(job,actor,row.id,all)
+ if(actor.role!=='agent'&&(!actor.permissions||actor.permissions.matrix.schedule.approve))approveSchedule(job,actor,row.id,all)
  return row
 }
 export function approveSchedule(job:Job,actor:Actor,id:string,all:Job[]){requireJobManager(actor);need(!job.schedule_calendar,'Review this booking in the schedule planner',409,'schedule_review');const row=find(job.schedules,id);need(row.status==='draft','Schedule already booked',409,'immutable');checkConflicts(all,job,row);requireScheduleClearance(job,[{...row,status:'booked'}]);recordApproval(job,actor,'schedule',row,{trade:row.trade,start:row.start,end:row.end,description:row.description,...travelFields(row as unknown as Input)});row.status='booked';return row}

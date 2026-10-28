@@ -2,7 +2,7 @@ import { mailText } from './mail-content'
 import { normalizeInbound, type InboundMail } from '../mail.events.mjs'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { auditStatement, automation } from './audit'
-import { clientAccess } from './job-customers'
+import { clientEmail } from './job-customers'
 import { mailLimits, parseReplyAddress, replyMatches } from './mail-model'
 import { messageOf } from './mail-store'
 import { loadWarrantyJob } from './warranty-store'
@@ -36,7 +36,7 @@ export async function plinthEmail(message: RoutedEmail, original: Bindings): Pro
  if (!check.ok) return refuse(env, message, 'The sender failed authentication', origin.job_id)
  const job = await loadWarrantyJob(env.DB, origin.job_id)
  if (!job) return refuse(env, message, 'Unknown reply address')
- if (!await clientAccess(env.DB, job, sender)) return refuse(env, message, 'The sender no longer has access to this job', job.id)
+ if (!await clientEmail(env.DB, job, sender)) return refuse(env, message, 'The sender no longer has access to this job', job.id)
  const id = crypto.randomUUID(), now = new Date().toISOString(), body = (mail.text ?? mailText(mail.html ?? '')).trim().slice(0, 100_000)
  const files = await Promise.all(mail.attachments.map(async (a, n) => ({ id: crypto.randomUUID(), name: fileName(a.filename, n), mime: (a.contentType || 'application/octet-stream').slice(0, 100), checksum: hex(await crypto.subtle.digest('SHA-256', a.content as BufferSource)), bytes: a.content })))
  const writes = [

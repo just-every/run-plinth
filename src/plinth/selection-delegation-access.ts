@@ -1,4 +1,4 @@
-import { clientAccess } from './job-customers'
+import { clientAccess, clientEmail } from './job-customers'
 import { getCustomer } from './customers'
 import { decisionHeld, type Selection } from './selection-model'
 import { portalEnabled } from './portal-policy'
@@ -18,7 +18,7 @@ async function companyContact(db:D1Database,job:Job,email:string) {
 export async function selectionDelegate(db:D1Database,job:Job,contactId:string) {
  if(!job.customer_id)return null
  const customer=await getCustomer(db,job.customer_id),contact=customer.contacts.find(c=>c.id===contactId)
- if(!contact?.email||await clientAccess(db,job,contact.email)||await companyContact(db,job,contact.email))return null
+ if(!contact?.email||await clientEmail(db,job,contact.email)||await companyContact(db,job,contact.email))return null
  const person=await nativeSelectionPerson(db,contact.email)
  return person?{contact,person}:null
 }
@@ -26,7 +26,7 @@ export async function delegationInvalid(db:D1Database,job:Job,selection:Selectio
  if(job.status!=='active'||!portalEnabled(job,'client','selections'))return 'Job or client selections are unavailable'
  if(job.customer_id!==grant.customer_id)return 'The linked customer changed'
  const delegator=await nativeSelectionPerson(db,grant.delegator_email),delegate=await selectionDelegate(db,job,grant.contact_id)
- if(!delegator||delegator.id!==grant.delegated_by.id||delegator.version!==grant.delegator_version||!await clientAccess(db,job,grant.delegator_email))return 'The delegating client no longer has the recorded authority'
+ if(!delegator||delegator.id!==grant.delegated_by.id||delegator.version!==grant.delegator_version||!await clientAccess(db,job,delegator.id))return 'The delegating client no longer has the recorded authority'
  if(!delegate||delegate.person.id!==grant.delegate.id||delegate.person.version!==grant.delegate_version||delegate.person.email.toLowerCase()!==grant.delegate_email)return 'The delegate no longer has the recorded identity and authority'
  const revision=selection.revisions.find(r=>r.id===grant.revision_id)
  if(grant.status==='used')return revision?.signature?.delegation?.delegation_id===grant.id?undefined:'The delegated signature is unavailable'
@@ -43,5 +43,5 @@ export function delegationGuards(db:D1Database,grant:SelectionDelegation) {
  return [[grant.delegated_by.id,grant.delegator_version],[grant.delegate.id,grant.delegate_version]].map(([id,version])=>db.prepare("INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND role='member' AND status='active') THEN 1 ELSE 0 END").bind(id,version))
 }
 export async function requireSelectionClient(db:D1Database,job:Job,actor:Actor) {
- need(actor.role==='member'&&await clientAccess(db,job,actor.email),'An assigned client contact must manage a signing delegation',403,'client_required')
+ need(actor.role==='member'&&await clientAccess(db,job,actor.id),'An assigned client contact must manage a signing delegation',403,'client_required')
 }

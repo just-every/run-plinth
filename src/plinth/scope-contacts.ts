@@ -1,9 +1,9 @@
-import {clientAccess} from './job-customers'
+import {clientEmail} from './job-customers'
 import {getVendor} from './vendors'
 import type {Job} from './model'
 /** ROLE-003 / SUB-001: a narrow inbox grant never escapes the contact's own released company scope. */
 export async function scopeContact(db:D1Database,job:Job,email:string,id:string|undefined,trade?:string){
- if(await clientAccess(db,job,email))return undefined
+ if(await clientEmail(db,job,email))return undefined
  const scope=job.subcontracts?.find(s=>s.id===id&&s.status==='released'&&(!trade||s.trade.toLowerCase()===trade.toLowerCase()))
  if(!scope)return undefined
  const vendor=await getVendor(db,scope.vendor_id)

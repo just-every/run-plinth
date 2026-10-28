@@ -30,7 +30,7 @@ export function selectionAction(job: Job, actor: Actor, input: Input, id?: strin
   revision.status = 'presented'; revision.presented_by = stamp(actor); recordApproval(job, actor, 'selection.present', revision, revision); return row
  }
  need(action === 'sign', 'Unknown selection action', 404, 'not_found')
- need(actor.role === 'member' && (actor.email.toLowerCase() === job.client_email || actor.client_job_id === job.id), 'The assigned client must sign this choice', 403, 'client_required')
+ need(actor.role === 'member' && actor.client_job_id === job.id, 'The assigned client must sign this choice', 403, 'client_required')
  return signSelectionRevision(job,actor,input,row,revision)
 }
 /** Both authorized doors fix the same immutable choice and downstream snapshot. */

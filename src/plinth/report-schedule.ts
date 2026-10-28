@@ -55,7 +55,7 @@ async function guards(db:D1Database,job:Job,s:ReportSchedule):Promise<D1Prepared
  if(s.audience==='manager'){
   if(!['owner','admin','project_manager'].includes(recipient.role)||recipient.role==='project_manager'&&!recipient.team?.job_ids.includes(job.id))return null
  }else if(s.audience==='client'){
-  if(recipient.role!=='member'||!await clientAccess(db,job,p.email))return null
+  if(recipient.role!=='member'||!await clientAccess(db,job,p.id))return null
  }else if(recipient.role!=='reader'||!recipient.team?.job_ids.includes(job.id)||recipient.permissions&&!recipient.permissions.financial)return null
  if(s.kind==='packet'&&!['billing','photos'].every(feature=>portalEnabled(job,'client',feature)))return null
  return result

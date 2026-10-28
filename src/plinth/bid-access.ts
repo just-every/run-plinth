@@ -1,4 +1,4 @@
-import {clientAccess} from './job-customers'
+import {clientEmail} from './job-customers'
 import {portalEnabled} from './portal-policy'
 import {scopeContact} from './scope-contacts'
 import {currentQualification, type Vendor} from './vendor-model'
@@ -8,7 +8,7 @@ import {bidEstimators} from './bid-follow-up'
 
 /** Current policy requires both a qualified contact and its own released company scope. */
 export async function bidContact(db:D1Database,job:BidJob,bid:BidPackage,invite:Pick<BidInvitation,'vendor_id'|'contact_id'|'email'|'subcontract_id'|'pre_award'>){
- if(await clientAccess(db,job,invite.email))return false
+ if(await clientEmail(db,job,invite.email))return false
  if(!portalEnabled(job,'subcontractor','bids'))return false
  const row=await db.prepare('SELECT data FROM pl_vendors WHERE id=?').bind(invite.vendor_id).first<{data:string}>()
  if(!row)return false

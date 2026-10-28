@@ -2,7 +2,7 @@ import { costBilling, costBillingAccess, refreshCostBilling } from './cost-billi
 import { correctInvoice, isInvoiceCorrection } from './invoice-corrections'
 import { requireReviewedInvoiceCapacity } from './invoice-correction-pricing'
 import { requireJobManager } from './auth'
-import { clientAccess } from './job-customers'
+import { clientAccess, clientEmail } from './job-customers'
 import { cents, find, need, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
 import { invoiceDigest, invoiceLines, invoiceSources } from './invoice-pricing'
 import { invoiceRows, type Invoice, type InvoiceJob, type InvoiceSnapshot, type InvoiceBalance, type InvoiceReceipt } from './invoice-model'
@@ -53,7 +53,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   need(input.kind === 'deposit' || input.kind === 'milestone' || input.kind === 'cost_plus', 'Choose deposit, milestone or cost_plus')
   if(input.kind==='cost_plus')costBillingAccess(actor)
   const recipient_email = text(input.recipient_email, 'recipient_email', 254).toLowerCase()
-  need(await clientAccess(db, job, recipient_email), 'Choose the original client or a currently authorized billing contact', 403, 'recipient')
+  need(await clientEmail(db, job, recipient_email), 'Choose the original client or a currently authorized billing contact', 403, 'recipient')
   need(input.source_retainage_release_id === undefined, 'Retainage releases adjust the original milestone ledger and cannot be invoiced twice')
   need(input.kind !== 'deposit' || input.source_application_id === undefined, 'Deposit invoices cannot name an earned application')
   const source_application_id = input.kind === 'milestone' ? text(input.source_application_id, 'source_application_id', 100) : undefined
@@ -74,7 +74,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
  const row = find(invoiceRows(job), id)
  if (isInvoiceCorrection(action)) return { record: row, writes: await correctInvoice(db, job, row, actor, input, action!, invoiceBalance(job, row)) }
  if (action === 'accept') {
-  need(actor.role === 'member' && await clientAccess(db, job, actor.email), 'Only a currently assigned signed-in client may acknowledge this invoice', 403, 'forbidden')
+  need(actor.role === 'member' && await clientAccess(db, job, actor.id), 'Only a currently assigned signed-in client may acknowledge this invoice', 403, 'forbidden')
   need(row.issued && !row.acceptance, 'Issue the invoice first; acknowledgment is recorded once', 409, 'invoice_state')
   need(input.confirm === true, 'Confirm your acknowledgment of this exact invoice')
   row.acceptance = { statement: text(input.statement, 'Acknowledgment statement', 2000), accepted_by: stamp(actor), email: actor.email, label: 'Client acknowledgment recorded; not payment or an electronic signature' }
@@ -84,7 +84,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
  requireJobManager(actor)
  if (action === 'issue') {
   need(row.status === 'draft' && !row.issued, 'Each invoice issues once', 409, 'invoice_state')
-  need(await clientAccess(db, job, row.recipient_email), 'The invoice recipient is no longer authorized', 403, 'recipient')
+  need(await clientEmail(db, job, row.recipient_email), 'The invoice recipient is no longer authorized', 403, 'recipient')
   if(row.kind==='cost_plus')costBillingAccess(actor)
   const sources = invoiceSources(job, row.source_application_id)
   if(row.kind==='cost_plus')sources.cost_billing=refreshCostBilling(job,row)

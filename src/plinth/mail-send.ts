@@ -3,7 +3,7 @@ import { operatorMail } from '../mail.server.mjs'
 import { auditStatement } from './audit'
 import { requireJobManager } from './auth'
 import { company } from './company'
-import { clientAccess } from './job-customers'
+import { clientEmail } from './job-customers'
 import { mailKinds, oneLine, optionalNotice, plain, replyAddress, type MailKind, type MailStatus } from './mail-model'
 import { suppression } from './mail-store'
 import { find, need, stamp, type Actor, type Input, type Job } from './model'
@@ -40,7 +40,7 @@ export async function sendJobMail(env: Bindings, actor: Actor, job: Job, input: 
  if (kind as string === 'note') return addNote(env.DB, actor, job, plain(input.body, 'Note', 20_000))
  need(Object.hasOwn(mailKinds, kind), 'Unknown message kind', 400, 'mail_kind')
  const email = String(input.to ?? job.client_email).trim().toLowerCase()
- need(await clientAccess(env.DB, job, email), 'That recipient is not a current client contact of this job', 403, 'recipient')
+ need(await clientEmail(env.DB, job, email), 'That recipient is not a current client contact of this job', 403, 'recipient')
  const { subject, text } = compose(job, kind, input), required = mailKinds[kind].required, id = crypto.randomUUID(), now = new Date().toISOString()
  const suppressed = required ? null : await suppression(env.DB, email)
  const row = { id, job_id: job.id, direction: 'out', visibility: 'client', kind, required: required ? 1 : 0, counterparty: email, subject, body: text, by_id: actor.id, by_name: actor.name, created_at: now }

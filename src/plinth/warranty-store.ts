@@ -1,5 +1,5 @@
 import { authGuard } from './auth'
-import { clientAccess } from './job-customers'
+import { clientEmail } from './job-customers'
 import { DomainError, need, type Actor, type Job } from './model'
 import { readClock } from './store'
 import { teamGrant } from './team'
@@ -31,7 +31,7 @@ export async function recipientGuards(db: D1Database, job: Job, recipient: Warra
   const office = await officeAuthority(db, job, recipient.operator_id ?? '', true)
   return office && office.email === recipient.email ? authorityGuards(db, office) : null
  }
- if (!await clientAccess(db, job, recipient.email)) return null
+ if (!await clientEmail(db, job, recipient.email)) return null
  // Assigned customer contacts need not have signed in, but a revoked native person cannot receive notices.
  const person = await db.prepare('SELECT id,version,status FROM oa_operators WHERE lower(email)=?').bind(recipient.email).first<{ id: string; version: number; status: string }>()
  if (person && person.status !== 'active') return null

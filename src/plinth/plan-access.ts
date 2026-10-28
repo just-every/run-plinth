@@ -12,7 +12,7 @@ export async function planRecipientAllowed(db:D1Database,job:Job,id:string){
  const person=await db.prepare("SELECT id,email,role FROM oa_operators WHERE id=? AND status='active'").bind(id).first<{id:string;email:string;role:string}>()
  if(!person)return false
  if(person.role==='member'){
-  if(await clientAccess(db,job,person.email))return portalEnabled(job,'client','plans')
+  if(await clientAccess(db,job,person.id))return portalEnabled(job,'client','plans')
   if(!portalEnabled(job,'subcontractor','plans'))return false
   for(const scope of job.subcontracts??[])if(await scopeContact(db,job,person.email,scope.id))return true
   return false

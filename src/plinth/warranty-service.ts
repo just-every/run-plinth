@@ -48,7 +48,7 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
  const value=await input(request);need(value.expected_version===previous.version,'Service records changed; reload before acting',409,'stale_version')
  const job=structuredClone(previous);active(job);let item:WarrantyCase,writes:D1PreparedStatement[]=[]
  if(!tail.length){
-  need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.email),'Only an assigned client submits a warranty request',403,'client_required')
+  need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.id),'Only an assigned client submits a warranty request',403,'client_required')
   const state=warrantyState(job);need(state.cases.length<500,'Warranty case limit reached')
   const component=find(state.components,text(value.component_id,'Component',100)),by=stamp(actor),caseId=crypto.randomUUID(),files=await decisionFiles(db,job,caseId,value.attachments)
   need(files.attachments.length>0&&files.attachments.every(a=>a.mime==='image/png'||a.mime==='image/jpeg'),'Include at least one original request photo')
@@ -81,7 +81,7 @@ export async function warrantyServiceResponse(request:Request,env:Bindings):Prom
   }else if(action==='review'){
    requireJobManager(actor);const visit=find(service.visits,text(value.visit_id,'Exact visit',100));need(visit===service.visits.at(-1)&&visit.submission&&!visit.review,'Review the latest submitted fix once',409,'visit_state');need(typeof value.accepted==='boolean','Choose accept or reject');visit.review={by,accepted:value.accepted,reason}
   }else if(action==='acknowledge-client'){
-   need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.email),'Only an assigned client acknowledges closure',403,'client_required')
+   need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.id),'Only an assigned client acknowledges closure',403,'client_required')
    const visit=find(service.visits,text(value.visit_id,'Exact accepted visit',100));need(visit===service.visits.at(-1)&&visit.review?.accepted===true,'The builder must accept the current repair first',409,'builder_acceptance')
    service.client_acknowledgment={by,visit_id:visit.id,statement:reason};closeReviewedWarrantyCase(job,actor,item,{reason,evidence_reference:'Accepted service visit '+visit.id})
   }else if(await noRepairAction(db,job,actor,item,value,action,portal)){}

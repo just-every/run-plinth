@@ -18,7 +18,7 @@ export async function selectionDecision(db:D1Database,job:Job,actor:Actor,input:
  }
  need(['reminder','dispute','withdraw'].includes(action),'Unknown decision action',404,'not_found')
  need(revision.status!=='draft','Present the decision before recording an outcome',409,'decision_state')
- if(action==='dispute')need(actor.role==='member'&&(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'The assigned client must dispute this decision',403,'client_required')
+ if(action==='dispute')need(actor.role==='member'&&actor.client_job_id===job.id,'The assigned client must dispute this decision',403,'client_required')
  else requireJobManager(actor)
  if(action==='reminder')need(revision.status==='presented','Only pending decisions need a reminder',409,'decision_state')
  need(!selection.decisions?.some(d=>d.revision_id===revision.id&&['dispute','withdraw'].includes(d.kind)),'This outcome is retained; prepare a replacement revision',409,'decision_held')

@@ -1,5 +1,5 @@
 import { authGuard, requireManager } from './auth'
-import { clientAccess } from './job-customers'
+import { clientEmail } from './job-customers'
 import { find, need, stamp, type Actor, type Input } from './model'
 import { roleOf } from './role-store'
 import { scopeContact } from './scope-contacts'
@@ -32,7 +32,7 @@ async function recipientAuthority(db: D1Database, job: MeetingSharingJob, input:
  }
  if (input.kind !== 'office') {
   if (person.role !== 'member') return null
-  const allowed = input.kind === 'client' ? await clientAccess(db, job, input.email) : !!await scopeContact(db, job, input.email, input.subcontract_id)
+  const allowed = input.kind === 'client' ? await clientEmail(db, job, input.email) : !!await scopeContact(db, job, input.email, input.subcontract_id)
   return allowed ? recipient : null
  }
  if (person.role !== 'owner' && person.role !== 'admin') return null

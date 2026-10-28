@@ -51,7 +51,7 @@ export function requireFieldLog(actor:Actor,allowAgent=false){need(actor.role===
 /** Estimator, superintendent and crew are Plinth role-table presets on an operator-auth administrator, like a project manager. */
 export const isTeamRole=(role:string):role is TeamRole=>role==='project_manager'||role==='estimator'||role==='superintendent'||role==='crew'||role==='bookkeeper'||role==='reader'
 export const isFieldRole=(actor:Actor)=>actor.role==='superintendent'||actor.role==='crew'
-export function visible(actor:Actor,job:Job){need(!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id),'Job not found',404,'not_found');need(actor.role!=='member'||(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'Job not found',404,'not_found')}
+export function visible(actor:Actor,job:Job){need(!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id),'Job not found',404,'not_found');need(actor.role!=='member'||actor.client_job_id===job.id,'Job not found',404,'not_found')}
 export function actorPredicate(actor:Actor):{sql:string;params:unknown[]} {
  const person="EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND status='active' AND role=?)"
  const role=actor.role==='agent'?null:isTeamRole(actor.role)?'admin':actor.role

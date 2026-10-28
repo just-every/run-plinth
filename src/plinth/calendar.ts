@@ -20,7 +20,7 @@ async function digest(token: string): Promise<string> {
 /** A person manages only their own subscription to the supplied, current job. */
 export async function manageCalendar(db: D1Database, actor: Actor, job: Job, input: Input, clock?: number): Promise<{ urlPath?: string; revoked: boolean }> {
  need(!actor.credential_id && ['owner', 'admin', 'project_manager', 'member'].includes(actor.role), 'A person must manage calendar subscriptions', 403, 'human_required')
- need(actor.role !== 'member' || await clientAccess(db,job,actor.email), 'Job not found', 404, 'not_found')
+ need(actor.role !== 'member' || await clientAccess(db,job,actor.id), 'Job not found', 404, 'not_found')
  need(input.expected_version === job.version, 'Job changed. Reload before applying this action.', 409, 'stale_version')
  need(input.action === 'rotate' || input.action === 'revoke', 'Choose rotate or revoke')
  const writes = [db.prepare('DELETE FROM pl_calendar_tokens WHERE person_id=? AND job_id=?').bind(actor.id, job.id)]
@@ -86,15 +86,15 @@ export async function calendarFeed(request: Request, env: Bindings): Promise<Res
  const match = /^\/api\/plinth\/calendar\/([a-f0-9]{64})\.ics$/.exec(path)
  if (!match) return new Response(null, { status: 404, headers })
  const row = await env.DB.prepare(`
-  SELECT j.data,p.email,p.role FROM pl_calendar_tokens t
+  SELECT j.data,p.id,p.role FROM pl_calendar_tokens t
   JOIN oa_operators p ON p.id=t.person_id
   JOIN pl_jobs j ON j.id=t.job_id
   WHERE t.token_hash=? AND p.status='active'
    AND p.role IN ('owner','admin','member')
    AND NOT EXISTS(SELECT 1 FROM pl_team m WHERE m.operator_id=p.id AND NOT EXISTS(SELECT 1 FROM json_each(m.data,'$.job_ids') a WHERE a.value=j.id))
    AND NOT EXISTS(SELECT 1 FROM pl_erased_jobs e WHERE e.job_id=j.id)
- `).bind(await digest(match[1]!)).first<{ data: string; email: string; role: string }>()
- if (!row || row.role === 'member' && (!await clientAccess(env.DB,JSON.parse(row.data) as Job,row.email)||!portalEnabled(JSON.parse(row.data) as Job,'client','schedule'))) return new Response(null, { status: 404, headers })
+ `).bind(await digest(match[1]!)).first<{ data: string; id: string; role: string }>()
+ if (!row || row.role === 'member' && (!await clientAccess(env.DB,JSON.parse(row.data) as Job,row.id)||!portalEnabled(JSON.parse(row.data) as Job,'client','schedule'))) return new Response(null, { status: 404, headers })
  return new Response(calendar(JSON.parse(row.data) as Job), {
   headers: { ...headers, 'content-type': 'text/calendar; charset=utf-8' },
  })

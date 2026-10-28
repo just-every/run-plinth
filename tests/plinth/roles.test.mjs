@@ -111,6 +111,27 @@ test('ROLE-003 — two client jobs keep selections, published records, direct fi
  }finally{await f.close()}
 })
 
+test('ROLE-003 — changing a client sign-in email never transfers job visibility or decisions', async()=>{
+ const f=await createFixture()
+ try{
+  const original='bound-client@example.com',foreignEmail='unclaimed-client@example.com'
+  const beforeInvitation=await createActiveJob(f,'Accepted invitation job',original)
+  const client=await f.invite(original,'Bound Client')
+  const afterInvitation=await createActiveJob(f,'Later assigned job',original)
+  let foreign=await createActiveJob(f,'Unrelated client job',foreignEmail)
+  let r=await f.json(`/api/plinth/jobs/${foreign.id}/variations`,{method:'POST',cookie:f.owner,body:{expected_version:foreign.version,description:'Unrelated client decision',amount_cents:12_500}});assert.equal(r.status,200);foreign=r.value.job;const change=r.value.record
+  r=await f.json('/auth/email',{method:'POST',cookie:client,body:{email:foreignEmail}});assert.equal(r.status,200,JSON.stringify(r.value))
+  const listing=await f.json('/api/plinth/jobs',{cookie:client});assert.equal(listing.status,200);assert.deepEqual(listing.value.jobs.map(job=>job.id).sort(),[beforeInvitation.id,afterInvitation.id].sort(),'The accepted operator keeps only their own jobs after an email change')
+  assert.equal((await f.json(`/api/plinth/jobs/${beforeInvitation.id}`,{cookie:client})).status,200,'The immutable invitation identity keeps existing access')
+  assert.equal((await f.json(`/api/plinth/jobs/${foreign.id}`,{cookie:client})).status,404,'The new sign-in address grants no foreign job')
+  assert.equal((await f.json(`/api/plinth/jobs/${foreign.id}/variations/${change.id}/approve`,{method:'POST',cookie:client,body:{expected_version:foreign.version}})).status,404,'The new sign-in address grants no foreign decision')
+  foreign=(await f.json(`/api/plinth/jobs/${foreign.id}`,{cookie:f.owner})).value.job;assert.equal(foreign.variations[0].status,'draft','The foreign change remains undecided')
+  const replacement=await f.invite(original,'Replacement Client'),replacementJob=await createActiveJob(f,'Replacement client job',original)
+  assert.deepEqual((await f.json('/api/plinth/jobs',{cookie:replacement})).value.jobs.map(job=>job.id),[replacementJob.id],'A newly invited user of the released address gets only later explicit assignments')
+  assert.deepEqual((await f.json('/api/plinth/jobs',{cookie:client})).value.jobs.map(job=>job.id).sort(),[beforeInvitation.id,afterInvitation.id].sort(),'Reusing the old address does not revoke or widen the original operator')
+ }finally{await f.close()}
+})
+
 test('ROLE-003 — two subcontractor companies keep bills and unverified compliance originals isolated across job, search, export, downloads and revocation', async()=>{
  const f=await createFixture()
  try{
@@ -321,6 +342,10 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   const order = async amount => (await act('/orders', { supplier: 'Champlain Lumber', vendor_email: people.junior.email, description: `PO ${amount}`, amount_cents: amount }, office)).value.record.id
   const small = await order(400_000), large = await order(600_000)
   assert.equal((await act(`/orders/${small}/issue`, {}, office)).status, 200, 'A $4,000 PO is within the $5,000 limit')
+  const amendedLines = amount => [{ id: 'framing', description: 'Framing package', cost_code: '06-100', quantity: '1', unit: 'package', unit_cents: amount }]
+  assert.equal((await act(`/orders/${small}/amend`, { lines: amendedLines(410_000), reason: 'Reviewed framing revision' }, office)).status, 200)
+  r = await act(`/orders/${small}/approve-amendment`, { budget_impact_cents: 10_000, date_impact_days: 0 }, office); assert.equal(r.status, 200, 'A role with order approval rights approves an amendment'); assert.equal(r.value.record.amount_cents, 410_000)
+  r = await act('/schedules', { trade: 'Framing', description: 'Approved framing booking', start: '2026-11-10T08:00:00Z', end: '2026-11-10T16:00:00Z' }, office); assert.equal(r.status, 200); assert.equal(r.value.record.status, 'booked', 'A role with schedule approval rights books its schedule')
   const held = job.version; r = await act(`/orders/${large}/issue`, {}, office); assert.equal(r.status, 403); assert.equal(r.value.error, 'over_limit'); assert.equal(job.version, held, 'The over-limit PO writes nothing')
   assert.equal(job.orders.find(o => o.id === small).issued_by.role, 'project_manager')
 
@@ -382,9 +407,13 @@ test('ROLE-006 — custom roles copied from presets resolve one permission on ev
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, permissions: { budgets: { view: true } }, financial_visible: true } })).status, 200)
   seen = await view(lead); assert.ok(seen.budgets.length, 'The next request shows the budget')
   assert.equal((await api(`/roles/${carpenter.id}`, { method: 'PUT', body: { expected_version: carpenter.version, name: 'stale' } })).status, 409)
-  assert.equal((await api(`/roles/${manager.id}`, { method: 'PUT', body: { expected_version: manager.version, permissions: { orders: { approve: false } } } })).status, 200)
+  assert.equal((await api(`/roles/${manager.id}`, { method: 'PUT', body: { expected_version: manager.version, permissions: { orders: { approve: false }, schedule: { approve: false } } } })).status, 200)
   const gone = job.version; r = await act(`/orders/${large}/issue`, {}, f.owner); assert.equal(r.status, 200, 'The owner still approves above the limit'); assert.equal((await act('/orders', { supplier: 'x', description: 'x', amount_cents: 100 }, office)).status, 200, 'Creating is still allowed')
   r = await act(`/orders/${(await order(100))}/issue`, {}, office); assert.equal(r.status, 403, 'With approve switched off the Office Manager no longer issues POs'); assert.ok(job.version > gone)
+  assert.equal((await act(`/orders/${small}/amend`, { lines: amendedLines(420_000), reason: 'Second reviewed framing revision' }, office)).status, 200, 'The role may still prepare an amendment')
+  const beforeDeniedAmendment = job.orders.find(order => order.id === small).amount_cents
+  r = await act(`/orders/${small}/approve-amendment`, { budget_impact_cents: 10_000, date_impact_days: 0 }, office); assert.equal(r.status, 403, 'Approving an amendment requires order approval rights'); assert.equal(job.orders.find(order => order.id === small).amount_cents, beforeDeniedAmendment, 'A refused amendment leaves the commitment unchanged')
+  r = await act('/schedules', { trade: 'Electrical', description: 'Draft electrical booking', start: '2026-11-11T08:00:00Z', end: '2026-11-11T16:00:00Z' }, office); assert.equal(r.status, 200); assert.equal(r.value.record.status, 'draft', 'Schedule creation stays draft without schedule approval rights')
   const permissionEvents = (await api('/audit?kind=permission')).value.events.map(e => e.action)
   for (const action of ['roles.create', 'roles.update', 'team.update']) assert.ok(permissionEvents.includes(action), action + ' is audited')
 

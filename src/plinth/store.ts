@@ -4,7 +4,7 @@ import { authGuard, visible } from './auth'
 import { auditStatement, jobRef, type AuditEvent } from './audit'
 import { DomainError, need, type Actor, type Job } from './model'
 export async function jobs(db:D1Database):Promise<Job[]> {const rows=await db.prepare('SELECT data FROM pl_jobs ORDER BY rowid DESC').all<{data:string}>();return rows.results.map(r=>JSON.parse(r.data) as Job)}
-export async function jobOf(db:D1Database,actor:Actor,id:string):Promise<Job>{const row=await db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(id).first<{data:string}>();need(row,'Job not found',404,'not_found');const job=JSON.parse(row.data) as Job;if(actor.role==='member'&&await clientAccess(db,job,actor.email))actor.client_job_id=job.id;visible(actor,job);return job}
+export async function jobOf(db:D1Database,actor:Actor,id:string):Promise<Job>{const row=await db.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(id).first<{data:string}>();need(row,'Job not found',404,'not_found');const job=JSON.parse(row.data) as Job;if(actor.role==='member'&&await clientAccess(db,job,actor.id))actor.client_job_id=job.id;visible(actor,job);return job}
 /** Every committed write carries its ROLE-005 audit row in the same batch. */
 export async function transaction(db:D1Database,actor:Actor,job:Job|null,writes:D1PreparedStatement[],clock?:number,event?:AuditEvent) {
  const seen=clock??(await db.prepare('SELECT version FROM pl_clock WHERE id=1').first<{version:number}>())!.version

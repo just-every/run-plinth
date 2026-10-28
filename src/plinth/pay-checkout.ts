@@ -13,13 +13,13 @@ export const paymentsEnabled = (env: Bindings) => !!env.STRIPE_SECRET_KEY && !!e
 const HOUR = 3_600_000
 export async function attempts(db: D1Database, jobId: string, actor: Actor): Promise<PaymentAttempt[]> {
  const client = actor.role === 'member'
- const rows = await db.prepare(`SELECT ${attemptColumns} FROM pl_payment_attempts WHERE job_id=?${client ? ' AND lower(client_email)=?' : ''} ORDER BY created_at DESC,rowid DESC`).bind(...(client ? [jobId, actor.email.toLowerCase()] : [jobId])).all<PaymentAttempt>()
+ const rows = await db.prepare(`SELECT ${attemptColumns} FROM pl_payment_attempts WHERE job_id=?${client ? ' AND created_by=?' : ''} ORDER BY created_at DESC,rowid DESC`).bind(...(client ? [jobId, actor.id] : [jobId])).all<PaymentAttempt>()
  return rows.results
 }
 export const shown = (rows: PaymentAttempt[], actor: Actor) => actor.role === 'member' ? rows.map(clientAttempt) : rows.map(({ request_json: _request, ...row }) => row)
 /** A client pays one issued USD invoice's current balance. The instruction is durable before Stripe is called, one is open per invoice, and a repeat returns the same hosted page. */
 export async function startCheckout(env: Bindings, actor: Actor, job: Job, input: Input) {
- need(actor.role === 'member' && await clientAccess(env.DB, job, actor.email), 'Only the client pays an invoice here', 403, 'forbidden')
+ need(actor.role === 'member' && await clientAccess(env.DB, job, actor.id), 'Only the client pays an invoice here', 403, 'forbidden')
  need(portalEnabled(job, 'client', 'billing'), 'Billing is not available for this job', 404, 'not_found')
  need(paymentsEnabled(env), 'Online payment is not set up for this builder', 409, 'payments_unconfigured')
  need(currencyOf(job) === 'USD', 'Only USD invoices are paid online', 409, 'payment_currency')
@@ -31,7 +31,7 @@ export async function startCheckout(env: Bindings, actor: Actor, job: Job, input
  const open = await env.DB.prepare(`SELECT ${attemptColumns} FROM pl_payment_attempts WHERE invoice_id=? AND status IN ('open','processing')`).bind(invoice.id).first<PaymentAttempt>()
  if (open?.settlement_state === 'unresolved') throw new DomainError('payment_unresolved', 'The previous Checkout instruction is unresolved; reconcile it against Stripe before another payment', 409)
  if (open?.status === 'processing') throw new DomainError('payment_processing', 'A bank payment for this invoice is still processing; wait for the processor to confirm it', 409)
- if (open && open.client_email.toLowerCase() === email && open.amount_cents === balance.due_cents && open.checkout_url && now - Date.parse(open.created_at) < 23 * HOUR) return { attempt: clientAttempt(open), url: open.checkout_url, reused: true }
+ if (open && open.created_by === actor.id && open.amount_cents === balance.due_cents && open.checkout_url && now - Date.parse(open.created_at) < 23 * HOUR) return { attempt: clientAttempt(open), url: open.checkout_url, reused: true }
  if (open) await env.DB.prepare("UPDATE pl_payment_attempts SET status='expired',settlement_state='canceled',label=?,updated_at=? WHERE id=? AND status='open'").bind('Replaced by a newer payment instruction', new Date(now).toISOString(), open.id).run()
  if (open && open.session_id) await stripeCall(env, `/checkout/sessions/${open.session_id}/expire`, { body: {} }).catch(() => undefined)
  const id = crypto.randomUUID(), at = new Date(now).toISOString(), builder = (await company(env.DB))?.name ?? 'Your builder', snapshot = invoice.issued

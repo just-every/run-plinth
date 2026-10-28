@@ -13,7 +13,7 @@ export async function noRepairAction(db:D1Database,job:Job,actor:Actor,item:Warr
  need(item.status==='open','The closed service history is immutable',409,'immutable')
  const service=item.service,by=stamp(actor),reason=text(input.reason,'Action statement or reason',4000)
  if(action==='withdraw-client'){
-  need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.email),'Only an assigned client withdraws a request',403,'client_required')
+  need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.id),'Only an assigned client withdraws a request',403,'client_required')
   need(!service.withdrawal,'The client withdrawal statement is immutable',409,'immutable')
   service.withdrawal={id:crypto.randomUUID(),by,statement:reason}
   return true
@@ -36,7 +36,7 @@ export async function noRepairAction(db:D1Database,job:Job,actor:Actor,item:Warr
   if(resolution.basis==='withdrawal')finalizeWarrantyCase(job,actor,item,{reason,evidence_reference:'Client withdrawal '+resolution.withdrawal_id+'; builder resolution '+resolution.id,withdrawal_id:resolution.withdrawal_id,resolution_id:resolution.id})
   return true
  }
- need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.email),'Only an assigned client acknowledges a not-covered resolution',403,'client_required')
+ need(!portal&&actor.role==='member'&&await clientAccess(db,job,actor.id),'Only an assigned client acknowledges a not-covered resolution',403,'client_required')
  const review=item.reviews.at(-1),resolution=service.no_repair_resolutions?.at(-1)
  need(review?.decision==='not_covered','The latest coverage decision must be not covered',409,'coverage_required')
  need(resolution?.basis==='not_covered'&&resolution.review_id===review.id,'The builder must resolve the latest not-covered decision first',409,'builder_resolution')
