@@ -45,7 +45,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | SCH-004 | missing | No published schedule changes and acknowledgments workflow exists. |
 | SCH-005 | done |  |
 | SCH-006 | done |  |
-| DOC-001 | partial | Installed journey and exact-candidate Verify proof pending. |
+| DOC-001 | done |  |
 | DOC-002 | missing | No drawing recognition hyperlinks and comparison workflow exists. |
 | DOC-003 | done | None for current native RFI doors. DOC-001 and DOC-007 inherit broader sharing; CLIENT-004 and SCH-004 and NOTIFY-001 inherit electronic and date execution and outbound delivery. |
 | DOC-004 | missing | No submittals approvals and procurement release workflow exists. |
