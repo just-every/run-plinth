@@ -45,7 +45,7 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   assert.equal((await f.request(photo(),{cookie:other})).status,404)
   assert.equal((await mutate('/diary',{note:'Unsafe upload',attachments:[{name:'unsafe.svg',mime:'image/svg+xml',base64:Buffer.from('<svg/>').toString('base64')}]})).status,400)
  })
- job=await proveDailyRecords(f,job,client,agent)
+ job=await proveDailyRecords(f,job,client,agent,other)
  await t.test('supplier commitments, partial receipts and cumulative claim approval/export reconcile once',async()=>{
   let r=await mutate('/orders',{supplier:'Build Supplies',description:'Stone and cabinetry',amount_cents:250_000},{token:agent});assert.equal(r.status,200);job=r.value.job;const order=r.value.record.id
   assert.equal((await mutate(`/orders/${order}/issue`,{},{token:agent})).status,403)

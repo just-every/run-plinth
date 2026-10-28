@@ -6,7 +6,7 @@ import type { DailyWeather } from './daily-logs-model'
 async function source(url: string) {
  const parsed = new URL(url)
  if (parsed.origin !== 'https://api.weather.gov' || parsed.username || parsed.password) throw Error('Invalid weather source')
- const response = await fetch(parsed, { headers: { accept: 'application/geo+json' }, redirect: 'manual', signal: AbortSignal.timeout(8000) })
+ const response = await fetch(parsed, { headers: { accept: 'application/geo+json', 'user-agent': 'Plinth daily weather (https://run-plinth.com)' }, redirect: 'manual', signal: AbortSignal.timeout(8000) })
  if (!response.ok) throw Error('Weather provider unavailable')
  const raw = await response.text()
  if (raw.length > 1_000_000) throw Error('Weather response exceeds supported size')

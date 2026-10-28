@@ -1,3 +1,4 @@
+import { weatherEdge } from '../../tests/plinth/daily-support.mjs'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { stripeEdge, intent } from '../../tests/plinth/payment-fixture.mjs'
@@ -7,6 +8,7 @@ export async function providerEdge() {
  let refuseNext=false
  const messages = [], stripe = stripeEdge()
  const outboundService = async request => {
+  if (new URL(request.url).origin === 'https://api.weather.gov') return weatherEdge(request)
   if (new URL(request.url).origin === 'https://api.stripe.com') return stripe.handler(request)
   assert.equal(request.url, 'https://api.resend.com/emails', 'Unexpected Worker egress')
   assert.equal(request.method, 'POST')

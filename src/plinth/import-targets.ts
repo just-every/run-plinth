@@ -27,9 +27,26 @@ function matches(row: TargetRow | null, destination: string, kind: string, id: s
   return sql(parts.map(p => `(${p})`).join(' AND '), ...params)
 }
 
+/** Keep every original-byte comparison while respecting the per-statement binding ceiling. */
+function matchesParts(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql[] {
+  scope(destination, kind)
+  if (!row) return [matches(row, destination, kind, id)]
+  const current = value(row)
+  const parts = [sql('EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND data=? AND version=? AND import_revision IS ?) AND (SELECT COUNT(*) FROM pl_attachments WHERE job_id=?)=? AND NOT EXISTS(SELECT 1 FROM pl_erased_jobs WHERE job_id=?)', id, current.data, current.version, row.revision || null, id, current.attachments.length, id)]
+  for (const attachment of current.attachments) {
+    const columns = attachmentColumns.filter(key => key !== 'bytes_hex')
+    parts.push(sql(`EXISTS(SELECT 1 FROM pl_attachments WHERE ${columns.map(key => `${key}=?`).join(' AND ')} AND length(bytes)=?)`, ...columns.map(key => attachment[key]), attachment.bytes_hex.length / 2))
+    for (let offset = 0; offset < attachment.bytes_hex.length; offset += 100000) {
+      const chunk = attachment.bytes_hex.slice(offset, offset + 100000)
+      parts.push(sql('EXISTS(SELECT 1 FROM pl_attachments WHERE id=? AND job_id=? AND hex(substr(bytes,?,?))=?)', attachment.id, id, offset / 2 + 1, chunk.length / 2, chunk))
+    }
+  }
+  return parts
+}
+
 /** Native jobs and their import provenance always share one atomic D1 batch. */
 export const importTargets: D1TargetAdapter = {
-  read, matches,
+  read, matches, matchesParts,
   write(row) {
     scope(row.destination, row.targetKind)
     const next = value(row)
@@ -51,7 +68,7 @@ export const importTargets: D1TargetAdapter = {
     for (const effect of effects) {
       const { targetKind: kind, targetId: id } = effect.provenance
       const current = await read(db, destination, kind, id) ?? null
-      guards.push(matches(current, destination, kind, id))
+      guards.push(...matchesParts(current, destination, kind, id))
       observations.push({ effectId: effect.provenance.id, current, entity: { table: 'pl_jobs', recordId: id } })
     }
     if (!guards.length) {

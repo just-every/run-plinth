@@ -6,9 +6,14 @@ import {costFixture} from './cost-support.mjs'
 test('COST-004 — half-complete framing, worse productivity, posted costs and a revised remaining bid produce independently reconciled immutable forecasts',async()=>{
  const f=await createFixture();try{
   const c=await costFixture(f);let r=await c.ok('/costs/bills',c.bill()),id=r.record.id;await c.ok(`/costs/bills/${id}/review`,{reason:'Reviewed coded source'});await c.ok(`/costs/bills/${id}/post`)
+  const dailyTask=(await c.ok('/schedules',{trade:'Synthetic framing crew',description:'Synthetic forecast production task',start:'2026-10-23T08:00:00Z',end:'2026-10-23T12:00:00Z'})).record
+  const dailyInput={date:'2026-10-23',work:'Synthetic installed framing for forecast review',headcounts:[{trade:'Framing',count:3}],quantities:[{task_id:dailyTask.id,cost_code:'06-100',quantity:'50',unit:'each'}]}
+  const daily=(await c.ok('/daily-logs',dailyInput)).record
+  await c.ok('/daily-logs/'+daily.id+'/review',{revision_id:daily.revisions[0].id,confirm:true,reason:'Synthetic reviewed source quantity'})
   const assumptions={as_of:'2026-10-23',source_as_of:'Two receipts and bill reconciled today; remaining bid synthetic-plinth-1',codes:[{cost_code:'06-100',remaining_quantity:'50',minutes_per_unit:'24',labor_hour_cents:3000,outstanding_commitment_cents:60000,unbought_cents:5000,risk_cents:2000,reference:'50 of 100 framing units remain; observed 24 minutes/unit vs original 15; revised remaining bid 5000'},{cost_code:'01-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:0,unbought_cents:10000,risk_cents:0,reference:'Separate unbought labor package'}]}
   r=await c.ok('/costs/forecasts',assumptions);const first=r.record
   assert.equal(first.remaining_cents,137000);assert.equal(first.final_cents,180000);assert.equal(first.margin_cents,120000);assert.equal(first.codes[0].actual_cents,33000);assert.equal(first.codes[0].remaining_cents,127000);assert.equal(first.codes[0].variance_cents,60000);assert.equal(r.ledger.forecast.stale,false)
+  assert.equal(first.assumptions.production_inputs.length,1);assert.equal(first.assumptions.production_inputs[0].quantity,'50');assert.equal(first.assumptions.production_inputs[0].task_id,dailyTask.id);assert.equal(first.assumptions.production_inputs[0].revision_id,daily.revisions[0].id)
   const stale=structuredClone(assumptions);stale.codes[0].outstanding_commitment_cents=100000;assert.equal((await c.act('/costs/forecasts',stale)).status,409,'Consumed commitment cannot return as remaining')
   const next=structuredClone(assumptions);next.codes[0].minutes_per_unit='30';next.codes[0].unbought_cents=8000
   r=await c.ok('/costs/forecasts',next);assert.equal(r.record.final_cents,198000);assert.equal(r.record.margin_cents,102000)
@@ -17,6 +22,11 @@ test('COST-004 — half-complete framing, worse productivity, posted costs and a
   const missing={...assumptions,codes:assumptions.codes.slice(0,1)};assert.equal((await c.act('/costs/forecasts',missing)).status,409)
   const pending=structuredClone(assumptions);pending.codes[0].pending_change_cents=1000;assert.equal((await c.act('/costs/forecasts',pending)).status,400)
   r=await c.ok('/costs/forecasts',{...pending,scenario:'pending'});assert.equal(r.record.final_cents,181000);assert.equal(r.record.revenue_cents,300000,'Pending scenario does not invent client-approved revenue')
+  const corrected=(await c.ok('/daily-logs/'+daily.id+'/correct',{...dailyInput,revision_id:daily.revisions[0].id,reason:'Synthetic corrected production source',quantities:[{...dailyInput.quantities[0],quantity:'55.125'}]})).record
+  r=await c.ok('/costs/forecasts',assumptions);assert.deepEqual(r.record.assumptions.production_inputs,[],'An unreviewed correction cannot silently become a forecast input');assert.equal(r.record.final_cents,180000)
+  await c.ok('/daily-logs/'+daily.id+'/review',{revision_id:corrected.revisions[1].id,confirm:true,reason:'Synthetic reviewed correction'})
+  r=await c.ok('/costs/forecasts',assumptions);assert.equal(r.record.assumptions.production_inputs[0].quantity,'55.125');assert.equal(r.record.assumptions.production_inputs[0].revision_id,corrected.revisions[1].id);assert.equal(r.record.final_cents,180000,'A production quantity does not post actual costs or alter reviewed money assumptions')
+  assert.deepEqual((await c.api(`/jobs/${c.job.id}/costs/forecasts`)).value.forecasts[0].assumptions.production_inputs,first.assumptions.production_inputs)
  }finally{await f.close()}
 })
 

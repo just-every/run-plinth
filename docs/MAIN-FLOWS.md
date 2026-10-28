@@ -20,6 +20,16 @@ The chart shows every booking as a bar on a weekly grid, with today's line and t
 
 An agent-prepared booking appears as a dashed draft on an oxblood-edged row, and the strip under the tabs says what the agent prepared and what waits on you. Select it and press **Approve trade booking**.
 
+## Keep a private crew record
+
+Open **Daily logs → Record a private crew day**. Record the date, headcounts by trade, work, delays, equipment and deliveries. Add exact installed quantities against existing tasks and cost codes. Original photos stay private, along with MP4 clips up to 1 MB each. A record accepts five originals totaling up to 8 MB; each photo is limited to 2 MB.
+
+The owner sets the named site and coordinates under **Daily weather Settings**. Preview the US National Weather Service observations for the local site date. Saving the record retrieves its own dated source snapshot; absent observations are shown as unavailable. A human weather correction is recorded separately and never replaces the NWS values.
+
+Crew and office users can add internal comments, annotate an exact photo and append a reasoned correction. A manager reviews the exact record revision. Only current reviewed quantities appear as source links in **Schedule** and **Financial review**, and future cost forecasts retain those sources. A correction requires fresh review. These quantities do not post time, payroll or actual costs and do not change promised task dates. Earlier revisions, reviews, annotations and original bytes remain in the private archive; job erasure removes them and fences old archive replay.
+
+Private records do not appear in the client portal or grant subcontractor access. The existing published daily log below remains a separate, explicit client publication workflow. Subcontractor comments, expanded publication and sharing, and outbound notices remain unfinished.
+
 ## Publish a daily log
 
 In **Daily logs**, select the **Log date** and record the work, conditions and decisions. Add up to five PNG or JPEG photos, each no larger than 2 MB. Press **Publish daily log**.

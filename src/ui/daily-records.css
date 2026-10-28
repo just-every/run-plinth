@@ -1,0 +1,7 @@
+.workspace .daily-media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; margin: 16px 0; }
+.workspace .daily-media figure { max-width: 360px; }
+.workspace .daily-media img, .workspace .daily-media video { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.workspace .daily-photo { position: relative; }
+.workspace .daily-media figcaption { margin-top: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.workspace .daily-records > details { margin: 14px 0; }
+.workspace .daily-records article > section { margin: 20px 0; }

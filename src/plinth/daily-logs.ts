@@ -4,18 +4,19 @@ import { decisionDownload } from './decision-files'
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Attachment, type Input, type Job } from './model'
 import { day } from './purchase-order-model'
 import { dailyWeather } from './daily-weather'
-import { dailyProduction, type DailyLog, type DailyLogView, type DailyRevision } from './daily-logs-model'
+import { reviewedDailyProduction } from './schedule-baseline-model'
+import { type DailyLog, type DailyLogView, type DailyRevision } from './daily-logs-model'
 
 /** Private field records never inherit client photo publication. Custom roles must hold current log switches and job scope. */
-export function dailyLogAccess(actor: Actor, job: Job, write = false) {
+export function dailyLogAccess(actor: Actor, job: Job, operation: 'view' | 'create' | 'edit' | 'approve' = 'view') {
  need(['owner','admin','project_manager','superintendent','crew'].includes(actor.role) && !actor.agent_door, 'Private daily log access required', 403, 'forbidden')
  need(!actor.team || actor.team.job_ids.includes(job.id), 'Job not found', 404, 'not_found')
- need(!actor.permissions || actor.permissions.matrix.logs.view && (!write || actor.permissions.matrix.logs.edit), 'Current daily log permission required', 403, 'forbidden')
+ need(!actor.permissions || actor.permissions.matrix.logs.view && actor.permissions.matrix.logs[operation], 'Current daily log permission required', 403, 'forbidden')
 }
 const codes = (job: Job) => [...new Set(job.budgets?.at(-1)?.codes.map(c => c.cost_code) ?? job.quotes.flatMap(q => q.lines.map(l => l.cost_code ?? 'Unassigned')))]
 export function dailyLogView(job: Job, actor: Actor): DailyLogView {
  dailyLogAccess(actor, job)
- return { version: job.version, write: !actor.permissions || actor.permissions.matrix.logs.edit, review: ['owner','admin','project_manager'].includes(actor.role) && (!actor.permissions || actor.permissions.matrix.logs.approve), configure: actor.role === 'owner', logs: job.daily_logs ?? [], settings: job.daily_log_settings ?? null, production: dailyProduction(job), tasks: job.schedules.filter(t => t.status !== 'cancelled').map(t => ({ id: t.id, description: t.description })), cost_codes: codes(job) }
+ return { job_id: job.id, version: job.version, create: !actor.permissions || actor.permissions.matrix.logs.create, write: !actor.permissions || actor.permissions.matrix.logs.edit, review: ['owner','admin','project_manager'].includes(actor.role) && (!actor.permissions || actor.permissions.matrix.logs.approve), configure: actor.role === 'owner', logs: job.daily_logs ?? [], settings: job.daily_log_settings ?? null, production: reviewedDailyProduction(job), tasks: job.schedules.filter(t => t.status !== 'cancelled').map(t => ({ id: t.id, description: t.description })), cost_codes: codes(job) }
 }
 function revision(job: Job, actor: Actor, input: Input, previous?: DailyRevision): DailyRevision {
  const headcounts = input.headcounts ?? [], quantities = input.quantities ?? []
@@ -38,10 +39,11 @@ async function originals(db: D1Database, job: Job, id: string, value: unknown) {
  need(Array.isArray(files) && files.length <= 5, 'Attach at most five original photos or MP4 videos')
  let total = 0
  for (const value of files) {
-  const file = object(value), bytes = fromBase64(file.base64, 6_291_456), name = text(file.name, 'Original name', 240)
+  const file = object(value), bytes = fromBase64(file.base64), name = text(file.name, 'Original name', 240)
   total += bytes.length; need(total <= 8_388_608, 'Daily media must total at most 8 MB')
   need(!/[\x00-\x1f/\\]/.test(name), 'Invalid original name')
   const prefix = new TextDecoder().decode(bytes.slice(4,12)), video = prefix.startsWith('ftyp') && /^(isom|iso2|mp41|mp42|avc1)$/.test(prefix.slice(4))
+  need(!video || bytes.length <= 1_048_576, 'Each MP4 video must be at most 1 MB')
   const mime = video ? 'video/mp4' : media(bytes)
   need(video || bytes.length <= 2_097_152, 'Each photo must be at most 2 MB')
   need(file.mime === undefined || file.mime === mime, 'Media type does not match the original bytes')
@@ -52,7 +54,7 @@ async function originals(db: D1Database, job: Job, id: string, value: unknown) {
  return { attachments, writes }
 }
 export async function dailyLogAction(db: D1Database, job: Job, actor: Actor, input: Input, id?: string, action?: string) {
- dailyLogAccess(actor, job, true); active(job)
+ dailyLogAccess(actor, job, !id ? 'create' : action === 'review' ? 'approve' : 'edit'); active(job)
  let row: DailyLog | undefined, writes: D1PreparedStatement[] = []
  if (id === 'settings') {
   requireOwner(actor)

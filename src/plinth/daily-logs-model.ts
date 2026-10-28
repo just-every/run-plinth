@@ -32,7 +32,7 @@ export function dailyProduction(job: Job): DailyProduction[] {
  })
 }
 export interface DailyLogView {
- version: number; write: boolean; review: boolean; configure: boolean;
+ job_id: string; version: number; create: boolean; write: boolean; review: boolean; configure: boolean;
  logs: DailyLog[]; settings: WeatherSite | null; production: DailyProduction[];
  tasks: { id: string; description: string }[]; cost_codes: string[];
 }
