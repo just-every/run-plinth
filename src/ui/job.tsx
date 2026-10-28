@@ -1,4 +1,4 @@
-import { JobDocuments } from './job-documents'
+import { JobDocuments, PrivateRecordDocuments } from './job-documents'
 import { PlanWorkspace } from './plans'
 import { Submittals } from './submittals'
 import { Satisfaction } from './satisfaction'
@@ -90,6 +90,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Meetings' && <Meetings {...props}/>}
       {open === 'Decision search' && <DecisionSearch {...props}/>}
       {open === 'History' && <History {...props} onErased={onBack} />}
+      {role==='owner' && open!=='Documents' && <PrivateRecordDocuments jobId={job.id} section={open} version={job.version}/>}
       {manager && <LinkedTodos job={job} section={open}/>}
     </div>}
   </div>
