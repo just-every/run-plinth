@@ -75,7 +75,7 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
     catch (e) { setInvalid(e instanceof FieldError && e.field ? [e.field] : []); setError(e instanceof Error ? e.message : 'Could not save.'); }
     finally { setBusy(false); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
   }
-  return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-describedby={error ? id : undefined}><fieldset disabled={busy} aria-busy={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset><p role="status" aria-live="polite">{busy ? <>Saving… <span aria-hidden="true">{elapsed.toFixed(1)} seconds elapsed. </span>Keep this page open.</> : message}</p>{message && <p role="timer" aria-label="Request duration">Completed in {completed} seconds.</p>}{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error} Your entries are still here. Review them and try again.</p>}</form>
+  return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-describedby={error ? id : undefined}><fieldset disabled={busy} aria-busy={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset>{(busy || message) && <p role="status" aria-live="polite">{busy ? <>Saving… <span aria-hidden="true">{elapsed.toFixed(1)} seconds elapsed. </span>Keep this page open.</> : message}</p>}{message && <p role="timer" aria-label="Request duration">Completed in {completed} seconds.</p>}{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error}</p>}{error && <p className="hint">Your entries are still here. Review them and try again.</p>}</form>
 }
 
 export function ReadState({ label, error, retry, loading }: { label: string; error?: string; retry: () => Promise<void>; loading: boolean }) {
@@ -102,7 +102,7 @@ export function Action({ children, action, className = '' }: {children: ReactNod
       })
     } catch (e) { setError(e instanceof Error ? e.message : 'Action failed.') }
     finally { setBusy(false) }
-  }}>{busy ? 'Working…' : children}</button>{busy && <span role="status">Request in progress…</span>}{error && <span ref={errorRef} tabIndex={-1} role="alert" className="error">{error} Review and try again.</span>}</span>
+  }}>{busy ? 'Working…' : children}</button>{busy && <span role="status">Request in progress…</span>}{error && <span ref={errorRef} tabIndex={-1} role="alert" className="error">{error}</span>}</span>
 }
 export function Download({ filename, data, label }: {filename: string; data: string; label: string}) {
   return <button className="secondary" onClick={() => { const url = URL.createObjectURL(new Blob([data], {type:'text/plain'})); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }}>{label}</button>
