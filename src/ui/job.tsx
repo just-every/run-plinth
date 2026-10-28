@@ -1,4 +1,5 @@
 import { PlanWorkspace } from './plans'
+import { Submittals } from './submittals'
 import { Satisfaction } from './satisfaction'
 import { Meetings, DecisionSearch } from './meetings'
 import { FinancialAccess } from './financial-access'
@@ -73,7 +74,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Selections' && <Selections {...props} />}
-      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} /><Subcontracts {...props} />{manager&&<SubcontractorRecords jobId={job.id}/>}</>}
+      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} />{manager&&<Submittals job={job} refresh={refresh}/>}<Subcontracts {...props} />{manager&&<SubcontractorRecords jobId={job.id}/>}</>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}

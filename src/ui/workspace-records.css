@@ -103,3 +103,5 @@
 .workspace .table-scroll .lines { min-width: 460px; }
 .workspace .table-scroll .lines td, .workspace .table-scroll .lines th { white-space: nowrap; }
 .workspace .table-scroll .lines td:last-child, .workspace .table-scroll .lines th:last-child { text-align: left; }
+
+.workspace #submittals .notice { border: 1px solid var(--line); }
