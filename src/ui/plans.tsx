@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PlanSetView, PlanSheetView, PlanView } from '../plinth/plan-model'
 import { planLink } from '../plinth/plan-model'
-import { Action, api, Badge, Field, Form } from './shared'
+import { Action, api, Field, Form } from './shared'
 import { openDrawing, TakeoffViewer } from './takeoff-viewer'
 import { Page } from './shell'
 
@@ -21,9 +21,9 @@ export function PlanWorkspace({jobId}:{jobId:string}){
   {!sources.length&&<p>No plan sets uploaded.</p>}
   {!!sources.length&&<label>Drawing revision<select aria-label="Drawing revision" value={current?.sheet.id??''} onChange={e=>{setSelected(e.target.value);const item=sources.find(s=>s.sheet.id===e.target.value)!;history.replaceState(null,'',planLink(jobId,item.set.id,item.sheet.id))}}>{sources.map(({set,sheet})=><option key={sheet.id} value={sheet.id}>{sheet.number} · {sheet.revision} · {set.title} · {status(set,sheet)}</option>)}</select></label>}
   {current&&!pinnedMissing&&<article className="record" aria-label="Selected drawing">
-   <h3>{current.sheet.number} · revision {current.sheet.revision}</h3><Badge>{status(current.set,current.sheet)}</Badge>
+   <h3>{current.sheet.number} · revision {current.sheet.revision}</h3><span className="badge" style={{fontSize:13}}>{status(current.set,current.sheet)}</span>
    <p>{current.set.title} · {current.sheet.kind} · Issued {current.set.issue_on} · Page {current.sheet.page}</p>
-   {current.sheet.superseded_by&&<p className="notice">Superseded by revision {current.sheet.superseded_by.revision}. This link retains the original source.</p>}
+   {current.sheet.superseded_by&&<p role="status">Superseded by revision {current.sheet.superseded_by.revision}. This link retains the original source.</p>}
    <p><a href={current.sheet.href}>Pinned link to this exact sheet</a> · <a href={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`}>Download exact original</a></p>
    <TakeoffViewer jobId={jobId} sourceUrl={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`} revision={{id:current.sheet.id,revision:data.sets.indexOf(current.set)+1,document:current.sheet.document,page:current.sheet.page,width:current.sheet.width,height:current.sheet.height,uploaded_by:current.set.prepared_by}} points={point?[point]:[]} mode="count" calibrations={[]} measurements={current.set.annotations.filter(a=>a.sheet_id===current.sheet.id).map(a=>({id:a.id,revision_id:current.sheet.id,kind:'count' as const,points:[{x:a.x,y:a.y}],name:'Annotation',dimension:'note',annotation:a.text,by:a.by}))} onPoint={setPoint} editable={data.annotate&&!!current.set.approved_by}/>
    <h4>Source revision annotations</h4>
