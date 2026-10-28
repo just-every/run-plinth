@@ -71,7 +71,7 @@ import { auditExport, auditResponse } from './audit-http'
 import { holdsResponse } from './holds'
 import { searchJobs } from './search'
 import { siteContacts } from './site-contacts'
-import { authenticated, authorize, isFieldRole, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
+import { assignedJob, authenticated, authorize, isFieldRole, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
 import { permissionView, roleJobView } from './role-view'
 import { rolesResponse } from './roles'
 import { teamResponse } from './team'
@@ -141,7 +141,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts[0]==='search'&&parts.length===1&&method==='GET'){
   need(actor.role!=='agent','A signed-in person searches jobs',403,'human_required')
   const query=new URL(request.url).searchParams.get('q')?.trim()??'';need(query.length>0&&query.length<=200,'Enter up to 200 characters')
-  const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!actor.team||actor.team.job_ids.includes(job.id))
+  const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>assignedJob(actor,job))
   return json({results:searchJobs((await named(env.DB,all.filter((_,i)=>allowed[i]))).map(job=>display(job,actor)),query)})
  }
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
@@ -156,7 +156,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  const followup=await followupResponse(request,env,actor,parts,body);if(followup)return followup
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
- if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!actor.team||actor.team.job_ids.includes(job.id));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
+ if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>assignedJob(actor,job));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}

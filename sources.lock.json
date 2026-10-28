@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "e2aa798930f805267f555116ed46ed8ce4f0c09f0b683fa18d86362b90b64006",
+      "sha256": "49ddaac7808e72dd6704dbcde25bbe0c8de0efd58c3ce8b9a14bceab01d6f5f5",
       "executable": false
     },
     ".gitignore": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
-      "sha256": "4588f5b22ec365d24a4bb2c5d8073cd6bdcfecfa7f933e102af2d155465ff4be",
+      "sha256": "270a973d05be5917c553112f10782d7efa2736f622effd88ed31b0adaf4fbbc0",
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
@@ -3237,7 +3237,7 @@
       "executable": false
     },
     "src/plinth/auth.ts": {
-      "sha256": "84ec197a2aaca4ac9289e77c808ca15e50254abaeab7cddf66d23308e47f72c3",
+      "sha256": "158ac655195944488dfd28689a2f67235847a6e067df98e3117c1e2ecc3bfd71",
       "executable": false
     },
     "src/plinth/bid-access.ts": {
@@ -3525,7 +3525,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "7a3d966a5f917332b8f8e278db7eb4e24ee35b02897103f0a15357ba7c61867c",
+      "sha256": "1927fe47c7bcd41d00a5e6443eb0d151e973702bd15e3719c81043ede8abb2e5",
       "executable": false
     },
     "src/plinth/import-context.ts": {

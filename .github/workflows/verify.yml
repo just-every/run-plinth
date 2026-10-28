@@ -40,7 +40,7 @@ jobs:
           mkdir -p "$base_source"
           gh api repos/runeditrun/base/tarball/d555e789cffb744a9f83d76ebe42a2e3bdd7a055 > "$base_archive"
           tar -xzf "$base_archive" -C "$base_source" --strip-components=1
-          node "$base_source/global/rer.mjs" verify
+          node "$base_source/bin/rer.mjs" verify
 
   installed:
     name: Installed ${{ matrix.journey }}
