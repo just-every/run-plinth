@@ -1,3 +1,5 @@
+import { agentHttpBoundary } from './plinth/agent-door/http'
+import { plinthAgentDoor } from './plinth/agent-door/index'
 import { plinthScheduled } from './plinth/scheduled'
 import { withDemo } from './modules/demo/index.mjs'
 import { seedDemo } from './demo'
@@ -9,7 +11,7 @@ import { staticAssetResponse } from './base/static-assets'
 import { deploymentHealth } from './base/deployment-health'
 import { lobbyResponse } from './base/lobby'
 import { setupStateResponse } from './base/setup-state'
-import { authResponse, runtimeBindings, type Bindings } from './auth.server'
+import { authResponse, businessSettings, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { plinthResponse } from './plinth/http'
 import { importResponse } from './plinth/imports'
@@ -32,10 +34,16 @@ export default withDemo({
   // Cloudflare Email Routing delivers a client's reply here; the handler stores only replies to a message it sent.
   email: (message, env) => plinthEmail(message, runtimeBindings(env)),
   async fetch(request, env, execution) {
+    const door = await plinthAgentDoor(env).handle(request)
+    if (door) return door
+    const business = await businessSettings(runtimeBindings(env)).handle(request)
+    if (business) return business
     const asset = await staticAssetResponse(request, env)
     if (asset) return asset
     const auth = await authResponse(request, env)
     if (auth) return auth
+    const agentBoundary = agentHttpBoundary(request)
+    if (agentBoundary) return agentBoundary
     const imports = await importResponse(request, runtimeBindings(env))
     if (imports) return imports
     const product = await plinthResponse(request, runtimeBindings(env))

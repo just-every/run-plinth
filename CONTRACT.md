@@ -12,6 +12,10 @@ This contract defines the product being built, not a release claim. The final St
 | Incumbents a buyer switches from | Buildertrend, Procore, Houzz Pro, JobTread, Ressio |
 | First buyer | A US owner or project manager of a 3–30-person residential builder or remodeler, coordinating clients, employees and subcontractors in USD |
 
+## Shared agent door boundary
+
+The currently supported draft-only agent work adopts Base's shared door and policy vocabulary, BASE-AGENT-001 through BASE-AGENT-013 (including BASE-AGENT-010 events). The native NATIVE-008 restrictions remain authoritative. A company policy can hold or block a supported draft; it cannot authorize a final decision, send, payment, grant, import or erasure that the native agent role refuses. The registry and conformance journey are declared in `agent-surface.json`. The Construction project coordinator inspects native job evidence and prepares the supported estimates, draft bookings, private logs, variations, orders, pay apps, takeoff and captured-product work. It does not claim the unimplemented AGENT-001 through AGENT-009 recovery outcomes, autonomous final actions in the draft Agent surface, or enforced spending limits.
+
 ## Operating rules
 
 Every page, API, file, webhook, automation and export enforces current authority. People approve exact immutable commercial terms; bearer agents prepare drafts and never become decision makers. Source revisions and optimistic versions bind approvals to what was reviewed. Dates and money are explicit; commitments, physical receipt, actual cost, invoice issue and settled payment are separate facts. Corrections add history. Imported records and restored provider work remain inert until an authorized person adopts/reconnects them. External effects retain stable identities and uncertain outcomes remain visible until reconciled. Acceptance scenarios use real application doors, with fakes only at paid/network edges; controlled live-provider and real-export journeys are separately identified when required.
