@@ -266,6 +266,28 @@ test('RPT-003 — weekly manager digest and monthly redacted packets retain fail
   const copiedRow=(await api('/report-schedules',{cookie:lender})).value.schedules.find(r=>r.schedule.id===copiedSchedule.value.schedule.id);assert.ok(copiedRow);assert.equal((await f.request(path(copiedRow),{cookie:lender})).status,200)
   assert.equal((await api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version,financial_visible:false}})).status,200)
   assert.equal((await f.request(path(copiedRow),{cookie:lender})).status,404,'A custom reader cannot download money after financial visibility is revoked')
+  assert.equal((await api('/roles/'+copied.value.role.id,{method:'PUT',body:{expected_version:copied.value.role.version+1,financial_visible:true}})).status,200)
+  assert.equal((await f.request(path(copiedRow),{cookie:lender})).status,404,'Restoring financial visibility does not revive an old recurring grant')
+  const renewed=await create('lender','monthly',lenderPerson.email);assert.equal(renewed.status,201)
+  await f.scheduled('2026-10-27T10:00:00Z')
+  const renewedRow=(await api('/report-schedules',{cookie:lender})).value.schedules.find(r=>r.schedule.id===renewed.value.schedule.id)
+  assert.ok(renewedRow);assert.equal((await f.request(path(renewedRow),{cookie:lender})).status,200,'An explicit fresh owner grant restores authorized packet access')
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:lenderPerson.id,status:'inactive'}})).status,200)
+  assert.equal((await f.request(path(renewedRow),{cookie:lender})).status,401,'Removing the recipient account revokes its existing session')
+  assert.equal((await f.request(path(renewedRow),{cookie:f.owner})).status,404,'Even the owner cannot use a packet grant bound to a removed account')
+  const beforeInactiveSend=f.messages.length
+  await f.scheduled('2027-01-27T10:00:00Z');f.setNow(Date.parse('2026-10-27T10:00:00Z'))
+  assert.ok(!f.messages.slice(beforeInactiveSend).some(m=>m.subject.startsWith('Your scheduled Plinth')&&m.to.includes(lenderPerson.email)),'The scheduler cannot send to a removed account')
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:lenderPerson.id,status:'active'}})).status,200)
+  assert.equal((await f.request(path(renewedRow),{cookie:f.owner})).status,404,'Reactivating an account still requires a fresh owner report grant')
   const fresh=(await c.read());assert.ok(!JSON.stringify(fresh).includes('report_schedules'),'Raw job projection never exposes delivery grants or snapshots')
+  assert.equal((await api('/jobs/'+c.job.id,{method:'DELETE',body:{expected_version:fresh.version}})).status,200)
+  for(const cookie of [f.owner,manager,client]){
+   assert.deepEqual((await api('/report-schedules',{cookie})).value.schedules,[],'Erasure removes the job and all generated report listings')
+   for(const row of [wm,lm,copiedRow,renewedRow])assert.equal((await f.request(path(row),{cookie})).status,404,'A retained link cannot recover an erased packet')
+  }
+  const afterErasure=f.messages.length
+  await f.scheduled('2027-02-27T10:00:00Z');await f.scheduled('2026-10-27T10:00:00Z');f.setNow(Date.parse('2026-10-27T10:00:00Z'))
+  assert.equal(f.messages.length,afterErasure,'Neither a future tick nor replay of an old occurrence resurrects an erased report or sends mail')
  }finally{await f.close()}
 })
