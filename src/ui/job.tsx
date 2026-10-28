@@ -17,9 +17,9 @@ import { Products } from './products'
 import { Warranties } from './warranties'
 import { Correspondence } from './correspondence'
 import { Selections } from './selections'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Job } from '../plinth/model'
-import { api, money } from './shared'
+import { api, money, ReadState } from './shared'
 import { limited, office } from './authority'
 import { Icon } from './icons'
 import { DecisionStrip } from './decisions'
@@ -38,18 +38,27 @@ export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'a
 
 export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: string; onBack: () => void; onChange: () => Promise<void>}) {
   const [job, setJob] = useState<Job>(), [section, setSection] = useState<Section>(), [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const heading = useRef<HTMLHeadingElement>(null), currentId = useRef(id)
+  currentId.current = id
   const manager = office(role)
-  async function refresh() { const result = await api('/jobs/' + id); setJob(result.job) }
+  async function refresh() {
+    setLoading(true); setError('')
+    try { const result = await api('/jobs/' + id); if (currentId.current === id) setJob(result.job) }
+    catch (cause) { if (currentId.current === id) setError(cause instanceof Error ? cause.message : 'Could not read this job.'); throw cause }
+    finally { if (currentId.current === id) setLoading(false) }
+  }
   useEffect(() => { const tab = new URLSearchParams(window.location.search).get('tab'); setJob(undefined); setSection(sections.find(s => s === tab)); refresh().catch(e => setError(e.message)) }, [id])
   useEffect(() => { if (!section) return; const url = new URL(window.location.href); url.searchParams.set('tab', section); window.history.replaceState(null, '', url) }, [section])
+  useEffect(() => { heading.current?.focus() }, [job?.id])
   async function mutate(path: string, body: Record<string, unknown> = {}) {
     try {
       const result = await api('/jobs/' + id + path, { ...body, expected_version: job?.version })
       if (result.job) setJob(result.job); else await refresh()
-      await onChange(); return result
-    } catch (e) { await refresh(); throw e }
+      await onChange().catch(() => {}); return result
+    } catch (e) { await refresh().catch(() => {}); throw e }
   }
-  if (!job) return <p className="loading" role={error ? 'alert' : 'status'}>{error || 'Opening job…'}</p>
+  if (!job) return <ReadState label="Opening job" loading={loading} error={error} retry={refresh}/>
   const open = section ?? (role === 'bookkeeper' || role === 'reader' ? 'Financial review' : role === 'estimator' ? 'Quote' : limited(role) ? 'Today' : job.status === 'active' ? 'Schedule' : 'Quote')
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
   const roleSections:Record<string,readonly Section[]>={estimator:['Plans','Quote','Bids','To-dos'],superintendent:['Plans','Today','Schedule','Daily logs','Punch','To-dos'],crew:['Plans','Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
@@ -59,7 +68,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   return <div className="job">
     {['owner','admin','project_manager','client'].includes(role)&&<FollowupPreferences jobId={job.id}/>}
     <header className="job-head">
-      <h1>{job.name}</h1>
+      <h1 ref={heading} tabIndex={-1}>{job.name}</h1>
       <ul className="chips" aria-label="Job facts">
         <li><Icon name="pin" />{job.address || 'Site address not entered'}</li>
         <li><Icon name="money" />{job.status === 'active' ? limited(role)||!job.quotes.some(quote=>quote.status==='accepted')||job.portal_features&&!job.portal_features.includes('contracts')?'Active job':<>Contract {money(contractTotal(job), job.currency)}</> : 'Quote preparation'}</li>
@@ -68,6 +77,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       <nav className="tabs" aria-label="Job sections">{sections.filter(s => (!['Customer','Warranty','RFIs','Bids','Today'].includes(s) || manager || limited(role))&&sectionAllowed(s)).map(s => <button key={s} aria-current={open === s ? 'page' : undefined} onClick={() => setSection(s)}>{s}{s === 'Changes' && changes > 0 && <span className="count" aria-label={`${changes} waiting`}>{changes}</span>}</button>)}</nav>
     </header>
     {!sectionAllowed(open)?<p role="alert" className="notice">This feature is not available for your access.</p>:<div className="job-body">
+      {error && <ReadState label="Refreshing job" loading={loading} error={error} retry={refresh}/>}
       {open !== 'Schedule' && !limited(role) && <DecisionStrip job={job} manager={manager} go={setSection} />}
       {open === 'Financial review' && <FinancialAccess {...props}/>}
       {open === 'Plans' && <PlanWorkspace jobId={job.id}/>}
