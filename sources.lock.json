@@ -4485,7 +4485,7 @@
       "executable": false
     },
     "src/ui/attachment-text.ts": {
-      "sha256": "01eaec74685b87b111b38fa891b23a2ee0a29baa3d2715ddcc81a0e1c3682237",
+      "sha256": "14b1cb6e90a872da290bacea53e609e8590be1e82607e3f65150e48fa0679c64",
       "executable": false
     },
     "src/ui/audit.tsx": {
@@ -4960,6 +4960,10 @@
       "sha256": "8836f10e75bece803ef6908fc8c17453f1862ba14367ea3892170852e83c17a4",
       "executable": false
     },
+    "tests/fixtures/drawing-scanned-large.pdf": {
+      "sha256": "e31a1cb8589a2c8b35213e1fed1e83c7d486437be62410311cfbb866ed6321df",
+      "executable": false
+    },
     "tests/fixtures/drawing-scanned-revised.pdf": {
       "sha256": "519d81f0305db97721b6e4da4ca0badd82651ada0cf8084f37799c8dd736d6b7",
       "executable": false
@@ -5089,7 +5093,7 @@
       "executable": false
     },
     "tests/journeys/drawing-review.mjs": {
-      "sha256": "13a9a015f4e2e2bc8e4f74963b11ec42bf9d54d79e4ddde1326b2e70aac1040c",
+      "sha256": "ce27560d146176ce603230bea892232f80d87008d1d0c12237c11ca58f552910",
       "executable": false
     },
     "tests/journeys/estimate-performance.mjs": {

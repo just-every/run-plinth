@@ -6,6 +6,7 @@ const base=process.env.PLINTH_URL,state=process.env.PLINTH_STATE,shots=process.e
 assert.ok(base&&state&&shots,'Use the disposable installed application')
 await mkdir(shots,{recursive:true})
 const original=await readFile(new URL('../fixtures/drawing-scanned.pdf',import.meta.url)),revised=await readFile(new URL('../fixtures/drawing-scanned-revised.pdf',import.meta.url))
+const large=await readFile(new URL('../fixtures/drawing-scanned-large.pdf',import.meta.url))
 const browser=await chromium.launch({headless:true,executablePath:process.env.PLINTH_CHROMIUM_PATH,args:['--use-mock-keychain','--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])]})
 try{
  const owner=await browser.newContext({storageState:state,viewport:{width:1440,height:1000}}),manager=await browser.newContext({viewport:{width:1440,height:1000}}),page=await owner.newPage(),mp=await manager.newPage()
@@ -21,7 +22,7 @@ try{
  await page.goto(base+`/app?job=${job.id}&tab=Plans`)
  const panel=page.getByRole('region',{name:'Versioned plans'}),drawing=page.getByRole('article',{name:'Selected drawing'}),reviewPanel=page.getByRole('region',{name:'Office drawing review'})
  async function upload(title,revision,bytes,sheets){
-  await panel.getByText('Upload a plan set',{exact:true}).click()
+  if(!await panel.getByLabel('Plan set title',{exact:true}).isVisible())await panel.getByText('Upload a plan set',{exact:true}).click()
   const form=panel.locator('form').last()
   await form.getByLabel('Plan set title',{exact:true}).fill(title);await form.getByLabel('Issue date',{exact:true}).fill(revision==='A'?'2026-10-01':'2026-10-10')
   await form.getByLabel('Original plan PDFs',{exact:true}).setInputFiles(sheets.map((_,i)=>({name:`synthetic-plinth-scan-${i+1}.pdf`,mimeType:'application/pdf',buffer:bytes})))
@@ -35,16 +36,20 @@ try{
  const first=(await read()).sets[0],[one,two]=first.sheets
  const capture=async label=>{for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`${shots}/DOC-002-${label}-${width}.png`,fullPage:true,animations:'disabled'})}await page.setViewportSize({width:1440,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Reviewed drawing fits the viewport')}
  const unexpected=[];page.on('request',request=>{const url=new URL(request.url());if(url.protocol.startsWith('http')&&url.origin!==base)unexpected.push(url.origin)})
- async function recognize(sheet,number,name,misread=false){
+ async function recognize(sheet,number,name,misread=false,sourceSet=first){
   await page.getByLabel('Drawing revision',{exact:true}).selectOption(sheet.id)
   await reviewPanel.getByRole('button',{name:'Recognize this source page',exact:true}).click()
+  await Promise.race([
+   reviewPanel.getByLabel('Proposed sheet number',{exact:true}).waitFor({state:'visible',timeout:120000}),
+   reviewPanel.getByRole('alert').waitFor({state:'visible',timeout:120000}).then(async()=>{throw new Error(await reviewPanel.getByRole('alert').textContent())}),
+  ])
   await expect(reviewPanel.getByLabel('Proposed sheet number',{exact:true})).toBeVisible({timeout:120000})
   const draft=reviewPanel.locator('pre');await expect(draft).toContainText(name.toUpperCase());const text=await draft.textContent();assert.ok(text.length>20)
   // Seed a familiar uncertain digit in the unreviewed proposal; the generated source text remains intact.
   await reviewPanel.getByLabel('Proposed sheet number',{exact:true}).fill(misread?'AI':number)
   await reviewPanel.getByRole('button',{name:'Save recognition proposal',exact:true}).click()
   const proposal=page.getByRole('article',{name:'Recognition proposal'});await expect(proposal).toBeVisible()
-  const saved=(await read()).sets.find(s=>s.id===first.id).drawing_review.proposals.at(-1)
+  const saved=(await read()).sets.find(s=>s.id===sourceSet.id).drawing_review.proposals.at(-1)
   assert.equal(saved.text,text.trim());assert.ok(saved.regions.length);assert.equal(saved.page,sheet.page);assert.equal(saved.checksum,sheet.document.checksum);assert.ok(saved.regions.every(r=>r.x>=0&&r.y>=0&&r.confidence>=0&&r.confidence<=100))
   if(misread){assert.equal(saved.number,'AI');await capture('uncertain-source-proposal')}
   await proposal.getByLabel('Reviewed sheet number',{exact:true}).fill(number);await proposal.getByLabel('Reviewed sheet name',{exact:true}).fill(name)
@@ -94,6 +99,19 @@ try{
  assert.equal((await manager.request.get(base+root+'/review-search?q=Kitchen')).status(),404)
  assert.equal((await manager.request.post(base+root+'/'+first.id+'/recognition-review',{headers:{origin:base},data:{expected_version:(await read()).version,proposal_id:live.drawing_review.proposals.at(-1).id,number:'wrong',name:'wrong',text:'wrong',confirm:true}})).status(),404)
  await mp.reload();await expect(mp.getByRole('region',{name:'Office drawing review'})).toHaveCount(0)
+ // An ordinary 24 by 36 inch architectural scan must fit the bounded OCR canvas.
+ await upload('Architectural scanned permit set','C',large,[[1,'A1',1]])
+ const architectural=(await read()).sets.at(-1),largeSheet=architectural.sheets[0]
+ assert.equal(largeSheet.width,1728);assert.equal(largeSheet.height,2592)
+ await recognize(largeSheet,'A1','Kitchen plan',false,architectural)
+ const reviewedLarge=(await read()).sets.at(-1),largeProposal=reviewedLarge.drawing_review.proposals.at(-1)
+ const detail=largeProposal.regions.find(r=>/SEE.*A2/i.test(r.text));assert.ok(detail,'Recognition preserves the scanned detail reference')
+ // The image starts 432 PDF points below the top and maps each scan pixel to 2.16 points.
+ for(const [key,expected] of Object.entries({x:119,y:693,width:497,height:43}))assert.ok(Math.abs(detail[key]-expected)<12,`${key} remains in source PDF coordinates: ${detail[key]}`)
+ assert.equal(reviewedLarge.sheets[0].number,'A1');assert.equal(reviewedLarge.drawing_review.reviews.at(-1).number,'A1')
+ const largeDownload=await owner.request.get(base+root+'/'+architectural.id+'/files/'+largeSheet.id)
+ assert.equal(largeDownload.status(),200);assert.deepEqual(await largeDownload.body(),large)
+ await capture('architectural-scan-reviewed')
  await owner.close();await manager.close()
  console.log('DOC-002 PASS: real two-page scanned PDF, local OCR coordinates and uncertainty, explicit number correction and adoption, reviewed detail hotspot, searchable markup, rendered exact-source revision changes, identical originals, stale and cross-job and revoked refusals; browser proof at 1440 and 390')
 }finally{await browser.close()}
