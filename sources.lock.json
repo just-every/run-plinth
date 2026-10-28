@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "133e8e197b54733513e400cfb116794efd0cafe90d450258a31968cc68edbdc8",
+      "sha256": "e410307eacebdd7f6e1f0f48d78bfff85d9aa9520bf647c9f90446a7b6e72fd9",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "03e7f4725fb3fe6665d3633d9ea26dae8d7caa4cd5aa92dd1636142c2c8c42d1",
+      "sha256": "c13dab4c633ff36e59edfa8fc420051014da0201964c23ac4232b09c1b7c9893",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8bba90e7e1120d2938382320902cfd26be7531024e4fcdb1edf7c1d6d276e380",
+      "sha256": "f15b39c2d3f67054b0a00007bde8a8c3164a638b9a28932efa7f051fdeac4109",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f0bf1e459239f74bd2033dc174c9119e8821a6cf9889443508e6ee802551bbcc",
+      "sha256": "b73ccecb56525a527bf35ad8b919c71d195914093e6498f3f08ed51ed79f96c1",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -1001,7 +1001,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "046ee2aeebfa5ea382cbf7cba3d1459d770cb77a419a3f1ac755b70b2e2c7024",
+      "sha256": "926ba3d929e6dd82fa505a56a3f002c7841d5137199b19513492a60289c0d12b",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4625,7 +4625,7 @@
       "executable": false
     },
     "src/ui/estimate-editor.tsx": {
-      "sha256": "de6cea1ac7462e3fd2810607de75918a260cda154178439c7e130bce4c5db1e0",
+      "sha256": "0747b0a32a6925175e95563597e52370ebbc24a54bc3f218bff319eb9162de41",
       "executable": false
     },
     "src/ui/estimate-performance.tsx": {
@@ -4689,7 +4689,7 @@
       "executable": false
     },
     "src/ui/invoices.tsx": {
-      "sha256": "ed142199ddefb9b282784e9d7cc02f2ec46f55954c93d8073b9fffd931d0a405",
+      "sha256": "5b8ddfb409b96a4cc6d70b1d5930e0bece357ba7ec40cb19f276a4929128e592",
       "executable": false
     },
     "src/ui/job-customer.tsx": {
@@ -4701,7 +4701,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "6b537a714e8bb23a672b468ef618041078a56645e11f66536641f0fc9a75f4c6",
+      "sha256": "36dc002473f3337414f66a76702ad5bc8035af66c14a0265576a817714f0105b",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -4853,7 +4853,7 @@
       "executable": false
     },
     "src/ui/scope.tsx": {
-      "sha256": "88e3441514460d0148fc337387cc630cb3c1da500478cfbdcb7f133e1556fb54",
+      "sha256": "ba2c6a1ba05923f4ed0199c88332c6d4fbb06231f55aa6abca5a8f6bcbf5b149",
       "executable": false
     },
     "src/ui/selection-decisions.tsx": {
@@ -4865,11 +4865,11 @@
       "executable": false
     },
     "src/ui/shared.tsx": {
-      "sha256": "70f279598a318b26e2716c3e1f2e497d62d828e7a424f4e2908b174630fbde3d",
+      "sha256": "f29b8c5641954e6648a7fb0a3c786a3a899753014209e6822d6a9f305d731679",
       "executable": false
     },
     "src/ui/shell.tsx": {
-      "sha256": "3c97d0766f205e680ce68e8a61f9fa3100c8bca27554f8b27e72db002308359b",
+      "sha256": "7e488bcf355a549109278049a2176eaade10e37883e8327f63e86a8e26ef16cb",
       "executable": false
     },
     "src/ui/signed-changes.tsx": {
@@ -4881,7 +4881,7 @@
       "executable": false
     },
     "src/ui/sov.tsx": {
-      "sha256": "debdf3f1b6b2d0d430f78efd212f38b8718e0dd334b890066bd13781c4efec48",
+      "sha256": "b9b2bf0660b9cd9c92fea1260caf29b46000244b6a0259e50156a4d838f18686",
       "executable": false
     },
     "src/ui/subcontractor-records.tsx": {
@@ -4961,7 +4961,7 @@
       "executable": false
     },
     "src/ui/workspace-shell.css": {
-      "sha256": "83c8e44a98c34fb56e773aeef15a340331d05fd61553de542cd2b09d5362c2cc",
+      "sha256": "dd68766ff7493a668257836303be768f78103c9e7d0b53015cfefb5002aa389d",
       "executable": false
     },
     "src/ui/workspace.css": {
@@ -4969,7 +4969,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "cea3d158e9dc37dda79a7cfa6893dd150688d5b2d237db377b08c0ba37ef080d",
+      "sha256": "ba091b5e5af70f06a7e9ed2bf3df97802a18c72a3b833c555384314ed5b063cd",
       "executable": false
     },
     "test-budget.json": {
@@ -5133,7 +5133,7 @@
       "executable": false
     },
     "tests/journeys/estimates.mjs": {
-      "sha256": "ccb4ad04e1236924bfd91964f22975c0a59e3defd0a9859d7849b9f14f1bc55e",
+      "sha256": "af17df917e9744ef5c2111945923edd93e48281177198dcda7c9629f7b77f437",
       "executable": false
     },
     "tests/journeys/field-day.mjs": {
@@ -5157,7 +5157,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "82957541d0b06f0dd84c15895ad46bc4db0a5087febdf1645e6dfc07514e9a25",
+      "sha256": "1ebbe12453de8808dca0e93f5ad7d12adebe22a6bcc1e4aedd7f53896539aca3",
       "executable": false
     },
     "tests/journeys/invoice-correction-sources.mjs": {
@@ -5169,7 +5169,7 @@
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
-      "sha256": "626f9505c1178a9892ccec7313fe731e207c57d507551ae7ab323308b0315abd",
+      "sha256": "91280bc216a1915e1d81a9c42ca47d8694e526211b1df8a29e82e8504ec9eeb4",
       "executable": false
     },
     "tests/journeys/legacy-attachment-search.mjs": {
