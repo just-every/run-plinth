@@ -1,3 +1,4 @@
+import { drawingAction, drawingOffice } from './drawing-review'
 import { requireJobManager } from './auth'
 import { digest } from './attachments'
 import { find, need, object, recordApproval, stamp, text, type Actor, type Input, type Job } from './model'
@@ -18,7 +19,7 @@ export async function planView(db:D1Database,job:Job,actor:Actor):Promise<PlanVi
  for(const set of sets.filter(s=>s.approved_by).toSorted((a,b)=>a.approved_by!.at.localeCompare(b.approved_by!.at)))for(const sheet of set.sheets)latest.set(key(sheet),{set,sheet})
  const people=planManager(actor)?(await db.prepare("SELECT id,display_name AS name FROM oa_operators WHERE status='active' ORDER BY display_name").all<{id:string;name:string}>()).results:[]
  const recipients=[];for(const person of people)if(await planRecipientAllowed(db,job,person.id))recipients.push(person)
- return {id:job.id,version:job.version,name:job.name,manage:planManager(actor),annotate:actor.role!=='member'&&actor.role!=='estimator'&&(!actor.permissions||actor.permissions.matrix.documents.create),person_id:actor.id,recipients,sets:sets.filter(s=>planSetVisible(actor,s)).map(set=>({...set,recipients:planManager(actor)?set.recipients:set.recipients.filter(r=>r.id===actor.id),sheets:set.sheets.map(sheet=>{const current=latest.get(key(sheet));return {...sheet,current:current?.sheet.id===sheet.id,...(current&&current.sheet.id!==sheet.id?{superseded_by:{set_id:current.set.id,sheet_id:current.sheet.id,revision:current.sheet.revision}}:{}),href:planLink(job.id,set.id,sheet.id)}})}))}
+ return {id:job.id,version:job.version,name:job.name,manage:planManager(actor),review:drawingOffice(actor),annotate:actor.role!=='member'&&actor.role!=='estimator'&&(!actor.permissions||actor.permissions.matrix.documents.create),person_id:actor.id,recipients,sets:sets.filter(s=>planSetVisible(actor,s)).map(set=>({...set,drawing_review:drawingOffice(actor)?set.drawing_review:undefined,recipients:planManager(actor)?set.recipients:set.recipients.filter(r=>r.id===actor.id),sheets:set.sheets.map(sheet=>{const current=latest.get(key(sheet));return {...sheet,current:current?.sheet.id===sheet.id,...(current&&current.sheet.id!==sheet.id?{superseded_by:{set_id:current.set.id,sheet_id:current.sheet.id,revision:current.sheet.revision}}:{}),href:planLink(job.id,set.id,sheet.id)}})}))}
 }
 export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,id?:string,verb?:string){
  const writes:D1PreparedStatement[]=[]
@@ -46,6 +47,7 @@ export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,i
  }
  const set=find(job.plan_sets??[],id)
  need(planSetVisible(actor,set),'Plan set not found',404,'not_found')
+ if(['recognition-propose','recognition-review','detail-link'].includes(verb??''))return {record:drawingAction(job,actor,input,set,verb!),writes}
  if(verb==='approve'){
   requireJobManager(actor);need(input.confirm===true,'Confirm the exact sheets and recipients')
   need(Array.isArray(input.recipient_ids)&&input.recipient_ids.length<=100,'Choose up to 100 current recipients')

@@ -1,3 +1,4 @@
+import { DrawingRecognition } from './drawing-recognition'
 import { useEffect, useState } from 'react'
 import type { PlanSetView, PlanSheetView, PlanView } from '../plinth/plan-model'
 import { planLink } from '../plinth/plan-model'
@@ -26,6 +27,7 @@ export function PlanWorkspace({jobId}:{jobId:string}){
    {current.sheet.superseded_by&&<p role="status">Superseded by revision {current.sheet.superseded_by.revision}. This link retains the original source.</p>}
    <p><a href={current.sheet.href}>Pinned link to this exact sheet</a> · <a href={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`}>Download exact original</a></p>
    <TakeoffViewer jobId={jobId} sourceUrl={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`} revision={{id:current.sheet.id,revision:data.sets.indexOf(current.set)+1,document:current.sheet.document,page:current.sheet.page,width:current.sheet.width,height:current.sheet.height,uploaded_by:current.set.prepared_by}} points={point?[point]:[]} mode="count" calibrations={[]} measurements={current.set.annotations.filter(a=>a.sheet_id===current.sheet.id).map(a=>({id:a.id,revision_id:current.sheet.id,kind:'count' as const,points:[{x:a.x,y:a.y}],name:'Annotation',dimension:'note',annotation:a.text,by:a.by}))} onPoint={setPoint} editable={data.annotate&&!!current.set.approved_by}/>
+   {data.review&&current.set.approved_by&&<DrawingRecognition key={current.sheet.id} data={data} set={current.set} sheet={current.sheet} mutate={mutate}/>}
    <h4>Source revision annotations</h4>
    {current.set.annotations.filter(a=>a.sheet_id===current.sheet.id).map(a=><p key={a.id}>{a.text} · {current.sheet.number} · source revision {a.revision} · {a.by.name}</p>)}
    {!current.set.annotations.some(a=>a.sheet_id===current.sheet.id)&&<p>No annotations on this revision.</p>}

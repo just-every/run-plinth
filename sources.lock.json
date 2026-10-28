@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "deeca7916564b4ca0a43ae6ea5254a385ebeef4c52c4499ff52063ba24e33aba",
+      "sha256": "325fb0a5f9488d16d7b79feb64db4e899aa8a351c6d45577578ddacd6b86983d",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "69aeceb0c2af9f9e9b069abe0b1d2c939f537c20b58edcef50d7ba0fd062920b",
+      "sha256": "7e8bc0ec1ff521f90d94a13eb196b123448b033efdbfbe38f4934d8df5a614f6",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "d0acb47dc41a9fd34b5046c4ad700df7d8a66123db7f0ea0cdda89e6cd42b7eb",
+      "sha256": "ad4d8e8a75f4083a811b8bd00ea7dcdae192cbfd754fdd9ac5f637bcef3b641d",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -3444,6 +3444,10 @@
       "sha256": "a60c4d73d8c61357027a2b90b4505a82b724eb301dfa48eef455febb00b90d46",
       "executable": false
     },
+    "src/plinth/drawing-review.ts": {
+      "sha256": "371972118aaf90dcc1ee8c914c1963c7b6410865774cea40784bb6b19ace0a88",
+      "executable": false
+    },
     "src/plinth/estimate-catalog.ts": {
       "sha256": "3e96254047d5260cd0306f8be8f59b1621f592cd03dd041c88b4b17fa1efb9f9",
       "executable": false
@@ -3525,7 +3529,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "1927fe47c7bcd41d00a5e6443eb0d151e973702bd15e3719c81043ede8abb2e5",
+      "sha256": "80125144483fb94f089feb31869ba10a719285904c32b76dc4ec306130cbf1fe",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3685,7 +3689,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "20f2c686e1900282459ff88fb416cbd68e2644f810dd034e9e6a6e56c09517b5",
+      "sha256": "0707895427c3162bc871e4bb1e1a6d8079d998d52ccb95466a91c403828f1c86",
       "executable": false
     },
     "src/plinth/plan-access.ts": {
@@ -3693,15 +3697,15 @@
       "executable": false
     },
     "src/plinth/plan-http.ts": {
-      "sha256": "9df86c42434a1c45ac93dc98c6ff6d037a965e674a86ec6873762e9d6e6ca7ae",
+      "sha256": "d77eebf83deb80dd11693796643b94d422f8fc1079b6729ec7913b0044668ba4",
       "executable": false
     },
     "src/plinth/plan-model.ts": {
-      "sha256": "c5165395943c50d8bc000f437e2aaa66b37f5902d3fa78cc7826750bb695f1e7",
+      "sha256": "a31466abcee31d3a7a6e2eb59bb092874703a3b3efbd007469f4cbe49a0b1eeb",
       "executable": false
     },
     "src/plinth/plans.ts": {
-      "sha256": "108f7b6159dd0e029ad25cf6340fdb7657e98567bacd7bec3fe822cc338544e3",
+      "sha256": "d4af26aaee3c3ae6c0eb7b2238b19ff916c9bf8ab6d2d6b41aeba17329f7801a",
       "executable": false
     },
     "src/plinth/portal-features.ts": {
@@ -4465,7 +4469,7 @@
       "executable": false
     },
     "src/ui/attachment-text.ts": {
-      "sha256": "96d0c21564f89cce2e50e80671400035500d1b856453515126ba43d4dfd7d145",
+      "sha256": "01eaec74685b87b111b38fa891b23a2ee0a29baa3d2715ddcc81a0e1c3682237",
       "executable": false
     },
     "src/ui/audit.tsx": {
@@ -4574,6 +4578,10 @@
     },
     "src/ui/decisions.tsx": {
       "sha256": "34bb837ed3a29be6756f37a7bbab02a0ab07b839c18fec44ae22ffe83d4fe69d",
+      "executable": false
+    },
+    "src/ui/drawing-recognition.tsx": {
+      "sha256": "51bfc6244d0c78e0ebccc77c78f4281ec6e25dae3ab02fbce2b892f385486807",
       "executable": false
     },
     "src/ui/estimate-catalog.tsx": {
@@ -4693,7 +4701,7 @@
       "executable": false
     },
     "src/ui/plans.tsx": {
-      "sha256": "d95489b890ce9b9e179816d111e364b943bbfd892046bb83a965d61eff6e24c4",
+      "sha256": "aa0ea368e92e4cf93972508222b53b7c22357f59ba68ab65fe712498aa8cf91d",
       "executable": false
     },
     "src/ui/portal-access.tsx": {
@@ -5265,7 +5273,11 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "1af8af178d2b74a56ddfe45c0c8c7ced6f9caf95be571e418f2ddbf13a47c531",
+      "sha256": "362f6c399119b99ab030a0d03c3ad37dd597ad8a955d148470aeeafc3e1af35a",
+      "executable": false
+    },
+    "tests/plinth/drawing-review-support.mjs": {
+      "sha256": "3462408d8bf223bdc5cd7506eef54e62cfe8e3c14bf487e9e0a150a8243f7c1f",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {

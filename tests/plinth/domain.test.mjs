@@ -1,3 +1,4 @@
+import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
@@ -943,5 +944,16 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   const erasedId=active.job.id
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId,{method:'DELETE',cookie:f.owner,body:{expected_version:active.job.version}})).status,200)
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)
+ }finally{await f.close()}
+})
+
+test('DOC-002 — office drawing review corrects source-bound proposals, reviews detail links and searches revision markup while refusing stale and revoked access',async()=>{
+ const f=await createFixture();try{
+  const job=await createActiveJob(f,'Reviewed drawing house',['synthetic-plinth-drawing-client','example.test'].join('@'))
+  const proof=await proveDrawingReview(f,job)
+  const latest=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
+  assert.equal((await f.json('/api/plinth/jobs/'+job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:latest.version}})).status,200)
+  for(const path of ['/review-search?q=Reviewed','/'+proof.set.id+'/links/'+proof.link,'/'+proof.set.id+'/files/'+proof.one.id])assert.equal((await f.request('/api/plinth/jobs/'+job.id+'/plans'+path,{cookie:f.owner})).status,404)
+  assert.equal((await f.json('/api/plinth/jobs/'+job.id+'/plans/'+proof.set.id+'/recognition-propose',{method:'POST',cookie:f.owner,body:{expected_version:latest.version}})).status,404,'Replay cannot resurrect erased recognition')
  }finally{await f.close()}
 })
