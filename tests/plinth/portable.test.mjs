@@ -223,7 +223,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const costJobId=c.job.id
     const {roomInput,roomFiles}=await import('../fixtures/room-board.mjs')
     job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
-    const roomCreated=await f.json('/api/plinth/jobs/'+job.id+'/room-boards',{method:'POST',cookie:f.owner,body:{expected_version:job.version,...roomInput(),products:[{product_id:supplierProduct.id,revision_id:supplierProduct.revisions[0].id}]}})
+    const roomCreated=await f.json('/api/plinth/jobs/'+job.id+'/room-boards',{method:'POST',cookie:f.owner,body:{expected_version:job.version,...roomInput(),walkthrough:{title:'Authorized archived tour',url:'https://example.com/synthetic-plinth-tour',confirm_authorized:true},products:[{product_id:supplierProduct.id,revision_id:supplierProduct.revisions[0].id}]}})
     assert.equal(roomCreated.status,200);job=roomCreated.value.job
     const archivedRoom=structuredClone(job.room_boards[0])
     const cookie=f.owner; await f.close();f=undefined

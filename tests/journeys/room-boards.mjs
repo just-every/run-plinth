@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
-import { roomFiles } from '../fixtures/room-board.mjs'
+import { roomFiles, roomIfc } from '../fixtures/room-board.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
 assert.ok(base&&process.env.PLINTH_STATE&&process.env.PLINTH_CLIENT_STATE&&shots,'Installed owner and client states are required')
 await mkdir(shots,{recursive:true})
@@ -34,6 +34,10 @@ try{
  await create.getByLabel('Measurement unit',{exact:true}).selectOption('m')
  await create.getByLabel('Reviewed product revision',{exact:true}).selectOption(pid+':'+pr)
  await create.getByLabel('Exact selection revision',{exact:true}).selectOption(selection.id+':'+sr.id)
+ await create.getByText('Link an authorized walkthrough',{exact:true}).click()
+ await create.getByLabel('Walkthrough title',{exact:true}).fill('Authorized kitchen tour')
+ await create.getByLabel('Walkthrough URL',{exact:true}).fill('https://example.com/synthetic-plinth-tour')
+ await create.getByRole('checkbox',{name:'I am authorized to use this design-tool link',exact:true}).check()
  await create.getByLabel('Room originals',{exact:true}).setInputFiles(roomFiles().map(({name,bytes})=>({name,mimeType:name.endsWith('.pdf')?'application/pdf':name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':'application/octet-stream',buffer:bytes})))
  await create.getByRole('button',{name:'Create room board',exact:true}).click()
  const board=panel.getByRole('article',{name:'Kitchen finish board',exact:true})
@@ -48,10 +52,10 @@ try{
  await annotate.getByRole('button',{name:'Save finish revision',exact:true}).click()
  await expect(board.getByText('Matte oak matches the signed cabinet specification',{exact:false})).toBeVisible()
  const capture=async label=>{for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await board.scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/EST-008-${label}-${width}.png`,fullPage:true,animations:'disabled'})}await page.setViewportSize({width:1440,height:1000})}
- for(const [format,name] of [['pdf','synthetic-plinth-plan.pdf'],['png','synthetic-plinth-finish.png'],['jpeg','synthetic-plinth-finish.jpg'],['glb','synthetic-plinth-room.glb'],['obj','synthetic-plinth-room.obj']]){
+ for(const [format,name] of [['pdf','synthetic-plinth-plan.pdf'],['png','synthetic-plinth-finish.png'],['jpeg','synthetic-plinth-finish.jpg'],['glb','synthetic-plinth-room.glb'],['obj','synthetic-plinth-room.obj'],['ifc','synthetic-plinth-room.ifc'],['ifc-extrusion','synthetic-plinth-extrusion.ifc']]){
   await board.getByRole('button',{name:'Open '+name,exact:true}).click()
-  if(format==='glb'||format==='obj'){
-   const model=board.getByRole('region',{name:'Model viewer '+name,exact:true});await expect(model.getByRole('img',{name:'Geometry of '+name,exact:true})).toBeVisible();await expect(model.getByRole('status')).toHaveText('4 vertices · 2 triangles · Static geometry');await expect(model.locator('polygon')).toHaveCount(2)
+  if(format==='glb'||format==='obj'||format.startsWith('ifc')){
+   const model=board.getByRole('region',{name:'Model viewer '+name,exact:true});await expect(model.getByRole('img',{name:'Geometry of '+name,exact:true})).toBeVisible();await expect(model.getByRole('status')).toHaveText(format==='ifc-extrusion'?'8 vertices · 12 triangles · Static geometry':'4 vertices · 2 triangles · Static geometry');await expect(model.locator('polygon')).toHaveCount(format==='ifc-extrusion'?12:2)
    const old=await model.locator('polygon').first().getAttribute('points');await model.getByLabel('Rotate model',{exact:true}).fill('70');await expect.poll(()=>model.locator('polygon').first().getAttribute('points')).not.toBe(old)
    if(format==='obj')await expect(model.getByText('OBJ materials and external textures are not rendered',{exact:true})).toBeVisible()
   }else{await expect(board.getByRole('status').filter({hasText:'Original opened: '+name})).toBeVisible();if(format==='pdf'){await expect(board.getByLabel('Finish marker 1',{exact:true})).toBeVisible();await board.getByLabel('PDF page',{exact:true}).fill('2');await expect(board.getByRole('status').filter({hasText:'page 2 of 2'})).toBeVisible();await board.getByLabel('PDF page',{exact:true}).fill('1');await expect(board.getByLabel('Finish marker 1',{exact:true})).toBeVisible()}}
@@ -59,9 +63,12 @@ try{
  }
  await board.getByText('Revise this room board',{exact:true}).click()
  const revision=board.locator('form').filter({has:page.getByRole('button',{name:'Save room revision',exact:true})})
- await revision.getByLabel('Room length',{exact:true}).fill('4.5');await revision.getByLabel('Additional room originals',{exact:true}).setInputFiles({name:'synthetic-plinth-plan-revised.pdf',mimeType:'application/pdf',buffer:(await import('../fixtures/takeoff-plan.mjs')).takeoffPlan(true)})
+ await revision.getByLabel('Room length',{exact:true}).fill('4.5');await revision.getByLabel('Additional room originals',{exact:true}).setInputFiles([{name:'synthetic-plinth-plan-revised.pdf',mimeType:'application/pdf',buffer:(await import('../fixtures/takeoff-plan.mjs')).takeoffPlan(true)},{name:'synthetic-plinth-unsupported.ifc',mimeType:'application/x-step',buffer:roomIfc('unsupported')}])
  await revision.getByRole('button',{name:'Save room revision',exact:true}).click()
  await expect(board.getByText('Measurements: 4.5 × 3 × 2.7 m',{exact:true})).toBeVisible()
+ await board.getByRole('button',{name:'Open synthetic-plinth-unsupported.ifc',exact:true}).click()
+ await expect(board.getByRole('alert')).toContainText('Unsupported IFC body: IFCBOOLEANRESULT')
+ await capture('unsupported-ifc')
  await act(`/products/${pid}/revise`,{...product,cost_quote_cents:18000})
  job=await read();const current=job.room_boards[0].revisions.at(-1),rootUrl=base+'/api/plinth'+root
  assert.deepEqual(job.room_boards[0].revisions[0],first);assert.equal(current.products[0].cost_quote_cents,12000);assert.deepEqual(job.selections[0].revisions[0].signature,signed);assert.deepEqual(job.quotes,quotes)
@@ -81,7 +88,16 @@ try{
  await page.setViewportSize({width:390,height:1000});await page.goto(base+`/app?job=${job.id}&tab=Room+boards&board=${job.room_boards[0].id}&revision=${first.id}`)
  await expect(page.getByRole('article',{name:'Kitchen finish board',exact:true}).getByText('Measurements: 4 × 3 × 2.7 m',{exact:true})).toBeVisible()
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Room board fits the phone viewport')
- const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')
+ const revisionBoard=page.getByRole('article',{name:'Kitchen finish board',exact:true})
+ const exportLink=revisionBoard.getByRole('link',{name:'Export this room revision',exact:true})
+ const exported=await owner.request.get(base+await exportLink.getAttribute('href'));assert.equal(exported.status(),200)
+ const packageOne=await (await import('jszip')).default.loadAsync(await exported.body()),manifest=JSON.parse(await packageOne.file('board.json').async('string'))
+ assert.equal(manifest.revision.id,first.id);assert.deepEqual(manifest.revision.selections[0].value.signature,signed)
+ for(const original of roomFiles()){const entry=manifest.originals.find(o=>o.name===original.name);assert.deepEqual(await packageOne.file(entry.path).async('nodebuffer'),original.bytes)}
+ assert.equal((await client.request.get(base+await exportLink.getAttribute('href'))).status(),403)
+ await owner.route('https://example.com/synthetic-plinth-tour',async route=>{assert.equal(route.request().headers().referer,undefined);await route.fulfill({contentType:'text/html',body:'<!doctype html><meta name="viewport" content="width=device-width"><title>Synthetic authorized tour</title><h1>Synthetic authorized kitchen walkthrough</h1><p>Design-tool boundary fixture; no provider authorization receipt.</p>'})})
+ const opened=page.waitForEvent('popup');await revisionBoard.getByRole('link',{name:'Authorized kitchen tour (external walkthrough)',exact:true}).click();const tour=await opened;await tour.waitForLoadState();await expect(tour.getByRole('heading',{name:'Synthetic authorized kitchen walkthrough'})).toBeVisible();assert.equal(new URL(tour.url()).pathname,'/synthetic-plinth-tour');await tour.close()
+ const menu=page.getByRole('button' ,{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')
  await owner.close();await client.close()
- console.log('EST-008 PASS: original PDF, PNG and JPEG opening, real GLB and OBJ geometry, immutable finish and room revisions, pinned signed sources, exact downloads, stale refusal and private access; screens at 1440 and 390')
+ console.log('EST-008 PASS: original PDF, PNG and JPEG opening, real GLB and OBJ geometry, immutable finish and room revisions, pinned signed sources, exact revision export packages, IFC tessellation and extrusions, unsupported-body refusal, explicit external link opening without referrer, stale refusal and private access; screens at 1440 and 390')
 }finally{await browser.close()}
