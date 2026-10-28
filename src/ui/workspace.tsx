@@ -52,7 +52,8 @@ export function Workspace() {
     return () => { current = false; clearTimeout(timer) }
   }, [words, searchAttempt])
   useEffect(() => {
-    if (ready && !selected) document.querySelector<HTMLElement>('main h1')?.focus()
+    // Typing in global search opens Jobs while the search field keeps keyboard focus.
+    if (ready && !selected && document.activeElement?.id !== 'job-search') document.querySelector<HTMLElement>('main h1')?.focus()
   }, [view, selected, ready])
   useEffect(() => {
     if (!menu) return

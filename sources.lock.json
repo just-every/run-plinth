@@ -4969,7 +4969,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "193c3601cc3ac19ccd41f618a5a9f3cb6e4632867e35efc3f1f5cf5ca2ee0d2c",
+      "sha256": "518c27bb449761008d99bebf8b820e8e86b7f98e9c1c7808da5d6d7d649c1f98",
       "executable": false
     },
     "test-budget.json": {
@@ -5157,7 +5157,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "767185848e15487aa341047aeb4f9b5af58cb4574cc0a345b54dff0bc224b959",
+      "sha256": "8bad7293f04ae46d9726d800c8303a95318406a9b327b657dd9c8a2ffffee631",
       "executable": false
     },
     "tests/journeys/invoice-correction-sources.mjs": {

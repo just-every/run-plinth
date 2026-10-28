@@ -195,6 +195,24 @@ export async function officeRecovery({ page, context, base, email, shots }) {
  await expect(page.getByRole('list', { name: 'Jobs', exact: true }).getByRole('button', { name: new RegExp(name.slice(0, 35)) })).toBeVisible()
  await searchFailure.close()
  await page.getByRole('button', { name: 'Clear search', exact: true }).click()
+ for (const tab of ['Quote', 'Billing']) {
+  await page.goto(`${base}/app?job=${savedId}&tab=${tab}`)
+  await expect(heading).toBeFocused()
+  const search = page.getByRole('searchbox', { name: 'Search jobs', exact: true })
+  await search.focus()
+  for (const letter of 'Maple') {
+   await page.keyboard.type(letter)
+   await expect(search).toBeFocused()
+  }
+  await expect(search).toHaveValue('Maple')
+  const result = page.getByRole('list', { name: 'Jobs', exact: true }).getByRole('button', { name: new RegExp(name.slice(0, 35)) })
+  await expect(result).toBeVisible()
+  await captureOffice(page, shots, `search-from-${tab.toLowerCase()}`, search)
+  await result.focus(); await page.keyboard.press('Enter')
+  await expect(heading).toBeFocused()
+  await page.locator('.rail-nav').getByRole('button', { name: /^Jobs/ }).focus(); await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Jobs', exact: true })).toBeFocused()
+ }
  console.log('OPS-001 Jobs PASS: failed reads and saves, retained draft, keyboard retry and drawer recovery, accessibility tree and reload of every acknowledged field')
 }
 
