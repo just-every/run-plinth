@@ -69,6 +69,14 @@ revoking access or erasing the job prevents a new eligible instruction. Rules ne
 make a financial decision. Earlier preview-only revisions remain inert until the
 owner and recipient make separate delivery choices.
 
+The native delivery journey also exercises fresh, never-attempted estimate sources:
+an authorized office recipient receives one notice, a changed reader role receives
+nothing and consumes no step, and restored authority permits that pending step once.
+Separate pending sources stay untouched after opt-out, pause and recorded acceptance.
+If a job is erased while its mail instruction is already at the provider, late
+completion cannot recreate the job or authorize another notice. The installed
+journey shows both owner history and recipient preferences at desktop and phone widths.
+
 Remaining AUTO-001 work includes the complete NOTIFY-001 multi-channel and digest
 routing, role defaults, delegated source recipients and real provider proof.
 NOTIFY-001 retains configured mail, Twilio sender, APNs and FCM prerequisites.

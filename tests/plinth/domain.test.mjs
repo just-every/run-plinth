@@ -949,11 +949,18 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
 })
 
 test('Owner follow-up delivery reserves each live source step once, honors recipient routing, and fences unsafe dispatch',async()=>{
- const {followupFixture}=await import('./followup-support.mjs')
+ const {followupFixture,followupAddress}=await import('./followup-support.mjs')
  const {generateKeyPairSync,sign}=await import('node:crypto')
  const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'P-256'})
- let mode='accepted'
- const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z'),mailProvider:'sendgrid',mailEventKey:publicKey.export({type:'spki',format:'der'}).toString('base64'),mailResponse:message=>message.subject.startsWith('Plinth follow-up:')&&mode==='refused'?Response.json({message:'Synthetic refusal'},{status:422}):message.subject.startsWith('Plinth follow-up:')&&mode==='unknown'?Promise.reject(new Error('Synthetic lost response')):new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-701'}})})
+ let mode='accepted',onNotice
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z'),mailProvider:'sendgrid',mailEventKey:publicKey.export({type:'spki',format:'der'}).toString('base64'),mailResponse:async message=>{
+  if(message.subject.startsWith('Plinth follow-up:')){
+   await onNotice?.()
+   if(mode==='refused')return Response.json({message:'Synthetic refusal'},{status:422})
+   if(mode==='unknown')throw new Error('Synthetic lost response')
+  }
+  return new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-701'}})
+ }})
  try{
   const c=await followupFixture(f),notices=()=>f.messages.filter(m=>m.subject.startsWith('Plinth follow-up:'))
   const configure=(job,kind,extra={})=>job.act('/followup-rules',{...c.config,kind,delivery:true,delivery_confirm:true,...extra})
@@ -1011,9 +1018,56 @@ test('Owner follow-up delivery reserves each live source step once, honors recip
   await c.active.act('/followup-consent',{kind:'collection',allowed:false,channel:'email',confirm:true},c.client)
   assert.ok((await c.preview(c.active)).actions.filter(a=>a.source_id===third.id).every(a=>a.reason==='Recipient opted out; sequence stopped'))
   await configure(c.active,'selection',{paused:true});await run(c.active);assert.equal(notices().length,beforeQuiet+1)
+
+  // Fresh sources and an unsuppressed recipient prove each stop before its first attempt.
+  const office=await f.invite(followupAddress(702),'Synthetic follow-up manager','admin')
+  const officeId=(await c.api('/team')).value.team.find(p=>p.name==='Synthetic follow-up manager').id
+  const reviseEstimate=()=>c.estimate.act('/quotes',{lines:[{description:'Revised synthetic renovation',quantity:1,unit_cents:100000}]})
+  const officeRule={recipients:[officeId],steps:[{after_days:0,label:'Current manager review',escalate:false}]}
+  await configure(c.estimate,'estimate',officeRule)
+  await consent(c.estimate,'estimate','email',office)
+  await reviseEstimate();await run(c.estimate)
+  const beforeRevocation=notices().length,historyBeforeRevocation=await history(c.estimate)
+  assert.ok(notices().at(-1).to.includes(followupAddress(702)),'An authorized office recipient receives the supported notice')
+  await reviseEstimate()
+  assert.equal((await f.json('/api/plinth/team/'+officeId,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'reader',job_ids:[c.estimate.job.id]}})).status,200)
+  const revokedSnapshot=await c.estimate.read()
+  await run(c.estimate)
+  assert.equal(notices().length,beforeRevocation,'A fresh source cannot notify a recipient whose role was revoked')
+  assert.deepEqual(await c.estimate.read(),revokedSnapshot)
+  assert.deepEqual(await history(c.estimate),historyBeforeRevocation,'Revocation cannot reserve or consume the pending source step')
+  assert.equal((await f.json('/api/plinth/team/'+officeId,{method:'PUT',cookie:f.owner,body:{expected_version:1,role:'admin'}})).status,200)
+  await run(c.estimate);assert.equal(notices().length,beforeRevocation+1)
+  await reviseEstimate();await c.estimate.act('/followup-consent',{kind:'estimate',allowed:false,channel:'email',confirm:true},office)
+  const beforeOptOut=notices().length,optedOutSnapshot=await c.estimate.read()
+  await run(c.estimate);assert.equal(notices().length,beforeOptOut,'Opt-out fences a new, never-attempted source')
+  assert.deepEqual(await c.estimate.read(),optedOutSnapshot)
+  await consent(c.estimate,'estimate','email',office);await run(c.estimate);assert.equal(notices().length,beforeOptOut+1)
+  await reviseEstimate();await configure(c.estimate,'estimate',{...officeRule,paused:true})
+  const beforeStop=notices().length,pausedSnapshot=await c.estimate.read()
+  await run(c.estimate);assert.equal(notices().length,beforeStop,'Pause fences a new, never-attempted source')
+  assert.deepEqual(await c.estimate.read(),pausedSnapshot)
+  await configure(c.estimate,'estimate',officeRule)
+  await c.estimate.act('/quotes/'+c.estimate.job.quotes.at(-1).id+'/accept',{method:'signed',evidence:'Synthetic recorded client agreement',schedule_choice:{kind:'none',reason:'Scheduling follows permit'}})
+  const resolvedSnapshot=await c.estimate.read()
+  await run(c.estimate);assert.equal(notices().length,beforeStop,'Resolution fences the pending step after the rule resumes')
+  assert.deepEqual(await c.estimate.read(),resolvedSnapshot)
+
+  // Erasure while the provider holds an instruction must survive its late completion.
+  const lastChoice=(await c.active.act('/selections',{room:'Bath',category:'Fixtures',allowance_cents:1000,cost_code:'22-100',decision_on:'2026-10-28',lead_days:1,options:[{name:'Basin',supplier:'Synthetic supplier',specifications:'Reviewed basin',price_cents:1000}]})).record
+  await c.active.act('/selections/'+lastChoice.id+'/present',{revision_id:lastChoice.revisions[0].id})
+  await configure(c.active,'selection',{recipients:[c.ownerId],steps:[{after_days:0,label:'Owner fixture review',escalate:false}]})
   const beforeErase=c.active.job.id
-  assert.equal((await f.json('/api/plinth/jobs/'+beforeErase,{method:'DELETE',cookie:f.owner,body:{expected_version:c.active.job.version}})).status,200)
-  await f.scheduled('2026-10-31T15:00:00Z');assert.equal(notices().length,beforeQuiet+1)
+  onNotice=async()=>{
+   await c.active.read()
+   assert.equal((await f.json('/api/plinth/jobs/'+beforeErase,{method:'DELETE',cookie:f.owner,body:{expected_version:c.active.job.version}})).status,200)
+  }
+  assert.equal((await c.api('/jobs/'+beforeErase+'/followup-rules/run',{expected_version:c.active.job.version,confirm:true})).status,200)
+  onNotice=undefined
+  const afterErase=notices().length
+  assert.equal(afterErase,beforeStop+1,'Only the already reserved instruction reached the provider before erasure')
+  assert.equal((await c.api('/jobs/'+beforeErase)).status,404,'A late provider result cannot resurrect erased work')
+  await f.scheduled('2026-10-31T15:00:00Z');assert.equal(notices().length,afterErase)
   assert.equal((await c.api('/jobs/'+beforeErase+'/followup-rules/run',{expected_version:c.active.job.version,confirm:true})).status,404)
  }finally{await f.close()}
  function followupRecipient(c){return 'synthetic-plinth-1'+String.fromCharCode(64)+'example.invalid'}

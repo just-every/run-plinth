@@ -111,6 +111,10 @@ try{
   }
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Follow-up settings fit '+width)
   await page.screenshot({path:shots+'/AUTO-001-settings-delivery-'+width+'.png',fullPage:true,animations:'disabled'})
+  await clientPage.setViewportSize({width,height:1000})
+  await expect(clientPage.getByLabel('Estimate delivery channel',{exact:true})).toHaveValue('email')
+  assert.ok(await clientPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Recipient follow-up preferences fit '+width)
+  await clientPage.screenshot({path:shots+'/AUTO-001-recipient-preferences-'+width+'.png',fullPage:true,animations:'disabled'})
  }
  for(const context of contexts.values())await context.close()
  console.log('AUTO-001 PASS: owner saves separate event and scheduled sequences, current recipients and consent, dated deduplicated previews, retained pause revisions, client opt-out and resolution; once-only provider email through explicit owner and recipient choices, retained history and replay refusal; no preview writes; settings screens at 1440 and 390')
