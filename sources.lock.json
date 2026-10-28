@@ -3537,7 +3537,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "a4f81cc906248ea32d7689dbee67e94b6edee7c8dac91dd53c6716e70f1542be",
+      "sha256": "3846bdf58497d32cb35ed7920991c513a98dcaa052afa42fb45126adec1063d7",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3865,11 +3865,11 @@
       "executable": false
     },
     "src/plinth/room-boards.ts": {
-      "sha256": "f86ddc7da64eca59b7322e475a6c75e90b3788642fa986670c16f80f9cec6a8c",
+      "sha256": "d185c6892e7e210cb45636103217c19085d078ff47d7c2700e357ad8bae810f8",
       "executable": false
     },
     "src/plinth/room-geometry.ts": {
-      "sha256": "0dfcaba2a6a3b3a14fcad3416789ffcb7eb29d682d3c7ba29f3c35177be2978b",
+      "sha256": "bc758ed2c7c2df0249f7e351a22b2807ed4854afdd16676ae7c35700b566d64c",
       "executable": false
     },
     "src/plinth/satisfaction-mail.ts": {
@@ -4797,11 +4797,11 @@
       "executable": false
     },
     "src/ui/room-boards.tsx": {
-      "sha256": "35e0e48417d8c5d2eb14db3ca6b08fd4d4f20d1e417e4a3cb26fae249ddfc11b",
+      "sha256": "7790ec5899e5676c79895f3b2d3021d01510064827433a34bab990bf56ec04bb",
       "executable": false
     },
     "src/ui/room-model-viewer.tsx": {
-      "sha256": "0e03f408e1bccbc829427f1b7775b4f043d4c7e1e4620e3ba60cddd0edc306de",
+      "sha256": "f59de2e2d8e0ddfff20e4516a809e37348e3419b4b4ad0ed31d1d3c7cd5e1898",
       "executable": false
     },
     "src/ui/satisfaction.tsx": {
@@ -5057,7 +5057,7 @@
       "executable": false
     },
     "tests/fixtures/room-board.mjs": {
-      "sha256": "f89ca38bb937ba0f36f78eff2ba1cfc0544cdb200ea3b82edc5a894130f338df",
+      "sha256": "4678943f3329fc6a1f085c868f136f9de040f6b99002b2c45d2c6edd641e3e3d",
       "executable": false
     },
     "tests/fixtures/search-document.mjs": {
@@ -5349,7 +5349,7 @@
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
-      "sha256": "d3bb1de43302b6addb52834581e1d4984668fd63f5503789981185d838285613",
+      "sha256": "785bdc1f7be7735f5eeb2fc7d82e71a8eed0deaf7560a64b082e5610e5f3f3e2",
       "executable": false
     },
     "tests/plinth/followup-support.mjs": {

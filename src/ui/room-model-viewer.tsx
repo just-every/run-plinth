@@ -16,7 +16,7 @@ export function RoomModelViewer({url,name}:{url:string;name:string}){
    <svg className="room-model" viewBox="0 0 600 400" role="img" aria-label={'Geometry of '+name}><title>{name} static model</title>{polygons.map((p,i)=><polygon key={i} points={p.points} fill="#b3cec5" stroke="#285c50" strokeWidth="1"/>)}</svg>
    <div className="room-camera"><label>Rotate model<input type="range" min="-180" max="180" value={yaw} onChange={e=>setYaw(Number(e.target.value))}/></label><label>Tilt model<input type="range" min="-90" max="90" value={pitch} onChange={e=>setPitch(Number(e.target.value))}/></label><label>Zoom model<input type="range" min="0.5" max="2" step="0.1" value={zoom} onChange={e=>setZoom(Number(e.target.value))}/></label></div>
   </>}
-  <p>Supported: static triangles, embedded GLB positions and node transforms, OBJ polygon triangulation. No external resources are fetched.</p>
+  <p>Supported: static triangles, embedded GLB positions and node transforms, OBJ polygon triangulation, IFC tessellated bodies and rectangular extrusions in SI units. No external resources are fetched.</p>
   {geometry?.unsupported.map(value=><p className="notice" key={value}>{value}</p>)}
  </section>
 }
