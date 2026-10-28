@@ -193,6 +193,11 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await surveyArchive.ok('/satisfaction/'+surveyId+'/respond',{score:4,answers:['Synthetic archived communication','Synthetic archived workmanship'],comment:'Synthetic archived follow-up'},archiveClient)
     await surveyArchive.ok('/satisfaction/'+surveyId+'/review-permission',{allowed:true},archiveClient)
     const archivedSurveyState=(await surveyArchive.survey()).surveys
+    const {performanceFixture}=await import('./performance-support.mjs'),performanceArchive=await performanceFixture(f),performanceSource=performanceArchive.jobs[0],performancePeer=performanceArchive.jobs[1]
+    const performanceProposal=await performanceSource.report('lessons',{catalog_id:performanceArchive.assembly.id,catalog_version:1,source_job_ids:[performanceSource.job.id,performancePeer.job.id],reason:'Archive completed-job production lesson',value:performanceArchive.assembly.revisions[0].value})
+    await performanceSource.report('lessons/'+performanceProposal.record.id+'/approve',{confirm:true})
+    const archivedPerformance=(await performanceArchive.call('/reports/performance/jobs/'+performanceSource.job.id)).performance
+    assert.equal(archivedPerformance.lessons[0].approved.catalog_version,2);assert.equal(archivedPerformance.completion.completed_on,'2026-10-23')
     const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -217,6 +222,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       assert.ok(!exported[0].tables.some(table=>['pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits'].includes(table.name)),'INT-009 and INT-014 live receiver and standing-grant authority are excluded from restoration')
       assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
     }
+    for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id).row.data);assert.deepEqual(recovered.estimate_performance,archivedPerformance);assert.deepEqual(recovered.quotes,performanceSource.job.quotes)}
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
@@ -271,11 +277,13 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
+    const performanceCurrent=(await f.json('/api/plinth/jobs/'+performanceSource.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+performanceSource.job.id,{method:'DELETE',cookie,body:{expected_version:performanceCurrent.version}})).status,200)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id),'Completed-job lessons and their source estimates disappear before the old archive is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_attachments'&&item.row.job_id===job.id),'ROLE-003 erasure removes job-local submission originals')
     assert.ok(!erasedRows.some(item=>['pl_mail_messages','pl_mail_files','pl_mail_originals','pl_decision_metadata','pl_file_transcriptions'].includes(item.table)&&item.row.job_id===job.id),'DOC-005 erasure removes correspondence originals and annotations before the journal fences the old archive')
     assert.ok(erasedRows.some(item=>item.table==='pl_vendor_documents'&&item.row.id===portalCompliance.compliance_id),'ROLE-003 company compliance evidence keeps its independent company custody')

@@ -1,3 +1,4 @@
+import { wallClock } from './time-zone'
 import { auditStatement } from './audit'
 import { catalogValue, date } from './catalog-input'
 import type { Assembly, CatalogEntry, EstimateTemplate } from './catalog-model'
@@ -50,7 +51,7 @@ export function performanceJob(job:Job,catalog:CatalogEntry[]){
    unknown:!assembly?'Assembly attribution unknown':knownQuantity===null?'Production denominator unknown':minutes===null?'Approved labor denominator unknown':trade===null?'Trade attribution unknown':null,
    source:{quote_id:quote?.id??null,line_ids:selected.map(l=>l.id),entry_ids:actual.map(e=>e.id),time_ids:time.map(s=>s.id),production:production.map(p=>({task_id:p.task_id,actual_id:p.actual.id,evidence:p.actual.evidence,quantity:p.actual.installed!.quantity,unit:p.actual.installed!.unit})),actuals:actual.map(e=>({id:e.id,source_id:e.source_id,kind:e.source_kind,amount_cents:e.amount_cents,dated_on:e.dated_on}))}}
  })
- const sales=state(job).sales.at(-1),won=quote?.status==='accepted',stage=won?'won':sales?.stage??(quote?'estimating':'qualified')
+ const sales=state(job).sales.findLast(s=>s.quote_id===quote?.id),won=quote?.status==='accepted',stage=won?'won':sales?.stage??(quote?'estimating':'qualified')
  return {id:job.id,name:job.name,version:job.version,currency:currencyOf(job),completion:state(job).completion??null,rows,
   sales:{stage,quote_id:quote?.id??null,estimator:quote?.prepared_by??null,amount_cents:quote?.total_cents??null,evidence:won?quote.acceptance?.evidence:sales?.evidence??null,history:state(job).sales},
   bids:(job.bids??[]).filter(b=>b.published_by).map(b=>{const revision=b.revisions.at(-1)!,invites=b.invitations.filter(i=>!i.revoked_by),responded=invites.filter(i=>i.responses.some(r=>r.revision_id===revision.id)),awards=(job.bid_comparison_awards??[]).filter(a=>a.package_id===b.id&&!a.cancelled);return {id:b.id,title:b.title,trade:b.trade,revision_id:revision.id,invited:invites.length,responded:responded.length,declined:invites.filter(i=>i.decline).length,response_rate:invites.length?responded.length/invites.length:null,awards:awards.map(a=>({id:a.id,amount_cents:a.amount_cents,comparison_id:a.comparison_id})),response_ids:responded.flatMap(i=>i.responses.filter(r=>r.revision_id===revision.id).map(r=>r.id))}})}
@@ -79,7 +80,7 @@ export async function performanceResponse(request:Request,db:D1Database,actor:Ac
  }else if(parts[4]==='complete'&&parts.length===5){
   need(job.status==='active'&&!value.completion,'Record completion once for an accepted job',409,'completion_state')
   const tasks=job.schedules.filter(t=>t.status==='booked');need(tasks.length&&tasks.every(t=>latestActual(job,t.id)?.actual_finish),'Every booked task needs recorded actual completion',409,'completion_sources');need(input.confirm===true,'Confirm completion evidence')
-  const completed_on=date(input.completed_on);need(tasks.every(t=>latestActual(job,t.id)!.actual_finish!.slice(0,10)<=completed_on),'Completion date precedes recorded work')
+  const completed_on=date(input.completed_on);need(tasks.every(t=>wallClock(Date.parse(latestActual(job,t.id)!.actual_finish!),job.time_zone??'UTC').date<=completed_on),'Completion date precedes recorded work')
   record=value.completion={completed_on,evidence:text(input.evidence,'Completion evidence',2000),by:stamp(actor)}
  }else if(parts[4]==='lessons'&&parts.length===5){
   need(value.completion,'Lessons require a completed source job',409,'completion_state')
@@ -96,6 +97,7 @@ export async function performanceResponse(request:Request,db:D1Database,actor:Ac
   if(lesson.kind==='assembly')for(const part of (lesson.value as Assembly).parts)await catalogEntry(db,part.rate_id,'rate')
   else for(const item of (lesson.value as EstimateTemplate).items)await catalogEntry(db,item.assembly_id,'assembly')
   const version=entry.version+1,by=stamp(actor);entry.version=version;entry.revisions.push({version,name:entry.name,value:lesson.value,reason:lesson.reason,approved_by:by})
+  need(JSON.stringify(entry).length<=2_000_000,'Catalog history is too large')
   writes.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_estimate_catalog WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(entry.id,lesson.catalog_version),db.prepare('UPDATE pl_estimate_catalog SET version=?,data=? WHERE id=?').bind(version,JSON.stringify(entry),entry.id))
   lesson.approved={by,catalog_version:version};record=lesson
  }else need(false,'Unknown performance action',404,'not_found')
