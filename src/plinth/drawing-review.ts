@@ -28,9 +28,9 @@ export function drawingSearch(job:Job,actor:Actor,query:string){
  requireDrawingOffice(actor);need(query.trim().length>0&&query.length<=200,'Enter up to 200 search characters')
  const hits=[]
  for(const set of job.plan_sets??[])for(const sheet of set.sheets){
-  const review=latestReview(set,sheet.id);if(!review)continue
-  const annotations=set.annotations.filter(a=>a.sheet_id===sheet.id)
-  if([review.number,review.name,review.text,...annotations.map(a=>a.text)].join('\n').toLowerCase().includes(query.toLowerCase()))hits.push({set_id:set.id,sheet_id:sheet.id,revision:sheet.revision,review,annotations,href:planLink(job.id,set.id,sheet.id)})
+  const review=latestReview(set,sheet.id),annotations=set.annotations.filter(a=>a.sheet_id===sheet.id)
+  const entry={id:review?.id??sheet.id,number:review?.number??sheet.number,name:review?.name??set.title,text:review?.text??''}
+  if([entry.number,entry.name,entry.text,...annotations.map(a=>a.text)].join('\n').toLowerCase().includes(query.toLowerCase()))hits.push({...entry,set_id:set.id,sheet_id:sheet.id,revision:sheet.revision,review,annotations,href:planLink(job.id,set.id,sheet.id)})
  }
  return {results:hits,count:hits.length}
 }

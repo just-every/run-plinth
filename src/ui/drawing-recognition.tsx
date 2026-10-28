@@ -32,7 +32,7 @@ export function DrawingRecognition({data,set,sheet,mutate}:{data:PlanView;set:Pl
   {proposal&&<article className="record" aria-label="Recognition proposal"><h4>Source proposal · page {proposal.page}</h4><p>Proposed {proposal.number} · {proposal.name}</p><Regions proposal={proposal}/>
    <Form key={proposal.id+review?.id} reset={false} submit="Adopt reviewed recognition" action={async f=>mutate(`/${set.id}/recognition-review`,{proposal_id:proposal.id,previous_review_id:review?.id??null,number:f.get('number'),name:f.get('name'),text:f.get('text'),confirm:f.get('confirm')==='on'})}>
     <Field label="Reviewed sheet number" name="number" defaultValue={review?.number??proposal.number}/><Field label="Reviewed sheet name" name="name" defaultValue={review?.name??proposal.name}/>
-    <label>Reviewed drawing text<textarea name="text" required defaultValue={review?.text??proposal.text} rows={6}/></label>
+    <label>Reviewed drawing text<textarea aria-label="Reviewed drawing text" name="text" required defaultValue={review?.text??proposal.text} rows={6}/></label>
     <label><input type="checkbox" name="confirm" required/> I checked the full text, name and number against this exact original page.</label>
    </Form>
   </article>}
@@ -42,14 +42,14 @@ export function DrawingRecognition({data,set,sheet,mutate}:{data:PlanView;set:Pl
    {(set.drawing_review?.links??[]).filter(l=>l.from_review===review.id).map(l=><p key={l.id}><Action action={async()=>{const target=await api(`/jobs/${data.id}/plans/${set.id}/links/${l.id}`);location.assign(target.href)}}>{l.label}</Action> · Source area {l.x}, {l.y}, {l.width} × {l.height}</p>)}
    {!!suggestions.length&&<p>Suggested references from reviewed text: {suggestions.map(t=>t.review!.number).join(', ')}. A reference becomes a link only after explicit review.</p>}
    <details><summary>Review a detail link</summary><Form reset={false} submit="Approve exact detail link" action={async f=>{const target=targets.find(t=>t.sheet.id===f.get('target'));if(!target?.review)throw new Error('Review the target sheet first.');await mutate(`/${set.id}/detail-link`,{from_review:review.id,to_set:target.set.id,to_review:target.review.id,label:f.get('label'),x:Number(f.get('x')),y:Number(f.get('y')),width:Number(f.get('width')),height:Number(f.get('height')),confirm:f.get('confirm')==='on'})}}>
-    <label>Reviewed link target<select name="target" required defaultValue={suggestions[0]?.sheet.id??''}><option value="">Choose a reviewed source</option>{targets.filter(t=>t.review).map(t=><option key={t.sheet.id} value={t.sheet.id}>{t.review!.number} · revision {t.sheet.revision} · page {t.sheet.page}</option>)}</select></label>
+    <label>Reviewed link target<select aria-label="Reviewed link target" name="target" required defaultValue={suggestions[0]?.sheet.id??''}><option value="">Choose a reviewed source</option>{targets.filter(t=>t.review).map(t=><option key={t.sheet.id} value={t.sheet.id}>{t.review!.number} · revision {t.sheet.revision} · page {t.sheet.page}</option>)}</select></label>
     <Field label="Detail link label" name="label" defaultValue={suggestions[0]?'Open detail on '+suggestions[0].review!.number:''}/>
     {(['x','y','width','height'] as const).map(k=><Field key={k} label={'Detail area '+k} name={k} type="number" step="any" min={k==='width'||k==='height'?'.01':'0'} defaultValue={proposal?.regions[0]?.[k]??(k==='width'||k==='height'?20:0)}/>)}
     <label><input type="checkbox" name="confirm" required/> I checked this source region and the exact reviewed target sheet.</label>
    </Form></details>
   </article>}
   <Form reset={false} submit="Search reviewed drawings" action={async()=>{const result=await api(`/jobs/${data.id}/plans/review-search?`+new URLSearchParams({q:query}));setHits(result.results)}}><Field label="Reviewed text or annotation" name="q" value={query} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setQuery(e.target.value)}/></Form>
-  <div aria-label="Reviewed drawing search results">{hits.map(hit=><p key={hit.review.id}><a href={hit.href}>{hit.review.number} · {hit.review.name} · revision {hit.revision}</a> · {hit.review.text}{hit.annotations.map((a:any)=><span key={a.id}> · {a.text}</span>)}</p>)}</div>
+  <div aria-label="Reviewed drawing search results">{hits.map(hit=><p key={hit.id}><a href={hit.href}>{hit.number} · {hit.name} · revision {hit.revision}</a> · {hit.text}{hit.annotations.map((a:any)=><span key={a.id}> · {a.text}</span>)}</p>)}</div>
   {!!comparisons.length&&<><label>Compare exact revision<select aria-label="Compare exact revision" value={compared} onChange={e=>setCompared(e.target.value)}><option value="">Choose another revision</option>{comparisons.map(t=><option key={t.sheet.id} value={t.sheet.id}>{t.sheet.number} · revision {t.sheet.revision} · page {t.sheet.page}</option>)}</select></label>{comparisons.filter(t=>t.sheet.id===compared).map(t=><DrawingComparison key={sheet.id+t.sheet.id} job={data.id} from={{set,sheet}} to={t}/>)}</>}
  </section>
 }
