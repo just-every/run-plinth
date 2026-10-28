@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "dad199d60a011b241fe3e574f6478ee2f5123f30126a77865c1a2a614b7c3db0",
+      "sha256": "759a138ce4e286877116855723b5b17c53f7e01e1066b0ead0099c13d251eef1",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c16b9a9855044cab002b4f48220b5b263d1279a1f06c7b3609d262d4e68e4465",
+      "sha256": "af6e1ee9e57f3cdc1e27bfb741bcf8827f539d5308b1e0202f481dd854f9f4fa",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "8ebe08ca80abd55170cf1ed8df2643999916fd474ccda5633edda33cdccf1693",
+      "sha256": "a951a85bf0540046f070b6ae76ad4e600afcb86bd86fe2d2d307bc76795c5141",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -4313,7 +4313,7 @@
       "executable": false
     },
     "src/ui/plans.tsx": {
-      "sha256": "9f4f8de7759fa19aab546c7094f2d7e8651cbf81eb37d3118661d49b096b6d66",
+      "sha256": "d95489b890ce9b9e179816d111e364b943bbfd892046bb83a965d61eff6e24c4",
       "executable": false
     },
     "src/ui/portal-access.tsx": {
