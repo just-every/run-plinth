@@ -157,7 +157,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "ebb2dff77974160b24a0235afedf6fa84fa89c24c724eda37868639cac06b146",
+      "sha256": "89945f1cfad580238187275c608b80f041e7b55c556cec10daa24d103fd1c8c2",
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
@@ -5393,7 +5393,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "16dff5b2e527577d1145b3f4d4f5c4f817137dd3c21c99fdec902d93e4c398b1",
+      "sha256": "01f3e5a861a816c89db5ad8a4abc088e222bdee1d7df8ab4f637240d017cac51",
       "executable": false
     }
   }
