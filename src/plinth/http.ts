@@ -71,7 +71,7 @@ import { auditExport, auditResponse } from './audit-http'
 import { holdsResponse } from './holds'
 import { searchJobs } from './search'
 import { siteContacts } from './site-contacts'
-import { authenticated, authorize, isFieldRole, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
+import { assignedJob, authenticated, authorize, isFieldRole, isTeamRole, requireJobManager, requireManager, requireOwner } from './auth'
 import { permissionView, roleJobView } from './role-view'
 import { rolesResponse } from './roles'
 import { teamResponse } from './team'
@@ -104,6 +104,10 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
+ if(actor.agent_native_role) {
+  const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
+  return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
+ }
  if(actor.role!=='owner'){job={...job};delete job.followup}
  job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
@@ -117,7 +121,9 @@ function display(job:Job,actor:Actor):any {
  return clientPolicyProjection(JSON.parse(JSON.stringify({...safe,selections:publicProductSources(selectionProjection(job,true)),approvals:safe.approvals.map(a=>a.kind==='selection.sign'?{...a,snapshot:publicProductSources(job.approvals.find(source=>source.id===a.id)!.snapshot)}:a)},(key,value)=>['resources','trade_invitations'].includes(key)?undefined:value)),job)
 }
 async function body(request:Request):Promise<Input>{need((request.headers.get('content-type')??'').split(';')[0]==='application/json','Send application/json',415,'content_type');const reader=request.body?.getReader();need(reader,'JSON body is required');const chunks:Uint8Array[]=[];let size=0;for(;;){const r=await reader.read();if(r.done)break;size+=r.value.byteLength;if(size>15_000_000){await reader.cancel();need(false,'Request is too large',413,'body_size')}chunks.push(r.value)}const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}try{return object(JSON.parse(new TextDecoder().decode(bytes)))}catch(error){if(error instanceof DomainError)throw error;throw new DomainError('invalid_json','Invalid JSON body')}}
-async function handle(request:Request,original:Bindings):Promise<Response>{const env=runtimeBindings(original),actor=await authorize(request,env),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
+async function handle(request:Request,original:Bindings):Promise<Response>{return nativePlinth(request,original,await authorize(request,original))}
+/** Native dispatcher shared by HTTP and explicitly declared door tools. Authentication stays at each caller. */
+export async function nativePlinth(request:Request,original:Bindings,actor:Actor):Promise<Response>{const env=runtimeBindings(original),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned
  const connections=await connectorsResponse(request,env,actor,parts,body);if(connections)return connections
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
@@ -135,7 +141,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts[0]==='search'&&parts.length===1&&method==='GET'){
   need(actor.role!=='agent','A signed-in person searches jobs',403,'human_required')
   const query=new URL(request.url).searchParams.get('q')?.trim()??'';need(query.length>0&&query.length<=200,'Enter up to 200 characters')
-  const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id))
+  const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>assignedJob(actor,job))
   return json({results:searchJobs((await named(env.DB,all.filter((_,i)=>allowed[i]))).map(job=>display(job,actor)),query)})
  }
  const compliance=await rulesResponse(request,env.DB,actor,parts,body);if(compliance)return compliance
@@ -150,7 +156,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  const templates=await templateResponse(request,env,actor,parts);if(templates)return templates
  const followup=await followupResponse(request,env,actor,parts,body);if(followup)return followup
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
- if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>!isTeamRole(actor.role)||actor.team!.job_ids.includes(job.id));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
+ if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>assignedJob(actor,job));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}

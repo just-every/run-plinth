@@ -37,7 +37,11 @@ const audit = (db: D1Database, actor: Actor, action: string, value: string) => d
  * qualification decisions only; clients and any future subcontractor login are refused. W-9 originals
  * are served only to owners and administrators, and every download is audited. */
 async function handle(request: Request, original: Bindings): Promise<Response> {
- const env = runtimeBindings(original), db = env.DB, actor = await authorize(request, env), method = request.method
+ return nativeVendors(request,original,await authorize(request,original))
+}
+/** Shared native directory service; the caller supplies a freshly authorized actor. */
+export async function nativeVendors(request:Request,original:Bindings,actor:Actor):Promise<Response> {
+ const env=runtimeBindings(original),db=env.DB,method=request.method
  requireManager(actor, method === 'GET')
  const parts = new URL(request.url).pathname.slice(root.length).split('/').filter(Boolean)
  need(parts.length <= 4, 'Unknown directory route', 404, 'not_found')

@@ -1,3 +1,9 @@
+# Shared company agent door
+
+Use `/mcp` and discover the Construction project coordinator prompt, tool schemas, resource templates, current scopes and policy revision. The shared `/agents` person door provides policy, audit, reviews, approvals and Pause. Native owner/admin sessions remain responsible for final business decisions. Local bearer credentials keep their existing draft scope. See [the agent door guide](AGENT-DOOR.md).
+
+The HTTP examples below describe the native draft payloads and the versioned SDK connector. Agent callers use those payloads inside each discovered MCP tool's `input`, with `job_id` and a stable `idempotency_key`. The installed Worker challenges unversioned bearer API requests with the MCP resource metadata.
+
 # Draft preparation for agents
 
 The HTTP API is the agent command surface. Every call uses native authenticated authority, and every edit supplies the job's current `expected_version`. Read `GET /api/plinth/jobs/:id` before preparing a draft; a stale version returns 409 with no write. Integer amounts are cents. An agent credential can read manager-visible jobs and prepare drafts; it cannot create jobs, approve, issue, receive, export, import or erase.

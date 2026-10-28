@@ -14,7 +14,7 @@ export function classify(method: string, path: string): Required<Pick<AuditEvent
  const kind: AuditKind = category==='costs'&&rest[1]==='accountant'?'permission':['send', 'send-email', 'notify', 'run'].includes(verb) ? 'send' : verb.startsWith('export') ? 'export' : permission.has(category) || verb === 'access' ? 'permission' : category === 'imports' ? 'import' : method === 'DELETE' ? 'erasure' : financial.has(category) || ['draws', 'lien', 'retainage'].includes(verb) ? 'financial' : 'record'
  return { kind, action: `${category === 'costs' ? 'cost.' + (rest[1] ?? 'ledger') : category}.${verb === rest[1] && category === 'costs' ? 'create' : verb}`, subject_kind: category, ...(id ? { subject_id: id } : {}), ...(job ? { job_id: job } : {}) }
 }
-export const source = (actor: Actor) => actor.credential_id ? 'agent' : actor.session_id ? 'session' : 'automation'
+export const source = (actor: Actor) => actor.agent_door || actor.credential_id ? 'agent' : actor.session_id ? 'session' : 'automation'
 async function digest(value: string) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, '0')).join('') }
 export const jobRef = (data: string) => digest(data)
 /** The audit row for one committed write. It joins the same D1 batch as the write, so a change and its history commit or fail together. */
@@ -23,7 +23,7 @@ export function auditSql(actor: Actor, event: AuditEvent = {}): { sql: string; p
  const kind = event.kind ?? routed?.kind ?? 'automation', action = event.action ?? routed?.action ?? 'automation.run'
  return {
   sql: 'INSERT INTO pl_audit(id,at,kind,action,actor_id,actor_name,actor_role,source,credential_id,subject_kind,subject_id,job_id,version_before,version_after,before_ref,after_ref,detail) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-  params: [crypto.randomUUID(), new Date().toISOString(), kind, action, actor.id, actor.name, actor.role, source(actor), actor.credential_id ?? null, event.subject_kind ?? routed?.subject_kind ?? null, event.subject_id ?? routed?.subject_id ?? null, event.job_id ?? routed?.job_id ?? null, event.version_before ?? null, event.version_after ?? null, event.before_ref ?? null, event.after_ref ?? null, event.detail ? JSON.stringify(event.detail) : null],
+  params: [crypto.randomUUID(), new Date().toISOString(), kind, action, actor.id, actor.agent_door ? `${actor.agent_door.agent.name} for ${actor.name}` : actor.name, actor.role, source(actor), actor.credential_id ?? null, event.subject_kind ?? routed?.subject_kind ?? null, event.subject_id ?? routed?.subject_id ?? null, event.job_id ?? routed?.job_id ?? null, event.version_before ?? null, event.version_after ?? null, event.before_ref ?? null, event.after_ref ?? null, event.detail || actor.agent_door ? JSON.stringify({...event.detail,...(actor.agent_door?{agent:actor.agent_door.agent,sponsor:{id:actor.id,name:actor.name}}:{})}) : null],
  }
 }
 export function auditStatement(db: D1Database, actor: Actor, event: AuditEvent = {}): D1PreparedStatement { const { sql, params } = auditSql(actor, event); return db.prepare(sql).bind(...params) }
