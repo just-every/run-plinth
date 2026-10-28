@@ -356,3 +356,46 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   const pending=(await first.report('lessons',{...input,catalog_version:2,reason:'Pending lesson awaiting a current catalog review'})).record;await c.call('/estimate-catalog/'+c.assembly.id,{expected_version:2,name:c.assembly.name,reason:'Separately reviewed catalog change',value:{...definition,parts:definition.parts.map((p,i)=>i===0?{...p,productivity:'3'}:p)}});const rejected=await f.json(`/api/plinth/reports/performance/jobs/${first.job.id}/lessons/${pending.id}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:first.job.version,confirm:true}});assert.equal(rejected.status,409);assert.equal(rejected.value.error,'stale_catalog');assert.equal((await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id).version,3)
  }finally{await f.close()}
 })
+
+test('Room boards retain original geometry, finish revisions and exact signed sources while unsafe access and stale writes change nothing',async()=>{
+ const {roomInput,roomFiles}=await import('../fixtures/room-board.mjs'),{createActiveJob}=await import('./helpers.mjs')
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const email=['synthetic-plinth-room','example.com'].join('@'),client=await f.invite(email),admin=await f.invite(['synthetic-plinth-office','example.com'].join('@'),'Office','admin'),agent=await f.agent()
+  let job=await createActiveJob(f,'Measured room construction',email),root='/api/plinth/jobs/'+job.id
+  const post=async(path,body={},credentials={cookie:f.owner})=>{const r=await f.json(root+path,{method:'POST',...credentials,body:{expected_version:job.version,...body}});if(r.status===200)job=(await f.json(root,{cookie:f.owner})).value.job;return r}
+  const product={name:'Oak cabinet finish',sku:'synthetic-plinth-1',supplier:'Synthetic supply',source_url:'https://example.com/synthetic-plinth',dimensions:'24 mm oak panel',cost_quote_cents:12000,lead_days:7,captured_on:'2026-10-01',valid_until:'2099-01-01',discontinued:false,evidence:'Reviewed original supplier specification',image:{name:'synthetic-plinth.png',base64:roomFiles()[1].bytes.toString('base64')}}
+  assert.equal((await post('/products',product)).status,200);const pid=job.products[0].id,pr=job.products[0].revisions[0].id
+  assert.equal((await post(`/products/${pid}/review`,{revision_id:pr,confirm:true})).status,200)
+  assert.equal((await post('/selections',{room:'Kitchen',category:'Cabinet finish',allowance_cents:15000,cost_code:'06-400',decision_on:'2026-11-01',lead_days:7,options:[{name:'Signed oak',supplier:'Synthetic supply',specifications:'24 mm matte oak',price_cents:15000,product_id:pid,product_revision_id:pr}]})).status,200)
+  const sid=job.selections[0].id,sr=job.selections[0].revisions[0].id,option=job.selections[0].revisions[0].options[0].id
+  assert.equal((await post(`/selections/${sid}/present`,{revision_id:sr})).status,200)
+  assert.equal((await post(`/selections/${sid}/sign`,{revision_id:sr,option_id:option,confirm:true,statement:'I approve the exact oak specification and price'},{cookie:client})).status,200)
+  const signed=structuredClone(job.selections[0].revisions[0].signature),accepted=structuredClone(job.quotes),input={...roomInput(),products:[{product_id:pid,revision_id:pr}],selections:[{selection_id:sid,revision_id:sr}]}
+  for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}]){const before=structuredClone(job);assert.ok([401,403].includes((await post('/room-boards',input,credentials)).status));assert.deepEqual((await f.json(root,{cookie:f.owner})).value.job,before)}
+  assert.equal((await post('/room-boards',input)).status,200);const board=job.room_boards[0],first=structuredClone(board.revisions[0]),file=first.files[0]
+  assert.deepEqual(first.measurements,input.measurements);assert.deepEqual(first.selections[0].value.signature,signed)
+  for(const original of roomFiles()){
+   const metadata=first.files.find(f=>f.name===original.name),path=root+'/room-boards/files/'+metadata.id
+   const r=await f.request(path+'?download=1',{cookie:f.owner});assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/^attachment;/);assert.deepEqual(Buffer.from(await r.arrayBuffer()),original.bytes)
+   for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}])assert.ok([401,403].includes((await f.request(path,credentials)).status))
+  }
+  for(const format of ['glb','obj']){const model=first.files.find(f=>f.format===format),r=await f.json(root+'/room-boards/files/'+model.id+'/geometry',{cookie:f.owner});assert.equal(r.status,200);assert.equal(r.value.vertices.length,4);assert.deepEqual(r.value.triangles,[[0,1,2],[0,2,3]]);assert.deepEqual(r.value.vertices[1],format==='glb'?[6,0,0]:[4,0,0]);if(format==='obj')assert.ok(r.value.unsupported.some(s=>s.includes('materials')))}
+  const revision={title:'Kitchen finish revision',measurements:{...input.measurements,length:'4.5'},base_revision_id:first.id,annotations:[{file_id:file.id,page:1,x:25,y:50,text:'Matte oak finish retained from signed specification'}]}
+  assert.equal((await post(`/room-boards/${board.id}/revise`,revision)).status,200);const second=structuredClone(job.room_boards[0].revisions[1]),before=structuredClone(job)
+  for(const body of [{...revision,expected_version:job.version-1},{...revision,base_revision_id:first.id},{...revision,base_revision_id:second.id,products:[{product_id:'synthetic-plinth-unknown',revision_id:pr}]}])assert.ok([404,409].includes((await post(`/room-boards/${board.id}/revise`,body)).status))
+  assert.deepEqual((await f.json(root,{cookie:f.owner})).value.job,before)
+  const other=await createActiveJob(f,'Separate room job',email)
+  assert.equal((await f.request(`/api/plinth/jobs/${other.id}/room-boards/files/${file.id}`,{cookie:f.owner})).status,404)
+  const foreign=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),expected_version:other.version,products:input.products}});assert.equal(foreign.status,404)
+  assert.equal((await post(`/products/${pid}/revise`,{...product,cost_quote_cents:18000})).status,200)
+  assert.deepEqual(job.room_boards[0].revisions[0],first);assert.deepEqual(job.room_boards[0].revisions[1],second);assert.equal(second.products[0].cost_quote_cents,12000)
+  assert.deepEqual(job.selections[0].revisions[0].signature,signed);assert.deepEqual(job.quotes,accepted)
+  for(const cookie of [client,admin]){assert.equal((await f.json(root,{cookie})).value.job.room_boards,undefined);assert.equal((await f.request(root+'/room-boards',{cookie})).status,403)}
+  const download=await f.request(root+'/room-boards/files/'+file.id,{cookie:f.owner});assert.deepEqual(Buffer.from(await download.arrayBuffer()),roomFiles()[0].bytes)
+  const erase=await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(erase.status,200)
+  assert.equal((await f.request(root+'/room-boards/files/'+file.id,{cookie:f.owner})).status,404)
+  assert.equal((await f.json(root+'/room-boards',{method:'POST',cookie:f.owner,body:{...input,expected_version:job.version}})).status,404)
+  assert.equal((await f.db.prepare('SELECT count(*) n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
+ }finally{await f.close()}
+})
