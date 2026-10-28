@@ -903,7 +903,7 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   assert.equal((await f.json(root+'/followup-rules',{method:'POST',cookie:f.owner,body:{...config,kind:'estimate',expected_version:snapshot.version-1}})).status,409)
   assert.deepEqual(await estimate.read(),snapshot);assert.equal(f.messages.length,calls)
   const early=await c.preview(estimate,'2026-10-27T15:00:00Z')
-  assert.equal(early.actions.filter(a=>a.status==='eligible').length,1);assert.equal(early.actions[1].reason,'Step not due')
+  assert.equal(early.actions[0].rule_revision,2);assert.equal(early.actions.filter(a=>a.status==='eligible').length,1);assert.equal(early.actions[1].reason,'Step not due')
   assert.equal((await c.preview(active,'2026-10-28T15:00:00Z')).actions.find(a=>a.source_id===c.invoice.id).reason,'Sequence not started')
   assert.ok((await c.preview(active,'2026-10-30T15:00:00Z')).actions.some(a=>a.source_id===c.invoice.id&&a.status==='eligible'))
   const before=await active.read(),beforeRules=await estimate.read(),beforeCalls=f.messages.length
@@ -934,6 +934,12 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   await active.act('/selections/'+next.id+'/present',{revision_id:next.revisions[0].id})
   assert.equal((await c.preview(active)).actions.find(a=>a.source_id===next.id&&!a.escalation).reason,'Recipient has no current access')
   const clientJob=(await f.json('/api/plinth/jobs/'+active.job.id,{cookie:c.client})).value.job;assert.equal(clientJob.followup,undefined,'Private configuration and other people consent never leave the owner door')
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:c.clientId,status:'inactive'}})).status,200)
+  assert.equal((await f.json('/api/plinth/jobs/'+active.job.id+'/followup-consent',{cookie:c.client})).status,401)
+  assert.equal((await c.preview(active)).actions.find(a=>a.source_id===next.id&&!a.escalation).reason,'Recipient has no current access')
+  assert.equal((await f.json('/api/plinth/jobs/'+active.job.id+'/followup-rules',{method:'POST',cookie:f.owner,body:{...config,kind:'selection',expected_version:active.job.version}})).status,403)
+  assert.equal((await f.request('/api/plinth/agent-credentials/'+(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0].id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
+  assert.equal((await f.json(root+'/followup-rules',{token:agent})).status,401)
   const erasedId=active.job.id
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId,{method:'DELETE',cookie:f.owner,body:{expected_version:active.job.version}})).status,200)
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)

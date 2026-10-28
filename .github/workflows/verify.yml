@@ -60,6 +60,9 @@ jobs:
       - name: Exercise installed estimate comparisons and catalog review
         if: matrix.journey == 'portfolio'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs estimate-performance
+      - name: Exercise installed owner follow-up rules
+        if: matrix.journey == 'bid-follow-up'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs followup-rules
       - name: Exercise settlement script against the processor boundary
         if: matrix.journey == 'settlements'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/live-proof/settlement-sandbox.mjs "$RUNNER_TEMP/plinth-settlement" --provider-edge

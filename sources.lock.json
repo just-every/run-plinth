@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "d32f6f2a733a6a0752646efef45426e63b07f867b7da59714eed1fa86b7e23fa",
+      "sha256": "b8b898aff06107290c90a919476dd6939da011a29b43d776d07ebada73358c5d",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "d5d43cbd682d6421381ed0c66259f5967b8550c3214e9e1cb28944c35129d404",
+      "sha256": "6db345694812d4b6dca03b1f5de835f55f47976d1276ae453eb7e7acf7aaac7d",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "962de25e7466359b72e93c3c279a34aaf22dee25a0d168f28eb7f2b2667c9c58",
+      "sha256": "dfeb9a1099fc6878de102b3f321228fe87d59012473e7fdad3cd68534770f653",
       "executable": false
     },
     "DEMO.md": {
@@ -973,7 +973,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "51c38c6cf8fa887897bfc26d0b55966b18d31ea72584b7fab7fa1d55eed48d21",
+      "sha256": "244b80cddd0b9858c2bf8ff6ecb11f6781ccf2613bdd8e5a400a718c36614f8e",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4277,7 +4277,7 @@
       "executable": false
     },
     "src/ui/followup-rules.tsx": {
-      "sha256": "9a9b3bc65f64eaacaad37e5dd9725d75b20955b436419a9f7eb3a2418faf5af9",
+      "sha256": "b57bd63db3d89e636424bb1b6b257c2adfe6b9f5d828dd7b6126aaa343378b79",
       "executable": false
     },
     "src/ui/gantt.tsx": {
@@ -4736,6 +4736,10 @@
       "sha256": "65aa2a4a02acae128844e85b4b4e465b24b35b9f145afc115fd61174a85b562c",
       "executable": false
     },
+    "tests/journeys/followup-rules.mjs": {
+      "sha256": "a2f4b04eebb7495c98326728020d0f8cc3ad1212d41bc737a189179202ea74d5",
+      "executable": false
+    },
     "tests/journeys/handover.mjs": {
       "sha256": "5b9a7a28183af243ccd0ce9b0ee7aed9f1115b81008e529d33e036332f1cce93",
       "executable": false
@@ -4929,7 +4933,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "2b0855965a4f57afd27dcfa53315d5bffa3006358575279da9f183c5d942718a",
+      "sha256": "1af8af178d2b74a56ddfe45c0c8c7ced6f9caf95be571e418f2ddbf13a47c531",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
