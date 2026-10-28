@@ -32,7 +32,7 @@ try{
   await rules.getByRole('checkbox',{name:'Synthetic follow-up client',exact:true}).check()
   await rules.getByLabel('Owner review limit (cents)',{exact:true}).fill('100000')
   await rules.getByLabel('Steps',{exact:true}).fill('0,reminder,First follow-up\n2,escalate,Owner review')
-  await rules.getByRole('checkbox',{name:'I confirm these preview settings; this authorizes no delivery or financial approval.',exact:true}).check()
+  await rules.getByRole('checkbox',{name:'I confirm these rule settings; delivery needs the separate approval above.',exact:true}).check()
   await rules.getByRole('button',{name:'Save preview rule',exact:true}).click()
   await expect(rules.getByRole('heading',{name:kind[0].toUpperCase()+kind.slice(1)+' sequence · revision 1',exact:true})).toBeVisible()
  }
@@ -60,7 +60,7 @@ try{
  await page.setViewportSize({width:1440,height:1000})
  await rules.getByRole('button',{name:'Edit collection rule',exact:true}).click()
  await rules.getByRole('checkbox',{name:'Pause this sequence',exact:true}).check()
- await rules.getByRole('checkbox',{name:'I confirm these preview settings; this authorizes no delivery or financial approval.',exact:true}).check()
+ await rules.getByRole('checkbox',{name:'I confirm these rule settings; delivery needs the separate approval above.',exact:true}).check()
  await rules.getByLabel('Revision reason',{exact:true}).fill('Owner paused collection sequence')
  await rules.getByRole('button',{name:'Save rule revision',exact:true}).click()
  await expect(rules.getByRole('heading',{name:'Collection sequence · revision 2',exact:true})).toBeVisible()

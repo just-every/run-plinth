@@ -3173,11 +3173,11 @@
       "executable": false
     },
     "src/plinth/followup-model.ts": {
-      "sha256": "fe14af078ff249ae52e1e27f08ef345245c1b2cfc508bd28610b913357baa068",
+      "sha256": "ef74c9eb82f3d365e26bf0534f72ad3d0717cd7ab5861cf2aacd8bbc7084891e",
       "executable": false
     },
     "src/plinth/followup-rules.ts": {
-      "sha256": "f20e84fd9bf4ff2e7340fe8c1cd85696cad762e00da1d1a375ef3d0ffce44c85",
+      "sha256": "37e9989779edf6442d5170d04881edb1ce083d9aea2f8a972226e00551ba14c6",
       "executable": false
     },
     "src/plinth/handover-actions.ts": {
@@ -3585,7 +3585,7 @@
       "executable": false
     },
     "src/plinth/scheduled.ts": {
-      "sha256": "1aec1a316fea6edaab181e324761af5a094704ff5e9c67aa4ea9b8bafbcc3e4b",
+      "sha256": "689aeffa3f88b0c8a4db3f3ce6a797dc8636aa24e86bef285e1c75028ada5e19",
       "executable": false
     },
     "src/plinth/scope-contacts.ts": {
@@ -4277,7 +4277,7 @@
       "executable": false
     },
     "src/ui/followup-rules.tsx": {
-      "sha256": "b57bd63db3d89e636424bb1b6b257c2adfe6b9f5d828dd7b6126aaa343378b79",
+      "sha256": "c3223817e58bb47bcd375ad4cba7ff830c24d81a97e2f701b760611f3fffcc84",
       "executable": false
     },
     "src/ui/gantt.tsx": {
@@ -4737,7 +4737,7 @@
       "executable": false
     },
     "tests/journeys/followup-rules.mjs": {
-      "sha256": "a2f4b04eebb7495c98326728020d0f8cc3ad1212d41bc737a189179202ea74d5",
+      "sha256": "cfe75c9c1c55f316d607ea5696ebaa7ba02ec1cc37140c949237ea1d15371c4e",
       "executable": false
     },
     "tests/journeys/handover.mjs": {
@@ -4933,7 +4933,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "1af8af178d2b74a56ddfe45c0c8c7ced6f9caf95be571e418f2ddbf13a47c531",
+      "sha256": "9eb92c48f027b48fdd55b47a78e1071dc1ddea60de6bf628e554a0ce26637837",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {

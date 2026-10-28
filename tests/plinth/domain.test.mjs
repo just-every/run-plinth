@@ -945,3 +945,70 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)
  }finally{await f.close()}
 })
+
+test('Owner follow-up delivery reserves each live source step once, honors recipient routing, and fences unsafe dispatch',async()=>{
+ const {followupFixture}=await import('./followup-support.mjs')
+ const {generateKeyPairSync,sign}=await import('node:crypto')
+ const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'P-256'})
+ let mode='accepted'
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z'),mailProvider:'sendgrid',mailEventKey:publicKey.export({type:'spki',format:'der'}).toString('base64'),mailResponse:message=>message.subject.startsWith('Plinth follow-up:')&&mode==='refused'?Response.json({message:'Synthetic refusal'},{status:422}):message.subject.startsWith('Plinth follow-up:')&&mode==='unknown'?Promise.reject(new Error('Synthetic lost response')):new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-701'}})})
+ try{
+  const c=await followupFixture(f),notices=()=>f.messages.filter(m=>m.subject.startsWith('Plinth follow-up:'))
+  const configure=(job,kind,extra={})=>job.act('/followup-rules',{...c.config,kind,delivery:true,delivery_confirm:true,...extra})
+  const consent=(job,kind,channel,cookie=f.owner,extra={})=>job.act('/followup-consent',{kind,allowed:true,channel,confirm:true,...extra},cookie)
+  const run=async job=>{await job.read();return job.act('/followup-rules/run',{confirm:true})}
+  const history=async job=>(await c.api('/jobs/'+job.job.id+'/followup-rules')).value.attempts
+  await configure(c.estimate,'estimate')
+  const initial=await c.estimate.read()
+  assert.equal((await c.api('/jobs/'+initial.id+'/followup-rules/run',{expected_version:initial.version,confirm:true},c.client)).status,403)
+  const agent=await f.agent()
+  assert.equal((await f.json('/api/plinth/jobs/'+initial.id+'/followup-rules/run',{method:'POST',token:agent,body:{expected_version:initial.version,confirm:true}})).status,403)
+  assert.equal((await run(c.estimate)).attempts,0,'Legacy preview consent never authorizes delivery')
+  await consent(c.estimate,'estimate','email',c.client);await consent(c.estimate,'estimate','email')
+  f.setNow(Date.parse('2026-10-30T15:00:00Z'))
+  const financial=structuredClone({quotes:c.estimate.job.quotes,invoices:c.estimate.job.invoices,approvals:c.estimate.job.approvals})
+  await f.scheduled('2026-10-30T15:00:00Z');await c.estimate.read()
+  assert.equal(notices().length,2);const first=await history(c.estimate)
+  assert.deepEqual(first.map(a=>a.status),['accepted','accepted'])
+  assert.equal(new Set(first.map(a=>a.key)).size,2);assert.ok(first.every(a=>a.rule_revision===1&&a.preference_revision>0&&a.provider_message_id))
+  assert.ok(notices()[0].to.includes(followupRecipient(c)))
+  assert.deepEqual({quotes:c.estimate.job.quotes,invoices:c.estimate.job.invoices,approvals:c.estimate.job.approvals},financial,'Dispatch never approves or changes finances')
+  await f.scheduled('2026-10-30T16:00:00Z');await run(c.estimate);assert.equal(notices().length,2)
+  await configure(c.estimate,'estimate',{reason:'New label does not reauthorize an attempted step'})
+  await run(c.estimate);assert.equal(notices().length,2);assert.deepEqual(await history(c.estimate),first)
+  await configure(c.active,'selection');await consent(c.active,'selection','email',c.client);await consent(c.active,'selection','email')
+  mode='refused';await run(c.active);assert.deepEqual((await history(c.active)).map(a=>a.status),['refused','refused'])
+  const afterRefusal=notices().length;await run(c.active);assert.equal(notices().length,afterRefusal)
+  await configure(c.active,'collection',{mode:'scheduled',starts_on:'2026-10-29'})
+  await consent(c.active,'collection','email',c.client);await consent(c.active,'collection','email')
+  f.setNow(Date.parse('2026-10-31T15:00:00Z'));mode='unknown';await run(c.active);assert.deepEqual((await history(c.active)).slice(-2).map(a=>a.status),['unknown','unknown'])
+  const afterUnknown=notices().length;await f.scheduled('2026-10-31T16:00:00Z');await run(c.active);assert.equal(notices().length,afterUnknown,'Uncertain effects are never repeated')
+  mode='accepted'
+  // A fresh issued source exercises the required fallback and recipient quiet hours.
+  const invoice=(await c.active.act('/invoices',{kind:'deposit',description:'Second reviewed deposit',amount_cents:1000,recipient_email:followupRecipient(c),due_on:'2026-10-30',terms:'Reviewed second deposit'})).record
+  await c.active.act('/invoices/'+invoice.id+'/issue')
+  await configure(c.active,'collection',{required:true,required_reason:'An issued invoice remains outstanding',steps:[{after_days:0,label:'Required collection',escalate:false}]})
+  await consent(c.active,'collection','off',c.client,{quiet_start:'08:00',quiet_end:'17:00',time_zone:'America/Chicago'})
+  const beforeQuiet=notices().length;await run(c.active);assert.equal(notices().length,beforeQuiet)
+  await consent(c.active,'collection','off',c.client)
+  await run(c.active);assert.equal(notices().length,beforeQuiet+1)
+  assert.match(notices().at(-1).text,/Required notice: An issued invoice remains outstanding/)
+  assert.equal((await history(c.active)).at(-1).required,true)
+  // A bounced mailbox gets an owned alternative, never another required email.
+  const accepted=(await history(c.active)).at(-1),timestamp=String(Date.parse('2026-10-31T15:00:00Z')/1000)
+  const events=[{email:followupRecipient(c),timestamp:Number(timestamp),event:'bounce',sg_event_id:'synthetic-plinth-701',sg_message_id:'synthetic-plinth-701',rer_delivery_id:accepted.id}],wire=JSON.stringify(events)
+  assert.equal((await f.request('/api/plinth/mail/events',{method:'POST',headers:{'x-twilio-email-event-webhook-timestamp':timestamp,'x-twilio-email-event-webhook-signature':sign('sha256',Buffer.from(timestamp+wire),privateKey).toString('base64')},body:events})).status,200)
+  assert.equal((await history(c.active)).at(-1).status,'bounced')
+  const third=(await c.active.act('/invoices',{kind:'deposit',description:'Third reviewed deposit',amount_cents:1000,recipient_email:followupRecipient(c),due_on:'2026-10-30',terms:'Reviewed third deposit'})).record
+  await c.active.act('/invoices/'+third.id+'/issue');await run(c.active);assert.equal(notices().length,beforeQuiet+1,'An unusable mailbox never receives repeated required mail')
+  assert.equal((await history(c.active)).at(-1).status,'owner_followup');assert.equal((await history(c.active)).at(-1).owner_id,c.ownerId)
+  await c.active.act('/followup-consent',{kind:'collection',allowed:false,channel:'email',confirm:true},c.client)
+  assert.ok((await c.preview(c.active)).actions.filter(a=>a.source_id===third.id).every(a=>a.reason==='Recipient opted out; sequence stopped'))
+  await configure(c.active,'selection',{paused:true});await run(c.active);assert.equal(notices().length,beforeQuiet+1)
+  const beforeErase=c.active.job.id
+  assert.equal((await f.json('/api/plinth/jobs/'+beforeErase,{method:'DELETE',cookie:f.owner,body:{expected_version:c.active.job.version}})).status,200)
+  await f.scheduled('2026-10-31T15:00:00Z');assert.equal(notices().length,beforeQuiet+1)
+  assert.equal((await c.api('/jobs/'+beforeErase+'/followup-rules/run',{expected_version:c.active.job.version,confirm:true})).status,404)
+ }finally{await f.close()}
+ function followupRecipient(c){return 'synthetic-plinth-1'+String.fromCharCode(64)+'example.invalid'}
+})
