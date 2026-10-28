@@ -11,7 +11,7 @@ const feature: Record<string, Feature> = {
  quotes: 'estimates', takeoff: 'estimates', 'takeoff-estimate': 'estimates', 'takeoff-files': 'estimates', pricing: 'estimates', 'estimate-template': 'estimates', 'pricing-rates': 'estimates', 'estimate-catalog': 'estimates', bids: 'estimates', 'bid-comparisons': 'estimates', products: 'estimates', 'product-images': 'estimates',
  selections: 'selections', 'selection-delegations': 'selections', 'decision-files': 'selections',
  variations: 'changes', 'variation-pricing': 'changes', 'allowance-changes': 'changes',
- orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
+ inventory: 'orders', orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
  schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', forecast: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
  diary: 'logs', time: 'time',
  'meeting-inbox': 'documents', rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', satisfaction: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
@@ -20,7 +20,7 @@ const feature: Record<string, Feature> = {
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
 }
 /** Verbs that decide, issue, send or publish rather than edit. */
-const approving = new Set(['follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
+const approving = new Set(['claim-review', 'transfer', 'install', 'return', 'receive', 'equipment', 'follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
 const common = [/^jobs$/, /^jobs\/[^/]+$/, /^todos(?:\/.*)?$/, /^jobs\/[^/]+\/todos(?:\/.*)?$/]
 const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
 export function requirement(method: string, relative: string): Requirement | 'common' | null {

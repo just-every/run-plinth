@@ -3037,7 +3037,7 @@
       "executable": false
     },
     "src/plinth/cost-forecast.ts": {
-      "sha256": "309b593dbc0145b04e2ca7fc04f741cca1f613d94b509cb40c2c9aa84421700c",
+      "sha256": "ec3f38adbfa5f41b83ae56f990d7352458b26c164b09932f17cdd56e2b13d91d",
       "executable": false
     },
     "src/plinth/cost-http.ts": {
@@ -3161,7 +3161,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "4e8a41693f96810c14341b9df89872ac6351cb7bf257fca7cbbdbb6e5d1dd786",
+      "sha256": "3723e93eefc5005f4f2de4575a498b52507ee9058145f7e491e2dd52244a3db7",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3285,7 +3285,7 @@
       "executable": false
     },
     "src/plinth/model.ts": {
-      "sha256": "60ae75299b6899d819a7475fb9787a0c92bbf87aa049d398830486f6ed66d5cf",
+      "sha256": "fdd807e9837238aa09275267bbc073fe5f6a0274428b0dadb628c5d258ae5f83",
       "executable": false
     },
     "src/plinth/operations.ts": {
@@ -3321,7 +3321,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "a8a135ecc9b8c2c5e0ccff5daf087d4c38eebd142c09fbba1efd93b03c90a00a",
+      "sha256": "beec98b06b3837aafd8dbb1e94a13aadd78a9624cb9b57ba71d7da2d684d227f",
       "executable": false
     },
     "src/plinth/portal-features.ts": {
@@ -3373,7 +3373,7 @@
       "executable": false
     },
     "src/plinth/purchase-order-model.ts": {
-      "sha256": "37927166d09350f76c286126ad19981b7741d6f053e67f3d5bc38a8937ed64d1",
+      "sha256": "e00fdd77c5efb5c6de6e19e9e02880e2a1ff3fa42a9b7a088a1daddcaeb991ec",
       "executable": false
     },
     "src/plinth/purchase-order-send.ts": {
@@ -3381,7 +3381,7 @@
       "executable": false
     },
     "src/plinth/purchase-orders.ts": {
-      "sha256": "25af4ea45be999a4d57a27f12ce7bafe487986fe68c0236569280ce7d5422fe5",
+      "sha256": "13a0f14474b9750c6234869c1459edc17f751753d4d47b0a841960016dbc71de",
       "executable": false
     },
     "src/plinth/quotes.ts": {
@@ -3576,6 +3576,14 @@
       "sha256": "038159ba437cf80aa16459ee5c1f63ad5bee6e381131eeb2109b3515a742314d",
       "executable": false
     },
+    "src/plinth/site-inventory-http.ts": {
+      "sha256": "6b585dede0b1fed46a02368304412d5e0ad1ece7940e04dfff068ca2adc21feb",
+      "executable": false
+    },
+    "src/plinth/site-inventory.ts": {
+      "sha256": "ff7bfd2f09fc547ba5b64aa80515e6c52c3e3e343433eb7562436b785a937c1a",
+      "executable": false
+    },
     "src/plinth/sov-document.ts": {
       "sha256": "dfeb0c3c35c4b4064a917f8bd4f2201bb0f9a137ea46ae969844c3d929c68727",
       "executable": false
@@ -3589,7 +3597,7 @@
       "executable": false
     },
     "src/plinth/store.ts": {
-      "sha256": "235627342161c56625d90ac5e3087e2841ce9ce549e1176edfd08a0a67649160",
+      "sha256": "742ea0e796972abedf4ce3955e98276f2eb9b97b548431a3c426ce44f1667660",
       "executable": false
     },
     "src/plinth/subcontractor-portal.ts": {
@@ -4813,7 +4821,7 @@
       "executable": false
     },
     "tests/plinth/cost-forecast.test.mjs": {
-      "sha256": "a243ba6a64d9800a6bb66460d3238572919d08a4d68748fe2d2519034445ace3",
+      "sha256": "9ee5272b9776c320cb0cd7556f2be2b044eec0501c16f7f48ea9843842efc3d3",
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
@@ -4852,6 +4860,10 @@
       "sha256": "020d70dfe30a96260a1a5ad9f62d4d0d2aa9372d870bf3347b2de6150222e260",
       "executable": false
     },
+    "tests/plinth/inventory-support.mjs": {
+      "sha256": "0b144c1586d496d611c3e67c23c9ed4f7e55c080fe8475a7c286804732366a24",
+      "executable": false
+    },
     "tests/plinth/invoices.test.mjs": {
       "sha256": "64ed4f1fdc9606be9e6b77a7d857723aca5b62bee0bd9fed29b6a8b944df1709",
       "executable": false
@@ -4881,7 +4893,7 @@
       "executable": false
     },
     "tests/plinth/purchase-orders.test.mjs": {
-      "sha256": "5405b67ac9e75e593e195aa810e42bb944075a9e8621102d72131e4836592dcd",
+      "sha256": "1a9bbe1232bfee509c0f44e7042bd449b7ce84180303a0da3ad0a086d3361451",
       "executable": false
     },
     "tests/plinth/report-schedule-support.mjs": {

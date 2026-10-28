@@ -2,6 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
 import {costFixture} from './cost-support.mjs'
+import {inventoryFixture} from './inventory-support.mjs'
+
+test('FIELD-005 — a supplier discrepancy needs an immutable human review and contributes its exact forecast exposure once without rewriting commitments',async()=>{
+ const f=await createFixture();try{
+  const c=await inventoryFixture(f);let r=await c.act('receive',c.receive);assert.equal(r.status,200);const claim=r.value.claims[0]
+  const input={as_of:'2026-10-28',source_as_of:'Synthetic reviewed receipt',codes:[{cost_code:'06-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:100000,unbought_cents:0,risk_cents:0,reference:'Separate replacement exposure'}]}
+  const forecast=async(extra={})=>c.api(`/jobs/${c.source.job.id}/costs/forecasts`,{expected_version:(await c.read()).value.version,...input,...extra})
+  assert.equal((await forecast()).value.error,'inventory_forecast_unreviewed')
+  assert.equal((await c.act('claim-review',{claim_id:claim.id,forecast_impact_cents:20000,reason:'Synthetic replacement exposure',confirm:false})).status,400)
+  r=await c.act('claim-review',{claim_id:claim.id,forecast_impact_cents:20000,reason:'Synthetic replacement exposure',confirm:true});assert.equal(r.status,200);assert.equal(r.value.claims[0].review.by.role,'owner')
+  assert.equal((await forecast()).value.error,'inventory_forecast_stale');assert.equal((await forecast({inventory_claims:[{claim_id:claim.id,forecast_impact_cents:10000}]})).status,409)
+  r=await forecast({inventory_claims:[{claim_id:claim.id,forecast_impact_cents:20000}]});assert.equal(r.status,200,JSON.stringify(r.value));assert.deepEqual([r.value.record.final_cents,r.value.record.remaining_cents,r.value.ledger.rows[0].commitment_cents,r.value.ledger.rows[0].received_cents],[120000,120000,100000,50000]);assert.equal(r.value.record.assumptions.codes[0].inventory_impact_cents,20000)
+  assert.equal(r.value.record.assumptions.inventory_claims[0].receipt_id,claim.receipt_id)
+  assert.equal((await c.api(`/jobs/${c.source.job.id}/inventory/claim-review`,{expected_version:r.value.version,operation_id:'synthetic-plinth-rereview',claim_id:claim.id,forecast_impact_cents:0,reason:'Rewrite previous review',confirm:true})).value.error,'immutable')
+ }finally{await f.close()}
+})
 
 test('COST-004 — half-complete framing, worse productivity, posted costs and a revised remaining bid produce independently reconciled immutable forecasts',async()=>{
  const f=await createFixture();try{
