@@ -6,6 +6,19 @@ import {inventoryFixture} from './inventory-support.mjs'
 
 test('FIELD-005 — a supplier discrepancy needs an immutable human review and contributes its exact forecast exposure once without rewriting commitments',async()=>{
  const f=await createFixture();try{
+  // A total shortage retains its ticket and claim without receiving stock or PO value.
+  const missing=await inventoryFixture(f),before=(await missing.read()).value
+  const zero={...missing.receive,lines:[{line_id:missing.order.lines[0].id,quantity:'0',expected_quantity:'1',damaged:'0'}]}
+  const shortage=await missing.act('receive',zero);assert.equal(shortage.status,200,JSON.stringify(shortage.value));const empty=shortage.value,claim0=empty.claims[0]
+  assert.deepEqual([claim0.damaged,claim0.short,claim0.exposure_cents],['0','1',10000]);assert.equal(claim0.receipt_id,empty.record.id)
+  assert.equal(empty.record.amount_cents,0);assert.deepEqual(empty.orders,before.orders,'A shortage preserves PO quantities and economics');assert.deepEqual(empty.lots,[]);assert.deepEqual(empty.movements,[])
+  const original=await f.request(`/api/plinth/jobs/${missing.source.job.id}/inventory/tickets/${empty.record.id}`,{cookie:f.owner});assert.equal(original.status,200);assert.equal(Buffer.from(await original.arrayBuffer()).toString('base64'),missing.receive.document.base64)
+  assert.equal((await missing.act('receive',{...zero,lines:[{...zero.lines[0],expected_quantity:'0'}]})).status,400,'An empty receipt without a shortage is refused')
+  assert.equal((await missing.act('receive',{...zero,lines:[{...zero.lines[0],damaged:'1'}]})).status,400,'Absent stock cannot be damaged')
+  assert.deepEqual((await missing.read()).value,(({record,...state})=>state)(empty),'Invalid zero deliveries leave the shortage unchanged')
+  const reviewed=await missing.act('claim-review',{claim_id:claim0.id,forecast_impact_cents:10000,reason:'Review the total shortage replacement exposure',confirm:true});assert.equal(reviewed.status,200)
+  const shortageForecast=await missing.api(`/jobs/${missing.source.job.id}/costs/forecasts`,{expected_version:reviewed.value.version,as_of:'2026-10-28',source_as_of:'Ticket records no delivery',codes:[{cost_code:'06-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:100000,unbought_cents:0,risk_cents:0,reference:'Total shortage reviewed separately from the unchanged PO'}],inventory_claims:[{claim_id:claim0.id,forecast_impact_cents:10000}]});assert.equal(shortageForecast.status,200,JSON.stringify(shortageForecast.value))
+  assert.deepEqual([shortageForecast.value.record.final_cents,shortageForecast.value.ledger.rows[0].commitment_cents,shortageForecast.value.ledger.rows[0].received_cents],[110000,100000,0])
   const c=await inventoryFixture(f);let r=await c.act('receive',c.receive);assert.equal(r.status,200);const claim=r.value.claims[0]
   const input={as_of:'2026-10-28',source_as_of:'Synthetic reviewed receipt',codes:[{cost_code:'06-100',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:100000,unbought_cents:0,risk_cents:0,reference:'Separate replacement exposure'}]}
   const forecast=async(extra={})=>c.api(`/jobs/${c.source.job.id}/costs/forecasts`,{expected_version:(await c.read()).value.version,...input,...extra})

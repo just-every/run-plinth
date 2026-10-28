@@ -64,6 +64,47 @@ test('FIELD-005 — delivery originals, segregated damage, atomic authorized tra
   r=await officePost('/inventory/return',{...late,posting_period:'2026-11',adjustment_reference:'Late original after accountant close'});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.record.dated_on,'2026-10-29')
   const lateOrder=(await c.api(`/jobs/${c.source.job.id}`)).value.job.orders[0],back=lateOrder.returns.at(-1);assert.equal(back.returned_on,'2026-10-29');const ledger=(await c.api(`/jobs/${c.source.job.id}/costs`)).value;const posted=ledger.rows[0].sources.procurement.find(p=>p.receipt_id===back.id);assert.deepEqual([posted.dated_on,posted.period,posted.amount_cents],['2026-10-29','2026-11',-10000]);assert.deepEqual((await c.api(`/jobs/${c.source.job.id}/costs/periods`)).value.periods[0],closed)
 
+  // Ordinary receipts remain returnable after another receipt on the same PO enters located custody.
+  const mixed=await inventoryFixture(f),line_id=mixed.order.lines[0].id
+  for(let i=0;i<4;i++)await mixed.source.act(`/orders/${mixed.order.id}/receive`,{lines:[{line_id,quantity:'1'}],reference:`Synthetic ordinary receipt ${i+1}`})
+  const stock=await mixed.api(`/jobs/${mixed.source.job.id}/inventory/receive`,{expected_version:mixed.source.job.version,operation_id:'synthetic-plinth-mixed-receipt',...mixed.receive,lines:[{line_id,quantity:'1'}]});assert.equal(stock.status,200,JSON.stringify(stock.value))
+  const unlocatedReturn=async(quantity)=>mixed.api(`/jobs/${mixed.source.job.id}/orders/${mixed.order.id}/return`,{expected_version:(await mixed.read()).value.version,lines:[{line_id,quantity}],reason:'Earlier ordinary receipt returned',reference:'Synthetic ordinary return'})
+  r=await unlocatedReturn('2');assert.equal(r.status,200,JSON.stringify(r.value))
+  const kept=(await mixed.read()).value
+  assert.deepEqual([kept.orders[0].received_cents,kept.orders[0].returned_cents,kept.orders[0].outstanding_cents],[30000,20000,70000])
+  assert.deepEqual(kept.orders[0].lines[0],{line_id,ordered:'10',received:'3',returned:'2',outstanding:'7'})
+  assert.deepEqual(kept.lots,stock.value.lots,'Returning ordinary receipts cannot consume located custody')
+  assert.equal((await unlocatedReturn('3')).value.error,'inventory_return','The ordinary door cannot consume the reserved located unit')
+  assert.deepEqual((await mixed.read()).value,kept,'Refused returns change neither the PO nor custody')
+  r=await mixed.api(`/jobs/${mixed.source.job.id}/inventory/return`,{expected_version:kept.version,operation_id:'synthetic-plinth-mixed-stock-return',lot_id:kept.lots[0].id,quantity:'1',dated_on:'2026-10-28',reference:'Return only the located unit'});assert.equal(r.status,200,JSON.stringify(r.value))
+  assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].returned_quantity,r.value.orders[0].received_cents,r.value.orders[0].returned_cents],['0','1',20000,30000])
+  r=await unlocatedReturn('2');assert.equal(r.status,200,JSON.stringify(r.value));const empty=(await mixed.read()).value
+  assert.deepEqual([empty.orders[0].received_cents,empty.orders[0].returned_cents,empty.orders[0].outstanding_cents],[0,50000,100000])
+
+ }finally{await f.close()}
+})
+
+test('FIELD-005 — current Purchasing visibility also fences generic job approval and review snapshots',async()=>{
+ const f=await createFixture();try{
+  const c=await inventoryFixture(f),cookie=await f.invite(['synthetic-plinth-private-purchasing','dev.localhost'].join('@'),'Synthetic restricted administrator','admin')
+  let r=await c.act('receive',c.receive);assert.equal(r.status,200)
+  const claim=r.value.claims[0]
+  r=await c.act('claim-review',{claim_id:claim.id,forecast_impact_cents:20000,reason:'Synthetic private supplier exposure',confirm:true});assert.equal(r.status,200)
+  const protectedKind=a=>a.kind==='receipt'||a.kind==='purchase_order'||a.kind.startsWith('purchase_order.')||a.kind.startsWith('inventory.')
+  const snapshots=(await c.api(`/jobs/${c.source.job.id}`)).value.job.approvals.filter(protectedKind)
+  for(const kind of ['purchase_order','receipt','inventory.receive','inventory.claim-review'])assert.ok(snapshots.some(a=>a.kind===kind),kind+' exists for authorized readers')
+  r=await c.api('/roles',{copy_of:'administrator',name:'Synthetic administrator without Purchasing',financial_visible:true,permissions:{orders:{view:false}}});assert.equal(r.status,201);let role=r.value.role
+  const person=(await c.api('/team')).value.team.find(p=>p.name==='Synthetic restricted administrator')
+  r=await f.json(`/api/plinth/team/${person.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:role.id,job_ids:[c.source.job.id]}});assert.equal(r.status,200)
+  const view=async()=>{const r=await c.api(`/jobs/${c.source.job.id}`,undefined,cookie);assert.equal(r.status,200);return r.value.job}
+  for(const allowed of [false,true,false]){
+   if(role.permissions.orders.view!==allowed){r=await f.json(`/api/plinth/roles/${role.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:role.version,permissions:{orders:{view:allowed}}}});assert.equal(r.status,200);role=r.value.role}
+   assert.equal(role.financial_visible,true,'Purchasing visibility is independent of financial visibility')
+   for(const path of [...(allowed?[]:['/inventory']),`/orders/${c.order.id}`]){const direct=await c.api(`/jobs/${c.source.job.id}${path}`,undefined,cookie);assert.equal(direct.status,allowed?200:403,path+' '+JSON.stringify(direct.value))}
+   const generic=await view()
+   assert.deepEqual(generic.approvals.filter(protectedKind),allowed?snapshots:[],'The next generic read follows the current Purchasing grant')
+   if(!allowed){assert.deepEqual(generic.orders,[]);assert.equal(generic.site_inventory,undefined);assert.ok(!JSON.stringify(generic).includes('Synthetic private supplier exposure'));assert.ok(generic.approvals.some(a=>a.kind==='quote'),'Unrelated permitted history remains visible')}
+  }
  }finally{await f.close()}
 })
 

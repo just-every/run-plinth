@@ -27,7 +27,11 @@ export function permissionView(job: Job, actor: Actor): Job {
  const drop = (...keys: string[]) => { for (const key of keys) delete out[key] }
  if (!can('estimates')) { out.quotes = []; drop('takeoff', 'products', 'bids', 'bid_comparisons', 'bid_cost_adjustments', 'bid_comparison_awards') }
  if (!can('budgets') || !p.financial) drop('budgets')
- if (!can('orders')) { out.orders = []; drop('subcontracts', 'portal_submissions') }
+ if (!can('orders')) {
+  out.orders = []; drop('subcontracts', 'portal_submissions')
+  // History carries the same private records as Purchasing, including immutable inventory reviews.
+  out.approvals = job.approvals.filter(a => a.kind !== 'receipt' && a.kind !== 'purchase_order' && !a.kind.startsWith('purchase_order.') && !a.kind.startsWith('inventory.'))
+ }
  if (!can('changes')) out.variations = []
  if (!can('selections')) drop('selections')
  if (!can('schedule')) { out.schedules = []; drop(...Object.keys(job).filter(key => key.startsWith('schedule_')), 'trade_invitations') }

@@ -10,7 +10,7 @@ export interface PoShipment { id: string; carrier: string; tracking: string; fre
 export interface PoAmendment { id: string; revision: number; reason: string; previous: { lines: PoLine[]; amount_cents: number; promised_on?: string }; proposed: { lines: PoLine[]; amount_cents: number; promised_on?: string }; budget_impact_cents: number; date_impact_days: number; status: 'pending' | 'approved'; prepared_by: Stamp; approved_by?: Stamp }
 export interface PoFulfillment { delivery_status: 'draft' | 'issued' | 'acknowledged' | 'shipped' | 'partially_received' | 'received' | 'cancelled'; commitment_cents: number; received_cents: number; returned_cents: number; outstanding_cents: number; freight_cents: number; lines: { line_id: string; ordered: string; received: string; returned: string; outstanding: string }[] }
 
-export const milli = (value: unknown, name: string) => { const q = typeof value === 'number' ? String(value) : value; need(typeof q === 'string' && /^\d{1,9}(\.\d{1,3})?$/.test(q), `${name} must be a positive quantity with up to three decimals`); const [whole, frac = ''] = q.split('.'); const n = Number(whole) * 1000 + Number(frac.padEnd(3, '0')); need(n > 0, `${name} must be positive`); return n }
+export const milli = (value: unknown, name: string, allowZero = false) => { const q = typeof value === 'number' ? String(value) : value; need(typeof q === 'string' && /^\d{1,9}(\.\d{1,3})?$/.test(q), `${name} must be a ${allowZero ? 'non-negative' : 'positive'} quantity with up to three decimals`); const [whole, frac = ''] = q.split('.'); const n = Number(whole) * 1000 + Number(frac.padEnd(3, '0')); need(allowZero || n > 0, `${name} must be positive`); return n }
 export const show = (m: number) => m % 1000 ? `${Math.floor(m / 1000)}.${String(m % 1000).padStart(3, '0').replace(/0+$/, '')}` : String(m / 1000)
 const lineTotal = (m: number, unit: number) => Math.floor((m * unit + 500) / 1000)
 export const day = (value: unknown, name: string) => { const d = text(value, name, 10); need(/^\d{4}-\d{2}-\d{2}$/.test(d) && new Date(d + 'T00:00:00Z').toISOString().slice(0, 10) === d, `${name} must be a calendar date (YYYY-MM-DD)`); return d }
@@ -53,7 +53,7 @@ export function poSource(job: Job, input: Input, lines: PoLine[], except?: strin
 }
 /** Per line, in thousandths: ordered, received (gross) and returned quantities. */
 function lineState(order: Order) {
- const qty = (rows: { lines?: LineQuantity[] }[], id: string) => rows.flatMap(r => r.lines ?? []).filter(l => l.line_id === id).reduce((n, l) => n + milli(l.quantity, 'quantity'), 0)
+ const qty = (rows: { lines?: LineQuantity[] }[], id: string) => rows.flatMap(r => r.lines ?? []).filter(l => l.line_id === id).reduce((n, l) => n + milli(l.quantity, 'quantity', true), 0)
  return (order.lines ?? []).map(l => ({ line: l, ordered: milli(l.quantity, 'quantity'), received: qty(order.receipts, l.id), returned: qty(order.returns ?? [], l.id) }))
 }
 export function fulfillment(order: Order): PoFulfillment {
@@ -63,11 +63,11 @@ export function fulfillment(order: Order): PoFulfillment {
  return { delivery_status, commitment_cents: order.amount_cents, received_cents: net, returned_cents: returned, outstanding_cents: order.amount_cents - net, freight_cents: freight, lines }
 }
 /** Line receipts and returns price at the line's unit price: a receipt never exceeds what is outstanding and a return never exceeds what was kept. */
-export function lineQuantities(order: Order, value: unknown, mode: 'receive' | 'return') {
+export function lineQuantities(order: Order, value: unknown, mode: 'receive' | 'return', allowZero = false) {
  need(order.lines && Array.isArray(value) && value.length > 0 && value.length <= 200, 'Send the line quantities')
  const state = lineState(order), rows = (value as unknown[]).map(v => {
   const q = object(v), s = state.find(x => x.line.id === text(q.line_id, 'line_id', 100)); need(s, 'PO line not found', 404, 'not_found')
-  const m = milli(q.quantity, 'quantity'), kept = s.received - s.returned, limit = mode === 'receive' ? s.ordered - kept : kept
+  const m = milli(q.quantity, 'quantity', allowZero), kept = s.received - s.returned, limit = mode === 'receive' ? s.ordered - kept : kept
   if (m > limit) throw new DomainError(mode === 'receive' ? 'over_receipt' : 'over_return', `${s.line.description}: only ${show(limit)} ${s.line.unit} ${mode === 'receive' ? 'outstanding' : 'received'}`, 409)
   // Priced as the change in the kept quantity's rounded value, so a fully received line sums to its total exactly.
   const priced = (n: number) => lineTotal(n, s.line.unit_cents)

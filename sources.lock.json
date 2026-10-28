@@ -3301,7 +3301,7 @@
       "executable": false
     },
     "src/plinth/operations.ts": {
-      "sha256": "9f4aa8f968c075d625d4d1b38740ddc816b1b44260db1aca44460e2168f55501",
+      "sha256": "2ea4e8ec7f97cf6ac09beb5e6f566262e7ec30ebe2f6c8be229a66d6fb4e0fa4",
       "executable": false
     },
     "src/plinth/pay-checkout.ts": {
@@ -3401,7 +3401,7 @@
       "executable": false
     },
     "src/plinth/purchase-order-model.ts": {
-      "sha256": "e22f86faa6f3ac85fecec66d7093e4bb2ebd9b487b0f465ceee6103c93b84ca3",
+      "sha256": "65bcdb4b65c18dbbf1925b10eb217996822e4976ea1158ff0fb31471d9f4e2d5",
       "executable": false
     },
     "src/plinth/purchase-order-send.ts": {
@@ -3409,7 +3409,7 @@
       "executable": false
     },
     "src/plinth/purchase-orders.ts": {
-      "sha256": "d3313730f44a45e024cd3ce01390c134ae496438619067a54966dc011ecd3f8f",
+      "sha256": "d1f34a462da34e00561b566a2991a7e2f4537897dcb917ff365a981167a23646",
       "executable": false
     },
     "src/plinth/quotes.ts": {
@@ -3493,7 +3493,7 @@
       "executable": false
     },
     "src/plinth/role-view.ts": {
-      "sha256": "488f88c1cbabf909ea226e50caa22931d6187eb00e39ac0894d627193e98c67a",
+      "sha256": "39922ede860c01ee8b8f66daec96d253ae4eb8664d3f0edf2f9c31a45bb12a62",
       "executable": false
     },
     "src/plinth/roles.ts": {
@@ -3609,7 +3609,7 @@
       "executable": false
     },
     "src/plinth/site-inventory.ts": {
-      "sha256": "fe0d63d7885de7bc3646eed541d1c77c3346af45d16af1fde387aeed10e48728",
+      "sha256": "e9af2f1c1c5a97a91cf92480039765d58034ea9205036bc0a4cbbd4e3e4220a2",
       "executable": false
     },
     "src/plinth/sov-document.ts": {
@@ -4865,7 +4865,7 @@
       "executable": false
     },
     "tests/plinth/cost-forecast.test.mjs": {
-      "sha256": "b15180023779cfe5e010ccc8e0fe33e96049981ffab480aacc36ef8a409d38f1",
+      "sha256": "fc69a483303e67f3dd75ff07e37aca41e2bb48744b767ba290e20fc5beacecbc",
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
@@ -4937,7 +4937,7 @@
       "executable": false
     },
     "tests/plinth/purchase-orders.test.mjs": {
-      "sha256": "400f5c339a5807eb48037b829b111b96eebf4252928b31d5d111c9a960d773b6",
+      "sha256": "fc99b27ca8424ad8b5d453b15b0e7197d0e41447bbe3665c1f3b9c8aef2fde74",
       "executable": false
     },
     "tests/plinth/report-schedule-support.mjs": {

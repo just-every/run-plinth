@@ -1,6 +1,6 @@
 import { requireJobManager } from './auth'
 import { cents, find, need, recordApproval, stamp, text, type Actor, type Input, type Job, type Order } from './model'
-import { amendment, day, fulfillment, lineQuantities, poSource } from './purchase-order-model'
+import { amendment, day, fulfillment, lineQuantities, milli, poSource } from './purchase-order-model'
 
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
 const issued = (job: Job, id: string) => { const row = find(job.orders, id); need(row.status === 'issued', 'Only an issued, open PO records fulfillment', 409, 'order_state'); return row }
@@ -22,8 +22,19 @@ export function orderAction(job: Job, actor: Actor, id: string, action: string, 
    ;(row.shipments ??= []).push(shipment); log(job, actor, 'ship', row, shipment); break
   }
   case 'return': {
-   need(inventoryReturn || !job.site_inventory?.lots.some(l=>l.order_id===row.id), 'Use the inventory return door for located stock',409,'inventory_return')
    const quantities = lineQuantities(row, input.lines, 'return'), back = { id: crypto.randomUUID(), ...quantities, reason: text(input.reason, 'return reason', 1000), reference: text(input.reference, 'return reference', 300), recorded_by: stamp(actor),...(input.returned_on===undefined?{}:{returned_on:day(input.returned_on,'Return date')}) }
+   if (!inventoryReturn && job.site_inventory) {
+    const lots = job.site_inventory.lots.filter(l => l.origin_job_id === job.id && l.order_id === row.id)
+    const located = new Set([...job.site_inventory.tickets.map(t => t.receipt_id), ...lots.map(l => l.receipt_id)])
+    for (const q of quantities.lines) {
+     // Reserve the net located receipts, including stock installed or transferred away. Earlier ordinary receipts
+     // remain returnable. Receipt ids avoid counting a lot twice if stock transfers back to its origin.
+     const received = row.receipts.filter(r => located.has(r.id)).flatMap(r => r.lines ?? []).filter(l => l.line_id === q.line_id).reduce((n, l) => n + milli(l.quantity, 'quantity', true), 0)
+     const returned = lots.filter(l => l.line_id === q.line_id).reduce((n, l) => n + l.returned, 0)
+     const kept = fulfillment(row).lines.find(l => l.line_id === q.line_id)!.received
+     need(milli(q.quantity, 'quantity') <= milli(kept, 'quantity', true) - received + returned, 'Use the inventory return door for located stock', 409, 'inventory_return')
+    }
+   }
    ;(row.returns ??= []).push(back); log(job, actor, 'return', row, back); break
   }
   case 'cancel': {

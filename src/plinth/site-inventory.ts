@@ -26,17 +26,20 @@ export async function receiveStock(job:Job,actor:Actor,input:Input){
  const order=find(job.orders,text(input.order_id,'order_id',100));need(order.lines,'Choose an itemized PO',409,'inventory_order')
  const location=text(input.location,'Stock location',200),received_on=day(input.received_on,'Arrival date'),original=await document(input.document)
  need(Array.isArray(input.lines)&&input.lines.length>0,'Provide delivered quantities')
- const rows=input.lines.map(value=>{const v=value as Input,line=find(order.lines!,String(v.line_id)),quantity=milli(v.quantity,'Delivered quantity'),damaged=v.damaged===undefined||String(v.damaged)==='0'?0:milli(v.damaged,'Damaged quantity'),expected=v.expected_quantity===undefined?quantity:milli(v.expected_quantity,'Expected delivery quantity');need(damaged<=quantity,'Damage cannot exceed the delivery');need(expected>=quantity,'Expected delivery cannot be below received quantity');const outstanding=fulfillment(order).lines.find(l=>l.line_id===line.id)!;need(expected<=Number(outstanding.outstanding)*1000,'Expected delivery exceeds the outstanding order',409,'over_receipt');return {line,quantity,damaged,short:expected-quantity}})
- const before=order.receipts.length;receiveOrder(job,actor,order.id,{...input,received_on});const receipt=order.receipts[before]!
+ const rows=input.lines.map(value=>{const v=value as Input,line=find(order.lines!,String(v.line_id)),quantity=milli(v.quantity,'Delivered quantity',true),damaged=v.damaged===undefined?0:milli(v.damaged,'Damaged quantity',true),expected=v.expected_quantity===undefined?quantity:milli(v.expected_quantity,'Expected delivery quantity');need(expected>0,'Record delivered stock or a positive expected shortage');need(damaged<=quantity,'Damage cannot exceed the delivery');need(expected>=quantity,'Expected delivery cannot be below received quantity');const outstanding=fulfillment(order).lines.find(l=>l.line_id===line.id)!;need(expected<=Number(outstanding.outstanding)*1000,'Expected delivery exceeds the outstanding order',409,'over_receipt');return {line,quantity,damaged,short:expected-quantity}})
+ const before=order.receipts.length;receiveOrder(job,actor,order.id,{...input,received_on},true);const receipt=order.receipts[before]!
  inventory(job).tickets.push({receipt_id:receipt.id,document:original})
  // Allocate the receipt's rounded cents once, then retain that value through every custody movement.
  const weights=rows.map(r=>BigInt(r.quantity)*BigInt(r.line.unit_cents)),total=weights.reduce((a,b)=>a+b,0n)
- const values=rows.map((_,i)=>Number(BigInt(receipt.amount_cents)*weights[i]!/total));let left=receipt.amount_cents-sum(values)
- const remainders=weights.map((w,i)=>({i,r:BigInt(receipt.amount_cents)*w%total})).sort((a,b)=>a.r===b.r?a.i-b.i:a.r>b.r?-1:1)
+ const values=rows.map((_,i)=>total?Number(BigInt(receipt.amount_cents)*weights[i]!/total):0);let left=receipt.amount_cents-sum(values)
+ const remainders=total?weights.map((w,i)=>({i,r:BigInt(receipt.amount_cents)*w%total})).sort((a,b)=>a.r===b.r?a.i-b.i:a.r>b.r?-1:1):[]
  for(const r of remainders)if(left-->0)values[r.i]++
  rows.forEach((r,i)=>{
-  const value=values[i]!,damage=price(r.damaged,value,r.quantity),lot:StockLot={id:crypto.randomUUID(),origin_job_id:job.id,order_id:order.id,receipt_id:receipt.id,line_id:r.line.id,description:r.line.description,unit:r.line.unit,cost_code:r.line.cost_code,location,received_on,quantity:r.quantity,good:r.quantity-r.damaged,damaged:r.damaged,installed:0,returned:0,transferred:0,good_cents:value-damage,damaged_cents:damage,value_cents:value}
-  inventory(job).lots.push(lot);movement(job,actor,input,{kind:'receive',lot_id:lot.id,quantity:show(r.quantity),amount_cents:value,dated_on:received_on,reference:receipt.reference})
+  // A total shortage has a ticket and claim, but no physical lot or stock movement.
+  if(r.quantity>0){
+   const value=values[i]!,damage=price(r.damaged,value,r.quantity),lot:StockLot={id:crypto.randomUUID(),origin_job_id:job.id,order_id:order.id,receipt_id:receipt.id,line_id:r.line.id,description:r.line.description,unit:r.line.unit,cost_code:r.line.cost_code,location,received_on,quantity:r.quantity,good:r.quantity-r.damaged,damaged:r.damaged,installed:0,returned:0,transferred:0,good_cents:value-damage,damaged_cents:damage,value_cents:value}
+   inventory(job).lots.push(lot);movement(job,actor,input,{kind:'receive',lot_id:lot.id,quantity:show(r.quantity),amount_cents:value,dated_on:received_on,reference:receipt.reference})
+  }
   if(r.damaged||r.short)inventory(job).claims.push({id:crypto.randomUUID(),order_id:order.id,receipt_id:receipt.id,line_id:r.line.id,cost_code:r.line.cost_code,supplier:order.supplier,damaged:show(r.damaged),short:show(r.short),exposure_cents:cents(Number((BigInt(r.damaged+r.short)*BigInt(r.line.unit_cents)+500n)/1000n)),reference:receipt.reference,by:stamp(actor)})
  })
  return receipt
