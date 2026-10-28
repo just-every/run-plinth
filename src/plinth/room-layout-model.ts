@@ -5,7 +5,7 @@ import { validateShape } from './takeoff-geometry'
 
 export interface LayoutPoint { x:number; y:number }
 export interface LayoutOpening { id:string; kind:'door'|'window'; wall:number; offset:number; width:number; height:number }
-export interface LayoutPlacement { id:string; name:string; x:number; y:number; width:number; depth:number; rotation:0|90; product_source:ProductSource; selection?:{id:string;revision_id:string;option_id:string} }
+export interface LayoutPlacement { id:string; name:string; x:number; y:number; width:number; depth:number; rotation:0|90; product_source:ProductSource; selection?:{id:string;revision_id:string;option_id:string;proposed_price_cents:number} }
 export interface LayoutGeometry { points:LayoutPoint[]; openings:LayoutOpening[]; placements:LayoutPlacement[] }
 export interface LayoutRevision extends LayoutGeometry { id:string; revision:number; reason:string; by:Stamp; reconstructed:boolean }
 export interface RoomLayout { id:string; name:string; underlays:{document:Attachment;by:Stamp}[]; revisions:LayoutRevision[]; adoptions:{revision_id:string;digest:string;sheet_id:string;selection_ids:string[];by:Stamp}[] }

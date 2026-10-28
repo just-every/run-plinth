@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "734bbc44ab3d0df85f42384d9f0ce62d733e23c6a179975706d973aad9a9cf5c",
+      "sha256": "789766276c3fca2670edf40c69c600aa77bc994d6e027d91732ef82abdbbd2ec",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0194658c320699d209dcb56aced8438f8d782a23b3eb7d02dd18f6c70943df7f",
+      "sha256": "9e49fc7e3753a08ed77a6cb44652b190571cc9fe346ac09c3ab2c778886b36b5",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "639de236f7856facfaa2e40d920c4792eadf21da60a6e6a3fd24b43b7805bafd",
+      "sha256": "7cff600bcfad277a46945184cbf432581521f9c4cb9a2c45cc5751468477e4b7",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -3557,7 +3557,7 @@
       "executable": false
     },
     "src/plinth/import-targets.ts": {
-      "sha256": "478986df8a2c6466228962b8c077f00a0173c60ef82dd1a4573c700abfe94159",
+      "sha256": "2032ef881dd1a1e6b353bd05f5fcb3fd9b78d395350a43bea2eab28d83f4faf1",
       "executable": false
     },
     "src/plinth/imports.ts": {
@@ -3858,6 +3858,18 @@
     },
     "src/plinth/roles.ts": {
       "sha256": "d9358726f34e4569272aa58b5d2b508d82b068ff2874b120643cdf980fe6b272",
+      "executable": false
+    },
+    "src/plinth/room-layout-model.ts": {
+      "sha256": "e41c8c9883ce44c47412df80ce4bf56ac0461561b37e4eaeaf669af16290cff3",
+      "executable": false
+    },
+    "src/plinth/room-layout-pdf.ts": {
+      "sha256": "419d603fae6eb4bfbffc023f6d0671ee0b0de86b961030ab6fc61711790460f9",
+      "executable": false
+    },
+    "src/plinth/room-layouts.ts": {
+      "sha256": "b19e70cb5560389a9fd29c85f84681342b4aa78d362cb1574c3e49003be0a1a8",
       "executable": false
     },
     "src/plinth/satisfaction-mail.ts": {
@@ -4780,6 +4792,14 @@
       "sha256": "450a642df0f65010944ddbf6aa1d684a0d5e7901b73f51208755a7f708ee08b5",
       "executable": false
     },
+    "src/ui/room-layouts.css": {
+      "sha256": "8853ce0f67b6c5c9a6ba6ee53cdcb4f6fb33a178265f4ef05845c93cd9a66655",
+      "executable": false
+    },
+    "src/ui/room-layouts.tsx": {
+      "sha256": "2ccef45bdbc1aaa50fdb6da6ef9e0b144a0d93fad4d57ba6489c84aeb87032e1",
+      "executable": false
+    },
     "src/ui/satisfaction.tsx": {
       "sha256": "06f54981b1dfc0857d5ab5d49b1b8d31cc5086a1a50a8964b240e4dc56aff559",
       "executable": false
@@ -5216,6 +5236,10 @@
       "sha256": "805a41523d8a996ce80dc795576fc0a0521c3a11185a742182cf878de6448222",
       "executable": false
     },
+    "tests/journeys/room-layouts.mjs": {
+      "sha256": "a34ead062b6d66683bb79c0de58eb4a9a6033caadc9aa08904bb663bb8c70499",
+      "executable": false
+    },
     "tests/journeys/satisfaction.mjs": {
       "sha256": "78f82b1ce028efd354c3b3cbabfacda1eb4bf1b9318c858fbe9166411fab6c3b",
       "executable": false
@@ -5317,7 +5341,7 @@
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
-      "sha256": "732db31e10a5a92ff0f00f46ce3b103d33dc4e1b914e849d7655415220817c7b",
+      "sha256": "0db76289b4286db8294573597ff99cfbe074c0ec187804796c8efd5af9a802a8",
       "executable": false
     },
     "tests/plinth/followup-support.mjs": {
@@ -5353,7 +5377,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "6772bfe7879cabb9e77787ab6e2af5bf362ebb7e3f66677aade542310e7d3606",
+      "sha256": "5b5b7fb0e8ea4f69a4a07e6cc1a25eb768a754d2df9b2c370892e9e071070484",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
@@ -5378,6 +5402,10 @@
     },
     "tests/plinth/roles.test.mjs": {
       "sha256": "5143cea9d75cbee37116c557e3cbfc1992cea2c0d403462e862e53f236942426",
+      "executable": false
+    },
+    "tests/plinth/room-layout-support.mjs": {
+      "sha256": "745ef62874eba0b53203003360d4254c2791d1080fa0bded319b182dc74f24b4",
       "executable": false
     },
     "tests/plinth/satisfaction-support.mjs": {

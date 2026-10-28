@@ -14,22 +14,26 @@ async function read(db: D1Database, destination: string, kind: string, id: strin
   const { results: attachments } = await db.prepare('SELECT id,job_id,entry_id,name,mime,checksum,size,hex(bytes) AS bytes_hex FROM pl_attachments WHERE job_id=? ORDER BY id').bind(id).all<AttachmentSnapshot>()
   return { destination, targetKind: kind, targetId: id, revision: row.import_revision ?? '', value: { data: row.data, version: row.version, attachments: attachments as unknown as Json[] } }
 }
-function matches(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql {
+function matchesParts(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql[] {
   scope(destination, kind)
-  if (!row) return sql('NOT EXISTS(SELECT 1 FROM pl_jobs WHERE id=?) AND NOT EXISTS(SELECT 1 FROM pl_attachments WHERE job_id=?)', id, id)
+  if (!row) return [sql('NOT EXISTS(SELECT 1 FROM pl_jobs WHERE id=?) AND NOT EXISTS(SELECT 1 FROM pl_attachments WHERE job_id=?)', id, id)]
   const current = value(row)
-  const parts = ['EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND data=? AND version=? AND import_revision IS ?)', '(SELECT COUNT(*) FROM pl_attachments WHERE job_id=?)=?', 'NOT EXISTS(SELECT 1 FROM pl_erased_jobs WHERE job_id=?)']
-  const params: unknown[] = [id, current.data, current.version, row.revision || null, id, current.attachments.length, id]
+  const guards = [sql('EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND data=? AND version=? AND import_revision IS ?) AND (SELECT COUNT(*) FROM pl_attachments WHERE job_id=?)=? AND NOT EXISTS(SELECT 1 FROM pl_erased_jobs WHERE job_id=?)', id, current.data, current.version, row.revision || null, id, current.attachments.length, id)]
+  // Each original remains an exact conjunct. Separate statements keep growing
+  // room histories below the D1 per-statement binding ceiling during erasure.
   for (const attachment of current.attachments) {
-    parts.push(`EXISTS(SELECT 1 FROM pl_attachments WHERE ${attachmentColumns.map(k => `${k === 'bytes_hex' ? 'hex(bytes)' : k}=?`).join(' AND ')})`)
-    params.push(...attachmentColumns.map(k => attachment[k]))
+    guards.push(sql(`EXISTS(SELECT 1 FROM pl_attachments WHERE ${attachmentColumns.map(k => `${k === 'bytes_hex' ? 'hex(bytes)' : k}=?`).join(' AND ')})`, ...attachmentColumns.map(k => attachment[k])))
   }
-  return sql(parts.map(p => `(${p})`).join(' AND '), ...params)
+  return guards
+}
+function matches(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql {
+  const guards = matchesParts(row, destination, kind, id)
+  return sql(guards.map(g => `(${g.sql})`).join(' AND '), ...guards.flatMap(g => g.params ?? []))
 }
 
 /** Native jobs and their import provenance always share one atomic D1 batch. */
 export const importTargets: D1TargetAdapter = {
-  read, matches,
+  read, matches, matchesParts,
   write(row) {
     scope(row.destination, row.targetKind)
     const next = value(row)
@@ -51,7 +55,7 @@ export const importTargets: D1TargetAdapter = {
     for (const effect of effects) {
       const { targetKind: kind, targetId: id } = effect.provenance
       const current = await read(db, destination, kind, id) ?? null
-      guards.push(matches(current, destination, kind, id))
+      guards.push(...matchesParts(current, destination, kind, id))
       observations.push({ effectId: effect.provenance.id, current, entity: { table: 'pl_jobs', recordId: id } })
     }
     if (!guards.length) {

@@ -310,7 +310,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!serialized.includes('test-session-secret-for-plinth-integration-only-2026'))
     await proveConnectorRecovery(destination,cookie,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:[job.id],event_types:['job.updated'],revoked_at:null},revokedConnector.value.subscription.id,connectorCredential.id,connector.value.signing_key)
     f=await createFixture({persistTo:source,ownerCookie:cookie})
-    r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
+    r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200,JSON.stringify(r.value))
     assert.equal((await f.request(layoutArchive.root+layoutPath+'/'+archiveLayoutRevision.id+'/model.json',{cookie})).status,404)
     assert.equal((await f.json(layoutArchive.root+layoutPath+'/import',{method:'POST',cookie,body:{expected_version:job.version,base_revision_id:archiveLayoutRevision.id,model:{format:'plinth-room-layout-1',unit:'m',geometry:layoutArchive.g},reason:'Replay erased geometry',reconstructed:true}})).status,404)
     const signedCurrent=(await f.json('/api/plinth/jobs/'+signedArchive.job.id,{cookie})).value.job;assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id,{method:'DELETE',cookie,body:{expected_version:signedCurrent.version}})).status,200);assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id+'/signed-changes',{cookie})).status,404)
