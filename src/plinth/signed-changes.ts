@@ -1,3 +1,4 @@
+import { enqueueContinuity, linkContinuityClaim } from './continuity'
 import { requireJobManager, personActor } from './auth'
 import { active, find, need, object, recordApproval, stamp, text, usdOnly, type Actor, type Input, type Job } from './model'
 import { clientAccess } from './job-customers'
@@ -54,6 +55,7 @@ export async function prepareSignedChange(db: D1Database, job: Job, actor: Actor
  need(client&&await clientAccess(db,job,client.email),'Choose a currently authorized assigned client',403,'change_signer')
  const clientActor=await personActor(db,{...client,displayName:client.display_name},{method:'POST',path:'/api/plinth/jobs/'+job.id+'/signed-changes'})
  const days=Number(input.extra_days);need(Number.isSafeInteger(days)&&days>=0&&days<=366,'Extra days must be whole calendar days from 0 to 366')
+ if(v.allowance_change)need(v.allowance_change.impacts.schedule_days===days,'Signed calendar-day impact must match the reviewed allowance source',409,'change_allowance')
  need(Array.isArray(input.task_ids)&&input.task_ids.length>0,'Choose the affected tasks')
  const ids=input.task_ids.map(id=>text(id,'Affected task',100));need(new Set(ids).size===ids.length&&ids.every(id=>job.schedules.some(t=>t.id===id&&t.status==='booked')),'Choose current booked tasks')
  const affected=new Set(ids);for(let n=0;n<job.schedules.length;n++)for(const t of job.schedules)if(t.predecessors?.some(p=>affected.has(p.id)))affected.add(t.id)
@@ -96,14 +98,14 @@ export async function actSignedChange(db: D1Database, job: Job, actor: Actor, ro
   need(input.confirm===true,'Explicitly confirm the reviewed budget, schedule, SOV and draft billing application')
   const v=find(job.variations,row.variation_id);need(v.status==='draft','Signed source is no longer pending',409,'change_sources')
   // The exact signed document is the only approval door for this variation.
-  approveVariation(job,client,v.id,undefined,true);reviseBudget(job,actor,v)
+  approveVariation(job,client,v.id,undefined,true);reviseBudget(job,actor,v);enqueueContinuity(job,actor,job.budgets!.at(-1)!)
   const assignments=object(input.code_assignments??{});const sov=prepareSov(job,actor,{code_assignments:assignments})
   const plan={calendar:row.schedule.calendar,tasks:row.schedule.tasks}
   const preview=await previewSchedule(job,actor,plan,all)
   need(canonical(preview.tasks.map(({prepared_by,revision,updated_at,...t})=>t))===canonical(row.schedule.tasks.map(({prepared_by,revision,updated_at,...t})=>t)),'Reviewed schedule changed',409,'change_schedule')
   await publishSchedule(job,actor,{...plan,digest:preview.digest},all)
   const billing=object(input.billing),claim=prepareClaim(job,actor,{description:'Draft billing for signed change: '+row.document.scope,...billing})
-  need(claim.sov,'A coded draft billing application is required')
+  need(claim.sov,'A coded draft billing application is required');linkContinuityClaim(job,claim)
   const invoice=await invoiceAction(db,job,actor,{kind:'milestone',source_application_id:claim.id,recipient_email:client.email,description:'Signed change: '+row.document.scope,due_on:billing.due_on,terms:billing.terms})
   row.application={by:stamp(actor),budget_revision:job.budgets!.at(-1)!.revision,sov_revision:sov.revision,claim_id:claim.id,invoice_id:invoice.record.id};row.status='applied'
   recordApproval(job,actor,'signed-change.apply',row,{document_digest:row.digest,...row.application})

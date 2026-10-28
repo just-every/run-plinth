@@ -20,7 +20,7 @@ const feature: Record<string, Feature> = {
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
 }
 /** Verbs that decide, issue, send or publish rather than edit. */
-const approving = new Set(['apply', 'decline', 'dispute', 'follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
+const approving = new Set(['follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
 const common = [/^jobs$/, /^jobs\/[^/]+$/, /^todos(?:\/.*)?$/, /^jobs\/[^/]+\/todos(?:\/.*)?$/]
 const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
 export function requirement(method: string, relative: string): Requirement | 'common' | null {
@@ -38,6 +38,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
+ if(job&&parts[2]==='signed-changes')return {feature:'changes',action:method==='GET'?'view':parts.length===3?'create':'approve',financial:true}
  if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':parts[4]==='review'||parts[4]==='release'?'approve':parts.length===3?'create':'edit',financial:true}
  const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = Object.hasOwn(feature, category) ? feature[category] : undefined
  if (!area) return null

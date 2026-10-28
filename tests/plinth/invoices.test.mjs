@@ -544,19 +544,19 @@ test('Signed change application reconciles native budget and SOV once, publishes
  try{
   const c=await signedChangeFixture(f),variation=await c.priced(),row=await c.present(),before=structuredClone(c.job),artifact=(await c.api('/jobs/'+c.job.id+'/signed-changes/'+row.id+'/document.json',undefined,c.client)).value
   await c.sign(row);await c.sign(row,c.client,'Synthetic change client')
-  const input={digest:row.digest,confirm:true,...c.billing(row)},path='/signed-changes/'+row.id+'/apply'
+  const signedState=structuredClone(c.job),input={digest:row.digest,confirm:true,...c.billing(row)},path='/signed-changes/'+row.id+'/apply'
   assert.equal((await c.act(path,input,c.client)).status,403)
   assert.equal((await c.act(path,{...input,billing:{...input.billing,lines:[]}})).status,400)
-  await c.read();assert.deepEqual(c.job.budgets,before.budgets);assert.deepEqual(c.job.schedules,before.schedules);assert.equal(c.job.variations[0].status,'draft')
+  await c.read();assert.deepEqual(c.job,signedState,'An invalid billing application changes no record or history');assert.deepEqual(c.job.budgets,before.budgets);assert.deepEqual(c.job.schedules,before.schedules);assert.equal(c.job.variations[0].status,'draft')
   await c.ok(path,input)
   const applied=(await c.list()).changes[0],after=structuredClone(c.job)
-  assert.equal(applied.status,'applied');assert.equal(c.job.budgets.length,2);assert.deepEqual(c.job.budgets[0],before.budgets[0]);assert.equal(c.job.budgets[1].contract_cents,330000)
+  assert.equal(applied.status,'applied');assert.equal(c.job.budgets.length,2);assert.equal(c.job.continuity.filter(w=>w.source.kind==='variation'&&w.source.id===variation.id).length,1,'The existing source-keyed downstream continuation is retained');assert.deepEqual(c.job.budgets[0],before.budgets[0]);assert.equal(c.job.budgets[1].contract_cents,330000)
   assert.deepEqual(c.job.budgets[1].codes.find(r=>r.cost_code==='08-500'),{cost_code:'08-500',revenue_cents:110000,cost_cents:45000,allowance_cents:0,commitment_plan_cents:0})
   assert.equal(c.job.sov.length,2);assert.deepEqual(c.job.sov[0],before.sov[0]);assert.equal(c.job.sov[1].contract_cents,330000)
   const scheduled=c.job.sov[1].lines.find(l=>l.source.id===variation.id);assert.equal(scheduled.scheduled_cents,110000);assert.equal(scheduled.cost_code,'08-500')
   assert.equal(c.job.schedules[0].start,'2026-11-09T08:00:00.000Z');assert.equal(c.job.schedules[0].end,'2026-11-09T12:00:00.000Z')
   const invoice=c.job.invoices.find(i=>i.id===applied.application.invoice_id),claim=c.job.claims.find(i=>i.id===applied.application.claim_id)
-  assert.equal(claim.status,'draft');assert.equal(invoice.status,'draft');assert.equal(invoice.source_application_id,claim.id);assert.equal(invoice.amount_cents,110000);assert.equal(invoice.lines.find(l=>l.source_id===variation.id).tax_cents,10000);assert.equal(invoice.number,undefined);assert.equal(invoice.issued,undefined)
+  assert.equal(claim.status,'draft');assert.equal(invoice.status,'draft');assert.equal(invoice.source_application_id,claim.id);assert.equal(invoice.amount_cents,110000);assert.equal(invoice.lines.find(l=>l.source_id===variation.id).tax_cents,10000);assert.equal(invoice.number,undefined);assert.equal(invoice.issued,undefined);assert.equal(invoice.sources.contract.variations[0].signed_document.digest,row.digest);assert.equal(invoice.sources.contract.variations[0].signed_document.signatures.length,2)
   assert.equal((await c.act('/invoices/'+invoice.id+'/issue')).status,409,'Draft commercial sources cannot issue before the existing application approval and issue doors')
   assert.equal((await c.api('/jobs/'+c.job.id,undefined,c.client)).value.job.invoices.length,0,'Draft invoice stays private')
   const signedArtifact=(await c.api('/jobs/'+c.job.id+'/signed-changes/'+row.id+'/document.json',undefined,c.client)).value
@@ -566,5 +566,9 @@ test('Signed change application reconciles native budget and SOV once, publishes
   assert.equal(c.job.orders.length,0);assert.equal(f.messages.filter(m=>m.subject?.includes('invoice')).length,0)
   await c.ok('/claims/'+claim.id+'/approve');await c.ok('/claims/'+claim.id+'/issue')
   await c.ok('/invoices/'+invoice.id+'/issue');assert.equal(c.job.invoices[0].issued.gross_cents,110000,'Existing reviewed issue door completes after the exact application is issued')
+  const beforeSend=f.messages.length;assert.equal((await c.act('/invoices/'+invoice.id+'/send',{confirm:false})).status,400);assert.equal(f.messages.length,beforeSend)
+  await c.ok('/invoices/'+invoice.id+'/send',{confirm:true});assert.equal(c.job.invoices[0].delivery.status,'accepted');assert.equal(f.messages.length,beforeSend+1)
+  const delivered=f.messages.at(-1);for(const privateCost of ['cost_unit_cents','cost_total_cents','45000','$450.00'])assert.ok(!delivered.text.includes(privateCost),'Client invoice email keeps private costs out')
+  assert.equal((await c.act('/invoices/'+invoice.id+'/send',{confirm:true})).status,409);assert.equal(f.messages.length,beforeSend+1,'Invoice-send replay cannot send another email')
  }finally{await f.close()}
 })
