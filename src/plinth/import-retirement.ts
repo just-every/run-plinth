@@ -14,7 +14,7 @@ export async function retireImportedJob(db: D1Database, actor: Actor, job: Job, 
   const checkpoint = [...await redactionStatements(db), ...await invalidateTransfersStatements(db)].map(toD1Sql) as D1Sql[]
   const values = [job.id, job.client_email]
   return retireD1ImportCustody(
-    { target: { kind: 'construction-project', id: job.id }, values },
+    { target: { kind: 'construction-project', id: job.id }, values, related:{source:record=>record.kind==='cost-workbook'&&(record.payload as unknown as {target_job?:{id:string}}).target_job?.id===job.id} },
     nativeStatements,
     importContext(db, actor, { originalErasurePolicy: 'withdraw-affected-artifacts' }),
     checkpoint,

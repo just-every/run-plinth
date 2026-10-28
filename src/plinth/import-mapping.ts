@@ -1,3 +1,4 @@
+import { catalogEffect } from './workbook-catalog'
 import { canonicalJson, sha256, type ImportMapping } from '../modules/import-kit/src/d1/index.ts'
 import type { Actor, Job, Stamp } from './model.ts'
 import type { WorkbookDraft } from './workbook-import.ts'
@@ -9,6 +10,11 @@ import { IMPORT_NAMESPACE, IMPORT_VERSION, type AcceptedJobRow } from './import-
 export function acceptedJobsMapping(actor: Actor): ImportMapping { return {
   version: IMPORT_VERSION,
   map(record) {
+    if(record.kind==='cost-workbook'){
+      const payload=record.payload as unknown as {target_job:Job;draft:WorkbookDraft;expected_version:number}
+      return {effects:[{targetKind:'cost-workbook',targetId:payload.target_job.id+':'+record.artifactHash,value:{data:canonicalJson(payload.target_job as unknown as import('../modules/import-kit/src/d1/index').Json),version:payload.target_job.version,expected_version:payload.expected_version}}]}
+    }
+    if(record.kind==='catalog-workbook')return {effects:[catalogEffect(record.payload as unknown as WorkbookDraft,actor,record.sourceId)]}
     if (record.kind === 'coded-workbook') {
       const draft = record.payload as unknown as WorkbookDraft
       const id = `import-${sha256(`${IMPORT_NAMESPACE}:${record.sourceId}`).slice(0,32)}`
