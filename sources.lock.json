@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "616ba7786fa2747aa68fd171183ab176956d2cf609ec3246af92dc243e8dd6e3",
+      "sha256": "ffca4c672b193ee216734c11ee583d41b3490d31ced6a98431f96ff4e6b42705",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "bb6fbe388d2f606ddd59dd6c5823885f049c0bc4b491ceb5d24a73ff2ce9e16f",
+      "sha256": "f20c1f6e2e596ab9e9e7b67794ed1fe1c410d1c240b5cea547f2d9954d8264b8",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "6f3689727c8c859835c13e7f986cde5998f730a9733edd0cb49d6340d5aab5d2",
+      "sha256": "374bb51cc06c15ae67fb0b8307d0d5f1cd903d7af06ae9e29eb3dee2e5d97621",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -233,7 +233,7 @@
       "executable": false
     },
     "docs/REPORTS.md": {
-      "sha256": "b17bab4e4707c9e3236210fc70b0f2f4d28a5cdcc513a9b1f4c68362d1080e3a",
+      "sha256": "81a4a1025b6948b49b953be227c54b0febde33254b25c21e2bf55734789d6b83",
       "executable": false
     },
     "docs/REUSE.md": {
@@ -4969,7 +4969,7 @@
       "executable": false
     },
     "tests/plinth/reports.test.mjs": {
-      "sha256": "ee9a54f0f2d72cab87e7995c08f5d453f8c4a66c74b1f76bd0968e6d84d79af4",
+      "sha256": "5c713c2bb347061d52025ec608c4a759afd331ce313d3eef8da652fc6859e0a6",
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {
