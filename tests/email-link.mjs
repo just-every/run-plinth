@@ -33,6 +33,25 @@ try {
     if (sql.length) await db.batch(sql.map(s => db.prepare(s)))
   }
   await mf.ready
+  // Refused uploads must finish through the same bounded transport as sign-in.
+  // Exercise both a normal refusal and a body that cannot be discarded safely,
+  // then continue ordinary authentication on the same HTTP client.
+  for (const [path, authorization, status] of [
+    ['/mcp?access_token=synthetic-plinth-transport', undefined, 401],
+    ['/agents/api/pause', 'Bearer synthetic-plinth-transport', 403],
+    ['/api/plinth/jobs', undefined, 401],
+  ]) {
+    for (const oversized of [false, true]) {
+      const response = await fetch(origin + path, {
+        method: 'POST', redirect: 'manual',
+        headers: { origin, 'content-type': 'application/json', ...(authorization ? { authorization } : {}) },
+        body: JSON.stringify({ payload: oversized ? 'x'.repeat(256 * 1024) : 'synthetic-plinth-transport' }),
+      })
+      assert.equal(response.status, oversized ? 413 : status, 'Unread uploads keep refusals bounded without breaking HTTP')
+      assert.equal(response.headers.get('set-cookie'), null, 'A refused upload cannot issue a session')
+      await response.arrayBuffer()
+    }
+  }
   assert.equal((await post('/auth/bootstrap', { token: bindings.SETUP_TOKEN, displayName: 'Owner' })).status, 303, 'owner claimed')
   assert.equal((await post('/auth/magic-link', { email: owner })).status, 202, 'ordinary sign-in link accepted')
   const message = messages.find(m => m.to.includes(owner))

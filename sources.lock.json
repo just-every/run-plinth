@@ -4149,7 +4149,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "3ce0e068ce672a55dd9c36ccdda899fce8552db8a9e36d90f869a52a2900c165",
+      "sha256": "efa8b4c2ab4ec2dea7876d20df5eee50f38089b823da1d7436a10661d7d03e0f",
       "executable": false
     },
     "src/site/docs/DocsPage.tsx": {
@@ -4945,7 +4945,7 @@
       "executable": false
     },
     "tests/email-link.mjs": {
-      "sha256": "acf999929d8e94c0bc1112db5040f8666d3727432cd4fa74cda0e0c176f39438",
+      "sha256": "74f5740f165603dba07393e20a0c4dfd3c720f50489b751ee2fce3cd4ef77d24",
       "executable": false
     },
     "tests/fixtures/advanced-tiff.mjs": {
@@ -5325,7 +5325,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "bde4d42991228127cfb6609567817165f76d9200576f6b38c7003491c9086ffd",
+      "sha256": "07792492ef8b40008953fd188ea3b29b5edd2261216b26b77963822edee2acf6",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
