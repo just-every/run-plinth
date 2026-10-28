@@ -987,6 +987,8 @@ test('Owner follow-up delivery reserves each live source step once, honors recip
   const afterUnknown=notices().length;await f.scheduled('2026-10-31T16:00:00Z');await run(c.active);assert.equal(notices().length,afterUnknown,'Uncertain effects are never repeated')
   mode='accepted'
   // A fresh issued source exercises the required fallback and recipient quiet hours.
+  const optional=notices().find(m=>m.to.includes(followupRecipient(c))),unsubscribe=/https?:\/\/\S+\/api\/plinth\/mail\/unsubscribe\/\S+/.exec(optional.text)?.[0];assert.ok(unsubscribe)
+  assert.equal((await fetch(f.origin+new URL(unsubscribe).pathname,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'List-Unsubscribe=One-Click'})).status,200)
   const invoice=(await c.active.act('/invoices',{kind:'deposit',description:'Second reviewed deposit',amount_cents:1000,recipient_email:followupRecipient(c),due_on:'2026-10-30',terms:'Reviewed second deposit'})).record
   await c.active.act('/invoices/'+invoice.id+'/issue')
   await configure(c.active,'collection',{required:true,required_reason:'An issued invoice remains outstanding',steps:[{after_days:0,label:'Required collection',escalate:false}]})
@@ -1001,6 +1003,7 @@ test('Owner follow-up delivery reserves each live source step once, honors recip
   const events=[{email:followupRecipient(c),timestamp:Number(timestamp),event:'bounce',sg_event_id:'synthetic-plinth-701',sg_message_id:'synthetic-plinth-701',rer_delivery_id:accepted.id}],wire=JSON.stringify(events)
   assert.equal((await f.request('/api/plinth/mail/events',{method:'POST',headers:{'x-twilio-email-event-webhook-timestamp':timestamp,'x-twilio-email-event-webhook-signature':sign('sha256',Buffer.from(timestamp+wire),privateKey).toString('base64')},body:events})).status,200)
   assert.equal((await history(c.active)).at(-1).status,'bounced')
+  assert.equal((await fetch(f.origin+new URL(unsubscribe).pathname,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'List-Unsubscribe=One-Click'})).status,200)
   const third=(await c.active.act('/invoices',{kind:'deposit',description:'Third reviewed deposit',amount_cents:1000,recipient_email:followupRecipient(c),due_on:'2026-10-30',terms:'Reviewed third deposit'})).record
   await c.active.act('/invoices/'+third.id+'/issue');await run(c.active);assert.equal(notices().length,beforeQuiet+1,'An unusable mailbox never receives repeated required mail')
   assert.equal((await history(c.active)).at(-1).status,'owner_followup');assert.equal((await history(c.active)).at(-1).owner_id,c.ownerId)

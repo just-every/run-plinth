@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "9875ffb2243aeb745f33c484de107ad49f36f7f587d227e2b0eef6e612ff6eaa",
+      "sha256": "b47d1860349d29124cf748ec1a341af429aaf41ae91f455dec2ce0da47a2cdc1",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b7008700ea482c849f42796126367d4dea9abc2af986adb647dade280f05de77",
+      "sha256": "d61928008cf32bc5a7558c64db57368d900196b3569f8d3a3f263b81d43cf7fa",
       "executable": false
     },
     "DEMO.md": {
@@ -3305,7 +3305,7 @@
       "executable": false
     },
     "src/plinth/mail-store.ts": {
-      "sha256": "337975b15a2abb2e5b5362f6dfe83a0323d53591ef76c7cf3a3aafa76a3c06e2",
+      "sha256": "f1d45d577c0377a7b6e8611afd1db22e8a2435976191b61de8bcb69f2b9a81bb",
       "executable": false
     },
     "src/plinth/meeting-share-http.ts": {
@@ -4941,7 +4941,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "908697e010bfaaeef378a85ddec42a7fa1a9c907dad211ae8192e2723038bada",
+      "sha256": "51e25462c9be7042ae4657fdbb3e277fce3ed3c73b06f43f0e81a7987903b0ba",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
