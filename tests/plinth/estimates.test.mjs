@@ -338,6 +338,7 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
   const newer=c.jobs[3],request={template_id:c.template.id,as_of:'2026-10-20',dimensions:{walls:'10'}},preview=await newer.act('/estimate-template/preview',request)
   assert.equal(preview.preview.proposal.lines.find(l=>l.cost_code==='06-100').cost_total_cents,7500)
+  const earlierDraft=structuredClone(newer.job.quotes.at(-1));await newer.act('/estimate-template/apply',{...request,digest:preview.preview.digest});assert.equal(newer.job.quotes.at(-1).cost_total_cents,8500);assert.deepEqual(newer.job.quotes.find(q=>q.id===earlierDraft.id),{...earlierDraft,status:'superseded'})
   assert.equal((await f.json(`/api/plinth/jobs/${first.job.id}/estimate-template/apply`,{method:'POST',cookie:f.owner,body:{expected_version:first.job.version,...request,digest:preview.preview.digest}})).status,409)
   const templateValue=structuredClone(c.template.revisions[0].value);templateValue.dimensions.walls='14'
   const templateLesson=(await first.report('lessons',{catalog_id:c.template.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Reviewed default wall dimension for future estimates',value:templateValue})).record
@@ -348,6 +349,6 @@ test('Reviewed completed-job lessons revise assemblies and templates only for ne
   const fresh=(await first.report('lessons',{catalog_id:c.template.id,catalog_version:1,source_job_ids:[first.job.id,second.job.id],reason:'Reviewed current completed source jobs',value:templateValue})).record
   const confirmed=await first.report(`lessons/${fresh.id}/approve`,{confirm:true});assert.equal(confirmed.record.approved.catalog_version,2)
   assert.deepEqual(first.job.quotes,history);{const after=await c.call(`/jobs/${first.job.id}/costs`);assert.deepEqual(after,{...before,version:after.version})}
-  const audit=(await c.call(`/audit?job_id=${first.job.id}&q=estimate.performance`)).events;assert.ok(audit.length>0)
+  const audit=(await c.call(`/audit?job_id=${first.job.id}&q=estimate.performance.lessons.approve`)).events;assert.equal(audit.length,2);assert.ok(audit.every(e=>e.actor_role==='owner'&&e.subject_kind==='estimate_performance'));assert.ok(audit.some(e=>e.subject_id===lesson.id))
  }finally{await f.close()}
 })

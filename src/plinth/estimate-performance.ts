@@ -14,7 +14,7 @@ const state=(job:Job):EstimatePerformance=>job.estimate_performance??={sales:[],
 /** Reports resolve grants before deriving rows, denominators or counts. Catalog edits retain their existing office authority. */
 function access(actor:Actor,write=false){
  need(['owner','admin','project_manager'].includes(actor.role),'Performance reports are office-only',403,'forbidden')
- if(actor.permissions){const p=actor.permissions;need(p.financial&&p.matrix.reports.view&&p.matrix.estimates.view&&p.matrix.budgets.view&&p.matrix.schedule.view,'Performance sources require current financial, estimate, budget and schedule visibility',403,'forbidden');if(write)need(p.matrix.reports.edit,'Performance editing is unavailable',403,'forbidden')}
+ if(actor.permissions){const p=actor.permissions;need(p.financial&&p.matrix.reports.view&&p.matrix.estimates.view&&p.matrix.budgets.view&&p.matrix.schedule.view&&p.matrix.orders.view&&p.matrix.time.view,'Performance sources require current financial, estimate, budget and schedule visibility',403,'forbidden');if(write)need(p.matrix.reports.edit,'Performance editing is unavailable',403,'forbidden')}
 }
 function catalogAccess(actor:Actor){
  need(actor.role==='owner'||actor.role==='admin','Only catalog managers approve lesson revisions',403,'forbidden')
@@ -63,11 +63,12 @@ export async function performanceResponse(request:Request,db:D1Database,actor:Ac
  if(parts.length===2&&request.method==='GET'){
   const estimators=[...new Set(mapped.flatMap(j=>j.sales.estimator?[j.sales.estimator.id]:[]))].map(id=>{const records=mapped.filter(j=>j.sales.estimator?.id===id),won=records.filter(j=>j.sales.stage==='won').length,lost=records.filter(j=>j.sales.stage==='lost').length;return {id,name:records[0]!.sales.estimator!.name,won,lost,open:records.length-won-lost,win_rate:won+lost?won/(won+lost):null,job_ids:records.map(j=>j.id)}})
   const lessons=available.flatMap(j=>state(j).lessons.filter(l=>l.sources.every(s=>available.some(a=>a.id===s.id))).map(l=>({...l,job_id:j.id})))
-  return json({as_of:new Date(Date.now()).toISOString(),jobs:mapped,estimators,lessons,catalog:catalog.filter(e=>e.kind!=='rate'),can_edit:!actor.permissions||actor.permissions.matrix.reports.edit,can_approve:(actor.role==='owner'||actor.role==='admin')&&(!actor.permissions||actor.permissions.matrix.estimates.edit&&actor.permissions.matrix.reports.approve),label:'Native source records under current grants. Unknown production is never zero. Won quotes use recorded client acceptance; lost outcomes are attributed office evidence.'})
+  const pipeline=[...new Set(mapped.map(j=>j.currency+':'+j.sales.stage))].map(key=>{const rows=mapped.filter(j=>j.currency+':'+j.sales.stage===key);return {currency:rows[0]!.currency,stage:rows[0]!.sales.stage,count:rows.length,amount_cents:rows.every(j=>j.sales.amount_cents!==null)?sum(rows.map(j=>j.sales.amount_cents!)):null}})
+  return json({as_of:new Date(Date.now()).toISOString(),jobs:mapped,pipeline,estimators,lessons,catalog:catalog.filter(e=>e.kind!=='rate'),can_edit:!actor.permissions||actor.permissions.matrix.reports.edit,can_approve:(actor.role==='owner'||actor.role==='admin')&&(!actor.permissions||actor.permissions.matrix.estimates.edit&&actor.permissions.matrix.reports.approve),label:'Native source records under current grants. Unknown production is never zero. Won quotes use recorded client acceptance; lost outcomes are attributed office evidence.'})
  }
  need(parts[2]==='jobs'&&parts[3]&&parts.length>=4,'Unknown performance route',404,'not_found')
  const previous=await jobOf(db,actor,parts[3]!);need(allowed(actor,previous),'Job not found',404,'not_found')
- if(request.method==='GET'&&parts.length===4)return json({job:performanceJob(previous,catalog),performance:state(previous)})
+ if(request.method==='GET'&&parts.length===4)return json({job:performanceJob(previous,catalog),performance:{...state(previous),lessons:state(previous).lessons.filter(l=>l.sources.every(s=>available.some(j=>j.id===s.id)))}})
  need(request.method==='POST','Method not allowed',405)
  const input=await body(request);need(input.expected_version===previous.version,'Job changed; reload the performance report',409,'stale_version')
  const job=structuredClone(previous),value=state(job);let record:unknown,writes:D1PreparedStatement[]=[]
