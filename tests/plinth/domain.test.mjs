@@ -1026,7 +1026,13 @@ test('Owner follow-up delivery reserves each live source step once, honors recip
   const officeRule={recipients:[officeId],steps:[{after_days:0,label:'Current manager review',escalate:false}]}
   await configure(c.estimate,'estimate',officeRule)
   await consent(c.estimate,'estimate','email',office)
-  await reviseEstimate();await run(c.estimate)
+  await reviseEstimate()
+  const beforeConcurrent=notices().length,concurrentVersion=c.estimate.job.version
+  const concurrent=await Promise.all([1,2].map(()=>c.api('/jobs/'+c.estimate.job.id+'/followup-rules/run',{expected_version:concurrentVersion,confirm:true})))
+  assert.ok(concurrent.some(r=>r.status===200))
+  assert.ok(concurrent.every(r=>[200,409].includes(r.status)),JSON.stringify(concurrent))
+  assert.equal(notices().length,beforeConcurrent+1,'Concurrent public runs reserve one provider instruction for the live source step')
+  await run(c.estimate);assert.equal(notices().length,beforeConcurrent+1)
   const beforeRevocation=notices().length,historyBeforeRevocation=await history(c.estimate)
   assert.ok(notices().at(-1).to.includes(followupAddress(702)),'An authorized office recipient receives the supported notice')
   await reviseEstimate()
