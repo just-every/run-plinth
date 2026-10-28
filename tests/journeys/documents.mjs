@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+import { chromium, expect } from '@playwright/test'
+const base=process.env.PLINTH_URL,state=process.env.PLINTH_STATE,shots=process.env.PLINTH_SCREENSHOTS
+assert.ok(base&&state&&shots,'Use the disposable installed application')
+await mkdir(shots,{recursive:true})
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLINTH_CHROMIUM_PATH,args:['--use-mock-keychain','--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])]})
+try{
+ const owner=await browser.newContext({storageState:state,viewport:{width:1440,height:1000}}),page=await owner.newPage()
+ const request=async(path,body)=>{const r=await owner.request.post(base+path,{headers:{origin:base},data:body});assert.ok(r.ok(),path+' '+await r.text());return r.json()}
+ const {job}=await request('/api/plinth/jobs',{name:'Maple house private documents',client_email:['client','dev.localhost'].join('@'),address:'148 Maple Street'})
+ const path='/api/plinth/jobs/'+job.id+'/documents',original=Buffer.from('%PDF-1.7\nsynthetic-plinth-1 original signed contract\n%%EOF'),revised=Buffer.from('%PDF-1.7\nsynthetic-plinth-2 revised signed contract\n%%EOF')
+ await request('/api/plinth/jobs/'+job.id+'/quotes',{expected_version:job.version,lines:[{description:'Synthetic contract record',quantity:1,unit_cents:100_000}]})
+ await page.goto(base+'/app?job='+job.id+'&tab=Documents')
+ const panel=page.getByRole('region',{name:'Private job documents',exact:true})
+ await expect(panel.getByRole('heading',{name:'Job documents',exact:true})).toBeVisible()
+ async function folder(name,parent=''){
+  const details=panel.locator('details').filter({has:page.getByText('Create a folder',{exact:true})})
+  if(!await details.evaluate(e=>e.open))await details.locator('summary').click()
+  await details.getByLabel('Folder name',{exact:true}).fill(name)
+  await details.getByLabel('Parent folder',{exact:true}).selectOption(parent)
+  await details.getByRole('button',{name:'Create folder',exact:true}).click()
+  await expect(panel.getByLabel('Folder',{exact:true}).locator('option:checked')).toHaveText(parent?'Contracts › '+name:name)
+  return panel.getByLabel('Folder',{exact:true}).inputValue()
+ }
+ const contracts=await folder('Contracts'),permits=await folder('Permits'),warranties=await folder('Warranties'),nested=await folder('Signed originals',contracts)
+ async function upload(name,target,bytes,tags){
+  const details=panel.locator('details').filter({has:page.getByText('Upload a file',{exact:true})})
+  if(!await details.evaluate(e=>e.open))await details.locator('summary').click()
+  await details.getByLabel('Upload folder',{exact:true}).selectOption(target)
+  await details.getByLabel('Document name',{exact:true}).fill(name)
+  await details.getByLabel('Tags, separated by commas',{exact:true}).fill(tags)
+  await details.getByLabel('Original file',{exact:true}).setInputFiles({name:'synthetic-plinth-'+name.replaceAll(' ','-')+'.pdf',mimeType:'application/pdf',buffer:bytes})
+  await details.getByRole('button',{name:'Keep original file',exact:true}).click()
+  await expect(details.getByRole('status')).toHaveText('Saved.')
+ }
+ await upload('Signed contract',nested,original,'signed, construction')
+ await panel.getByLabel('Folder',{exact:true}).selectOption(permits);await upload('Building permit',permits,original,'permit')
+ await panel.getByLabel('Folder',{exact:true}).selectOption(warranties);await upload('Plumbing warranty',warranties,original,'closeout')
+ await panel.getByLabel('Folder',{exact:true}).selectOption(nested)
+ const contract=panel.getByRole('article',{name:'Signed contract',exact:true})
+ await contract.getByText('Add an immutable version',{exact:true}).click()
+ await contract.getByLabel('New original file',{exact:true}).setInputFiles({name:'synthetic-plinth-contract-revised.pdf',mimeType:'application/pdf',buffer:revised})
+ await contract.getByRole('button',{name:'Keep new version',exact:true}).click()
+ await expect(contract.getByRole('link')).toHaveCount(2)
+ for(const [index,bytes] of [[0,original],[1,revised]]){const href=await contract.getByRole('link').nth(index).getAttribute('href'),file=await owner.request.get(base+href);assert.equal(file.status(),200);assert.deepEqual(await file.body(),bytes)}
+ await contract.getByText('Link a private version to a record',{exact:true}).click()
+ await contract.getByLabel('Exact file version',{exact:true}).selectOption({label:'Version 1'})
+ await contract.getByRole('button',{name:'Link private version',exact:true}).click()
+ await expect(contract.getByText('Private version 1 linked to quotes',{exact:false})).toBeVisible()
+ await panel.getByLabel('Folder',{exact:true}).selectOption('')
+ await panel.getByLabel('Search file names',{exact:true}).fill('warranty')
+ await expect(panel.getByRole('article')).toHaveCount(1);await expect(panel.getByRole('heading',{name:'Plumbing warranty',exact:true})).toBeVisible()
+ await panel.getByLabel('Search tag',{exact:true}).fill('signed');await expect(panel.getByRole('article')).toHaveCount(0)
+ await panel.getByLabel('Search file names',{exact:true}).fill('contract');await expect(contract).toBeVisible()
+ await panel.getByLabel('Search file names',{exact:true}).fill('');await panel.getByLabel('Search tag',{exact:true}).fill('')
+ const library=await(await owner.request.get(base+path)).json(),privateFile=library.library.files.find(f=>f.name==='Signed contract')
+ const client=await browser.newContext({storageState:process.env.PLINTH_CLIENT_STATE})
+ assert.equal((await client.request.get(base+path)).status(),403)
+ assert.equal((await client.request.get(base+path+'/files/'+privateFile.id+'/'+privateFile.versions[0].id)).status(),403)
+ const cross=await request('/api/plinth/jobs',{name:'Another private job',client_email:['client','dev.localhost'].join('@'),address:'150 Maple Street'})
+ assert.equal((await owner.request.get(base+'/api/plinth/jobs/'+cross.job.id+'/documents/files/'+privateFile.id+'/'+privateFile.versions[0].id)).status(),404)
+ async function capture(label,region){for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000});await expect(region).toBeVisible()
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Private document screen fits the viewport')
+  if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
+  await page.screenshot({path:shots+'/DOC-007-'+label+'-'+width+'.png',fullPage:true,animations:'disabled'})
+ }}
+ await capture('job-originals',panel)
+ await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'Quote',exact:true}).click();const attachments=page.getByRole('region',{name:'Private record attachments',exact:true});await expect(attachments.getByRole('link',{name:'Signed contract · version 1',exact:true})).toBeVisible()
+ await capture('record-link',attachments)
+ await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'People & access',exact:true}).click()
+ const company=page.getByRole('region',{name:'Private company documents',exact:true})
+ await company.getByText('Create a folder',{exact:true}).click();await company.getByLabel('Folder name',{exact:true}).fill('Company templates');await company.getByRole('button',{name:'Create folder',exact:true}).click()
+ await expect(company.getByLabel('Folder',{exact:true}).locator('option:checked')).toHaveText('Company templates')
+ await company.getByText('Upload a file',{exact:true}).click();await company.getByLabel('Document name',{exact:true}).fill('Standard warranty template');await company.getByLabel('Original file',{exact:true}).setInputFiles({name:'synthetic-plinth-template.pdf',mimeType:'application/pdf',buffer:original});await company.getByRole('button',{name:'Keep original file',exact:true}).click()
+ await expect(company.getByRole('heading',{name:'Standard warranty template',exact:true})).toBeVisible()
+ const template=await owner.request.get(base+await company.getByRole('link').getAttribute('href'));assert.deepEqual(await template.body(),original)
+ await capture('company-originals',company)
+ await client.close();await owner.close()
+ console.log('DOC-007 PASS: native folders, original-byte versions, search, company custody and refused external and cross-job originals; browser proof at 1440 and 390')
+}finally{await browser.close()}
