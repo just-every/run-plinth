@@ -3213,7 +3213,7 @@
       "executable": false
     },
     "src/plinth/import-targets.ts": {
-      "sha256": "478986df8a2c6466228962b8c077f00a0173c60ef82dd1a4573c700abfe94159",
+      "sha256": "9c0ac60cc93b5b5c85b0ab9888b22ba91d861ea183985c501d983d1dba797787",
       "executable": false
     },
     "src/plinth/imports.ts": {
@@ -4317,7 +4317,7 @@
       "executable": false
     },
     "src/ui/job-documents.tsx": {
-      "sha256": "d0e9c79017c07106fb408ac44717da7b590f0af00a8d05be961115e2d780dccb",
+      "sha256": "c689c544f1ea26cc4abf1baca7536be835030948810f8f61bb051968df85038a",
       "executable": false
     },
     "src/ui/job-subcontracts.tsx": {
@@ -4714,6 +4714,10 @@
     },
     "tests/journeys/costs.mjs": {
       "sha256": "aef246168121fd99cc9249ad0fa4cec25e7024c96d75d5234ffc70ac59a5f451",
+      "executable": false
+    },
+    "tests/journeys/documents.mjs": {
+      "sha256": "4d4f1f1f1d6699f6eb252742542a309a8018e113118b2bab95ef19e4753458b6",
       "executable": false
     },
     "tests/journeys/estimate-performance.mjs": {
