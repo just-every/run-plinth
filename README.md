@@ -58,11 +58,15 @@ Use the RunEditRun account for fleet work. Your own fork can use your own accoun
 
 Worker `construction-plinth`, project `construction/plinth`, edition `plinth`, local D1 `foundation` and package `@construction/plinth` are stable identifiers; do not rename them during an update. Hosted mail delivery and deployment need your account credentials and are not exercised by this first-release seed build.
 
+## Company agents
+
+Plinth exposes the shared Base agent door at `/mcp`, canonical OAuth resource metadata, `/api/rer/agent-policy`, and `/agents`. Business sponsors bind through signed Business person IDs to current native accounts. Native role, custom permission and job grants still apply. Local credentials retain their draft-only scope. Read the [agent door guide](docs/AGENT-DOOR.md) for the registry and boundaries.
+
 ## Development
 
 `rer describe` lists supported commands; `rer check` validates the command contract. `rer verify` builds and runs the integration tests and hosted-output checks; build and deploy do not run tests. CI has one **Verify** workflow per pushed commit, capped below 200 tests. See [ACCEPTANCE.md](ACCEPTANCE.md), [source reuse](docs/REUSE.md) and [the command contract](SEED-COMMAND-CONTRACT.md).
 
-This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.80**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
+This edition started from committed Base `fc0e1041efa55771142bbb57c4ab4743147e264d` and pins published `@runeditrun/rer` **0.2.85**. The Base auth, installer, import kit, archive and deployment paths are reused. The run site wears the desk-approved look (the stepladder mark, Inter, chalk-line blue, oxblood and sea-glass; tokens in `public/site/theme.css`); setup and the workspace keep Albert Sans until their own round.
 
 ## Run site and guides
 

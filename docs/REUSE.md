@@ -27,3 +27,7 @@ The stepladder mark (public/brand/mark.svg, with hand-tuned 16 and 32 px favicon
 Shared Base sources track `rer-v0.2.80` (`11f94fec479228d71ba6d7dd6ea7796c0d42c544`). The verbatim copies and their hashes are recorded in `base-copies.json`; intentional adaptations have origin mappings and retained comparison snapshots in `edition.json`. Applied migrations retain their original bytes and provenance. Demo samples are Plinth domain records; [DEMO.md](../DEMO.md) describes their lifecycle and outbound policy.
 
 PDF rendering for EST-004 uses [Mozilla PDF.js](https://github.com/mozilla/pdf.js), distributed as `pdfjs-dist` under Apache-2.0. Its worker renders retained job PDF originals locally in the installed browser; measured quantities and commercial approvals remain Plinth records.
+
+## Shared company agent door
+
+`src/modules/agent-door`, `src/modules/business-settings`, the refreshed byte-exact `src/modules/operator-auth`, and their theme/icon dependency are recorded from Base `d555e789cffb744a9f83d76ebe42a2e3bdd7a055` in `base-copies.json`. The three new `2026102801xx` migrations add agent-door and Business identity storage without rewriting applied migrations. The native adapters under `src/plinth/agent-door` retain Plinth's draft-only authority, current grants and native persistence. Published CLI `0.2.85` remains a separate package pin; the matching unreleased conformance runner is acquired as an exact source archive in Verify.
