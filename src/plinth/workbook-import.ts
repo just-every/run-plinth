@@ -4,6 +4,8 @@ import { DOMParser, type Document, type Element } from '@xmldom/xmldom'
 import { canonicalJson, sha256, type SourceBundle, type Json } from '../modules/import-kit/src/d1/index.ts'
 import { IMPORT_LIMITS, IMPORT_NAMESPACE, csvCells } from './import-source.ts'
 import { DomainError, need, object, text, type Line } from './model.ts'
+import { lineCents, measurement } from './estimate-math.ts'
+import { standardConversion } from './us-conventions.ts'
 import { estimateLines } from './estimate-input.ts'
 
 interface Cell { value: string; address: string; formula?: string; problem?: string }
@@ -13,7 +15,8 @@ export const workbookFields = ['id', 'description', 'code', 'phase', 'category',
 export type WorkbookField = typeof workbookFields[number]
 interface Mapping { sheet: string; columns: Partial<Record<WorkbookField, string>>; codes: Record<string,string>; units: Record<string,string>; currency: 'USD' | 'AUD'; duplicates: 'reject' | 'skip-identical'; reviewed_formulas: boolean; excluded_rows: Record<string,string> }
 interface Diagnostic { row?: number; cell?: string; code: string; message: string; resolved: boolean }
-export interface WorkbookDraft { name: string; client_email: string; address: string; currency: 'USD' | 'AUD'; lines: Line[]; total_cents: number; cost_total_cents?: number; mapping: Mapping; provenance: { row: number; cells: Record<string, Cell> }[]; diagnostics: Diagnostic[]; artifact_sha256: string; source_name: string }
+interface RowTotal { row: number; total_cents: number | null; cost_total_cents: number | null; disposition: 'included' | 'excluded' | 'duplicate' | 'rejected' }
+export interface WorkbookDraft { name: string; client_email: string; address: string; currency: 'USD' | 'AUD'; lines: Line[]; total_cents: number; cost_total_cents?: number; mapping: Mapping; provenance: { row: number; cells: Record<string, Cell> }[]; diagnostics: Diagnostic[]; artifact_sha256: string; source_name: string; source_totals: { total_cents: number | null; cost_total_cents: number | null; rows: RowTotal[] } }
 const fail = (message: string): never => { throw new DomainError('invalid_workbook', message) }
 const nodes = (node: Document | Element, tag: string) => Array.from(node.getElementsByTagName(tag))
 const content = (node: Element, tag: string) => nodes(node, tag)[0]?.textContent ?? ''
@@ -43,7 +46,7 @@ export async function readWorkbook(input: Record<string,unknown>): Promise<Workb
   book.sheets=[{name:'CSV',rows:csvCells(value).map((values,i)=>({number:i+1,cells:values.map((value,j)=>({value,address:column(j)+(i+1)}))}))}]
  } else {
   let zip: JSZip
-  try { zip=await JSZip.loadAsync(bytes,{checkCRC32:true}) } catch { return fail('Choose a valid unencrypted XLSX workbook') }
+  try { zip=await JSZip.loadAsync(bytes) } catch { return fail('Choose a valid unencrypted XLSX workbook') }
   const entries=Object.values(zip.files)
   need(entries.length<=200, 'Workbook contains too many package parts')
   // Check declared expanded sizes before decompression, then actual sizes as well.
@@ -96,17 +99,30 @@ export function workbookSource(book: Workbook, input: Record<string,unknown>): {
  const mapping:Mapping={sheet:sheet.name,columns,codes:stringMap(raw.codes,'Code mapping'),units:stringMap(raw.units,'Unit mapping'),currency:raw.currency,duplicates:raw.duplicates,reviewed_formulas:raw.reviewed_formulas===true,excluded_rows:stringMap(raw.excluded_rows,'Exclusion reason')}
  for(const code of Object.values(mapping.codes))need(/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(code),'Target cost codes must use letters, digits, dots, underscores or hyphens')
  const email=text(input.client_email,'Client email',254).toLowerCase();need(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),'Provide a client email')
+ const sourceRows: RowTotal[]=[]
  const diagnostics: Diagnostic[]=book.problems.map(message=>({code:'unsupported_content',message,resolved:false})),lines:Line[]=[],provenance:WorkbookDraft['provenance']=[],seen=new Map<string,string>()
  for(const row of sheet.rows.slice(1)){
   if(!row.cells.some(c=>c.value||c.formula))continue
   const fields:Record<string,Cell>={};for(const [key,col] of Object.entries(columns)){let i=0;for(const letter of col)i=i*26+letter.charCodeAt(0)-64;fields[key]=row.cells[i-1]??{value:'',address:col+row.number}}
+  const sourceTotal:RowTotal={row:row.number,total_cents:null,cost_total_cents:null,disposition:'rejected'}
+  sourceRows.push(sourceTotal)
+  const values=Object.fromEntries(Object.entries(fields).map(([key,c])=>[key,c.value]))
+  // Raw totals include omitted and duplicate rows. An unsupported value remains unknown.
+  try {
+   need(!Object.values(fields).some(c=>c.problem||c.formula&&!mapping.reviewed_formulas),'Source values need review')
+   const quantity=measurement(values.quantity),unit=mapping.units[values.unit],rateUnit=mapping.units[values.rate_unit||values.unit]
+   need(unit&&rateUnit,'Map units before comparing source totals')
+   const conversion=standardConversion(unit,rateUnit)??undefined;need(unit===rateUnit||conversion,'Unsupported unit conversion')
+   const rate=(key:string)=>{need(/^(0|[1-9]\d*)$/.test(values[key])&&Number.isSafeInteger(Number(values[key])), 'Invalid source cents');return Number(values[key])}
+   sourceTotal.total_cents=lineCents(quantity,rate('unit_cents'),conversion)
+   if(values.cost_unit_cents)sourceTotal.cost_total_cents=lineCents(quantity,rate('cost_unit_cents'),conversion)
+  }catch { /* The preview reports unknown rather than inventing a source amount. */ }
   const reason=mapping.excluded_rows[String(row.number)]
-  if(reason){diagnostics.push({row:row.number,code:'excluded',message:reason,resolved:true});continue}
+  if(reason){sourceTotal.disposition='excluded';diagnostics.push({row:row.number,code:'excluded',message:reason,resolved:true});continue}
   const problem=Object.values(fields).find(c=>c.problem||c.formula&&!mapping.reviewed_formulas)
   if(problem){diagnostics.push({row:row.number,cell:problem.address,code:problem.problem?'formula_or_cell':'formula_review',message:problem.problem??'Review the cached formula values before adopting',resolved:false});continue}
-  const values=Object.fromEntries(Object.entries(fields).map(([key,c])=>[key,c.value]))
   const rowHash=canonicalJson(values),previous=seen.get(values.id)
-  if(previous!==undefined){const resolved=mapping.duplicates==='skip-identical'&&previous===rowHash;diagnostics.push({row:row.number,code:'duplicate',message:resolved?'Identical duplicate omitted':'Duplicate source id; exclude or correct the conflicting row',resolved});continue}
+  if(previous!==undefined){sourceTotal.disposition='duplicate';const resolved=mapping.duplicates==='skip-identical'&&previous===rowHash;diagnostics.push({row:row.number,code:'duplicate',message:resolved?'Identical duplicate omitted':'Duplicate source id; exclude or correct the conflicting row',resolved});continue}
   seen.set(values.id,rowHash)
   try {
    need(mapping.codes[values.code],`Unmapped or invalid cost code: ${values.code}`)
@@ -114,14 +130,16 @@ export function workbookSource(book: Workbook, input: Record<string,unknown>): {
    if(values.rate_unit)need(mapping.units[values.rate_unit],`Unmapped rate unit: ${values.rate_unit}`)
    const amount=(key:string)=>{const value=values[key];need(/^(0|[1-9]\d*)$/.test(value),`${key} must contain exact whole cents`);const n=Number(value);need(Number.isSafeInteger(n),`${key} is too large`);return n}
    const line=estimateLines({lines:[{id:values.id,description:values.description,cost_code:mapping.codes[values.code],phase:values.phase,category:values.category,quantity:values.quantity,unit:mapping.units[values.unit],...(values.rate_unit?{rate_unit:mapping.units[values.rate_unit]}:{}),unit_cents:amount('unit_cents'),...(values.cost_unit_cents?{cost_unit_cents:amount('cost_unit_cents')}:{})}]}).lines[0]
-   lines.push(line);provenance.push({row:row.number,cells:fields})
+   sourceTotal.disposition='included';lines.push(line);provenance.push({row:row.number,cells:fields})
   }catch(error){diagnostics.push({row:row.number,code:'invalid_row',message:error instanceof DomainError?error.message:'Invalid estimate row',resolved:false})}
  }
  for(const excluded of Object.keys(mapping.excluded_rows))need(sheet.rows.slice(1).some(r=>String(r.number)===excluded),'Excluded row is not in the selected sheet')
  const total_cents=lines.reduce((total,line)=>total+line.total_cents,0),cost=lines.every(l=>l.cost_total_cents!==undefined)?lines.reduce((total,line)=>total+line.cost_total_cents!,0):undefined
  need(Number.isSafeInteger(total_cents)&&total_cents<=1_000_000_000_000,'Estimate total exceeds the supported range')
  need(cost===undefined||Number.isSafeInteger(cost)&&cost<=1_000_000_000_000,'Estimate cost total exceeds the supported range')
- const draft:WorkbookDraft={name:text(input.title,'Estimate title',200),client_email:email,address:text(input.address,'Site address',500,true),currency:mapping.currency,lines,total_cents,...(cost===undefined?{}:{cost_total_cents:cost}),mapping,provenance,diagnostics,artifact_sha256:book.hash,source_name:book.name}
+ const sourceTotal=(key:'total_cents'|'cost_total_cents')=>{const value=sourceRows.every(r=>r[key]!==null)?sourceRows.reduce((sum,r)=>sum+r[key]!,0):null;return value!==null&&Number.isSafeInteger(value)&&value<=1_000_000_000_000?value:null}
+ const source_totals={total_cents:sourceTotal('total_cents'),cost_total_cents:sourceTotal('cost_total_cents'),rows:sourceRows}
+ const draft:WorkbookDraft={name:text(input.title,'Estimate title',200),client_email:email,address:text(input.address,'Site address',500,true),currency:mapping.currency,lines,total_cents,...(cost===undefined?{}:{cost_total_cents:cost}),mapping,provenance,diagnostics,source_totals,artifact_sha256:book.hash,source_name:book.name}
  const payload=draft as unknown as Json
  return {draft,canAdopt:lines.length>0&&diagnostics.every(d=>d.resolved),source:{diagnostics:[],artifacts:[{name:book.name,sha256:book.hash,size:book.size,original:{status:'available',base64:book.base64}}],records:[{namespace:IMPORT_NAMESPACE,kind:'coded-workbook',sourceId:'workbook:'+book.hash,payload,payloadHash:sha256(canonicalJson(payload)),artifactHash:book.hash,location:{artifact:book.name,pointer:sheet.name}}]}}
 }

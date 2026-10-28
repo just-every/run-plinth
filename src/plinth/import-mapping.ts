@@ -16,7 +16,7 @@ export function acceptedJobsMapping(actor: Actor): ImportMapping { return {
       const job: Job = { id,version:1,name:draft.name,client_email:draft.client_email,address:draft.address,status:'quoting',created_by:source,currency:draft.currency,
         quotes:[{id:`${id}-quote`,revision:1,lines:draft.lines,total_cents:draft.total_cents,...(draft.cost_total_cents===undefined?{}:{cost_total_cents:draft.cost_total_cents}),status:'draft',notes:'Imported coded estimate. Native approval is required before work or financial adoption.',prepared_by:source}],
         schedules:[],diary:[],variations:[],orders:[],claims:[],approvals:[],
-        import_evidence:{format:'coded-workbook-v1',artifact_sha256:record.artifactHash,source_name:draft.source_name,mapping:draft.mapping,provenance:draft.provenance,diagnostics:draft.diagnostics,acceptance_verified:false,reviewed_by:{id:actor.id,name:actor.name,role:actor.role}},
+        import_evidence:{format:'coded-workbook-v1',artifact_sha256:record.artifactHash,source_name:draft.source_name,mapping:draft.mapping,provenance:draft.provenance,diagnostics:draft.diagnostics,source_totals:draft.source_totals,acceptance_verified:false,reviewed_by:{id:actor.id,name:actor.name,role:actor.role}},
       }
       return {effects:[{targetKind:'construction-project',targetId:id,value:{data:canonicalJson(job),version:1,attachments:[]}}]}
     }

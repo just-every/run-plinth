@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "133e8e197b54733513e400cfb116794efd0cafe90d450258a31968cc68edbdc8",
+      "sha256": "ced6a3429bd7e77ae55c7c223b46f7447a651a27e2dbe9103181f54d4b9beccd",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "edc99cbeb01f607de46f61ddd1c4258df78a009a1ac703793cca423089e394e5",
+      "sha256": "6b3c4aff0e3ab36f9ed1074f96c47855e012c0a6bb9792c8282387b52cbb4ec5",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "cd40ec4e8f47d09e094dfb3503d24d5d827e200188c490406d89e1751db12a77",
+      "sha256": "8470a617551be56eb82503b7b61dc62e3b163076c52f47ce76fe7e1429e48e52",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "5620880438ce70ff4bd4ed7701bf86e894df67e2c72c6e547c1dc22656d02ebf",
+      "sha256": "c3b534575ee6d136b9066cba5b4434c0853599900c3f1d295c386312e7d32cd0",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -201,7 +201,7 @@
       "executable": false
     },
     "docs/IMPORT.md": {
-      "sha256": "c556028e0a5d13a3547d180642ff7e3a28e19e5ad7b0bc1af1b3a64121002c2d",
+      "sha256": "d9934fc4c612580804172a35403331077a01c406c339260efc8d244097d701e5",
       "executable": false
     },
     "docs/MAIN-FLOWS.md": {
@@ -997,7 +997,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "5b57ea38406c805da46754cc00d05efced8622ab72f16966b08061b28a8860df",
+      "sha256": "8680dce52f390eb64bd771db9f8a4ece3dee2cb3d95bef6c2a5db4657c007fa2",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -3241,7 +3241,7 @@
       "executable": false
     },
     "src/plinth/auth.ts": {
-      "sha256": "158ac655195944488dfd28689a2f67235847a6e067df98e3117c1e2ecc3bfd71",
+      "sha256": "5accf9aabdcaee126dc67dddb28b365b142fd4759e4c8e10ea1407dac1ec8c2c",
       "executable": false
     },
     "src/plinth/bid-access.ts": {
@@ -3485,7 +3485,7 @@
       "executable": false
     },
     "src/plinth/estimate-report.ts": {
-      "sha256": "eb82069f6eb0cacafd198d334eb32489dc25e50c39f3c0ec6b0793ae9913213c",
+      "sha256": "046fee10a3c49a96a02e4947d9b2e1f044a5d996fa7aa7865ba6e44e3dfca6bc",
       "executable": false
     },
     "src/plinth/field-geofence.ts": {
@@ -3545,7 +3545,7 @@
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
-      "sha256": "10ea8f5e9474ea1118b7246cf0a227e1c94274d07bf6b4eb2f4a4f85d6d03314",
+      "sha256": "b45e11836ff2ae86b7a3b918498ed524a0229bbcb826514e522ad4a56c4538bb",
       "executable": false
     },
     "src/plinth/import-retirement.ts": {
@@ -3589,7 +3589,7 @@
       "executable": false
     },
     "src/plinth/job-customers.ts": {
-      "sha256": "0443376718a0e57cab01299f294185852d5fd7319aef8b926425cd21b9c37ae2",
+      "sha256": "3638a3c5a21678c3c0e87c3ef1887a7a0482c146d68a40b6b8040fb6b905b91a",
       "executable": false
     },
     "src/plinth/job-request.ts": {
@@ -4126,6 +4126,10 @@
     },
     "src/plinth/warranty-store.ts": {
       "sha256": "82228e091dd1ccfb65fb90e7cbf60a020ba6bb4a4336a29251b9cee095d0561e",
+      "executable": false
+    },
+    "src/plinth/workbook-import.ts": {
+      "sha256": "c6607a681db44ee146441e6275581ba04102a1b6788c3448b8d8256d4d69c8d6",
       "executable": false
     },
     "src/router.tsx": {
@@ -4912,6 +4916,14 @@
       "sha256": "9eab33ddc14ba63f73a8271cdb254ee4f477c853f8a76d749615186f736d84e8",
       "executable": false
     },
+    "src/ui/workbook-import.css": {
+      "sha256": "ab0f8a9954d6c656f9c9910320a52e7c4dadf0e97e52f7f656c4bad3dc7a9ec2",
+      "executable": false
+    },
+    "src/ui/workbook-import.tsx": {
+      "sha256": "c2e2741c04220bf10fd8f846b1fcf86e7f055a0d9b19cc52a7537aed9a6970b9",
+      "executable": false
+    },
     "src/ui/workspace-base.css": {
       "sha256": "98db7d9c19a40f23da5e3ee10ea5ad7ccd6b803606e043d0e9e5e433cae2c417",
       "executable": false
@@ -5046,6 +5058,10 @@
     },
     "tests/fixtures/unextractable-documents.mjs": {
       "sha256": "48ff0f45c16b7f44a53075f9c3ea52e3443aa22994f283299342d48d600dfbda",
+      "executable": false
+    },
+    "tests/fixtures/workbook-estimate.mjs": {
+      "sha256": "f960b446d09a7f6d7c40c84865382467636f1d99e5fc0fbed2bdcabeb9565401",
       "executable": false
     },
     "tests/journeys/attachment-extraction.mjs": {
@@ -5260,6 +5276,10 @@
       "sha256": "86d5b47a3934db45789bfb1c94cdfc0be7a4343c057cdffa4d163ee89257f306",
       "executable": false
     },
+    "tests/journeys/workbook-import.mjs": {
+      "sha256": "f2ef4ee0b323d9f8eb105c1f383928000dd0c9fac50c9da1ed9ea0004b7ee41d",
+      "executable": false
+    },
     "tests/plinth/attachment-search.test.mjs": {
       "sha256": "d4cce48408f322339764886fa1240061b8abffea34ec3bfc62ba1cff3f43e534",
       "executable": false
@@ -5317,7 +5337,7 @@
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
-      "sha256": "558d6fc07d7b46237600f5f2e253e782ccc857b21c3096f5a5a8ee7f75aad252",
+      "sha256": "c1b0c12fc31496fde60372ae822ecdb4c0d372c7975f9d6fe71e6f3353e5059b",
       "executable": false
     },
     "tests/plinth/followup-support.mjs": {
@@ -5329,7 +5349,7 @@
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
-      "sha256": "e94382d0275e10b30ab3c8519160f3b9db7630331f302a91d300e39d7d99efb3",
+      "sha256": "c244aae1ddb691fc42be22e4eeb2c7ef4675b88cfc0519efcda2871e60ad65b0",
       "executable": false
     },
     "tests/plinth/invoices.test.mjs": {
@@ -5353,7 +5373,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "9334401fa372c8145ce1c25135f309672790965c8fa2288fa65955a37fd40b86",
+      "sha256": "925bbc6cd6fe061b0926053c0713af7c481ecbd24f0507e7f5d0c3845fba6162",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

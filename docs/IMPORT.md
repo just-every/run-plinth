@@ -105,3 +105,67 @@ imports the D1 entry point and requires `nodejs_compat`. The vendored runtime is
 copied from the committed Base reference. Local integration checks establish
 local behavior only; hosted upload, Worker resource and provider acceptance are
 not claimed.
+
+## Coded estimate workbooks
+
+The owner can also upload a UTF-8 CSV or an XLSX under **Coded estimate workbook**.
+This creates a separate quoting job with an inert coded estimate. It remains
+visible only to the owner until the owner records native quote acceptance. It does not
+replace a native job, accept a quote, post actual costs or adopt financial
+opening balances. Legacy XLS, catalogs, time and expense costs, supplier bill
+matching, SOV and opening balances remain outside this import door.
+
+Inspect the file, choose one worksheet, and map column letters to source row id,
+description, code, phase, category, quantity, measurement unit and selling rate
+in whole cents. Rate unit and cost rate in whole cents are optional. Code and
+unit mappings explicitly translate source values to native values. Choose USD
+or historical AUD; no currency conversion is performed. Quantities remain exact
+decimal strings. Native exact unit conversions and half-up line rounding apply.
+
+The preview compares all source row amounts with the included draft totals.
+Duplicate and explicitly excluded row amounts remain in the source total, with
+their disposition shown. An unreviewed, unsupported or unavailable value makes
+its source amount unknown. The draft totals include only valid included rows;
+an unknown cost stays unknown. Resolve every diagnostic before adoption.
+
+The supported XLSX formula vocabulary is cell references and decimal literals
+combined with basic arithmetic, or SUM over cell references and ranges on the
+selected sheet. Plinth never evaluates a formula. Every used formula must have
+a saved cached value, and the owner must explicitly review those source values.
+Missing caches, other formula types, Excel errors, macros, external links and
+active content remain diagnostics. Remove unsupported active content from a
+copy in the source application. No fallback invents a value. Dates, booleans and
+scientific-notation quantities are not silently converted to measurements.
+
+Duplicate source ids are rejected unless the owner chooses to omit identical
+mapped rows. Conflicting duplicates need correction or explicit row exclusion.
+Each exclusion requires its worksheet row number and a reason. An invalid code
+must be mapped to a reviewed native code, corrected in the source, or excluded.
+The review retains exact cell addresses, source values and cached formula text.
+Raw provenance is owner-only and is absent from client job responses. Owner JSON
+cost-code exports include the original mapping and provenance alongside native
+line and code totals. CSV cost-code exports retain exact quantities and cents.
+
+POST `/api/plinth/imports/workbook/inspect` takes `{name,base64}` and returns sheet
+names and column labels. POST `/api/plinth/imports/workbook/preview` also takes
+`title`, `client_email`, optional `address`, and `mapping`. The mapping contains
+`sheet`, `columns`, `codes`, `units`, `currency`, `duplicates` (`reject` or
+`skip-identical`), `reviewed_formulas`, and `excluded_rows`. Column keys are `id`,
+`description`, `code`, `phase`, `category`, `quantity`, `unit`, `rate_unit`,
+`unit_cents`, and `cost_unit_cents`. Map each key to a column letter; code and unit
+maps use source values as keys. Exclusions map row numbers to reasons.
+
+Commit uses the same input plus the preview `fingerprint` at
+`/api/plinth/imports/workbook/commit`. It reparses and fingerprints everything.
+Changed bytes, metadata, mapping, cache review or exclusions invalidate approval.
+One original file has one adoption identity: repeating its approved request
+returns the same journal; trying a different mapping after adoption is refused.
+To import another sheet, export that sheet as a separate source file and review
+it explicitly. Preview stores nothing. Adoption retains exact original bytes
+under the existing journal, originals, undo, native-edit preservation, erasure
+and portable recovery rules above. An erased import cannot be replayed into a
+new native job. A restored journal grants no credentials or automatic execution.
+
+Limits are 256 KiB of original file bytes, ten worksheets, 100 data rows per
+worksheet, 100 columns, 200 package parts and 2 MB of declared expanded XLSX
+content. Unsupported and encrypted packages are refused explicitly.

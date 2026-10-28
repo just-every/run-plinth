@@ -111,8 +111,8 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
  const jobs=async()=>(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs
  try {
   const inspect=await call('/workbook/inspect',input);assert.equal(inspect.status,200,JSON.stringify(inspect.value));assert.deepEqual(inspect.value.sheets.map(s=>s.name),['Estimate','Notes'])
-  const client=await f.invite(input.client_email),agent=await f.agent()
-  for(const credentials of [{cookie:client},{token:agent},{}])assert.ok([401,403].includes((await call('/workbook/preview',input,credentials)).status))
+  const client=await f.invite(input.client_email),agent=await f.agent(),admin=await f.invite(['workbook-office','dev.localhost'].join('@'),'Workbook office','admin')
+  for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}])assert.ok([401,403].includes((await call('/workbook/preview',input,credentials)).status))
   let rejected=await call('/workbook/preview',{...input,mapping:{...input.mapping,reviewed_formulas:false,excluded_rows:{}}})
   assert.equal(rejected.status,200,JSON.stringify(rejected.value));assert.equal(rejected.value.canAdopt,false)
   assert.ok(rejected.value.draft.diagnostics.some(d=>d.code==='formula_review'&&d.cell==='F3'))
@@ -125,11 +125,12 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
   }
   assert.deepEqual(await jobs(),[])
   const review=await call('/workbook/preview',input);assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
-  assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
+  assert.equal(review.value.draft.source_totals.total_cents,1422);assert.equal(review.value.draft.source_totals.cost_total_cents,947);assert.deepEqual(review.value.draft.source_totals.rows.map(r=>r.disposition),['included','included','duplicate','excluded']);assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
   assert.equal(review.value.draft.provenance[1].cells.quantity.address,'F3');assert.equal(review.value.draft.provenance[1].cells.quantity.formula,'5/4')
   assert.equal((await call('/workbook/commit',{...input,mapping:{...input.mapping,currency:'AUD'},fingerprint:review.value.fingerprint})).status,409)
   const adopted=await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint});assert.equal(adopted.status,200,JSON.stringify(adopted.value));assert.equal(adopted.value.job.state,'completed')
   const imported=(await jobs())[0],quote=imported.quotes[0]
+  for(const cookie of [client,admin]){assert.equal((await f.request('/api/plinth/jobs/'+imported.id,{cookie})).status,404);assert.deepEqual((await f.json('/api/plinth/jobs',{cookie})).value.jobs,[])}
   assert.equal(imported.status,'quoting');assert.equal(quote.status,'draft');assert.equal(quote.lines.length,2);assert.equal(quote.lines[1].quantity,'1.25');assert.deepEqual(imported.approvals,[])
   assert.equal((await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint})).value.job.id,adopted.value.job.id);assert.equal((await jobs()).length,1)
   const changed={...input,title:'Different title'},changedPreview=await call('/workbook/preview',changed)

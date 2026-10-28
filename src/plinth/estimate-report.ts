@@ -20,6 +20,7 @@ export function costCodeReport(job: Job, actor: Actor, quoteId: string) {
  return {
   format: 'plinth-estimate-cost-codes-v1', currency: currencyOf(job), job_id: job.id, job_name: job.name, quote_id: quote.id, revision: quote.revision, status: quote.status,
   rounding: quote.pricing ? 'Base measurements round half-up once per line. Scoped pricing stages round half-up, then allocate cents proportionally by largest remainder in source-line order; final line totals include reviewed tax.' : 'Exact quantity × conversion numerator ÷ conversion denominator × integer rate cents; round half-up once per line, then sum included lines.',
+  ...(actor.role === 'owner' && job.import_evidence?.format === 'coded-workbook-v1' ? { workbook_source: job.import_evidence } : {}),
   ...(quote.pricing ? { pricing: quote.pricing } : {}), ...(quote.takeoff_source?{takeoff_source:quote.takeoff_source}:{}),
   alternate_selections: quote.alternate_selections ?? {}, inclusions: quote.inclusions ?? [], exclusions: quote.exclusions ?? [],
   lines: quote.lines.map(line => ({ ...line, included: included(line) })),
