@@ -991,5 +991,13 @@ test('Private document libraries keep exact versions, record links and company o
  const credential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0]
  assert.equal((await f.request('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
  assert.equal((await f.request(download,{token:agent})).status,401)
+ const large=Buffer.alloc(2_097_152,32);large.write('%PDF-1.7\nsynthetic-plinth-3 original\n')
+ const largest=await d.change('/files/'+d.contract.id+'/versions',{file:{name:'synthetic-plinth-large.pdf',base64:large.toString('base64')}}),latest=largest.versions.at(-1)
+ const largeRoute=d.root+'/files/'+largest.id+'/'+latest.id,response=await f.request(largeRoute,{cookie:f.owner});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),large,'The advertised maximum original downloads unchanged')
+ const hold=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:d.job.id,kind:'legal_hold',reason:'Retain private document originals for review',confirm:true}});assert.equal(hold.status,201)
+ let erase=await f.json('/api/plinth/jobs/'+d.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:(await d.read()).version}});assert.equal(erase.status,409);assert.equal(erase.value.error,'retention_hold');assert.equal((await f.request(largeRoute,{cookie:f.owner})).status,200)
+ assert.equal((await f.request('/api/plinth/holds/'+hold.value.hold.id+'/release',{method:'POST',cookie:f.owner,body:{reason:'Review complete; perform the requested erasure'}})).status,200)
+ erase=await f.json('/api/plinth/jobs/'+d.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:(await d.read()).version}});assert.equal(erase.status,200,JSON.stringify(erase.value));assert.equal((await f.request(largeRoute,{cookie:f.owner})).status,404)
+ assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_job_document_files WHERE job_id=?').bind(d.job.id).first()).n,0,'Erasure removes all original bytes, including maximum-sized versions')
  }finally{await f.close()}
 })

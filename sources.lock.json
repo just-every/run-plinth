@@ -484,6 +484,10 @@
       "sha256": "478a68e770f6c1b3ba7a611e4cda6e1013811479c88b95eb724e8d2c2f71cb0f",
       "executable": false
     },
+    "migrations/core/202610280104_job_documents.sql": {
+      "sha256": "54c3e6ad7eb08dfc9cba375523e5b5e32242aefa6e4e86d9db9d8e6a35a4b959",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "f8365e5206255cb0d379f6d8b66e77425fb2e25e4d3c26dc8df95510fcea3424",
       "executable": false
@@ -3541,7 +3545,7 @@
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
-      "sha256": "cfa4cd27f39bd3b30448218e40f76cf9ab093f6bbb921627052e5cbaa50f0669",
+      "sha256": "0c4f9056ef86c97284cdcab60414b847e31dde01e0aab0049c692b1830e25e3c",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -3557,7 +3561,7 @@
       "executable": false
     },
     "src/plinth/import-targets.ts": {
-      "sha256": "9c0ac60cc93b5b5c85b0ab9888b22ba91d861ea183985c501d983d1dba797787",
+      "sha256": "478986df8a2c6466228962b8c077f00a0173c60ef82dd1a4573c700abfe94159",
       "executable": false
     },
     "src/plinth/imports.ts": {
@@ -3593,7 +3597,7 @@
       "executable": false
     },
     "src/plinth/job-documents.ts": {
-      "sha256": "52b58c415ecfc57a1f32da599f50419031d6c461f652a10902057370be7cf912",
+      "sha256": "c30fabb9d22f0b5438ccbb845951f3fbba37289126ba441e894d91f081770ab2",
       "executable": false
     },
     "src/plinth/job-request.ts": {
@@ -5289,7 +5293,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "35259c61c7e706bb1837368ab22267f356ac8eab773a9ca4db5e91b86b896915",
+      "sha256": "8900d14f6ea20d691715abe422de4660bf7e0b8d0047b599034ed17dbeb6d45e",
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
@@ -5329,7 +5333,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "835adf0130c3417351f428894627e83a1474c6f23ea5df3d70c34e91188b162b",
+      "sha256": "1c334051a0e172cd92331f5475fb6f3133635b8e50fbbb4f2c2b29f8b9503ce8",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

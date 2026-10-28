@@ -305,6 +305,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!erasedRows.some(item=>item.table==='pl_jobs'&&item.row.id===job.id),'DOC-004 erasure removes the complete register before old-archive replay is fenced')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id),'Completed-job lessons and their source estimates disappear before the old archive is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_attachments'&&item.row.job_id===job.id),'ROLE-003 erasure removes job-local submission originals')
+    assert.ok(!erasedRows.some(item=>item.table==='pl_job_document_files'&&item.row.job_id===job.id),'Private document erasure removes every original version before archive replay is fenced')
     assert.ok(!erasedRows.some(item=>['pl_mail_messages','pl_mail_files','pl_mail_originals','pl_decision_metadata','pl_file_transcriptions'].includes(item.table)&&item.row.job_id===job.id),'DOC-005 erasure removes correspondence originals and annotations before the journal fences the old archive')
     assert.ok(erasedRows.some(item=>item.table==='pl_vendor_documents'&&item.row.id===portalCompliance.compliance_id),'ROLE-003 company compliance evidence keeps its independent company custody')
 
