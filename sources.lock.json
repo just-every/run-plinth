@@ -977,7 +977,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "244b80cddd0b9858c2bf8ff6ecb11f6781ccf2613bdd8e5a400a718c36614f8e",
+      "sha256": "994de4ee58d6f59c2171a6fb7603ede3252bfbf2b90e589fb88b16d9b4a2f52b",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4333,7 +4333,7 @@
       "executable": false
     },
     "src/ui/job-documents.tsx": {
-      "sha256": "298b4356c0351c8cc69190b4845b6ea9b1704ac31b60c912378bf5c0eca25366",
+      "sha256": "d0e9c79017c07106fb408ac44717da7b590f0af00a8d05be961115e2d780dccb",
       "executable": false
     },
     "src/ui/job-subcontracts.tsx": {
@@ -4341,7 +4341,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "545f213e43e2045182eb22a06d1ddde7b99d38eb9ca87d9a3f9bd00c742d0ba9",
+      "sha256": "dff01824797656eb72c069c9ded1bc5f4e5fa361f7ad43a218333cb619838a2a",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -4732,6 +4732,10 @@
       "sha256": "aef246168121fd99cc9249ad0fa4cec25e7024c96d75d5234ffc70ac59a5f451",
       "executable": false
     },
+    "tests/journeys/documents.mjs": {
+      "sha256": "4d4f1f1f1d6699f6eb252742542a309a8018e113118b2bab95ef19e4753458b6",
+      "executable": false
+    },
     "tests/journeys/estimate-performance.mjs": {
       "sha256": "d0947ac8918643d2f58d347f82881c562109042a8b62e0851889b01e345266fb",
       "executable": false
@@ -4989,7 +4993,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "7451081713333de329c1f10158d99aae56ba2dfdc7bb55ed790ad23a8cf26eb2",
+      "sha256": "835adf0130c3417351f428894627e83a1474c6f23ea5df3d70c34e91188b162b",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DocumentLibrary, DocumentFolder, PrivateDocument } from '../plinth/job-documents'
+import type { DocumentLibrary, PrivateDocument } from '../plinth/job-documents'
 import { api, dateTime, Field, Form } from './shared'
 
 interface Source { version: number; library: DocumentLibrary; targets: {kind:string;id:string;label:string}[] }
@@ -36,4 +36,15 @@ function Document({file,folder,source,path,mutate}:{file:PrivateDocument;folder:
   {!!source.targets.length&&<details><summary>Link a private version to a record</summary><Form submit="Link private version" action={async f=>{const [kind,record_id]=String(f.get('target')).split(':');return mutate('/links',{document_id:file.id,version_id:f.get('version'),kind,record_id})}}><label>Exact file version<select name="version" defaultValue={file.versions.at(-1)?.id}>{file.versions.map(v=><option key={v.id} value={v.id}>Version {v.revision}</option>)}</select></label><label>Existing job record<select name="target">{source.targets.map(t=><option key={t.kind+':'+t.id} value={t.kind+':'+t.id}>{t.kind} · {t.label}</option>)}</select></label></Form></details>}
   {source.library.links.filter(l=>l.document_id===file.id).map(l=><p key={l.id}>Private version {file.versions.find(v=>v.id===l.version_id)?.revision} linked to {l.kind} · {source.targets.find(t=>t.kind===l.kind&&t.id===l.record_id)?.label??'Historical record'}; external access is unchanged.</p>)}
  </article>
+}
+
+/** Internal attachments remain a separate view from the record's published content. */
+export function PrivateRecordDocuments({jobId,section,version}:{jobId:string;section:string;version:number}) {
+ const [source,setSource]=useState<Source>(),[error,setError]=useState('')
+ useEffect(()=>{let current=true;api('/jobs/'+jobId+'/documents').then(value=>{if(current){setSource(value);setError('')}}).catch(e=>{if(current)setError(e.message)});return()=>{current=false}},[jobId,version])
+ const kinds:Record<string,string[]>={Quote:['quotes'],Schedule:['schedules'],'Daily logs':['diary'],Changes:['variations'],Selections:['selections'],Purchasing:['orders','subcontracts','submittals'],Billing:['invoices','claims'],RFIs:['rfis'],Punch:['punch'],Warranty:['warranties'],'To-dos':['todos'],Meetings:['meetings'],Handover:['handover']}
+ const links=source?.library.links.filter(l=>kinds[section]?.includes(l.kind))??[]
+ if(error)return <p role="alert">{error}</p>
+ if(!links.length)return null
+ return <section className="card" aria-label="Private record attachments"><h2>Private record attachments</h2><p>Only the owner can open these linked versions. Published records do not include them.</p>{links.map(link=>{const file=source!.library.files.find(f=>f.id===link.document_id)!,revision=file.versions.find(v=>v.id===link.version_id)!,target=source!.targets.find(t=>t.kind===link.kind&&t.id===link.record_id);return <p key={link.id}>{target?.label??'Historical record'} · <a href={'/api/plinth/jobs/'+jobId+'/documents/files/'+file.id+'/'+revision.id}>{file.name} · version {revision.revision}</a></p>})}</section>
 }
