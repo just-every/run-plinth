@@ -362,7 +362,7 @@ No separate owner-approved desk-built CLAIMS.md was supplied for Plinth as of 17
 
 ## Status
 
-Judged from the code and tests at commit `9a49470f0c2844caaa93a2deadcb053f65e3a27a` (28 October 2026). BID-003 is proven by the named HTTP and installed journeys and six detected behavior mutations. The landing candidate adds its status and generated documents, source lock and a procurement-aware schedule-hold message; the exercised follow-up implementation and assertions are unchanged. RPT-001 retains its earlier proof pin `52b2edb4f56a8700193f7fc051b6e9f747e36b71`. The earlier CT judgment baseline remains `d9f2ba4f19033079779b714187d96d7f66ccbd53`. Exact-candidate Verify and guarded publication and landing gates remain required before counting.
+Judged from the code and tests at commit `19325df8efc48bc4e09f9173b4594fdf56e5d7cb` (28 October 2026). The candidate keeps that follow-up implementation and strengthens BID-003 assertions for an acknowledged package with a missing price, independent response and decline stops, the schedule planner and a start moved before material arrival. The named HTTP and installed journeys and eight detected behavior mutations prove BID-003; exact-candidate execution is required below. RPT-001 retains its earlier proof pin `52b2edb4f56a8700193f7fc051b6e9f747e36b71`. The earlier CT judgment baseline remains `d9f2ba4f19033079779b714187d96d7f66ccbd53`. Exact-candidate Verify and guarded publication and landing gates remain required before counting.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

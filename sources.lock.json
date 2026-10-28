@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "47d94d98587df423b235899d389618fcde3033e5c94b4f2c119589378f20d5da",
+      "sha256": "f5b725aada8e4030f0283c8007541983c3c5a321f7aa73aab89272f0ad75dc0a",
       "executable": false
     },
     "DEMO.md": {
@@ -4893,7 +4893,7 @@
       "executable": false
     },
     "tests/plinth/subcontractors.test.mjs": {
-      "sha256": "48145e1e9801bf48b73a9d9b6baa3f90902c860607fcc2753aece34a359cf9ec",
+      "sha256": "80147d776f45a195f55a28b89fdd66cb59457e944e41f7b156ea8c8c2b0570a8",
       "executable": false
     },
     "tests/plinth/us-conventions.test.mjs": {
