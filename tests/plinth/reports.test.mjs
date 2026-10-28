@@ -291,3 +291,32 @@ test('RPT-003 — weekly manager digest and monthly redacted packets retain fail
   assert.equal(f.messages.length,afterErasure,'Neither a future tick nor replay of an old occurrence resurrects an erased report or sends mail')
  }finally{await f.close()}
 })
+
+test('Completed estimates reconcile source-linked productivity, native outcomes and current-only authorized reporting',async()=>{
+ const {performanceFixture,performanceAddress}=await import('./performance-support.mjs'),f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await performanceFixture(f),report=(await c.call('/reports/performance'))
+  assert.deepEqual(report.jobs.map(j=>j.name).sort(),['Cedar completed remodel','Lost remodel proposal','Maple completed remodel','Open remodel proposal'])
+  const first=report.jobs.find(j=>j.id===c.jobs[0].job.id),second=report.jobs.find(j=>j.id===c.jobs[1].job.id),a=first.rows.find(r=>r.cost_code==='06-100'),b=second.rows.find(r=>r.cost_code==='06-100')
+  assert.equal(first.completion.completed_on,'2026-10-23');assert.equal(second.completion.completed_on,'2026-10-23')
+  assert.equal(a.assembly_id,c.assembly.id);assert.equal(a.assembly_version,1);assert.equal(a.trade,'Framing');assert.equal(a.estimated_cost_cents,6000);assert.equal(a.actual_cost_cents,6000)
+  assert.equal(a.estimated_minutes,120);assert.equal(a.approved_minutes,120);assert.equal(a.estimated_quantity,10);assert.equal(a.installed_quantity,10);assert.equal(a.actual_units_per_hour,5)
+  assert.equal(b.estimated_cost_cents,7200);assert.equal(b.actual_cost_cents,9000);assert.equal(b.estimated_minutes,144);assert.equal(b.approved_minutes,180);assert.equal(b.installed_quantity,12);assert.equal(b.actual_units_per_hour,4)
+  assert.equal(a.source.time_ids.length,1);assert.equal(a.source.production.length,1);assert.equal(a.source.actuals.reduce((n,e)=>n+e.amount_cents,0),6000);assert.equal(a.source.quote_id,c.jobs[0].job.quotes.at(-1).id)
+  const unknown=first.rows.find(r=>r.cost_code==='06-200');assert.equal(unknown.installed_quantity,null);assert.equal(unknown.actual_units_per_hour,null);assert.equal(unknown.unknown,'Production denominator unknown')
+  assert.equal(report.estimators.length,1);assert.deepEqual(Object.fromEntries(['won','lost','open','win_rate'].map(k=>[k,report.estimators[0][k]])),{won:2,lost:1,open:1,win_rate:2/3})
+  assert.equal(report.jobs.find(j=>j.id===c.jobs[2].job.id).sales.evidence,'Native client correspondence 2');assert.equal(first.sales.evidence,'Native signed proposal 0')
+  assert.equal((await f.json(`/api/plinth/reports/performance/jobs/${first.id}/sales`,{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[0].job.version,quote_id:c.jobs[0].job.quotes.at(-1).id,stage:'lost',reason:'Invalid downgrade',evidence:'invalid',confirm:true}})).status,409)
+  const agent=await f.agent(),client=await f.invite(performanceAddress('performance-client'))
+  for(const auth of [{},{token:agent},{cookie:client}])assert.ok([401,403].includes((await f.json('/api/plinth/reports/performance',auth)).status))
+  const admin=await f.invite(performanceAddress('performance-scoped'),'Scoped reviewer','admin'),team=(await c.call('/team')).team,person=team.find(p=>p.email===performanceAddress('performance-scoped'))
+  let r=await f.json('/api/plinth/roles',{method:'POST',cookie:f.owner,body:{name:'Scoped performance manager',copy_of:'project_manager'}});assert.equal(r.status,201);let role=r.value.role
+  r=await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:role.id,job_ids:[first.id],po_limit_cents:0}});assert.equal(r.status,200)
+  let scoped=await f.json('/api/plinth/reports/performance',{cookie:admin});assert.equal(scoped.status,200);assert.deepEqual(scoped.value.jobs.map(j=>j.id),[first.id]);assert.equal(scoped.value.estimators[0].win_rate,1);assert.equal(scoped.value.estimators[0].lost,0)
+  assert.equal((await f.json('/api/plinth/reports/performance/jobs/'+second.id,{cookie:admin})).status,404)
+  r=await f.json('/api/plinth/roles/'+role.id,{method:'PUT',cookie:f.owner,body:{expected_version:role.version,name:role.name,financial_visible:false}});assert.equal(r.status,200)
+  assert.equal((await f.json('/api/plinth/reports/performance',{cookie:admin})).status,403)
+  const publicJob=(await f.json('/api/plinth/jobs/'+first.id,{cookie:client})).value.job;assert.equal(publicJob.estimate_performance,undefined);assert.ok(!JSON.stringify(publicJob).includes('Reviewed finished job'))
+  assert.equal((await f.json('/api/plinth/reports/performance/jobs/'+c.jobs[3].job.id+'/complete',{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[3].job.version,completed_on:'2026-10-23',evidence:'No actual completion',confirm:true}})).status,409)
+ }finally{await f.close()}
+})
