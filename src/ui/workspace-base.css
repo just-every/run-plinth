@@ -62,7 +62,7 @@ body:has(.workspace) { margin: 0; padding: 0; background: var(--paper); color: v
 .workspace select:not([multiple],[size]:not([size="1"])):disabled{--rer-select-ink:color-mix(in srgb,var(--rer-muted) 55%,transparent)}
 
 /* Status badges and fact chips. */
-.workspace .badge { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; border-radius: 999px; background: var(--line-soft); color: var(--body); font-size: 12.5px; font-weight: 650; line-height: 1.2; white-space: nowrap; }
+.workspace .badge { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; border-radius: 999px; background: var(--line-soft); color: var(--body); font-size: 13px; font-weight: 650; line-height: 1.2; white-space: nowrap; }
 .workspace .badge-icon:empty { display: none; }
 .workspace .badge-icon.is-check { font-size: 11px; }
 .workspace .badge:is(.status-accepted, .status-approved, .status-published, .status-booked, .status-exported, .status-issued, .status-completed, .status-active) { background: color-mix(in srgb, var(--mint) 55%, #fff); color: #13513f; }

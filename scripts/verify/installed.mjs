@@ -49,7 +49,8 @@ try {
  await client.storageState({ path: clientState })
  await browser.close(); browser = undefined
  console.log(`Installed ${name}: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic`)
- journey = spawn(process.execPath, [`tests/journeys/${name}.mjs`], { env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+ for(const journeyName of name==='plans'?['plans','submittals']:[name]){
+ journey = spawn(process.execPath, [`tests/journeys/${journeyName}.mjs`], { env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
  // Assertion stacks must never disclose a native confirmation URL or token.
  const redact = line => line.replace(/https?:\/\/[^\s"'<>]*\/auth\/confirm[^\s"'<>]*/g, '[native confirmation withheld]').replace(/(?:pi|seti)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+/g, '[provider secret withheld]')
  for (const stream of [journey.stdout, journey.stderr]) {
@@ -60,8 +61,9 @@ try {
  const timeout = setTimeout(() => { console.error('Installed journey exceeded twenty minutes'); signal('SIGTERM'); setTimeout(() => signal('SIGKILL'), 5000).unref() }, 20 * 60_000)
  try {
   const code = await new Promise((resolve, reject) => { journey.once('error', reject); journey.once('exit', resolve) })
-  assert.equal(code, 0, `Installed ${name} journey passed at 1440 and 390`)
+  assert.equal(code, 0, `Installed ${journeyName} journey passed at 1440 and 390`)
  } finally { clearTimeout(timeout); signal('SIGKILL'); journey = undefined }
+ }
 } finally {
  signal('SIGKILL')
  await browser?.close()

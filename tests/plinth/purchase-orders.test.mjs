@@ -1,3 +1,4 @@
+import { submittalFixture } from './submittal-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createFixture } from './helpers.mjs'
@@ -82,6 +83,24 @@ test('SUB-005 — itemized cost-coded vendor PO from the budget: acknowledgment,
   assert.deepEqual([r.value.record.status, r.value.record.amount_cents, r.value.record.cancelled.released_cents], ['cancelled', 8_000, 24_000])
   assert.equal((await act(`/orders/${light}/receive`, { lines: [{ line_id: 'led', quantity: '1' }], reference: 'Late' })).value.error, 'order_state')
 
+  // A registered vendor package is also enforced by the ordinary issue, amendment and send doors.
+  const submittal=await submittalFixture(f,job);job=submittal.job
+  const gatedOrder=submittal.order.id,gatedRow=submittal.row,currentCycle=gatedRow.cycles.at(-1)
+  assert.equal((await act('/orders/'+gatedOrder+'/issue')).status,200)
+  r=await act('/orders/'+gatedOrder+'/amend',{reason:'Revised window dimensions',lines:[{id:'windows',description:'Revised W1 windows',cost_code:'12-350',quantity:'1',unit:'package',unit_cents:125000}],budget_impact_cents:5000,date_impact_days:0})
+  assert.equal(r.status,200,JSON.stringify(r.value))
+  const beforeGate=structuredClone(job)
+  r=await act('/orders/'+gatedOrder+'/approve-amendment',{budget_impact_cents:5000,date_impact_days:0})
+  assert.equal(r.value.error,'submittal_mismatch');assert.deepEqual(job,beforeGate,'A mismatched approved package changes no commitment terms')
+  r=await act('/submittals/'+gatedRow.id+'/resubmit',{cycle_id:currentCycle.id,...submittal.submission('Window W1 version three',submittal.revised)})
+  assert.equal(r.status,200,JSON.stringify(r.value));const amendedCycle=r.value.record.cycles.at(-1)
+  r=await act('/submittals/'+gatedRow.id+'/review',{cycle_id:amendedCycle.id,disposition:'approved',comment:'Reviewed the revised dimensions and exact commitment',confirm:true});assert.equal(r.status,200)
+  r=await act('/submittals/'+gatedRow.id+'/release',{cycle_id:amendedCycle.id,order_id:gatedOrder,product_reference:amendedCycle.product_reference,confirm:true});assert.equal(r.status,200)
+  r=await act('/orders/'+gatedOrder+'/approve-amendment',{budget_impact_cents:5000,date_impact_days:0});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.record.amount_cents,125000)
+  assert.equal(r.value.record.amendments[0].previous.amount_cents,120000)
+  r=await act('/submittals/'+gatedRow.id+'/resubmit',{cycle_id:amendedCycle.id,...submittal.submission('Window W1 version four',submittal.revised)});assert.equal(r.status,200)
+  const sendCount=sent().length
+  r=await act('/orders/'+gatedOrder+'/send');assert.equal(r.value.error,'submittal_unapproved');assert.equal(sent().length,sendCount,'A new unapproved cycle never reaches the supplier')
   r = await f.json(`/api/plinth/jobs/${job.id}`, { cookie: client }); assert.equal(r.status, 200)
   assert.deepEqual(r.value.job.orders, []); assert.ok(!JSON.stringify(r.value).includes('Green Mountain Cabinet'), 'Clients never see vendor POs')
  } finally { await f.close() }

@@ -1,3 +1,4 @@
+import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
 import { satisfactionResponse } from './satisfaction'
 import { reportScheduleResponse } from './report-schedule'
@@ -102,7 +103,7 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -150,6 +151,12 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}
+ if(parts[2]==='submittals'&&method==='GET'){
+  submittalAccess(actor)
+  if(parts.length===3)return json({version:previous.version,person_id:actor.id,manage:actor.role==='owner',register:previous.submittals??[],reviewers:await submittalReviewers(env.DB,previous),orders:previous.orders})
+  if(parts.length===5&&parts[3]==='files')return submittalFile(env.DB,previous,actor,parts[4]!)
+  return json({error:'not_found'},404)
+ }
  if(parts.length===3&&parts[2]==='capacity'&&method==='GET'){requireJobManager(actor);const conflicts=resourceConflicts(await resources(env.DB),await jobs(env.DB),previous);return json({resources:(await resources(env.DB)).map(r=>actor.role==='project_manager'?{...r,history:[],leave:r.leave.map(w=>({...w,reason:'Unavailable'}))}:r),bookings:(await jobs(env.DB)).flatMap(j=>j.schedules.filter(t=>t.status==='booked'&&!t.milestone).map(t=>({job_name:actor.role==='project_manager'&&!actor.team!.job_ids.includes(j.id)?'Another job':j.name,description:actor.role==='project_manager'&&!actor.team!.job_ids.includes(j.id)?'Allocated resource':t.description,start:t.start,end:t.end,resources:t.resources??[]}))),conflicts:conflicts.map(c=>actor.role==='project_manager'&&!actor.team!.job_ids.includes(c.job_id)?{reason:c.reason,resource_id:c.resource_id,job_name:'Another job',start:c.start,end:c.end}:c)})}
  if(parts.length===3&&parts[2]==='forecast'&&method==='GET'){need(actor.role!=='member','Forecasts are internal',403,'forbidden');const booked=previous.schedules.some(t=>t.status==='booked');if(!booked)return json({forecast:null});const planned=await previewSchedule(previous,{...actor,role:'admin',permissions:undefined},{calendar:previous.schedule_calendar,tasks:previous.schedules},await jobs(env.DB));return json({forecast:{completion_before:planned.completion_before,completion_after:planned.completion_after,tasks:planned.tasks.map(t=>({id:t.id,description:t.description,start:t.start,end:t.end,status:t.status}))}})}
  if(parts.length===4&&parts[2]==='invoices'&&parts[3]==='cost-sources'&&method==='GET'){costBillingAccess(actor);const state=previous.cost_records;return json({entries:(state?.entries??[]).map(e=>{const source=state?.bills.find(b=>b.id===e.source_id)??state?.sources.find(s=>s.id===e.source_id);return {...e,reference:source?.reference,document_checksum:source?.document?.checksum}})})}
@@ -225,7 +232,8 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
+ if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
  else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
  else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='portal-policy'&&parts.length===3)record=portalPolicy(job,actor,input)
@@ -263,6 +271,7 @@ async function handle(request:Request,original:Bindings):Promise<Response>{const
  if(JSON.stringify(previous.schedules)!==JSON.stringify(job.schedules))await requireResources(env.DB,job,await jobs(env.DB),actor)
  enforceCostPeriods(previous,job,actor,input)
  refreshCostExceptions(job)
+ if(category==='orders'&&['issue','approve-amendment','receive','ship'].includes(action??''))await requireSubmittalGate(env.DB,job,job.orders.find(o=>o.id===id)!)
  await saveJob(env.DB,actor,previous,job,writes,clock)
  if(actor.role==='member'&&category==='invoices')record=invoiceProjection(job,actor).find(invoice=>invoice.id===id)
  if(actor.role==='member'&&category==='selections')record=selectionProjection(job,true).find(s=>s.id===id)

@@ -794,3 +794,73 @@ test('DOC-001 — approved plan sets supersede exact sheets, notify current reci
  assert.deepEqual((await f.json('/api/plinth/plan-inbox',{cookie:client})).value.jobs,[])
  }finally{await f.close()}
 })
+
+test('DOC-004 — native window submittal cycles preserve vendor originals and exact reviewer decisions while procurement refuses unsafe release',async()=>{
+ const f=await createFixture()
+ try{
+  const address=n=>['synthetic-plinth-submittal-'+n,'example.test'].join('@')
+  const client=await f.invite(address(1),'Submittal client'),manager=await f.invite(address(2),'Designated reviewer','admin'),other=await f.invite(address(3),'Other manager','admin')
+  let job=await createActiveJob(f,'Window review house',address(1))
+  const team=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team,reviewer=team.find(p=>p.name==='Designated reviewer')
+  assert.equal((await f.json('/api/plinth/team/'+reviewer.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[job.id],po_limit_cents:200000}})).status,200)
+  const root='/api/plinth/jobs/'+job.id
+  const read=()=>f.json(root+'/submittals',{cookie:f.owner})
+  const act=async(path,body={},cookie=f.owner)=>{const r=await f.json(root+path,{method:'POST',cookie,body:{expected_version:job.version,...body}});if(r.status===200)job=r.value.job;return r}
+  const ok=async(path,body={},cookie)=>{const r=await act(path,body,cookie);assert.equal(r.status,200,JSON.stringify(r.value));return r.value.record}
+  const unchanged=async(path,body,credentials=f.owner,code)=>{const before=await read(),audit=(await f.db.prepare('SELECT count(*) AS n FROM pl_audit').first()).n,attachments=(await f.db.prepare('SELECT count(*) AS n FROM pl_attachments').first()).n;const r=await act(path,body,credentials);assert.ok([400,403,409].includes(r.status),JSON.stringify(r));if(code)assert.equal(r.value.error,code);assert.deepEqual((await read()).value,before.value);assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_audit').first()).n,audit);assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments').first()).n,attachments);return r}
+  const order=await ok('/orders',{supplier:'Synthetic window supplier',description:'Window schedule W1',amount_cents:120000})
+  const original=takeoffPlan(),revised=takeoffPlan(true)
+  const submission=(product,bytes,extra={})=>({product_reference:product,required_on:'2026-11-12',specified_scope:'W1 insulated low-e window package',reviewer_id:reviewer.id,deviates:false,attachments:[{name:'synthetic-plinth-window.pdf',mime:'application/pdf',base64:bytes.toString('base64')}],...extra})
+  let row=await ok('/submittals',{title:'Window package',order_id:order.id,...submission('Window version one',original,{deviates:true,deviation:'The proposed glass omits the low-e coating'})})
+  const id=row.id,first=row.cycles[0],path='/submittals/'+id,release=(cycle,extra={})=>({cycle_id:cycle.id,order_id:order.id,product_reference:cycle.product_reference,confirm:true,...extra})
+  assert.deepEqual([first.required_on,first.reviewer.id,first.product_reference],['2026-11-12',reviewer.id,'Window version one']);assert.match(first.deviation,/low-e/);assert.ok(first.attachments[0].checksum)
+  await unchanged('/orders/'+order.id+'/issue',{},f.owner,'submittal_unapproved')
+  const review={cycle_id:first.id,disposition:'approved',comment:'An unauthorized approval',confirm:true}
+  await unchanged(path+'/review',review,f.owner,'submittal_reviewer')
+  await unchanged(path+'/review',review,other,'submittal_reviewer')
+  await unchanged(path+'/review',review,client)
+  row=await ok(path+'/annotate',{cycle_id:first.id,file_id:first.attachments[0].id,page:1,text:'Coating missing on the submitted glazing schedule'},manager)
+  row=await ok(path+'/review',{...review,disposition:'rejected',comment:'Reject this glass and resubmit the specified coating'},manager)
+  const rejected=structuredClone(row.cycles[0])
+  await unchanged(path+'/release',release(first),f.owner,'submittal_unapproved')
+  await unchanged(path+'/annotate',{cycle_id:first.id,file_id:first.attachments[0].id,page:1,text:'Rewrite closed review'},manager,'immutable')
+  row=await ok(path+'/resubmit',{cycle_id:first.id,...submission('Window version two',revised)})
+  const second=row.cycles[1]
+  await unchanged(path+'/review',{cycle_id:first.id,disposition:'approved',comment:'Approve stale package',confirm:true},manager,'submittal_version')
+  await unchanged(path+'/review',{cycle_id:second.id,disposition:'approved',comment:'Missing consent',confirm:false},manager)
+  row=await ok(path+'/review',{cycle_id:second.id,disposition:'approved',comment:'Current glazing matches W1',confirm:true},manager)
+  assert.deepEqual(row.cycles[0],rejected);assert.equal(row.cycles[1].decision.by.id,reviewer.id)
+  await unchanged(path+'/release',release(second,{product_reference:'Other window model'}),f.owner,'submittal_mismatch')
+  await unchanged(path+'/release',release(second,{order_id:'different-commitment'}),f.owner,'submittal_mismatch')
+  await unchanged(path+'/release',release(first),f.owner,'submittal_version')
+  await unchanged('/orders/'+order.id+'/issue',{},f.owner,'submittal_version')
+  await ok(path+'/release',release(second))
+  await ok('/orders/'+order.id+'/issue')
+  assert.equal(job.orders[0].status,'issued');assert.equal(job.orders[0].submittal_release.cycle_id,second.id);assert.equal(job.orders[0].amount_cents,120000)
+  const register=(await read()).value.register[0]
+  for(const [cycle,bytes] of [[register.cycles[0],original],[register.cycles[1],revised]]){
+   const file=await f.request(root+'/submittals/files/'+cycle.attachments[0].id,{cookie:f.owner});assert.equal(file.status,200);assert.deepEqual(Buffer.from(await file.arrayBuffer()),bytes)
+   assert.equal((await f.request(root+'/submittals/files/'+cycle.attachments[0].id,{cookie:client})).status,403)
+  }
+  const projected=(await f.json(root,{cookie:client})).value;assert.ok(!JSON.stringify(projected).includes('Coating missing'));assert.equal(projected.job.submittals,undefined)
+  const otherJob=await createActiveJob(f,'Unrelated window job',address(1))
+  assert.equal((await f.request('/api/plinth/jobs/'+otherJob.id+'/submittals/files/'+first.attachments[0].id,{cookie:f.owner})).status,404)
+  assert.equal((await f.json(root+'/submittals',{token:await f.agent()})).status,403)
+  const beforeRevoke=structuredClone((await read()).value.register)
+  assert.equal((await f.json('/api/plinth/team/'+reviewer.id,{method:'PUT',cookie:f.owner,body:{expected_version:1,role:'project_manager',job_ids:[],po_limit_cents:200000}})).status,200)
+  await unchanged('/orders/'+order.id+'/receive',{amount_cents:100,reference:'Unsafe receipt'},f.owner,'submittal_authority')
+  assert.equal((await f.json(root+'/submittals',{cookie:manager})).status,404)
+  assert.deepEqual((await read()).value.register,beforeRevoke)
+  assert.equal((await f.json('/api/plinth/team/'+reviewer.id,{method:'PUT',cookie:f.owner,body:{expected_version:2,role:'project_manager',job_ids:[job.id],po_limit_cents:200000}})).status,200)
+  await unchanged(path+'/release',release(second),f.owner,'submittal_authority')
+  row=await ok(path+'/resubmit',{cycle_id:second.id,...submission('Window version three',revised)})
+  const third=row.cycles[2]
+  await ok(path+'/review',{cycle_id:third.id,disposition:'revise_resubmit',comment:'Provide a clearer mullion detail',confirm:true},manager)
+  await unchanged(path+'/release',release(third),f.owner,'submittal_unapproved')
+  assert.equal((await f.json(root,{cookie:f.owner})).value.job.approvals.some(a=>a.kind.startsWith('submittal.')),false,'Submittal decisions are served only through the gated register')
+  const erased=await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(erased.status,200)
+  assert.equal((await read()).status,404)
+  assert.equal((await f.request(root+'/submittals/files/'+first.attachments[0].id,{cookie:f.owner})).status,404)
+  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
+ }finally{await f.close()}
+})

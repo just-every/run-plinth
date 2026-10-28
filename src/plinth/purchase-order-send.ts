@@ -1,3 +1,4 @@
+import { requireSubmittalGate } from './submittals'
 import { selected } from './selection-model'
 import { operatorMail } from '../mail.server.mjs'
 import type { Bindings } from '../auth.server'
@@ -29,6 +30,7 @@ export async function sendOrder(env: Bindings, previous: Job, actor: Actor, id: 
  const recipient = await deliveryPermissions(env.DB, previous, current.vendor_email, 'orders', true)
  need(recipient, 'The purchase order recipient is no longer authorized', 403, 'recipient')
  if(current.source?.kind==='selection')selected(previous,current.source.selection_id,current.source.revision_id)
+ await requireSubmittalGate(env.DB,previous,current)
  const revision = revisionOf(current), sender = operatorMail(env), from = env.MAIL_FROM
  need(sender && from, `${UNCONFIGURED}; download the PO and send it yourself`, 409, 'mail_unconfigured')
  need(!(delivery.status === 'accepted' && delivery.revision === revision), 'This revision was already accepted by the mail provider', 409, 'already_sent')
@@ -43,6 +45,7 @@ export async function sendOrder(env: Bindings, previous: Job, actor: Actor, id: 
   if (!eligible || approved.vendor_email !== current.vendor_email || approved.status !== 'issued' || revisionOf(approved) !== revision) {
    status = 'refused'; label = 'Recipient or purchase order access changed; nothing was sent'
   } else {
+  await requireSubmittalGate(env.DB,latest,approved)
   await checkWarrantySend(env.DB, latest, await readClock(env.DB), eligible, actor)
   const result = await sender.send(message(latest, approved, from, actor.email, (await company(env.DB))?.name ?? 'Your builder', attempt))
   if (result.status === 'accepted') { status = 'accepted'; label = `Accepted by the mail provider for ${current.vendor_email}; delivery not confirmed`; providerId = result.providerMessageId ?? undefined }
