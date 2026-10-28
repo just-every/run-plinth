@@ -7,9 +7,10 @@ import { Page } from './shell'
 
 const status=(set:PlanSetView,sheet:PlanSheetView)=>!set.approved_by?'Unapproved draft':sheet.current?'Latest approved':'Superseded history'
 export function PlanWorkspace({jobId}:{jobId:string}){
- const [data,setData]=useState<PlanView>(),[error,setError]=useState(''),[selected,setSelected]=useState(()=>new URLSearchParams(location.search).get('plan_sheet')??'')
+ const [data,setData]=useState<PlanView>(),[error,setError]=useState(''),[selected,setSelected]=useState(''),[point,setPoint]=useState<{x:number;y:number}>()
  const refresh=()=>api(`/jobs/${jobId}/plans`).then(r=>{setData(r.plans);setError('')}).catch(e=>{setData(undefined);setError(e.message)})
- useEffect(()=>{setData(undefined);void refresh()},[jobId])
+ useEffect(()=>{setSelected(new URLSearchParams(window.location.search).get('plan_sheet')??'');setData(undefined);void refresh()},[jobId])
+ useEffect(()=>setPoint(undefined),[data?.version,selected])
  const mutate=async(path:string,body:Record<string,unknown>={})=>{try{const r=await api(`/jobs/${jobId}/plans${path}`,{expected_version:data?.version,...body});setData(r.plans);return r} catch(e){await refresh();throw e}}
  if(!data)return <p role={error?'alert':'status'}>{error||'Opening plans…'}</p>
  const sources=data.sets.flatMap(set=>set.sheets.map(sheet=>({set,sheet}))),pinned=sources.find(s=>s.sheet.id===selected),current=pinned??sources.find(s=>s.sheet.current)??sources.at(-1)
@@ -24,11 +25,11 @@ export function PlanWorkspace({jobId}:{jobId:string}){
    <p>{current.set.title} · {current.sheet.kind} · Issued {current.set.issue_on} · Page {current.sheet.page}</p>
    {current.sheet.superseded_by&&<p className="notice">Superseded by revision {current.sheet.superseded_by.revision}. This link retains the original source.</p>}
    <p><a href={current.sheet.href}>Pinned link to this exact sheet</a> · <a href={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`}>Download exact original</a></p>
-   <TakeoffViewer jobId={jobId} sourceUrl={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`} revision={{id:current.sheet.id,revision:data.sets.indexOf(current.set)+1,document:current.sheet.document,page:current.sheet.page,width:current.sheet.width,height:current.sheet.height,uploaded_by:current.set.prepared_by}} points={[]} mode="count" calibrations={[]} measurements={[]} onPoint={()=>{}} editable={false}/>
+   <TakeoffViewer jobId={jobId} sourceUrl={`/api/plinth/jobs/${jobId}/plans/${current.set.id}/files/${current.sheet.id}`} revision={{id:current.sheet.id,revision:data.sets.indexOf(current.set)+1,document:current.sheet.document,page:current.sheet.page,width:current.sheet.width,height:current.sheet.height,uploaded_by:current.set.prepared_by}} points={point?[point]:[]} mode="count" calibrations={[]} measurements={current.set.annotations.filter(a=>a.sheet_id===current.sheet.id).map(a=>({id:a.id,revision_id:current.sheet.id,kind:'count' as const,points:[{x:a.x,y:a.y}],name:'Annotation',dimension:'note',annotation:a.text,by:a.by}))} onPoint={setPoint} editable={data.annotate&&!!current.set.approved_by}/>
    <h4>Source revision annotations</h4>
    {current.set.annotations.filter(a=>a.sheet_id===current.sheet.id).map(a=><p key={a.id}>{a.text} · {current.sheet.number} · source revision {a.revision} · {a.by.name}</p>)}
    {!current.set.annotations.some(a=>a.sheet_id===current.sheet.id)&&<p>No annotations on this revision.</p>}
-   {data.annotate&&current.set.approved_by&&<Form submit="Save source annotation" action={async f=>mutate(`/${current.set.id}/annotate`,{sheet_id:current.sheet.id,text:f.get('text')})}><Field label="Revision annotation" name="text"/></Form>}
+   {data.annotate&&current.set.approved_by&&<Form submit="Save source annotation" action={async f=>mutate(`/${current.set.id}/annotate`,{sheet_id:current.sheet.id,text:f.get('text'),x:Number(f.get('x')),y:Number(f.get('y'))})}><p>Choose a point on the drawing or enter its source PDF coordinates.</p><Field label="Annotation X" name="x" type="number" min="0" max={current.sheet.width} step="any" value={point?.x??''} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setPoint({x:Number(e.target.value),y:point?.y??0})}/><Field label="Annotation Y" name="y" type="number" min="0" max={current.sheet.height} step="any" value={point?.y??''} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setPoint({y:Number(e.target.value),x:point?.x??0})}/><Field label="Revision annotation" name="text"/></Form>}
   </article>}
   <h3>Plan sets and notices</h3>
   {data.sets.map(set=><article className="record" key={set.id}><h4>{set.title}</h4><p>Issued {set.issue_on} · {set.approved_by?'Approved by '+set.approved_by.name:'Awaiting approval'}</p>
