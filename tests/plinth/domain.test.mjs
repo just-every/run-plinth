@@ -698,3 +698,67 @@ test('INT-014 scheduled delivery rechecks current credentials and job existence 
   assert.equal(log.status, 200); assert.deepEqual(log.value.deliveries, [])
  } finally { await f.close() }
 })
+
+// One complete distribution lifecycle through the native HTTP doors and real D1.
+test('DOC-001 — approved plan sets supersede exact sheets, notify current recipients and retain pinned originals and annotations',async()=>{
+ const f=await createFixture();try{
+ const address=n=>['synthetic-plinth-'+n,'example.test'].join('@')
+ const client=await f.invite(address(101),'Plan client'),trade=await f.invite(address(102),'Plan trade'),other=await f.invite(address(103),'Unrelated person'),crew=await f.invite(address(104),'Plan crew','admin')
+ let job=await createActiveJob(f,'Versioned plan distribution',address(101));job=(await createReleasedScope(f,job,address(102),'Framing')).job
+ const root=`/api/plinth/jobs/${job.id}/plans`,read=async(cookie=f.owner)=>f.json(root,{cookie})
+ const people=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team,crewId=people.find(p=>p.email===address(104)).id
+ const assign=async(ids,version=0)=>{const r=await f.json('/api/plinth/team/'+crewId,{method:'PUT',cookie:f.owner,body:{expected_version:version,role:'crew',job_ids:ids,po_limit_cents:0}});assert.equal(r.status,200);return r.value.member.version}
+ let crewVersion=await assign([job.id])
+ const eligible=(await read()).value.plans.recipients,clientId=eligible.find(p=>p.name==='Plan client').id,tradeId=eligible.find(p=>p.name==='Plan trade').id
+ const act=async(path,body={},cookie=f.owner)=>{const current=(await read()).value.plans;return f.json(root+path,{method:'POST',cookie,body:{expected_version:current.version,...body}})}
+ const source=(number,revision,kind='plan',changed=false)=>({number,revision,kind,page:1,width:400,height:400,document:{name:'synthetic-plinth-plan.pdf',mime:'application/pdf',base64:takeoffPlan(changed).toString('base64')}})
+ let r=await act('',{title:'Permit set',issue_on:'2026-10-01',sheets:[source('A1','A'),source('S1','A','specification'),source('AD1','A','addendum')]});assert.equal(r.status,200,JSON.stringify(r.value))
+ const firstId=r.value.record.id,first=r.value.plans.sets.find(s=>s.id===firstId),old=first.sheets[0],original=structuredClone(first.sheets)
+ assert.deepEqual(first.sheets.map(s=>s.kind),['plan','specification','addendum']);assert.equal(first.issue_on,'2026-10-01')
+ assert.equal((await read(crew)).value.plans.sets.length,0,'Field staff cannot open an unapproved upload')
+ assert.equal((await f.request(`${root}/${firstId}/files/${old.id}`,{cookie:crew})).status,404)
+ for(const cookie of [crew,client])assert.ok([403,404].includes((await act(`/${firstId}/approve`,{confirm:true,recipient_ids:[]},cookie)).status))
+ const token=await f.agent();assert.equal((await f.json(root,{token})).status,403)
+ assert.equal((await act(`/${firstId}/approve`,{recipient_ids:[crewId]})).status,400)
+ r=await act(`/${firstId}/approve`,{confirm:true,recipient_ids:[crewId,clientId,tradeId]});assert.equal(r.status,200,JSON.stringify(r.value))
+ assert.deepEqual(r.value.plans.sets[0].recipients.map(p=>p.id).sort(),[crewId,clientId,tradeId].sort())
+ assert.equal((await read(other)).status,404)
+ r=await act(`/${firstId}/annotate`,{sheet_id:old.id,text:'Retain framing note on revision A'},crew);assert.equal(r.status,200,JSON.stringify(r.value))
+ const annotation=r.value.plans.sets[0].annotations[0];assert.equal(annotation.sheet_id,old.id);assert.equal(annotation.revision,'A');assert.equal(annotation.by.name,'Plan crew')
+ r=await act('',{title:'Construction set',issue_on:'2026-10-10',sheets:[source('A1','B','plan',true),source('S1','B','specification'),source('AD1','B','addendum')]});assert.equal(r.status,200,JSON.stringify(r.value))
+ const secondId=r.value.record.id,newSheet=r.value.plans.sets.find(s=>s.id===secondId).sheets[0]
+ assert.equal((await read(crew)).value.plans.sets.flatMap(s=>s.sheets).find(s=>s.current).id,old.id,'Pending uploads never replace the approved field drawing')
+ assert.equal((await f.request(`${root}/${secondId}/files/${newSheet.id}`,{cookie:crew})).status,404)
+ const stale=(await read()).value.plans.version
+ r=await act(`/${secondId}/approve`,{confirm:true,recipient_ids:[crewId,clientId,tradeId]});assert.equal(r.status,200,JSON.stringify(r.value))
+ assert.equal((await f.json(`${root}/${secondId}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:stale,confirm:true,recipient_ids:[crewId]}})).status,409)
+ const field=(await read(crew)).value.plans,latest=field.sets.find(s=>s.id===secondId),historic=field.sets.find(s=>s.id===firstId)
+ assert.deepEqual(field.sets.flatMap(s=>s.sheets).filter(s=>s.current).map(s=>s.id).sort(),latest.sheets.map(s=>s.id).sort())
+ assert.ok(historic.sheets.every(s=>!s.current));assert.equal(historic.sheets[0].superseded_by.sheet_id,newSheet.id);assert.equal(historic.sheets[0].superseded_by.revision,'B')
+ const pin=new URL(historic.sheets[0].href,f.origin);assert.equal(pin.searchParams.get('plan_job'),job.id);assert.equal(pin.searchParams.get('plan_set'),firstId);assert.equal(pin.searchParams.get('plan_sheet'),old.id)
+ assert.deepEqual(historic.annotations,[annotation]);assert.deepEqual(latest.annotations,[])
+ assert.deepEqual(historic.sheets.map(s=>s.document),original.map(s=>s.document),'Approval preserves exact original document identities and checksums')
+ for(const [set,sheet,bytes] of [[firstId,old,takeoffPlan()],[secondId,newSheet,takeoffPlan(true)]]){
+  const response=await f.request(`${root}/${set}/files/${sheet.id}`,{cookie:crew});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+ }
+ for(const cookie of [client,trade]){
+  const inbox=await f.json('/api/plinth/plan-inbox',{cookie});assert.equal(inbox.status,200);assert.deepEqual(inbox.value.jobs.map(j=>j.id),[job.id]);assert.equal(inbox.value.jobs[0].sets.find(s=>s.id===secondId).recipients.length,1,'Recipients see only their own acknowledgment')
+ }
+ assert.equal((await read(crew)).value.plans.sets.find(s=>s.id===secondId).recipients[0].acknowledged_by,undefined,'Opening the plan is not acknowledgment')
+ r=await act(`/${secondId}/acknowledge`,{},crew);assert.equal(r.status,200);const acknowledgment=r.value.plans.sets.find(s=>s.id===secondId).recipients[0].acknowledged_by;assert.equal(acknowledgment.id,crewId)
+ r=await act(`/${secondId}/acknowledge`,{},crew);assert.deepEqual(r.value.plans.sets.find(s=>s.id===secondId).recipients[0].acknowledged_by,acknowledgment)
+ r=await act(`/${secondId}/approve`,{confirm:true,recipient_ids:[crewId,clientId,tradeId]});assert.equal(r.status,200);assert.equal(r.value.plans.sets.find(s=>s.id===secondId).recipients.length,3,'Approval replay creates no duplicate notices')
+ assert.equal((await act(`/${secondId}/approve`,{confirm:true,recipient_ids:[crewId]})).status,409,'Approved distributions cannot silently change recipients')
+ assert.equal((await f.json('/api/plinth/jobs/'+job.id,{cookie:client})).value.job.plan_sets,undefined,'Generic job data never bypasses the plan projection')
+ await setPortalFeatures(f,job.id,[],['plans'])
+ assert.equal((await read(trade)).status,404);assert.equal((await f.request(`${root}/${firstId}/files/${old.id}`,{cookie:trade})).status,404)
+ assert.deepEqual((await f.json('/api/plinth/plan-inbox',{cookie:trade})).value.jobs,[])
+ crewVersion=await assign([],crewVersion);assert.equal((await read(crew)).status,404)
+ assert.equal((await act(`/${secondId}/acknowledge`,{},crew)).status,404)
+ const final=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
+ assert.equal((await f.json('/api/plinth/jobs/'+job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:final.version}})).status,200)
+ assert.equal((await f.request(`${root}/${firstId}/files/${old.id}`,{cookie:f.owner})).status,404)
+ assert.equal((await f.json(root,{method:'POST',cookie:f.owner,body:{expected_version:final.version,title:'Replayed capture',issue_on:'2026-10-10',sheets:[source('A1','C')]}})).status,404,'A replay cannot recreate an erased job')
+ assert.deepEqual((await f.json('/api/plinth/plan-inbox',{cookie:client})).value.jobs,[])
+ }finally{await f.close()}
+})

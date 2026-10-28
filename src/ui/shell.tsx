@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { api, initials } from './shared'
 import { Icon, type IconName } from './icons'
 
-export type View = 'jobs' | 'imports' | 'people' | 'audit' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids' | 'todos' | 'subcontractor-records'
+export type View = 'plans' | 'jobs' | 'imports' | 'people' | 'audit' | 'customers' | 'vendors' | 'trade' | 'rfis' | 'punch' | 'bids' | 'todos' | 'subcontractor-records'
 export type Me = { displayName: string; email: string; role: string }
 const roles: Record<string, string> = { owner: 'Owner', admin: 'Administrator', project_manager: 'Project manager', estimator: 'Estimator', superintendent: 'Superintendent', crew: 'Crew', client: 'Client', member: 'Client' }
 
@@ -17,6 +17,7 @@ export function Rail({ view, role, roleName, me, jobs, selected, open, onView, o
     <ul className="rail-nav">
       {item('jobs', 'folder', 'Jobs', jobs.length)}
       {item('todos','folder','My to-dos')}
+      {!['bookkeeper','reader'].includes(role)&&item('plans','folder','Plan inbox')}
       {role === 'client' && item('subcontractor-records','folder','Subcontractor records')}
       {role === 'client' && item('bids','folder','Bid inbox')}
       {role === 'client' && item('punch','folder','Punch inbox')}

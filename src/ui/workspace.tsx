@@ -1,3 +1,4 @@
+import { PlanInbox } from './plans'
 import {ReportSettings,ReportDownloads} from './report-schedules'
 import {SubcontractorRecords} from './subcontractor-records'
 import { Todos } from './todos'
@@ -23,7 +24,7 @@ import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
 
 export function Workspace() {
-  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
+  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>(()=>new URLSearchParams(location.search).get('view')==='plans'?'plans':'jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
   const create = useRef<HTMLElement>(null)
   const [totals, setTotals] = useState<CurrencyTotal[]>([])
   const [matches, setMatches] = useState<Job[]>([])
@@ -50,6 +51,7 @@ export function Workspace() {
       <TopBar query={query} manager={manager} onMenu={() => setMenu(true)} onQuery={value => { setQuery(value); if (value) { setView('jobs'); setSelected('') } }} onNew={() => { go('jobs'); setTimeout(() => { create.current?.scrollIntoView({ block: 'center' }); create.current?.querySelector('input')?.focus() }) }} />
       <main className="content">
         {error && <p role="alert" className="error">{error}</p>}
+        {view === 'plans' && <PlanInbox/>}
         {view === 'todos' && <Todos jobs={jobs}/>}
         {view === 'subcontractor-records' && <SubcontractorRecords/>}
         {view === 'bids' && <BidInbox/>}
