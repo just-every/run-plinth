@@ -208,6 +208,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await performanceSource.report('lessons/'+performanceProposal.record.id+'/approve',{confirm:true})
     const archivedPerformance=(await performanceArchive.call('/reports/performance/jobs/'+performanceSource.job.id)).performance
     assert.equal(archivedPerformance.lessons[0].approved.catalog_version,2);assert.equal(archivedPerformance.completion.completed_on,'2026-10-23')
+    const followupOwner=f.owner;await f.close();f=await createFixture({persistTo:source,ownerCookie:followupOwner,now:Date.parse('2026-11-02T15:00:00Z')})
+    const followupRoot='/api/plinth/jobs/'+job.id+'/followup-rules',followupSettings=(await f.json(followupRoot,{cookie:f.owner})).value
+    const followupAct=async(path,input)=>{const r=await f.json('/api/plinth/jobs/'+job.id+path,{method:'POST',cookie:f.owner,body:{expected_version:job.version,...input}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job;return r.value}
+    await followupAct('/followup-rules',{kind:'rfi',mode:'scheduled',starts_on:'2026-11-01',stop_on:'2099-12-31',recipients:[followupSettings.owner_id],escalation_recipient:followupSettings.owner_id,quiet_start:'20:00',quiet_end:'08:00',time_zone:'UTC',approval_limit_cents:0,steps:[{after_days:0,label:'Archive first notice',escalate:false},{after_days:7,label:'Archive future escalation',escalate:true}],reason:'Owner reviewed archive sequence',confirm:true,delivery:true,delivery_confirm:true})
+    await followupAct('/followup-consent',{kind:'rfi',allowed:true,channel:'email',confirm:true})
+    await followupAct('/followup-rules/run',{confirm:true})
+    const archivedFollowup=structuredClone(job.followup)
+    assert.equal(archivedFollowup.attempts.length,1);assert.equal(archivedFollowup.attempts[0].status,'accepted')
     const costJobId=c.job.id
     const cookie=f.owner; await f.close();f=undefined
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -233,6 +241,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       assert.equal(rows(exported).find(item=>item.table==='pl_api_requests'&&item.row.operation_key==='synthetic-plinth-archive-draft').row.record_id,connectorDraft.value.draft.id,'INT-009 draft replay identity survives private CLI recovery')
     }
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id).row.data);assert.deepEqual(recovered.estimate_performance,archivedPerformance);assert.deepEqual(recovered.quotes,performanceSource.job.quotes)}
+    for(const records of [rows(original),rows(restored)])assert.deepEqual(JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===job.id).row.data).followup,archivedFollowup,'AUTO-001 source steps, owner approval, recipient choices, immutable rule revisions and once-only dispatch history survive native CLI recovery')
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority

@@ -891,6 +891,8 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   await estimate.act('/followup-rules',{...config,kind:'estimate',reason:'Reviewed a second time'})
   assert.deepEqual(estimate.job.followup.rules[0].revisions[0],oldRevision)
   assert.equal(estimate.job.followup.rules[0].revisions.length,2)
+  const {followupSourceJourney}=await import('./followup-support.mjs')
+  await followupSourceJourney(f,c)
   const foreign=await f.invite(followupAddress(2),'Unrelated client'),admin=await f.invite(followupAddress(3),'Synthetic administrator','admin'),agent=await f.agent()
   const root='/api/plinth/jobs/'+estimate.job.id
   const snapshot=await estimate.read(),calls=f.messages.length

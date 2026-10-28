@@ -29,3 +29,51 @@ export async function followupFixture(f){
  const preview=async(c,as_of='2026-10-30T15:00:00Z')=>{const result=await api('/jobs/'+c.job.id+'/followup-rules/preview?as_of='+encodeURIComponent(as_of));assert.equal(result.status,200,JSON.stringify(result.value));return result.value}
  return {api,estimate,active,client,clientId,ownerId,config,consent,preview,choice,invoice}
 }
+
+/** Exercise the other live source doors without granting private records to external people. */
+export async function followupSourceJourney(f,c){
+ const {createReleasedScope}=await import('./helpers.mjs')
+ const job=c.active,tradeEmail=followupAddress(710),designerEmail=followupAddress(711)
+ const trade=await f.invite(tradeEmail,'Synthetic follow-up trade'),designer=await f.invite(designerEmail,'Synthetic follow-up designer')
+ const setup=await createReleasedScope(f,job.job,tradeEmail,'Framing');job.job=setup.job
+ const task=(await job.act('/schedules',{trade:'Framing',description:'Follow-up framing visit',start:'2026-11-04T15:00:00Z',end:'2026-11-04T16:00:00Z'})).record
+ const invitation=(await job.act('/schedules/'+task.id+'/invite',{email:tradeEmail,subcontract_id:setup.scope.id})).record
+ await job.act('/rfi-access',{email:designerEmail,role:'designer',sheet_ids:[]})
+ const rfi=(await job.act('/rfis',{title:'Confirm framing detail',question:'Which reviewed detail applies?',assignee_email:designerEmail,due_on:'2026-10-29',task_ids:[]})).record
+ const owner=(await c.api('/jobs/'+job.job.id+'/followup-rules')).value.recipients.find(p=>p.id===c.ownerId)
+ const component=(await job.act('/warranties',{kind:'component',name:'Reviewed fixture',starts_on:'2026-01-01',ends_on:'2028-12-31',terms:'Original fixture terms',signed_terms_reference:'synthetic-plinth-712'})).record
+ const warranty=(await job.act('/warranties',{kind:'case',component_id:component.id,defect_key:'synthetic-plinth-713',description:'Fixture adjustment outstanding',reported_on:'2026-10-27',reviewer_email:owner.email})).record
+ const bidRoot='/bids/'+job.job.id
+ const bidAct=async(path,body,cookie=f.owner)=>{await job.read();const r=await c.api(bidRoot+path,{expected_version:job.job.version,...body},cookie);assert.ok([200,201].includes(r.status),JSON.stringify(r.value));await job.read();return r.value}
+ const bid=await bidAct('',{title:'Reviewed framing package',trade:'Framing',scope:'Price the reviewed frame',mode:'unpriced',lines:[{cost_code:'06-100',description:'Reviewed frame'}],note:'Original framing plan',due_on:'2026-10-29',plans:[{name:'synthetic-plinth-714.pdf',base64:Buffer.from('%PDF-1.4\nsynthetic-plinth-714\n%%EOF').toString('base64')}]})
+ const packageId=bid.record_id,revision=job.job.bids.at(-1).revisions[0].id
+ await bidAct('/'+packageId+'/publish',{revision_id:revision,confirm:true})
+ await bidAct('/'+packageId+'/invite',{vendor_id:setup.vendor.id,contact_id:'scope-contact',subcontract_id:setup.scope.id,cost_codes:['06-100'],confirm:true})
+ const bidSource=job.job.bids.at(-1).invitations[0]
+ for(const kind of ['bid','rfi','confirmation','warranty']){
+  await job.act('/followup-consent',{kind,allowed:true,channel:'email',confirm:true},f.owner)
+  await job.act('/followup-rules',{...c.config,kind,recipients:[c.ownerId],delivery:true,delivery_confirm:true})
+ }
+ const preview=await c.preview(job,'2026-10-30T15:00:00Z')
+ for(const source of [bidSource,rfi,invitation,warranty])assert.equal(preview.actions.filter(a=>a.source_id===source.id&&a.status==='eligible').length,2)
+ assert.equal((await c.api('/jobs/'+job.job.id+'/followup-rules',{...c.config,kind:'bid',expected_version:job.job.version})).status,403,'Private bid reminders cannot name a client recipient')
+ const notices=f.messages.filter(m=>m.subject.startsWith('Plinth follow-up:')).length
+ await job.act('/followup-rules/run',{confirm:true})
+ assert.equal(f.messages.filter(m=>m.subject.startsWith('Plinth follow-up:')).length,notices+4,'Each private source gets one due owner notice, with future escalation withheld')
+ await bidAct('/'+packageId+'/decline',{revision_id:revision,reason:'Not pricing this package'},trade)
+ const answered=await c.api('/rfi-inbox/'+job.job.id+'/rfis/'+rfi.id+'/respond',{expected_version:job.job.version,text:'Use reviewed detail A',cost_impact_cents:0,date_impact_days:0},designer);assert.equal(answered.status,200,JSON.stringify(answered.value));await job.read()
+ const response=job.job.rfis.find(r=>r.id===rfi.id).responses[0]
+ await job.act('/rfis/'+rfi.id+'/publish',{response_id:response.id,cost_impact_cents:0,date_impact_days:0,confirm:true})
+ await job.act('/rfis/'+rfi.id+'/resolve',{reason:'Reviewed detail resolves the question'})
+ await job.read()
+ const confirmation=await c.api('/trade-confirmations/'+invitation.id+'/confirm',{expected_version:job.job.version,reason:'I confirm this exact visit',confirm:true},trade);assert.equal(confirmation.status,200,JSON.stringify(confirmation.value));await job.read()
+ await job.act('/warranties/'+warranty.id+'/review',{decision:'covered',reason:'Reviewed fixture adjusted',source_reference:'synthetic-plinth-715'})
+ await job.act('/warranties/'+warranty.id+'/close',{reason:'Builder verified fixture adjustment',evidence_reference:'synthetic-plinth-716'})
+ const after=await c.preview(job,'2026-11-05T15:00:00Z')
+ for(const source of [bidSource,rfi,invitation,warranty])assert.ok(after.actions.filter(a=>a.source_id===source.id).every(a=>a.reason==='Source resolved or held'),'Resolved source never escalates: '+source.id)
+ await f.scheduled('2026-11-05T15:00:00Z');await job.read()
+ await job.act('/followup-rules/run',{confirm:true})
+ assert.equal(f.messages.filter(m=>m.subject.startsWith('Plinth follow-up:')).length,notices+4,'Resolution does not dispatch or escalate again')
+ assert.equal((await c.api('/jobs/'+job.job.id+'/followup-consent',undefined,trade)).status,404)
+ return {preview,after}
+}

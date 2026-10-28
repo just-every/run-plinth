@@ -49,14 +49,6 @@ try{
  const before=await c.active.read(),wire=await c.preview(c.active,'2026-11-04T15:00:00Z')
  assert.equal(new Set(wire.actions.map(a=>a.key)).size,4)
  await preview();assert.deepEqual(await c.active.read(),before,'Dated UI previews never write a job or financial record')
- for(const width of [1440,390]){
-  await page.setViewportSize({width,height:1000})
-  if(width===390){
-   const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')
-  }
-  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Follow-up settings fit '+width)
-  await page.screenshot({path:shots+'/AUTO-001-settings-preview-'+width+'.png',fullPage:true,animations:'disabled'})
- }
  await page.setViewportSize({width:1440,height:1000})
  await rules.getByRole('button',{name:'Edit collection rule',exact:true}).click()
  await rules.getByRole('checkbox',{name:'Pause this sequence',exact:true}).check()
@@ -86,6 +78,40 @@ try{
  await expect(p.getByText('Eligible preview · Prospective action only; nothing sent',{exact:true})).toHaveCount(1)
  await expect(p.getByText('Withheld · Step not due',{exact:true})).toHaveCount(1)
  assert.equal((await json('/api/plinth/jobs/'+c.active.job.id+'/followup-rules',{cookie:c.client})).status,403)
+ // A preview never dispatches; only separately approved delivery and the recipient channel do.
+ await clientPage.goto(base+'/app?job='+c.estimate.job.id)
+ await clientPage.locator('summary').filter({hasText:/^Follow-up preview Settings$/}).click()
+ await clientPage.getByLabel('Estimate delivery channel',{exact:true}).selectOption('email')
+ await clientPage.getByRole('button',{name:'Save estimate preference',exact:true}).click()
+ await expect(clientPage.getByRole('status').filter({hasText:'Saved.'})).toBeVisible()
+ await rules.getByRole('button',{name:'Edit estimate rule',exact:true}).click()
+ await rules.getByRole('checkbox',{name:'Enable once-only email delivery',exact:true}).check()
+ await rules.getByRole('checkbox',{name:'I explicitly approve the hourly scheduler and Run now to attempt eligible email notices once.',exact:true}).check()
+ await rules.getByRole('checkbox',{name:'I confirm these rule settings; delivery needs the separate approval above.',exact:true}).check()
+ await rules.getByRole('button',{name:'Save rule revision',exact:true}).click()
+ await expect(rules.getByRole('heading',{name:'Estimate sequence · revision 2',exact:true})).toBeVisible()
+ await preview('2026-10-27T15:00:00Z')
+ await rules.getByRole('checkbox',{name:'Attempt eligible notices at the current installation time. No automatic resend.',exact:true}).check()
+ await rules.getByRole('button',{name:'Run eligible notices now',exact:true}).click()
+ const history=rules.getByRole('region',{name:'Follow-up delivery history',exact:true})
+ await expect(history.getByRole('heading',{name:'Rule revision 2 · Email · accepted',exact:true})).toBeVisible()
+ const attempts=(await c.api('/jobs/'+c.estimate.job.id+'/followup-rules')).value.attempts
+ assert.equal(attempts.length,1);assert.equal(attempts[0].recipient_id,c.clientId)
+ const latest=await owner.request.get(process.env.PLINTH_PROVIDER_EDGE_URL+'/mail/latest?email='+encodeURIComponent('synthetic-plinth-1'+String.fromCharCode(64)+'example.invalid'))
+ const sent=(await latest.json()).message;assert.ok(sent.subject.startsWith('Plinth follow-up:'));assert.match(sent.text,/outstanding follow-up work/)
+ await preview('2026-10-27T15:00:00Z')
+ await rules.getByRole('checkbox',{name:'Attempt eligible notices at the current installation time. No automatic resend.',exact:true}).check()
+ await rules.getByRole('button',{name:'Run eligible notices now',exact:true}).click()
+ await expect(history.getByRole('heading',{name:'Rule revision 2 · Email · accepted',exact:true})).toHaveCount(1)
+ assert.deepEqual((await c.api('/jobs/'+c.estimate.job.id+'/followup-rules')).value.attempts,attempts,'Repeated Run now cannot resend the source step')
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000})
+  if(width===390){
+   const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')
+  }
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Follow-up settings fit '+width)
+  await page.screenshot({path:shots+'/AUTO-001-settings-delivery-'+width+'.png',fullPage:true,animations:'disabled'})
+ }
  for(const context of contexts.values())await context.close()
- console.log('AUTO-001 PASS: owner saves separate event and scheduled sequences, current recipients and consent, dated deduplicated previews, retained pause revisions, client opt-out and resolution; no preview writes; settings screens at 1440 and 390')
+ console.log('AUTO-001 PASS: owner saves separate event and scheduled sequences, current recipients and consent, dated deduplicated previews, retained pause revisions, client opt-out and resolution; once-only provider email through explicit owner and recipient choices, retained history and replay refusal; no preview writes; settings screens at 1440 and 390')
 }finally{await browser.close()}
