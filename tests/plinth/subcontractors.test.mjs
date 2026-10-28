@@ -45,6 +45,10 @@ test('BID-003 — approved long-lead procurement follows the clock, deduplicates
   assert.equal((await c.act(path+'/review-follow-up',{reason:'Wrong authority'})).status,403)
   assert.equal((await c.act(path+'/review-follow-up',{reason:'Compared the received price; follow up privately on the remaining supplier before ordering'},estimator.cookie)).status,200)
   assert.equal((await promise(`/schedules/${task}/approve`)).status,200,'Only an explicit estimator review permits a human start promise')
+  await c.refresh()
+  assert.equal((await c.act(path+'/acknowledge',{revision_id:c.revision},subs[1].cookie)).status,200)
+  assert.equal((await c.act(path+'/respond',{revision_id:c.revision,items:[{cost_code:'08-100',description:'Second reviewed window price',amount_cents:470000}],exclusions:'',attachments:[]},subs[1].cookie)).status,200)
+  await f.scheduled('2026-11-03T15:00:00Z');await c.refresh();assert.deepEqual(bid().follow_up.escalation.invitation_ids,[],'The remaining escalation clears when the last price arrives');assert.deepEqual(bid().invitations.map(i=>i.reminders),reminders)
   const audit=(await c.api('/audit')).value;assert.ok(JSON.stringify(audit).includes('bid.follow-up'))
   const current=(await c.api(`/jobs/${c.job.id}`)).value.job
   assert.equal(current.orders.length,0);assert.equal(current.subcontracts?.length??0,0)
@@ -69,6 +73,11 @@ test('BID-003 — current grants, revised plans and erasure fence approved follo
   assert.equal((await c.act(path+'/addendum',{revision_id:c.revision,confirm:true,note:'Synthetic changed window specification',due_on:'2026-10-31',plans:[{name:'synthetic-plinth-2.pdf',base64:Buffer.from('%PDF-1.7\nsynthetic-plinth-2\n%%EOF').toString('base64')}]})).status,200)
   await f.scheduled('2026-11-01T15:00:00Z');await c.refresh();assert.equal(c.source.bids[0].follow_up.escalation,undefined,'A changed revision requires fresh reminder approval')
   assert.equal((await c.act(path+'/follow-up',{...c.plan,expected_version:oldVersion})).value.error,'stale_version')
+  const admin=await f.invite(email(6),'Synthetic approving administrator','admin')
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,revision_id:c.source.bids[0].revisions.at(-1).id,draft_task:undefined,task_id:c.source.bids[0].follow_up.task_id},admin)).status,200)
+  const beforeRevocation=structuredClone(c.source.bids[0]),person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email(6))
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
+  await f.scheduled('2026-11-02T15:00:00Z');await c.refresh();assert.deepEqual(c.source.bids[0],beforeRevocation,'Revoked approval authority cannot run a captured follow-up')
   const job=(await c.api(`/jobs/${c.job.id}`)).value.job
   assert.equal((await f.json(`/api/plinth/jobs/${c.job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version,confirm:c.job.name}})).status,200)
   await f.scheduled('2026-11-02T15:00:00Z');assert.equal((await c.api(`/bids/${c.job.id}`)).status,404)

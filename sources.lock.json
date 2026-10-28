@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "152d9058794b801f32878a70e74743cbfb7721f246d8003ca5b6dfea89169a94",
+      "sha256": "434a8d01229ded1b604c28b1b2b84a46fdec898ab05cd569c36e5236769373ee",
       "executable": false
     },
     ".gitignore": {
@@ -949,7 +949,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "c66072ab27b17ad0e5015a7ed5154e33fdf967f38adffef70cc2a91caa43252a",
+      "sha256": "362bc6276fc01d3752a5d86b136ca37f1d87832e67b7f3e3cb964276d8fda436",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4592,6 +4592,10 @@
       "sha256": "21c9154202b0afbf8397dd69d69548a00aaa244edc004a935b887a45e4130341",
       "executable": false
     },
+    "tests/journeys/bid-follow-up.mjs": {
+      "sha256": "2285efb080c22634926d294ba18d927e7b71a865029409489ac058741169b85e",
+      "executable": false
+    },
     "tests/journeys/bids.mjs": {
       "sha256": "1ef0539ba0f43ebda95b2161c35fbf7835825e65a4034836dd2441829da53b13",
       "executable": false
@@ -4889,7 +4893,7 @@
       "executable": false
     },
     "tests/plinth/subcontractors.test.mjs": {
-      "sha256": "4f3a0afd715fbe8742bdb3d8ea4b644498744cb2ed72bff23591ad0c86999147",
+      "sha256": "48145e1e9801bf48b73a9d9b6baa3f90902c860607fcc2753aece34a359cf9ec",
       "executable": false
     },
     "tests/plinth/us-conventions.test.mjs": {
