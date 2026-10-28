@@ -1,4 +1,5 @@
 import { followupResponse } from './followup-rules'
+import { documentsResponse } from './job-documents'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
 import { satisfactionResponse } from './satisfaction'
@@ -109,7 +110,7 @@ function display(job:Job,actor:Actor):any {
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
  if(actor.role!=='owner'){job={...job};delete job.followup}
- job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,private_documents:undefined,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -129,6 +130,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const documents=await documentsResponse(request,env.DB,actor,parts);if(documents)return documents
  const plans=await planResponse(request,env,actor,parts,body);if(plans)return plans
  const subPortal=await subcontractorPortalResponse(request,env,actor,parts);if(subPortal)return subPortal
  const scheduledReports=await reportScheduleResponse(request,env,actor,parts,body);if(scheduledReports)return scheduledReports
