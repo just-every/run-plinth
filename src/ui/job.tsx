@@ -1,3 +1,4 @@
+import { PlanWorkspace } from './plans'
 import { Satisfaction } from './satisfaction'
 import { Meetings, DecisionSearch } from './meetings'
 import { FinancialAccess } from './financial-access'
@@ -28,7 +29,7 @@ import { JobCustomer } from './job-customer'
 import { History } from './history'
 import { Subcontracts } from './job-subcontracts'
 
-export const sections = ['Quote', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'Messages', 'Meetings', 'Decision search', 'Financial review', 'History'] as const
+export const sections = ['Quote', 'Plans', 'Schedule', 'Daily logs', 'Changes', 'Selections', 'Purchasing', 'Billing', 'Customer', 'Warranty', 'RFIs', 'Punch', 'Bids', 'Today', 'To-dos', 'Handover', 'Messages', 'Meetings', 'Decision search', 'Financial review', 'History'] as const
 export type Section = typeof sections[number]
 export type JobProps = { job: Job; manager: boolean; role: string; refresh: () => Promise<void>; mutate: (path: string, body?: Record<string, unknown>) => Promise<any>; go: (section: Section) => void }
 export const contractTotal = (job: Job) => (job.quotes.find(q => q.status === 'accepted')?.total_cents || 0) + job.variations.filter(v => v.status === 'approved').reduce((sum, v) => sum + v.amount_cents, 0)
@@ -49,8 +50,8 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   if (!job) return <p className="loading" role={error ? 'alert' : 'status'}>{error || 'Opening job…'}</p>
   const open = section ?? (role === 'bookkeeper' || role === 'reader' ? 'Financial review' : role === 'estimator' ? 'Quote' : limited(role) ? 'Today' : job.status === 'active' ? 'Schedule' : 'Quote')
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
-  const roleSections:Record<string,readonly Section[]>={estimator:['Quote','Bids','To-dos'],superintendent:['Today','Schedule','Daily logs','Punch','To-dos'],crew:['Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
-  const sectionAllowed=(s:Section)=>s==='Meetings'?true:s==='Handover'&&role==='client'?(!job.portal_features||job.portal_features.includes('handover')||job.portal_features.includes('warranty')):limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||s==='Decision search'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
+  const roleSections:Record<string,readonly Section[]>={estimator:['Plans','Quote','Bids','To-dos'],superintendent:['Plans','Today','Schedule','Daily logs','Punch','To-dos'],crew:['Plans','Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
+  const sectionAllowed=(s:Section)=>s==='Plans'?role!=='client'&&role!=='bookkeeper'&&role!=='reader':s==='Meetings'?true:s==='Handover'&&role==='client'?(!job.portal_features||job.portal_features.includes('handover')||job.portal_features.includes('warranty')):limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||s==='Decision search'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
   const props: JobProps = { job, manager, role, mutate, refresh, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
@@ -66,6 +67,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
     {!sectionAllowed(open)?<p role="alert" className="notice">This feature is not available for your access.</p>:<div className="job-body">
       {open !== 'Schedule' && !limited(role) && <DecisionStrip job={job} manager={manager} go={setSection} />}
       {open === 'Financial review' && <FinancialAccess {...props}/>}
+      {open === 'Plans' && <PlanWorkspace jobId={job.id}/>}
       {open === 'Quote' && <Quotes {...props} />}
       {open === 'Schedule' && <Schedule {...props} />}
       {open === 'Daily logs' && <DailyLogs {...props} />}

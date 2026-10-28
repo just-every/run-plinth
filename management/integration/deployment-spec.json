@@ -231,9 +231,51 @@
     },
     {
       "binding": "DB",
+      "name": "202610270200_decision_sources.sql",
+      "sha256": "a252bac1403a8d2442fddddd4768b784bb5a6c94ec21dce042ae9a89577a6a9b",
+      "sql": "-- Job-owned source annotations and original email custody follow the job's erasure and archive boundary.\nCREATE TABLE pl_decision_metadata (\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n source TEXT NOT NULL,\n data TEXT NOT NULL,\n PRIMARY KEY(job_id,source)\n);\nCREATE TABLE pl_mail_originals (\n message_id TEXT PRIMARY KEY REFERENCES pl_mail_messages(id) ON DELETE CASCADE,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n size INTEGER NOT NULL CHECK(size BETWEEN 1 AND 10485760),\n bytes BLOB NOT NULL CHECK(length(bytes)=size),\n UNIQUE(job_id,checksum)\n);\n"
+    },
+    {
+      "binding": "DB",
       "name": "202610270200_stripe_payments.sql",
       "sha256": "a6b147101c9f6693d0eedcb1f21ca9d9e9968b7ed222e2bfd443a91db6e27f69",
       "sql": "-- PAY-001 hosted Stripe checkout: one durable attempt per client payment instruction, and the signed processor events already applied.\nCREATE TABLE pl_payment_attempts (\n id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n invoice_id TEXT NOT NULL,\n amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),\n currency TEXT NOT NULL CHECK(currency = 'usd'),\n status TEXT NOT NULL CHECK(status IN ('open','processing','paid','failed','expired','review')),\n label TEXT NOT NULL,\n client_email TEXT NOT NULL,\n session_id TEXT,\n checkout_url TEXT,\n payment_intent_id TEXT,\n method TEXT,\n wallet TEXT,\n fee_cents INTEGER,\n livemode INTEGER,\n receipt_id TEXT,\n created_by TEXT NOT NULL,\n created_at TEXT NOT NULL,\n updated_at TEXT NOT NULL\n);\nCREATE INDEX pl_payment_job ON pl_payment_attempts(job_id, created_at);\nCREATE UNIQUE INDEX pl_payment_one_open ON pl_payment_attempts(invoice_id) WHERE status IN ('open','processing');\nCREATE UNIQUE INDEX pl_payment_session ON pl_payment_attempts(session_id) WHERE session_id IS NOT NULL;\nCREATE TABLE pl_payment_events (\n id TEXT PRIMARY KEY,\n type TEXT NOT NULL,\n attempt_id TEXT,\n digest TEXT NOT NULL,\n received_at TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610270300_payment_reconciliation.sql",
+      "sha256": "fc3300913467065e3203a5ef9b1bf3f387f2175a45098e11683be6c77d6b0a45",
+      "sql": "-- Settlement facts and a durable, unresolved provider instruction survive delayed events.\nALTER TABLE pl_payment_attempts ADD COLUMN settlement_state TEXT NOT NULL DEFAULT 'initiated';\nALTER TABLE pl_payment_attempts ADD COLUMN request_json TEXT;\nALTER TABLE pl_payment_attempts ADD COLUMN reversed_cents INTEGER NOT NULL DEFAULT 0;\nALTER TABLE pl_payment_attempts ADD COLUMN reconciled_at TEXT;\nALTER TABLE pl_payment_attempts ADD COLUMN revision INTEGER NOT NULL DEFAULT 0;\nUPDATE pl_payment_attempts SET settlement_state=CASE status WHEN 'paid' THEN 'settled' WHEN 'review' THEN 'settled' WHEN 'expired' THEN 'canceled' ELSE CASE WHEN status='open' THEN 'initiated' ELSE status END END;\nCREATE UNIQUE INDEX pl_payment_intent ON pl_payment_attempts(payment_intent_id) WHERE payment_intent_id IS NOT NULL;\nCREATE TABLE pl_payment_refunds (\n id TEXT PRIMARY KEY, attempt_id TEXT NOT NULL REFERENCES pl_payment_attempts(id) ON DELETE CASCADE,\n amount_cents INTEGER NOT NULL CHECK(amount_cents>0), reason TEXT NOT NULL, created_by TEXT NOT NULL,\n status TEXT NOT NULL, provider_id TEXT, created_at TEXT NOT NULL\n);\nCREATE UNIQUE INDEX pl_payment_refund_pending ON pl_payment_refunds(attempt_id) WHERE status='unresolved';\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610270400_connector_recovery.sql",
+      "sha256": "b8e56b1a36a778dd55e337d20b81e8feaab34e06b4e30129fa521e3b92d7ab9f",
+      "sql": "-- Recovery carries scope references, never endpoint paths, signing keys or consent.\nCREATE TABLE pl_connector_bindings (\n id TEXT PRIMARY KEY,\n receiver_origin TEXT NOT NULL,\n job_ids TEXT NOT NULL,\n event_types TEXT NOT NULL,\n revoked_at TEXT\n);\nINSERT INTO pl_connector_bindings(id,receiver_origin,job_ids,event_types,revoked_at)\n SELECT id,substr(receiver,1,7+instr(substr(receiver,9),'/')),job_ids,event_types,revoked_at\n FROM pl_connector_subscriptions;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610271100_refund_posting.sql",
+      "sha256": "5961304b3512febf2503129160b90b46622208e01698c4e731893bf2a0e15d7b",
+      "sql": "-- A refund retains its reviewed source date and open-period booking across delayed reconciliation.\nALTER TABLE pl_payment_refunds ADD COLUMN posting_json TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610271200_file_transcriptions.sql",
+      "sha256": "676b30a596f225955a0ef92d1ab1c23bd82f9af7fed773d3587c281ed48589e5",
+      "sql": "-- Supplementary human text never replaces original bytes or embedded extraction.\nCREATE TABLE pl_file_transcriptions (\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n source TEXT NOT NULL,\n checksum TEXT NOT NULL CHECK(length(checksum)=64),\n revision INTEGER NOT NULL CHECK(revision>0),\n text TEXT NOT NULL CHECK(length(text) BETWEEN 1 AND 100000),\n supplied_by TEXT NOT NULL,\n PRIMARY KEY(job_id,source,revision)\n);\nCREATE TRIGGER pl_file_transcriptions_immutable BEFORE UPDATE ON pl_file_transcriptions\nBEGIN SELECT RAISE(ABORT,'Transcription revisions are immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610272000_portfolio_snapshots.sql",
+      "sha256": "fa880a6784162488e5bf64bb597ad9831ae0747287914b239ec745260f587bfc",
+      "sql": "-- Explicit report captures retain source versions; current grants and erasure still apply.\nCREATE TABLE pl_portfolio_snapshots (\n snapshot_id TEXT NOT NULL,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n name TEXT NOT NULL,\n captured_at TEXT NOT NULL,\n data TEXT NOT NULL CHECK(json_valid(data)),\n PRIMARY KEY(snapshot_id,job_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610280100_plan_file_chunks.sql",
+      "sha256": "51ce97f29a3a420ae28d1ec913cc92ebe363db19653588c7bad1eb9dfbe1a7ed",
+      "sql": "-- Large plan originals are kept in bounded rows under the same job custody.\nCREATE TABLE pl_plan_file_chunks (\n file_id TEXT NOT NULL,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n set_id TEXT NOT NULL,\n position INTEGER NOT NULL CHECK(position >= 0),\n bytes BLOB NOT NULL CHECK(length(bytes) BETWEEN 1 AND 524288),\n PRIMARY KEY(file_id,position)\n);\nCREATE INDEX pl_plan_chunk_job ON pl_plan_file_chunks(job_id);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
