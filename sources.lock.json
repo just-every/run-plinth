@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "12df09a8f1f800ff798b0bd91dde040b1c1dda52aace76db55fe1b868bdd7a32",
+      "sha256": "e9c183f44c30885a2ad09d63e52a4da1a8b09e529f47cc5ebfd0a885dac6371a",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8a58f9a44742a7adf852c579fa7929a2c827d179ac50d339d3fdd8d85bfdb4e9",
+      "sha256": "09e088b5a568c00bb8b21ff1b63677974d47adf94c9a161dbfd30936303decde",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "95c2e26ac2ee6bb0593190e64fc98aac2d7e3452ba03e3f3049e1f9d334aa4cd",
+      "sha256": "04f17ee23def857ad00beb0dde2a1ec3c4d797f2211d5f42e3c7715a6ea5983b",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -225,7 +225,7 @@
       "executable": false
     },
     "docs/REPORTS.md": {
-      "sha256": "b17bab4e4707c9e3236210fc70b0f2f4d28a5cdcc513a9b1f4c68362d1080e3a",
+      "sha256": "b67caafedba3bf638880d192cfc0f56441823602e952deae5d1d9777427f0611",
       "executable": false
     },
     "docs/REUSE.md": {
@@ -3409,7 +3409,7 @@
       "executable": false
     },
     "src/plinth/report-schedule.ts": {
-      "sha256": "efea1b002601881dd8e8f82344776d1c7eac26cd316d39b80e83b6508b71159b",
+      "sha256": "a60f16ab0915e4e841e4e78f01d27ca510879d40cd702fb84b7c1263e950f48d",
       "executable": false
     },
     "src/plinth/report-store.ts": {
@@ -3601,7 +3601,7 @@
       "executable": false
     },
     "src/plinth/team.ts": {
-      "sha256": "c5ba9ecf0306cdef4b4ae06d104f91b5cf5fca5e682c3dfd902c188d4456498e",
+      "sha256": "ac2851ec78af5a6c3ff0fc221d20a748e76dad20cf668eee7677d22eab157fae",
       "executable": false
     },
     "src/plinth/time-zone.ts": {
@@ -4845,7 +4845,7 @@
       "executable": false
     },
     "tests/plinth/reports.test.mjs": {
-      "sha256": "f58d28952071209085ef3877254c235e7d6f526aac89c6b6b60b032efa58d701",
+      "sha256": "2fb2446f22fc0891e7b32cab20d3a91a957677c680dc536329da880f4844ba4a",
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {

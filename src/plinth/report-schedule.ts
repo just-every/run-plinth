@@ -47,7 +47,8 @@ async function guards(db:D1Database,job:Job,s:ReportSchedule):Promise<D1Prepared
  if(!p||p.version!==s.recipient_version||p.email.toLowerCase()!==s.recipient_email)return null
  const recipient=await reportRecipient(db,p)
  if(!recipient||recipient.team?.version!==s.recipient_team_version||recipient.permissions?.role_version!==s.recipient_role_version)return null
- if(recipient.permissions&&!recipient.permissions.matrix.reports.view)return null
+ // A recurring grant cannot expand the selected job scope of any custom preset.
+ if(recipient.permissions&&(!recipient.permissions.matrix.reports.view||!recipient.team?.job_ids.includes(job.id)))return null
  const result=[...authorityGuards(db,owner),db.prepare("INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND status='active') THEN 1 ELSE 0 END").bind(p.id,p.version),db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_auth_settings WHERE singleton=1 AND generation=?) THEN 1 ELSE 0 END').bind(s.generation)]
  if(recipient.team)result.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_team WHERE operator_id=? AND version=?) THEN 1 ELSE 0 END').bind(p.id,recipient.team.version))
  else if(p.role==='admin')result.push(db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM pl_team WHERE operator_id=?) THEN 1 ELSE 0 END').bind(p.id))

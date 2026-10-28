@@ -38,8 +38,9 @@ export async function teamResponse(request: Request, db: D1Database, actor: Acto
   await transaction(db, actor, null, [stale, db.prepare('DELETE FROM pl_team WHERE operator_id=?').bind(id), audit(`${id}:admin`)], clock)
   return Response.json({ member: { id, role: 'admin' } }, { headers })
  }
- need(base === 'admin' || Array.isArray(input.job_ids) && input.job_ids.length <= 500, 'job_ids must be a list of up to 500')
- const job_ids = base === 'admin' ? [] : [...new Set((input.job_ids as unknown[]).map(j => text(j, 'job id', 100)))]
+ const requestedJobs = base === 'admin' && input.job_ids === undefined ? [] : input.job_ids
+ need(Array.isArray(requestedJobs) && requestedJobs.length <= 500, 'job_ids must be a list of up to 500')
+ const job_ids = [...new Set(requestedJobs.map(j => text(j, 'job id', 100)))]
  const known = job_ids.length ? (await db.prepare(`SELECT count(*) AS n FROM pl_jobs WHERE id IN (${job_ids.map(() => '?').join(',')})`).bind(...job_ids).first<{ n: number }>())!.n : 0
  need(known === job_ids.length, 'Assign existing jobs only', 404, 'not_found')
  const role = input.role as TeamRole | 'custom', grant: TeamGrant = { role, ...(custom ? { base, role_id: custom.role.id } : {}), job_ids, po_limit_cents: role === 'project_manager' ? cents(input.po_limit_cents, 'po_limit_cents') : 0, updated_by: stamp(actor) }, version = (previous?.version ?? 0) + 1, data = JSON.stringify(grant)
