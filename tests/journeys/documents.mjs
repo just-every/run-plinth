@@ -64,6 +64,7 @@ try{
   await page.setViewportSize({width,height:1000});await expect(region).toBeVisible()
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Private document screen fits the viewport')
   if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
+  await page.evaluate(()=>window.scrollTo(0,0))
   await page.screenshot({path:shots+'/DOC-007-'+label+'-'+width+'.png',fullPage:true,animations:'disabled'})
  }}
  await capture('job-originals',panel)
