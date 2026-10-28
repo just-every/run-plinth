@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "8dcc2d28f5b44673f5500b82e9b45f3ee93138abb16c4963e3448a7bf73d2bbe",
+      "sha256": "616ba7786fa2747aa68fd171183ab176956d2cf609ec3246af92dc243e8dd6e3",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ae4c0c7c38ccd7df93405bfce193e52a8786330532ce74dcb5e094f2fd668ece",
+      "sha256": "bb6fbe388d2f606ddd59dd6c5823885f049c0bc4b491ceb5d24a73ff2ce9e16f",
       "executable": false
     },
     "DEMO.md": {
@@ -177,7 +177,7 @@
       "executable": false
     },
     "docs/ESTIMATE-PERFORMANCE.md": {
-      "sha256": "81dd31202f336e9e335c33f2a89f4a2f7e71a0e2cca33ad079ddb7a609c9758f",
+      "sha256": "7efb77e7fc79d6ae44a7892ad5208c6056431754459f04a849ac94294b8d6496",
       "executable": false
     },
     "docs/FIELD-TIME.md": {
@@ -3137,7 +3137,7 @@
       "executable": false
     },
     "src/plinth/estimate-performance.ts": {
-      "sha256": "be0818eac4dc4463a06631282e80444d916dcc62db92b31841f85b5ed66c21a8",
+      "sha256": "4fe5b043f89e6f023ab1fa9c339928fa3099b1204fbab9b07c19de119949e265",
       "executable": false
     },
     "src/plinth/estimate-pricing.ts": {
@@ -4245,7 +4245,7 @@
       "executable": false
     },
     "src/ui/estimate-performance.tsx": {
-      "sha256": "373e324af2c784b7aa39cf3109acf334869806a81464b4915851c33ef99eaba0",
+      "sha256": "e36ef243273d2ae866a14a7628deda09c44d35510a95748f79031bc83cf16714",
       "executable": false
     },
     "src/ui/estimate-pricing.tsx": {
@@ -4917,7 +4917,7 @@
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
-      "sha256": "1c6d6481deb8da05365b4360053483b1d9b382d39666d6f5a94038c9087bbdf6",
+      "sha256": "558d6fc07d7b46237600f5f2e253e782ccc857b21c3096f5a5a8ee7f75aad252",
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
@@ -4969,7 +4969,7 @@
       "executable": false
     },
     "tests/plinth/reports.test.mjs": {
-      "sha256": "e4f072458e8c2265aa87e174380dc4d9f97f4e5a3605e544af798df4008f74e0",
+      "sha256": "ee9a54f0f2d72cab87e7995c08f5d453f8c4a66c74b1f76bd0968e6d84d79af4",
       "executable": false
     },
     "tests/plinth/roles.test.mjs": {
