@@ -27,7 +27,7 @@ export const holds = (role: { permissions: Matrix }, feature: Feature, action: A
 /** Validate a role's switches; unknown features or actions are refused rather than ignored. */
 export function parseSpec(input: Input, previous?: RoleSpec): RoleSpec {
  const copy = previous?.copy_of ?? input.copy_of
- need(typeof copy === 'string' && copy in presets, 'Copy one of administrator, project_manager, estimator, superintendent, crew, bookkeeper or reader')
+ need(typeof copy === 'string' && Object.hasOwn(presets, copy), 'Copy one of administrator, project_manager, estimator, superintendent, crew, bookkeeper or reader')
  const source = previous ?? { ...structuredClone(presets[copy as Preset]), copy_of: copy as Preset }
  const next: RoleSpec = { name: input.name === undefined && previous ? previous.name : text(input.name, 'Role name', 80), copy_of: source.copy_of, permissions: structuredClone(source.permissions), financial_visible: source.financial_visible, po_limit_cents: source.po_limit_cents }
  if (input.permissions !== undefined) {

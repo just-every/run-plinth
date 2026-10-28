@@ -30,6 +30,6 @@ const SIZES: Record<string, { dimension: 'length' | 'area'; size: string }> = {
 }
 /** The exact conversion between two standard US or metric units of the same dimension, or null when either unit is not one of them. */
 export function standardConversion(unit: string, rateUnit: string): { numerator: string; denominator: string } | null {
- const from = SIZES[unit], to = SIZES[rateUnit]
+ const from = Object.hasOwn(SIZES, unit) ? SIZES[unit] : undefined, to = Object.hasOwn(SIZES, rateUnit) ? SIZES[rateUnit] : undefined
  return from && to && from.dimension === to.dimension && unit !== rateUnit ? { numerator: from.size, denominator: to.size } : null
 }

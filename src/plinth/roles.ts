@@ -17,7 +17,7 @@ export async function rolesResponse(request: Request, db: D1Database, actor: Act
   const assigned = new Map<string, number>(); for (const r of (await db.prepare("SELECT data FROM pl_team").all<{ data: string }>()).results) { const g = JSON.parse(r.data) as { role_id?: string }; if (g.role_id) assigned.set(g.role_id, (assigned.get(g.role_id) ?? 0) + 1) }
   return Response.json({ presets: [{ id: 'owner', name: 'Owner', locked: true }, ...Object.entries(presets).map(([id, p]) => ({ id, name: p.name, permissions: p.permissions, financial_visible: p.financial_visible, po_limit_cents: p.po_limit_cents, builtin: true }))], roles: results.map(r => ({ ...JSON.parse(r.data) as Role, assigned: assigned.get((JSON.parse(r.data) as Role).id) ?? 0 })) }, { headers })
  }
- need(parts[1] !== 'owner' && !(parts[1] && parts[1] in presets), 'The owner role and the presets cannot be edited or deleted; copy one instead', 403, 'locked')
+ need(parts[1] !== 'owner' && !(parts[1] && Object.hasOwn(presets, parts[1])), 'The owner role and the presets cannot be edited or deleted; copy one instead', 403, 'locked')
  const clock = await readClock(db), at = (event: string) => ({ kind: 'permission' as const, action: event })
  if (request.method === 'POST' && parts.length === 1) {
   const input = object(await readBody(request)), spec = parseSpec(input)
