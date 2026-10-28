@@ -3,10 +3,11 @@ import { requireJobManager } from './auth'
 import { digest, fromBase64 } from './attachments'
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Attachment, type Input, type Job, type Schedule } from './model'
 import type { ConstraintEvent, ScheduleBlocker, ScheduleConstraint } from './schedule-constraint-model'
+import { bidProcurementBlockers } from './bid-follow-up'
 
 /** Holds apply to their tasks and every successor, across every publication door. */
 export function scheduleBlockers(job: Job, tasks: Schedule[]): ScheduleBlocker[] {
- const result: ScheduleBlocker[] = []
+ const result: ScheduleBlocker[] = bidProcurementBlockers(job,tasks)
  for (const constraint of job.schedule_constraints ?? []) {
   const status = constraint.events.at(-1)!.action
   if (status === 'cleared') continue
@@ -23,7 +24,7 @@ export function scheduleBlockers(job: Job, tasks: Schedule[]): ScheduleBlocker[]
 }
 export function requireScheduleClearance(job: Job, tasks: Schedule[]) {
  const blockers = scheduleBlockers(job, tasks)
- need(!blockers.length, 'Clear the inspection, permit or site holds before publishing affected work', 409, 'schedule_hold', { blockers })
+ need(!blockers.length, 'Clear inspection, permit, site or procurement holds before publishing affected work', 409, 'schedule_hold', { blockers })
 }
 async function documents(db: D1Database, job: Job, input: Input) {
  const rows = input.documents ?? []; need(Array.isArray(rows) && rows.length <= 3, 'Attach up to three original documents')

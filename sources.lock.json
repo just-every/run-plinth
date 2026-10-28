@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "9907f5dba6606c56bb6823678892e2d544129599589e25d5f34359faa006f586",
+      "sha256": "3ab8f2396214d39a3ea217fccf045a86bb62aae4a373ffe516ce9fd9c29dffb2",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "18da7a13e7b87e564e8ff90027aca5682767f7f5df11a4fd10311d8b7eaf3995",
+      "sha256": "4b0bd850f0b6a658687265bea22732a62befc6ae8f890f7dbf8188cd34b73485",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c1a7a3e2f780793d93b73e0cf77122f5991e1dc3865db9fdbd8ddc8e96c8bdc9",
+      "sha256": "541fb76a87c10889e8a471eb1c90a01dc9c2599ba14d795ec30d031ef9c2b084",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "8cc5edfe3d0faad5c83c5882eb9fb47fdcce46690d84e5a4a72cfea915631475",
+      "sha256": "75a21f2904e606934a0eff0dccd23be86b6375d3c368e1a8ab7114c7ffde4237",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -953,7 +953,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "9e0da796f9e465196c0783284c72f575b43570a91d535454ee9e7cc9542042b6",
+      "sha256": "4d4bee20ed357e812b6ff8e945bca43212c4ac1ee011ebb09d674e2899ca67dd",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -2893,11 +2893,11 @@
       "executable": false
     },
     "src/plinth/bid-access.ts": {
-      "sha256": "1389161b7d4d580001e13c15469f592f2b6f081ab7ff3ba841bc60ce54cbb45c",
+      "sha256": "d27be2169e41f7e3fe7b88b852ccf6c10c9373bc1aa89a7f80c03ccfe12ee402",
       "executable": false
     },
     "src/plinth/bid-actions.ts": {
-      "sha256": "eca1084c97ea60901f97cb0366025a5df303817ff9297a1258f3074aea08ed55",
+      "sha256": "8c669ead791c916181b217e7494323c7a79feb85ef8029b761a0a34058488c10",
       "executable": false
     },
     "src/plinth/bid-comparison-actions.ts": {
@@ -2920,8 +2920,12 @@
       "sha256": "654b5669fc4ce21363ca8cafe520a01d9fd99bfcc68b79c58346939d120a0049",
       "executable": false
     },
+    "src/plinth/bid-follow-up.ts": {
+      "sha256": "cbddeda0ca403cbe85c41600145cf176949d8266b21cdbadcc6ce52b778669b0",
+      "executable": false
+    },
     "src/plinth/bid-model.ts": {
-      "sha256": "46e47a544dd70c3016826513d3f084552166479a3d482575c23b11a86c5a049a",
+      "sha256": "1c5d5c8b45c6e48304a1a5e9e405f448b588505e726ded0a34f43be749241463",
       "executable": false
     },
     "src/plinth/bids.ts": {
@@ -3317,7 +3321,7 @@
       "executable": false
     },
     "src/plinth/permissions.ts": {
-      "sha256": "8bc27f5516073b73cb1571e973c587d7416f5ab4eadb6099b5732c5f906208d6",
+      "sha256": "a8a135ecc9b8c2c5e0ccff5daf087d4c38eebd142c09fbba1efd93b03c90a00a",
       "executable": false
     },
     "src/plinth/portal-features.ts": {
@@ -3449,7 +3453,7 @@
       "executable": false
     },
     "src/plinth/role-gate.ts": {
-      "sha256": "e09d7a723b154f10404a688ce5ca8bc60e9661a3cce6b988fef1279970e69b16",
+      "sha256": "0900915970f8820a9c70b88ed3b881d1b1c0417d466c1d2c3c6c98c8e128e404",
       "executable": false
     },
     "src/plinth/role-model.ts": {
@@ -3505,7 +3509,7 @@
       "executable": false
     },
     "src/plinth/schedule-constraints.ts": {
-      "sha256": "869e37513b81a70549b1582c47982643463dcc134246dc222e3d0dbf6ff654b0",
+      "sha256": "31cc79402aa65c525403dcffba558d08a432ddb534b6800685eea1eea9c20f71",
       "executable": false
     },
     "src/plinth/schedule-model.ts": {
@@ -3529,7 +3533,7 @@
       "executable": false
     },
     "src/plinth/scheduled.ts": {
-      "sha256": "7e1a217811a13c0a9b20d6899c7b5dc99ea16b260c10199bffd003880ede1f81",
+      "sha256": "1aec1a316fea6edaab181e324761af5a094704ff5e9c67aa4ea9b8bafbcc3e4b",
       "executable": false
     },
     "src/plinth/scope-contacts.ts": {
@@ -4096,12 +4100,16 @@
       "sha256": "a8bae0ee6941c012d08e9de82fff6adfe7700f3a31e8597ffcfb95f3979e2a75",
       "executable": false
     },
+    "src/ui/bid-follow-up.tsx": {
+      "sha256": "0be6c20bbe5d82091f15ccfaa94d651ae9ebeabdaa8d57037ce4556530d92ee5",
+      "executable": false
+    },
     "src/ui/bid-records.tsx": {
-      "sha256": "fe90ac0cc9bcf873b0021329740b191bc539fe32ddc280b5c55d98dbdb010147",
+      "sha256": "13d82079131bbe00897621f0317f0decd75c961d6fa1765f8fe708dad72731a8",
       "executable": false
     },
     "src/ui/bids.tsx": {
-      "sha256": "c5b9efa33dee65179d5eb3bd749518c5821514372788e0eb26a1bf8f6959ddbd",
+      "sha256": "f80a2ddd97b4dc1ecf39b3a45c28300ade8185202e982b3e883e4d9370cee48d",
       "executable": false
     },
     "src/ui/booking-changes.tsx": {
@@ -4608,6 +4616,10 @@
       "sha256": "21c9154202b0afbf8397dd69d69548a00aaa244edc004a935b887a45e4130341",
       "executable": false
     },
+    "tests/journeys/bid-follow-up.mjs": {
+      "sha256": "2285efb080c22634926d294ba18d927e7b71a865029409489ac058741169b85e",
+      "executable": false
+    },
     "tests/journeys/bids.mjs": {
       "sha256": "1ef0539ba0f43ebda95b2161c35fbf7835825e65a4034836dd2441829da53b13",
       "executable": false
@@ -4784,6 +4796,10 @@
       "sha256": "5a9008eb980ea50046bcdfd1ab1b51360d36afc88f12b2848cb68b64320fc55b",
       "executable": false
     },
+    "tests/plinth/bid-follow-up-support.mjs": {
+      "sha256": "9038266f0a1565e544649586ba09eaea7756dff60b1d02b831d3c92272ad3a07",
+      "executable": false
+    },
     "tests/plinth/connector-recovery-support.mjs": {
       "sha256": "087e14cd23c72444f02b2a68456001f669026b80cd25952d8b37b16afd897bb8",
       "executable": false
@@ -4909,7 +4925,7 @@
       "executable": false
     },
     "tests/plinth/subcontractors.test.mjs": {
-      "sha256": "21aba1c019f01584fbc8a25e9fd440df4465ef30750b0250c122206204f03326",
+      "sha256": "80147d776f45a195f55a28b89fdd66cb59457e944e41f7b156ea8c8c2b0570a8",
       "executable": false
     },
     "tests/plinth/us-conventions.test.mjs": {

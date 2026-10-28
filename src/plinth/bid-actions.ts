@@ -5,6 +5,7 @@ import {cents,find,need,object,stamp,sum,text,usdOnly,type Actor,type Input} fro
 import {getVendor} from './vendors'
 import {bidContact,requireBidInvite} from './bid-access'
 import type {BidJob,BidLine,BidPackage,BidRevision} from './bid-model'
+import {bidFollowUpAction} from './bid-follow-up'
 
 async function revision(db:D1Database,job:BidJob,actor:Actor,input:Input,number:number){
  const id=crypto.randomUUID(),files=await decisionFiles(db,job,id,input.plans)
@@ -24,6 +25,7 @@ export async function bidAction(db:D1Database,job:BidJob,actor:Actor,input:Input
   ;(job.bids??=[]).push(bid);return {record:bid,writes:rev.writes}
  }
  const bid=find(job.bids??[],id),writes:D1PreparedStatement[]=[]
+ if(['follow-up','pause-follow-up','run-follow-up','review-follow-up'].includes(action??'')){await bidFollowUpAction(db,job,bid,actor,input,action!);return {record:bid,writes}}
  if(['publish','invite','revoke','addendum','answer'].includes(action??'')){
   requireManager(actor)
   if(action==='publish'){need(!bid.published_by,'Package already published',409,'immutable');need(input.confirm===true&&input.revision_id===bid.revisions.at(-1)!.id,'Review and explicitly publish this exact plan revision');bid.published_by=stamp(actor)}

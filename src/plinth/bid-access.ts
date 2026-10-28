@@ -4,6 +4,7 @@ import {scopeContact} from './scope-contacts'
 import {currentQualification, type Vendor} from './vendor-model'
 import {need, type Actor} from './model'
 import type {BidInvitation, BidJob, BidPackage, BidSource} from './bid-model'
+import {bidEstimators} from './bid-follow-up'
 
 /** Current policy requires both a qualified contact and its own released company scope. */
 export async function bidContact(db:D1Database,job:BidJob,bid:BidPackage,invite:Pick<BidInvitation,'vendor_id'|'contact_id'|'email'|'subcontract_id'|'pre_award'>){
@@ -35,8 +36,8 @@ export async function bidSource(db:D1Database,job:BidJob,actor:Actor):Promise<Bi
   const own=office?undefined:await bidInvite(db,job,bid,actor)
   if(!office&&!own)continue
   const allowed=own?.cost_codes??bid.lines.map(l=>l.cost_code)
-  bids.push({...bid,...(own?{scope:bid.lines.filter(l=>allowed.includes(l.cost_code)).map(l=>l.description).join(' · ')}:{}),lines:bid.lines.filter(l=>allowed.includes(l.cost_code)).map(l=>bid.mode==='unpriced'?{cost_code:l.cost_code,description:l.description}:l),invitations:(office?bid.invitations:[own!]).map(i=>({...i,...bidStatus(bid,i)}))})
+  bids.push({...bid,...(own?{follow_up:undefined,scope:bid.lines.filter(l=>allowed.includes(l.cost_code)).map(l=>l.description).join(' · ')}:{}),lines:bid.lines.filter(l=>allowed.includes(l.cost_code)).map(l=>bid.mode==='unpriced'?{cost_code:l.cost_code,description:l.description}:l),invitations:(office?bid.invitations:[own!]).map(i=>({...i,...bidStatus(bid,i)}))})
  }
- return {id:job.id,version:job.version,name:job.name,cost_codes:office?[...new Set(job.quotes.at(-1)?.lines.flatMap(l=>l.cost_code?[l.cost_code]:[])??[])]:[],bids}
+ return {id:job.id,version:job.version,name:job.name,cost_codes:office?[...new Set(job.quotes.at(-1)?.lines.flatMap(l=>l.cost_code?[l.cost_code]:[])??[])]:[],bids,...(office?{tasks:job.schedules.map(({id,description,start,status})=>({id,description,start,status})),estimators:await bidEstimators(db,job)}:{})}
 }
 export async function requireBidInvite(db:D1Database,job:BidJob,bid:BidPackage,actor:Actor){need(actor.role==='member','Only the invited subcontractor contact may respond',403,'bid_contact');const invite=await bidInvite(db,job,bid,actor);need(invite,'Bid invitation not found',404,'not_found');return invite}

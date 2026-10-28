@@ -2,6 +2,94 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {setPortalFeatures} from './helpers.mjs'
 import { createActiveJob, createFixture } from './helpers.mjs'
+import {bidFollowUpFixture} from './bid-follow-up-support.mjs'
+
+test('BID-003 — approved long-lead procurement follows the clock, deduplicates private chases, stops on response and decline, and escalates before promising work', async()=>{
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try {
+  const email=n=>[`synthetic-plinth-${n}`,'example.invalid'].join('@'),subs=[]
+  for(let n=1;n<=3;n++)subs.push({email:email(n),cookie:await f.invite(email(n))})
+  const estimator={email:email(4),cookie:await f.invite(email(4),'Synthetic estimator','admin')},agent=await f.agent()
+  const c=await bidFollowUpFixture(f,{subs,estimator,clientEmail:email(5)}),path=`/${c.id}`
+  await f.scheduled('2026-10-28T15:00:00Z');await c.refresh()
+  assert.deepEqual(c.source.bids[0].invitations.map(i=>i.reminders??[]),[[],[],[]],'Nothing chases without explicit approval')
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,confirm:false})).status,400)
+  assert.equal((await c.act(path+'/follow-up',c.plan,subs[0].cookie)).status,403)
+  assert.equal((await c.act(path+'/follow-up',c.plan,estimator.cookie)).status,403)
+  assert.equal((await c.act(path+'/follow-up',c.plan,undefined,{token:agent})).status,403)
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,required_on_site:'2026-11-01'})).value.error,'bid_dates','Bid deadline must leave the full material lead time')
+  assert.equal((await c.act(path+'/follow-up',c.plan)).status,200)
+  const bid=()=>c.source.bids[0],plan=structuredClone(bid().follow_up),task=plan.task_id
+  assert.deepEqual([plan.required_on_site,plan.lead_days,plan.order_by,plan.remind_on],['2026-12-01',30,'2026-11-01','2026-10-28'])
+  assert.equal((await c.api(`/jobs/${c.job.id}`)).value.job.schedules.find(t=>t.id===task).status,'draft','Approving reminders never promises a start')
+  await f.scheduled('2026-10-27T15:00:00Z');await c.refresh();assert.ok(bid().invitations.every(i=>!i.reminders?.length))
+  await f.scheduled('2026-10-28T15:00:00Z');await c.refresh()
+  assert.deepEqual(bid().invitations.map(i=>i.reminders.map(r=>r.kind)),[['acknowledgment'],['acknowledgment'],['acknowledgment']])
+  const initialReminders=bid().invitations.map(i=>structuredClone(i.reminders))
+  await f.scheduled('2026-10-28T16:00:00Z');await c.refresh();assert.deepEqual(bid().invitations.map(i=>i.reminders),initialReminders,'Repeated cron keeps stable occurrence identities')
+  assert.equal((await c.act(path+'/acknowledge',{revision_id:c.revision},subs[0].cookie)).status,200)
+  assert.equal((await c.act(path+'/respond',{revision_id:c.revision,items:[{cost_code:'08-100',description:'Reviewed window package',amount_cents:450000}],exclusions:'Synthetic excludes installation',attachments:[]},subs[0].cookie)).status,200)
+  assert.equal((await c.act(path+'/acknowledge',{revision_id:c.revision},subs[1].cookie)).status,200,'Acknowledging plans does not supply the missing price')
+  assert.equal((await c.act(path+'/decline',{revision_id:c.revision,reason:'Synthetic unavailable capacity'},subs[2].cookie)).status,200)
+  await f.scheduled('2026-10-30T15:00:00Z');await c.refresh()
+  assert.deepEqual(bid().invitations[0].reminders.map(r=>r.kind),['acknowledgment'],'An answered contact receives no missing-price chase')
+  assert.deepEqual(bid().invitations[1].reminders.map(r=>r.kind),['acknowledgment','price'],'An acknowledged package still needs its missing price')
+  assert.deepEqual(bid().invitations[2].reminders.map(r=>r.kind),['acknowledgment'],'A declined invitation receives no further chase')
+  const remaining=bid().invitations[1].id,answered=structuredClone(bid().invitations[0].reminders),declined=structuredClone(bid().invitations[2].reminders)
+  const promise=async(suffix,body={})=>{const current=(await c.api(`/jobs/${c.job.id}`)).value.job;return c.api(`/jobs/${c.job.id}${suffix}`,{expected_version:current.version,...body})}
+  let r=await promise(`/schedules/${task}/approve`);assert.equal(r.value.error,'schedule_hold');assert.ok(r.value.details.blockers.some(b=>b.accountable==='Synthetic estimator'))
+  const proposed=(await c.api(`/jobs/${c.job.id}`)).value.job.schedules
+  r=await promise('/schedule/preview',{tasks:proposed});assert.equal(r.status,200);assert.ok(r.value.preview.blockers.some(b=>b.task_id===task&&b.status==='procurement_pending'))
+  assert.equal((await promise('/schedule/publish',{tasks:proposed,digest:r.value.preview.digest})).value.error,'schedule_hold','The schedule planner also refuses an unreviewed procurement promise')
+  await f.scheduled('2026-11-01T15:00:00Z');await c.refresh()
+  assert.deepEqual(bid().follow_up.escalation.invitation_ids,[remaining]);assert.equal(bid().follow_up.escalation.at,'2026-11-01T15:00:00.000Z')
+  const escalated=structuredClone(bid().follow_up.escalation),reminders=structuredClone(bid().invitations.map(i=>i.reminders))
+  await f.scheduled('2026-11-02T15:00:00Z');await c.refresh();assert.deepEqual(bid().follow_up.escalation,escalated);assert.deepEqual(bid().invitations.map(i=>i.reminders),reminders)
+  assert.deepEqual(bid().invitations[0].reminders,answered);assert.deepEqual(bid().invitations[2].reminders,declined)
+  r=await c.api(`/bids/${c.job.id}`,undefined,subs[1].cookie);assert.equal(r.value.source.bids[0].follow_up,undefined);assert.equal(r.value.source.bids[0].invitations.length,1);assert.equal(r.value.source.tasks,undefined)
+  r=await c.api(`/bids/${c.job.id}`,undefined,estimator.cookie);assert.deepEqual(r.value.source.bids[0].follow_up.escalation.invitation_ids,[remaining])
+  assert.equal((await c.act(path+'/review-follow-up',{reason:'Wrong authority'})).status,403)
+  assert.equal((await c.act(path+'/review-follow-up',{reason:'Compared the received price; follow up privately on the remaining supplier before ordering'},estimator.cookie)).status,200)
+  assert.equal((await promise(`/schedules/${task}/approve`)).status,200,'Only an explicit estimator review permits a human start promise')
+  assert.equal((await promise(`/schedules/${task}/move`,{start:'2026-11-30T08:00:00Z',end:'2026-11-30T09:00:00Z'})).value.error,'schedule_hold','A reviewed gap cannot promise work before the material is required on site')
+  await c.refresh()
+  assert.equal((await c.act(path+'/respond',{revision_id:c.revision,items:[{cost_code:'08-100',description:'Second reviewed window price',amount_cents:470000}],exclusions:'',attachments:[]},subs[1].cookie)).status,200)
+  await f.scheduled('2026-11-03T15:00:00Z');await c.refresh();assert.deepEqual(bid().follow_up.escalation.invitation_ids,[],'The remaining escalation clears when the last price arrives');assert.deepEqual(bid().invitations.map(i=>i.reminders),reminders)
+  const audit=(await c.api('/audit')).value;assert.ok(JSON.stringify(audit).includes('bid.follow-up'))
+  const current=(await c.api(`/jobs/${c.job.id}`)).value.job
+  assert.equal(current.orders.length,0);assert.equal(current.subcontracts?.length??0,0)
+ } finally {await f.close()}
+})
+
+test('BID-003 — current grants, revised plans and erasure fence approved follow-up and replay',async()=>{
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try {
+  const email=n=>[`synthetic-plinth-${n}`,'example.invalid'].join('@'),subs=[]
+  for(let n=1;n<=3;n++)subs.push({email:email(n),cookie:await f.invite(email(n))})
+  const estimator={email:email(4),cookie:await f.invite(email(4),'Synthetic estimator','admin')},c=await bidFollowUpFixture(f,{subs,estimator,clientEmail:email(5)}),path=`/${c.id}`
+  assert.equal((await c.act(path+'/follow-up',c.plan)).status,200)
+  await setPortalFeatures(f,c.job.id,[],['bids']);await f.scheduled('2026-10-30T15:00:00Z');await c.refresh();assert.ok(c.source.bids[0].invitations.every(i=>!i.reminders?.length),'Disabled portal never receives reminders')
+  await setPortalFeatures(f,c.job.id);await c.refresh()
+  const vendor=c.vendors[0];assert.equal((await c.api(`/vendors/${vendor.id}/qualifications`,{expected_version:vendor.version,trade:'Windows',status:'rejected',evidence:'Synthetic qualification revoked'})).status,200)
+  assert.equal((await c.act(path+'/revoke',{invitation_id:c.source.bids[0].invitations[1].id})).status,200)
+  await f.scheduled('2026-10-30T15:00:00Z');await c.refresh();assert.deepEqual(c.source.bids[0].invitations.map(i=>i.reminders?.length??0),[0,0,2],'Qualification and invitation revocation stop the chase')
+  assert.equal((await c.act(path+'/pause-follow-up')).status,200);await f.scheduled('2026-11-01T15:00:00Z');await c.refresh();assert.equal(c.source.bids[0].follow_up.escalation,undefined)
+  const oldVersion=c.source.version
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,draft_task:undefined,task_id:c.source.bids[0].follow_up.task_id})).status,200)
+  assert.equal((await c.act(path+'/addendum',{revision_id:c.revision,confirm:true,note:'Synthetic changed window specification',due_on:'2026-10-31',plans:[{name:'synthetic-plinth-2.pdf',base64:Buffer.from('%PDF-1.7\nsynthetic-plinth-2\n%%EOF').toString('base64')}]})).status,200)
+  await f.scheduled('2026-11-01T15:00:00Z');await c.refresh();assert.equal(c.source.bids[0].follow_up.escalation,undefined,'A changed revision requires fresh reminder approval')
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,expected_version:oldVersion})).value.error,'stale_version')
+  const admin=await f.invite(email(6),'Synthetic approving administrator','admin')
+  assert.equal((await c.act(path+'/follow-up',{...c.plan,revision_id:c.source.bids[0].revisions.at(-1).id,draft_task:undefined,task_id:c.source.bids[0].follow_up.task_id},admin)).status,200)
+  const beforeRevocation=structuredClone(c.source.bids[0]),person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email(6))
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
+  await f.scheduled('2026-11-02T15:00:00Z');await c.refresh();assert.deepEqual(c.source.bids[0],beforeRevocation,'Revoked approval authority cannot run a captured follow-up')
+  const job=(await c.api(`/jobs/${c.job.id}`)).value.job
+  assert.equal((await f.json(`/api/plinth/jobs/${c.job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version,confirm:c.job.name}})).status,200)
+  await f.scheduled('2026-11-02T15:00:00Z');assert.equal((await c.api(`/bids/${c.job.id}`)).status,404)
+  assert.equal((await c.act(path+'/follow-up',c.plan)).status,404,'Replayed approval cannot resurrect an erased job')
+ } finally {await f.close()}
+})
 
 test('SUB-001 — restricted subcontractor directory, private W-9 custody, reviewed rates, qualification and dated scope awards', async () => {
  const f = await createFixture()

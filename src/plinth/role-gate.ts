@@ -28,6 +28,7 @@ const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
   rule('POST', `jobs/${id}/pricing/(?:preview|apply)`), rule('POST', `jobs/${id}/estimate-template/(?:preview|apply)`),
   rule('GET', 'pricing-rates'), rule('GET', `pricing-rates/${id}`), rule('GET', 'estimate-catalog'),
   rule('GET', 'bids'), rule('GET', `bids/${id}`), rule('GET', `bids/${id}/files/${id}`), rule('POST', `bids/${id}`),
+  rule('POST', `bids/${id}/${id}/review-follow-up`),
  ],
  // Superintendents record the day: logs are saved as drafts for the office to publish, and observations are captured with photos.
  superintendent: [...common, rule('GET', `jobs/${id}/time`), rule('POST', `jobs/${id}/time`), rule('POST', `jobs/${id}/time/${id}/correct`), rule('POST', `jobs/${id}/time/(?:consent|location)`), rule('POST', `jobs/${id}/diary`), rule('POST', `jobs/${id}/punch/issues`), rule('POST', `jobs/${id}/schedule-actuals`)],

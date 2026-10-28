@@ -38,7 +38,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | EST-008 | missing | No room design and client visualization handoff workflow exists. |
 | BID-001 | partial | Exact changes in plinth-ruling-20261021-2235 were not supplied; ct confirmation of the implemented pre-award exception remains pending. Default ADOPTED: explicit owner and admin consent to a qualified active company contact and selected cost codes grants bid-only access before award; no subcontract, work access or outbound notice is created. Existing released-scope invitations remain supported. Every bid door rechecks the current contact, qualification, invitation and feature preset; assigned PMs read only assigned jobs. BID-002 and ROLE-003 inherit this boundary. All BID-001 acceptance behavior is asserted; policy approval keeps the clause partial. |
 | BID-002 | done |  |
-| BID-003 | missing | No bid follow-up and procurement lead times workflow exists. |
+| BID-003 | done |  |
 | SCH-001 | done |  |
 | SCH-002 | done |  |
 | SCH-003 | done | None for current native doors. SCH-004 and NOTIFY-001 inherit outbound delivery and escalation. |
