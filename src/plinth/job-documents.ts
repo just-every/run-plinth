@@ -1,6 +1,5 @@
 import { requireOwner } from './auth'
 import { digest, fromBase64 } from './attachments'
-import { decisionDownload } from './decision-files'
 import { jobRequest } from './job-request'
 import { find, need, object, stamp, text, type Attachment, type Input, type Job, type Stamp } from './model'
 import { jobOf, readClock, saveJob, transaction } from './store'
@@ -60,7 +59,7 @@ async function change(db: D1Database, state: DocumentLibrary, actor: Actor, inpu
   const stored = await original(object(input.file), folder.area)
   const revision: DocumentVersion = { id: crypto.randomUUID(), revision: document.versions.length + 1, file: stored.file, by }
   document.versions.push(revision); record = document
-  writes.push(job ? db.prepare('INSERT INTO pl_attachments(id,job_id,entry_id,name,mime,checksum,size,bytes) VALUES(?,?,?,?,?,?,?,?)').bind(stored.file.id,job.id,revision.id,stored.file.name,stored.file.mime,stored.file.checksum,stored.file.size,stored.bytes.buffer) : db.prepare('INSERT INTO pl_company_document_files(id,bytes) VALUES(?,?)').bind(stored.file.id,stored.bytes.buffer))
+  writes.push(job ? db.prepare('INSERT INTO pl_job_document_files(id,job_id,bytes) VALUES(?,?,?)').bind(stored.file.id,job.id,stored.bytes.buffer) : db.prepare('INSERT INTO pl_company_document_files(id,bytes) VALUES(?,?)').bind(stored.file.id,stored.bytes.buffer))
  } else if (parts[0] === 'links' && parts.length === 1 && job) {
   const document = find(state.files, text(input.document_id, 'Document', 100)), revision = find(document.versions, text(input.version_id, 'Exact version', 100))
   const target = documentTargets(job).find(t => t.kind === input.kind && t.id === input.record_id)
@@ -84,8 +83,7 @@ export async function documentsResponse(request: Request, db: D1Database, actor:
  if (request.method === 'GET') {
   if (tail[0] === 'files' && tail.length === 3) {
    const document = find(state.files, tail[1]), revision = find(document.versions, tail[2]), file = revision.file
-   if (job) return decisionDownload(db, job, [file], file.id)
-   const stored = await db.prepare('SELECT bytes FROM pl_company_document_files WHERE id=?').bind(file.id).first<{bytes:ArrayBuffer}>()
+   const stored = await (job ? db.prepare('SELECT bytes FROM pl_job_document_files WHERE id=? AND job_id=?').bind(file.id,job.id) : db.prepare('SELECT bytes FROM pl_company_document_files WHERE id=?').bind(file.id)).first<{bytes:ArrayBuffer}>()
    need(stored, 'Original file missing', 503, 'document_missing')
    const bytes = new Uint8Array(stored.bytes)
    need(bytes.length === file.size && await digest(bytes) === file.checksum, 'Original integrity check failed', 503, 'document_integrity')
