@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir, userInfo } from 'node:os'
-import { resolve, join } from 'node:path'
+import { resolve, join, extname } from 'node:path'
+import { createServer } from 'node:http'
 import { chromium } from '@playwright/test'
 import { installedWorker } from './installed-worker.mjs'
 import { providerEdge } from './provider-edge.mjs'
@@ -10,18 +11,32 @@ import { nativeSignIn } from './native-signin.mjs'
 import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
-assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards'].includes(name), 'Choose an installed product journey')
+assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name), 'Choose an installed product journey')
 assert.equal(process.env.HOME, userInfo().homedir, 'Browser-driving Node uses the real account HOME')
 const shots = resolve(process.env.PLINTH_SCREENSHOTS_ROOT ?? 'artifacts/installed', name)
 await mkdir(shots, { recursive: true })
 const scratch = await mkdtemp(join(tmpdir(), 'synthetic-plinth-'))
-let provider, worker, browser, journey
+let provider, worker, browser, journey, site
 const signal = value => { if (journey?.pid) { try { process.kill(-journey.pid, value) } catch (error) { if (error.code !== 'ESRCH') throw error } } }
 const stop = () => signal('SIGTERM')
 process.once('SIGTERM', stop); process.once('SIGINT', stop)
 try {
  provider = await providerEdge()
- worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules', 'signed-changes', 'room-boards'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
+ worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
+ if (name === 'office') {
+  const root = resolve('dist/site')
+  site = createServer(async (request, response) => {
+   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
+   const file = join(root, pathname === '/' ? 'index.html' : pathname.replace(/^\//, '') + (extname(pathname) ? '' : '.html'))
+   if (!file.startsWith(root + '/')) { response.writeHead(404).end(); return }
+   try {
+    const body = await readFile(file), types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' }
+    response.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' }); response.end(body)
+   } catch { response.writeHead(404).end() }
+  })
+  await new Promise(resolve => site.listen(0, '127.0.0.1', resolve))
+  process.env.PLINTH_SITE = 'http://127.0.0.1:' + site.address().port
+ }
  const ownerState = join(scratch, 'owner.json'), clientState = join(scratch, 'client.json')
  Object.assign(process.env, {
   PLINTH_URL: worker.origin, PLINTH_STATE: ownerState, PLINTH_CLIENT_STATE: clientState,
@@ -49,7 +64,7 @@ try {
  await client.storageState({ path: clientState })
  await browser.close(); browser = undefined
  console.log(`Installed ${name}: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic`)
- for(const journeyName of name==='plans'?['plans','submittals','drawing-review','room-boards']:[name]){
+ for(const journeyName of name==='plans'?['plans','submittals','drawing-review','room-boards']:name==='office'?['estimates','invoices']:[name]){
  journey = spawn(process.execPath, [`tests/journeys/${journeyName}.mjs`], { env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
  // Assertion stacks must never disclose a native confirmation URL or token.
  const redact = line => line.replace(/https?:\/\/[^\s"'<>]*\/auth\/confirm[^\s"'<>]*/g, '[native confirmation withheld]').replace(/(?:pi|seti)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+/g, '[provider secret withheld]')
@@ -69,6 +84,7 @@ try {
  await browser?.close()
  await worker?.close()
  await provider?.close()
+ if (site) await new Promise(resolve => site.close(resolve))
  await rm(scratch, { recursive: true, force: true })
  process.removeListener('SIGTERM', stop); process.removeListener('SIGINT', stop)
 }
