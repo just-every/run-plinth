@@ -111,7 +111,7 @@ function display(job:Job,actor:Actor):any {
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
  if(actor.role!=='owner'){job={...job};delete job.followup}
- job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('plans.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)

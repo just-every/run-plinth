@@ -1,3 +1,4 @@
+import { drawingLink, drawingSearch } from './drawing-review'
 import type { Bindings } from '../auth.server'
 import { need, type Actor, type Input } from './model'
 import { planAccess } from './plan-access'
@@ -18,6 +19,8 @@ export async function planResponse(request:Request,env:Bindings,actor:Actor,part
   return json({jobs:visible})
  }
  const clock=await readClock(env.DB),previous=(await jobs(env.DB)).find(j=>j.id===parts[1]);need(previous,'Plan job not found',404,'not_found');await planAccess(env.DB,previous,actor)
+ if(request.method==='GET'&&parts.length===4&&parts[3]==='review-search')return json(drawingSearch(previous,actor,new URL(request.url).searchParams.get('q')??''))
+ if(request.method==='GET'&&parts.length===6&&parts[4]==='links'){const result=drawingLink(previous,actor,parts[3]!,parts[5]!);return new URL(request.url).searchParams.get('open')==='1'?new Response(null,{status:303,headers:{location:new URL(result.href,request.url).href,'cache-control':'private, no-store'}}):json(result)}
  if(request.method==='GET'&&parts.length===3)return json({plans:await planView(env.DB,previous,actor)})
  if(request.method==='GET'&&parts.length===6&&parts[4]==='files')return planFile(env.DB,previous,actor,parts[3]!,parts[5]!)
  need(request.method==='POST'&&(parts.length===3||parts.length===5),'Unknown plan route',404,'not_found')

@@ -20,7 +20,7 @@ const feature: Record<string, Feature> = {
  company: 'company', vendors: 'company', customers: 'company', customer: 'company', 'compliance-rules': 'company', roles: 'company',
 }
 /** Verbs that decide, issue, send or publish rather than edit. */
-const approving = new Set(['follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
+const approving = new Set(['recognition-review', 'detail-link', 'follow-up', 'run-follow-up', 'credit', 'debit', 'void', 'write-off', 'refund', 'accept', 'issue', 'send', 'approve', 'publish', 'release', 'award', 'sign', 'move', 'cancel', 'notify', 'run', 'resume', 'order', 'receipt', 'draws', 'lien'])
 const common = [/^jobs$/, /^jobs\/[^/]+$/, /^todos(?:\/.*)?$/, /^jobs\/[^/]+\/todos(?:\/.*)?$/]
 const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
 export function requirement(method: string, relative: string): Requirement | 'common' | null {

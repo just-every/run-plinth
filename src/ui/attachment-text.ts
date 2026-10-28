@@ -186,3 +186,25 @@ export async function extractAttachmentText(href: string, name: string, password
  const file = await original(href, run); check(run)
  return extract(file, name, password, everyPage, run)
 }
+
+/** Read one exact plan page; proposals retain source coordinates and OCR confidence. */
+export async function recognizeDrawing(href:string,pageNumber:number,run:Run){
+ const file=await original(href,run),pdfjs=await import('pdfjs-dist')
+ pdfjs.GlobalWorkerOptions.workerSrc=pdfWorkerUrl
+ const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),stopAtErrors:true,useWasm:false})
+ disposeWith(run,()=>{void task.destroy()})
+ const pdf=await task.promise,page=await pdf.getPage(pageNumber),viewport=page.getViewport({scale:2})
+ if(Math.ceil(viewport.width)*Math.ceil(viewport.height)>MAX_PIXELS)throw new Error('This drawing exceeds the 16 megapixel recognition limit.')
+ const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height)
+ try{
+  const context=canvas.getContext('2d');if(!context)throw new Error('Drawing canvas unavailable.')
+  const render=page.render({canvas,canvasContext:context,viewport}),cancel=()=>render.cancel()
+  run.signal.addEventListener('abort',cancel,{once:true})
+  try{await untilStopped(render.promise,run.signal)}finally{run.signal.removeEventListener('abort',cancel)}
+  const worker=await ocr(run),result=await untilStopped(worker.recognize(canvas,{}, {blocks:true}),run.signal)
+  check(run)
+  const regions=(result.data.blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines.map(l=>({text:l.text.trim(),x:l.bbox.x0/2,y:l.bbox.y0/2,width:(l.bbox.x1-l.bbox.x0)/2,height:(l.bbox.y1-l.bbox.y0)/2,confidence:l.confidence})))).filter(r=>r.text&&r.width>0&&r.height>0)
+  if(!regions.length)throw new Error('No text was recognized. This page needs manual review; no proposal was saved.')
+  return {text:boundedText(result.data.text.trim()),regions}
+ }finally{canvas.width=0;canvas.height=0;page.cleanup()}
+}
