@@ -4449,7 +4449,7 @@
       "executable": false
     },
     "src/ui/site-inventory.tsx": {
-      "sha256": "a6adb6502c6588cd692f5a52566fcbc44dfef910d9ea80ee91a36a293fbc1cd5",
+      "sha256": "5cc1caaff30057ed5504633b0e578f33ac5d4a1ed7bbb85f79ac832ea911de50",
       "executable": false
     },
     "src/ui/site.tsx": {
