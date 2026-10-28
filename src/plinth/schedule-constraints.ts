@@ -24,7 +24,7 @@ export function scheduleBlockers(job: Job, tasks: Schedule[]): ScheduleBlocker[]
 }
 export function requireScheduleClearance(job: Job, tasks: Schedule[]) {
  const blockers = scheduleBlockers(job, tasks)
- need(!blockers.length, 'Clear the inspection, permit or site holds before publishing affected work', 409, 'schedule_hold', { blockers })
+ need(!blockers.length, 'Clear inspection, permit, site or procurement holds before publishing affected work', 409, 'schedule_hold', { blockers })
 }
 async function documents(db: D1Database, job: Job, input: Input) {
  const rows = input.documents ?? []; need(Array.isArray(rows) && rows.length <= 3, 'Attach up to three original documents')

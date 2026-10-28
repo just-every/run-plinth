@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "30f822217a40d37db990098210d5ae3dcc6977944e5217b5715dd616d49417e5",
+      "sha256": "d80eedb709e7e371be1e1704c89deda1cb5176355265fd7978da41daba0880df",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "080705a2b99f512feb3f301b26b23177eefce05af21deea9ff110848b1ddb041",
+      "sha256": "47d94d98587df423b235899d389618fcde3033e5c94b4f2c119589378f20d5da",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "95c2e26ac2ee6bb0593190e64fc98aac2d7e3452ba03e3f3049e1f9d334aa4cd",
+      "sha256": "78935a2398099c3e639a706f9aa7bbd6ad7bd20657cbfa0aae9b8404cead6257",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -3489,7 +3489,7 @@
       "executable": false
     },
     "src/plinth/schedule-constraints.ts": {
-      "sha256": "4da0ebe46d128c41c1f6748068d5f029b819c824b4485c8de0ae275384add45d",
+      "sha256": "31cc79402aa65c525403dcffba558d08a432ddb534b6800685eea1eea9c20f71",
       "executable": false
     },
     "src/plinth/schedule-model.ts": {
