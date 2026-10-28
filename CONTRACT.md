@@ -364,7 +364,7 @@ No separate owner-approved desk-built CLAIMS.md was supplied for Plinth as of 17
 
 Judged from the code and tests at commit `52b2edb4f56a8700193f7fc051b6e9f747e36b71` (27 October 2026). RPT-001 is proven on this code pin by the named HTTP and installed journeys and six detected mutations. The landing candidate changes only contract status, generated documents and the source lock after this pin; its code and tests are identical. The earlier CT judgment baseline remains `d9f2ba4f19033079779b714187d96d7f66ccbd53`. Exact-candidate Verify and guarded publication and landing gates remain required before counting.
 
-CARE-004 proof began at `eed7abc77c84738e9346418f2d4d66cd702bd7e8`; the landing candidate also asserts owner fallback after manager revocation and counts one response per distinct involved company and trade. The exact candidate and its Verify event are named in the branch handoff. Fresh CT judgment and guarded main landing remain required before the fleet counts this DONE.
+CARE-004 proof began at `eed7abc77c84738e9346418f2d4d66cd702bd7e8`; the landing candidate also asserts owner fallback after manager revocation and counts one response per distinct involved company and trade, and independently fences satisfaction metrics by current custom-role job grants. The exact candidate and its Verify event are named in the branch handoff. Fresh CT judgment and guarded main landing remain required before the fleet counts this DONE.
 
 
 | Clauses | Done | Partial | Missing | Total |

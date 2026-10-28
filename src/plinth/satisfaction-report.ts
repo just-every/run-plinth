@@ -2,7 +2,8 @@ import type { Actor, Job } from './model'
 import { need } from './model'
 import { jobs } from './store'
 
-export function satisfactionValues(job:Job) {
+export function satisfactionValues(job:Job,actor?:Actor) {
+ if(actor?.permissions&&!actor.team?.job_ids.includes(job.id))return {'native.satisfaction_count':null,'native.satisfaction_score':null,'native.satisfaction_low':null}
  const surveys=job.satisfaction?.surveys.filter(s=>s.response)??[]
  return {'native.satisfaction_count':surveys.length,'native.satisfaction_score':surveys.length?surveys.reduce((n,s)=>n+s.response!.score,0)/surveys.length:null,'native.satisfaction_low':surveys.filter(s=>s.response!.score<=s.settings.low_score).length}
 }

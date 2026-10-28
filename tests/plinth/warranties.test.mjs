@@ -419,6 +419,13 @@ test('CARE-004 — two completed jobs retain configurable high and low survey re
   assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,200)
   assert.equal((await a.call('/jobs/'+b.job.id+'/satisfaction',undefined,customCookie)).status,404)
   assert.deepEqual((await a.call('/reports/satisfaction',undefined,customCookie)).value.responses.map(r=>r.job_id),[a.job.id])
+  assert.equal((await a.call('/reports/records?record_scope=job',undefined,customCookie)).value.records.find(r=>r.id===a.job.id).values['native.satisfaction_count'],1)
+  const adminCopy=await a.call('/roles',{copy_of:'administrator',name:'Synthetic scoped survey administrator'});assert.equal(adminCopy.status,201)
+  assert.equal((await a.call('/team/'+customPerson.id,{expected_version:1,role:'custom',role_id:adminCopy.value.role.id,job_ids:[]},f.owner,'PUT')).status,200)
+  const hiddenMetrics=(await a.call('/reports/records?record_scope=job',undefined,customCookie)).value.records
+  for(const record of hiddenMetrics){assert.equal(record.values['native.satisfaction_count'],null,'Custom administrator copies receive no survey totals outside current job assignments');assert.equal(record.values['native.satisfaction_score'],null);assert.equal(record.values['native.satisfaction_low'],null)}
+  assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,404)
+  assert.deepEqual((await a.call('/reports/satisfaction',undefined,customCookie)).value.responses,[])
   assert.equal((await a.call('/team/'+manager.id,{expected_version:2,role:'project_manager',job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
   await b.read();const document=b.job.handover.documents[0],replacement=await b.ok('/handover/packages',{title:'Synthetic later closeout',documents:[{document_id:document.id,revision_id:document.revisions[0].id}]})
   await b.ok('/handover/packages/'+replacement.id+'/complete',{digest:replacement.digest,confirm:true,client_safe:true,statement:'Builder completed later closeout'})
