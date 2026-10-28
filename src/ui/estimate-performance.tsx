@@ -9,10 +9,10 @@ const amount=(n:number|null,currency:string)=>n===null?'Unknown':money(n,currenc
 const number=(n:number|null)=>n===null?'Unknown':Number(n.toFixed(4)).toLocaleString()
 export function EstimatePerformanceReport(){
  const [report,setReport]=useState<Report>(),[error,setError]=useState(''),[jobId,setJobId]=useState(''),[catalogId,setCatalogId]=useState(''),[review,setReview]=useState<Report['lessons'][number]>()
- const refresh=async()=>{const r=await api('/reports/performance');setReport(r);setJobId(id=>r.jobs.some((j:PerformanceJob)=>j.id===id)?id:r.jobs[0]?.id??'');setCatalogId(id=>r.catalog.some((e:CatalogEntry)=>e.id===id)?id:r.catalog[0]?.id??'')}
+ const refresh=async()=>{setError('');const r=await api('/reports/performance');setReview(undefined);setReport(r);setJobId(id=>r.jobs.some((j:PerformanceJob)=>j.id===id)?id:r.jobs[0]?.id??'');setCatalogId(id=>r.catalog.some((e:CatalogEntry)=>e.id===id)?id:r.catalog[0]?.id??'')}
  const act=async(job:PerformanceJob,action:string,input:object)=>{await api(`/reports/performance/jobs/${job.id}/${action}`,{expected_version:job.version,...input});setReview(undefined);await refresh()}
  const job=report?.jobs.find(j=>j.id===jobId),entry=report?.catalog.find(e=>e.id===catalogId)
- return <details className="card" onToggle={e=>{if(e.currentTarget.open&&!report)refresh().catch(e=>setError(e.message))}}><summary>Estimate productivity and sales</summary>{error&&<p role="alert">{error}</p>}{report&&<>
+ return <details className="card" onToggle={e=>{if(e.currentTarget.open&&!report)refresh().catch(e=>setError(e.message))}}><summary>Estimate productivity and sales</summary><button type="button" onClick={()=>refresh().catch(e=>setError(e.message))}>Refresh performance report</button>{error&&<p role="alert">{error}</p>}{report&&<>
  <p>{report.label}</p><p>As of {report.as_of}</p>
  <h3>Estimator outcomes</h3>{report.estimators.map(e=><p key={e.id}>{e.name}: {e.won} won · {e.lost} lost · {e.open} open · Win rate {e.win_rate===null?'Unknown':number(e.win_rate*100)+'%'}</p>)}
  <h3>Sales pipeline</h3>{report.pipeline.map(p=><p key={p.currency+p.stage}>{p.stage}: {p.count} jobs · {amount(p.amount_cents,p.currency)} · {p.currency}</p>)}{report.jobs.map(j=><p key={j.id}><a href={`/app?job=${j.id}`}>{j.name}</a> · {j.sales.stage} · {amount(j.sales.amount_cents,j.currency)} · {j.sales.evidence??'No outcome evidence'}</p>)}

@@ -53,6 +53,7 @@ try{
  const after=(await call(`/api/plinth/jobs/${first.job.id}/costs`)).value;assert.deepEqual(after,{...before,version:after.version})
  const next=c.jobs[3],request={template_id:c.template.id,as_of:'2026-10-20'},preview=await next.act('/estimate-template/preview',request)
  assert.equal(preview.preview.proposal.cost_total_cents,11900);await next.act('/estimate-template/apply',{...request,digest:preview.preview.digest});assert.equal(next.job.quotes.at(-1).cost_total_cents,11900)
+ await page.getByRole('button',{name:'Refresh performance report',exact:true}).click();const renewed=page.locator('p').filter({has:page.getByRole('link',{name:next.job.name,exact:true})});await expect(renewed).toContainText('estimating');await expect(renewed).toContainText('$231.00')
  const client=await invite(performanceAddress('performance-client'),'Synthetic reporting client');assert.equal((await call('/api/plinth/reports/performance',{cookie:client})).status,403)
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No page overflow at '+width)
