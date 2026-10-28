@@ -6,7 +6,7 @@ import { optionalNotice } from './mail-model'
 import { suppression } from './mail-store'
 import { find, need, recordApproval, stamp, type Actor, type Input, type Job } from './model'
 import { readClock, saveJob } from './store'
-import type { SubmittalNotice } from './submittal-model'
+import { submittalCommitment, type SubmittalNotice } from './submittal-model'
 import { currentReviewer, submittalAccess } from './submittals'
 import { checkWarrantySend, loadWarrantyJob, saveWarrantyJob } from './warranty-store'
 
@@ -19,6 +19,7 @@ async function eligible(env: Bindings, job: Job, actor: Actor, id: string, input
  need(cycle.decision, 'Complete the review before notifying the supplier', 409, 'submittal_unreviewed')
  await currentReviewer(env.DB, job, cycle)
  need(order.status !== 'cancelled', 'The commitment was cancelled', 409, 'order_state')
+ need(cycle.commitment === submittalCommitment(order, true), 'Commitment terms changed; review a new cycle before notifying the supplier', 409, 'submittal_mismatch')
  need(order.vendor_email && input.to === order.vendor_email, 'Confirm the existing purchase order supplier email', 409, 'recipient')
  const guards = await deliveryPermissions(env.DB, job, order.vendor_email, 'documents', true)
  need(guards, 'The supplier recipient no longer has access', 403, 'recipient')
