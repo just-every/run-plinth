@@ -703,12 +703,16 @@ test('INT-014 scheduled delivery rechecks current credentials and job existence 
 test('DOC-001 — approved plan sets supersede exact sheets, notify current recipients and retain pinned originals and annotations',async()=>{
  const f=await createFixture();try{
  const address=n=>['synthetic-plinth-'+n,'example.test'].join('@')
- const client=await f.invite(address(101),'Plan client'),trade=await f.invite(address(102),'Plan trade'),other=await f.invite(address(103),'Unrelated person'),crew=await f.invite(address(104),'Plan crew','admin')
+ const client=await f.invite(address(101),'Plan client'),trade=await f.invite(address(102),'Plan trade'),other=await f.invite(address(103),'Unrelated person'),crew=await f.invite(address(104),'Plan crew','admin'),restricted=await f.invite(address(105),'Restricted plan manager','admin')
  let job=await createActiveJob(f,'Versioned plan distribution',address(101));job=(await createReleasedScope(f,job,address(102),'Framing')).job
  const root=`/api/plinth/jobs/${job.id}/plans`,read=async(cookie=f.owner)=>f.json(root,{cookie})
  const people=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team,crewId=people.find(p=>p.email===address(104)).id
  const assign=async(ids,version=0)=>{const r=await f.json('/api/plinth/team/'+crewId,{method:'PUT',cookie:f.owner,body:{expected_version:version,role:'crew',job_ids:ids,po_limit_cents:0}});assert.equal(r.status,200);return r.value.member.version}
  let crewVersion=await assign([job.id])
+ const restrictedId=people.find(p=>p.email===address(105)).id
+ const restrictedRole=await f.json('/api/plinth/roles',{method:'POST',cookie:f.owner,body:{copy_of:'project_manager',name:'Plan review without approval',permissions:{documents:{approve:false}}}});assert.equal(restrictedRole.status,201)
+ assert.equal((await f.json('/api/plinth/team/'+restrictedId,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'custom',role_id:restrictedRole.value.role.id,job_ids:[job.id],po_limit_cents:0}})).status,200)
+
  const eligible=(await read()).value.plans.recipients,clientId=eligible.find(p=>p.name==='Plan client').id,tradeId=eligible.find(p=>p.name==='Plan trade').id
  const act=async(path,body={},cookie=f.owner)=>{const current=(await read()).value.plans;return f.json(root+path,{method:'POST',cookie,body:{expected_version:current.version,...body}})}
  const source=(number,revision,kind='plan',changed=false)=>({number,revision,kind,page:1,width:400,height:400,document:{name:'synthetic-plinth-plan.pdf',mime:'application/pdf',base64:takeoffPlan(changed).toString('base64')}})
@@ -723,12 +727,15 @@ test('DOC-001 — approved plan sets supersede exact sheets, notify current reci
  r=await act(`/${firstId}/approve`,{confirm:true,recipient_ids:[crewId,clientId,tradeId]});assert.equal(r.status,200,JSON.stringify(r.value))
  assert.deepEqual(r.value.plans.sets[0].recipients.map(p=>p.id).sort(),[crewId,clientId,tradeId].sort())
  assert.equal((await read(other)).status,404)
- r=await act(`/${firstId}/annotate`,{sheet_id:old.id,text:'Retain framing note on revision A'},crew);assert.equal(r.status,200,JSON.stringify(r.value))
- const annotation=r.value.plans.sets[0].annotations[0];assert.equal(annotation.sheet_id,old.id);assert.equal(annotation.revision,'A');assert.equal(annotation.by.name,'Plan crew')
+ r=await act(`/${firstId}/annotate`,{sheet_id:old.id,x:80,y:120,text:'Retain framing note on revision A'},crew);assert.equal(r.status,200,JSON.stringify(r.value))
+ const annotation=r.value.plans.sets[0].annotations[0];assert.equal(annotation.x,80);assert.equal(annotation.y,120);assert.equal(annotation.sheet_id,old.id);assert.equal(annotation.revision,'A');assert.equal(annotation.by.name,'Plan crew')
  r=await act('',{title:'Construction set',issue_on:'2026-10-10',sheets:[source('A1','B','plan',true),source('S1','B','specification'),source('AD1','B','addendum')]});assert.equal(r.status,200,JSON.stringify(r.value))
  const secondId=r.value.record.id,newSheet=r.value.plans.sets.find(s=>s.id===secondId).sheets[0]
  assert.equal((await read(crew)).value.plans.sets.flatMap(s=>s.sheets).find(s=>s.current).id,old.id,'Pending uploads never replace the approved field drawing')
  assert.equal((await f.request(`${root}/${secondId}/files/${newSheet.id}`,{cookie:crew})).status,404)
+ const beforeRefusal=(await read()).value.plans
+ assert.equal((await act(`/${secondId}/approve`,{confirm:true,recipient_ids:[crewId]},restricted)).status,403,'Approval requires the independent document approval switch')
+ assert.deepEqual((await read()).value.plans,beforeRefusal,'A refused approval writes no notice or state')
  const stale=(await read()).value.plans.version
  r=await act(`/${secondId}/approve`,{confirm:true,recipient_ids:[crewId,clientId,tradeId]});assert.equal(r.status,200,JSON.stringify(r.value))
  assert.equal((await f.json(`${root}/${secondId}/approve`,{method:'POST',cookie:f.owner,body:{expected_version:stale,confirm:true,recipient_ids:[crewId]}})).status,409)

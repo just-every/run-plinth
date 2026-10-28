@@ -25,17 +25,17 @@ import { Page, Rail, TopBar, type Me, type View } from './shell'
 import './workspace.css'
 
 export function Workspace() {
-  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>(()=>new URLSearchParams(location.search).get('view')==='plans'?'plans':'jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
+  const [jobs, setJobs] = useState<Job[]>([]), [role, setRole] = useState(''), [roleName, setRoleName] = useState(''), [me, setMe] = useState<Me>(), [selected, setSelected] = useState(''), [view, setView] = useState<View>('jobs'), [error, setError] = useState(''), [ready, setReady] = useState(false), [query, setQuery] = useState(''), [menu, setMenu] = useState(false)
   const create = useRef<HTMLElement>(null)
   const [totals, setTotals] = useState<CurrencyTotal[]>([])
   const [matches, setMatches] = useState<Job[]>([])
   async function refresh() { const result = await api('/jobs'); setJobs(result.jobs); setTotals(result.currency_totals ?? []); setRole(result.role); setRoleName(result.role_name ?? ''); setReady(true) }
-  useEffect(() => { const job = new URLSearchParams(window.location.search).get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
+  useEffect(() => { const params=new URLSearchParams(window.location.search);if(params.get('view')==='plans')setView('plans'); const job = params.get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
   useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
-  const go = (to: View) => { setView(to); setSelected(''); setMenu(false); if (to === 'jobs') refresh() }
-  const open = (id: string) => { const url = new URL(window.location.href); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
+  const go = (to: View) => { const url=new URL(window.location.href);for(const key of ['plan_job','plan_set','plan_sheet'])url.searchParams.delete(key);if(to==='plans')url.searchParams.set('view','plans');else url.searchParams.delete('view');window.history.replaceState(null,'',url);setView(to); setSelected(''); setMenu(false); if (to === 'jobs') refresh() }
+  const open = (id: string) => { const url = new URL(window.location.href);for(const key of ['view','plan_job','plan_set','plan_sheet'])url.searchParams.delete(key); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
   const words = query.trim()
   useEffect(() => {
     if (!words) return

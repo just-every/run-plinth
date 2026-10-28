@@ -1,6 +1,6 @@
 import type { Attachment, Stamp } from './model'
 export interface PlanSheet { id:string; number:string; revision:string; kind:'plan'|'specification'|'addendum'; page:number; width:number; height:number; document:Attachment }
-export interface PlanAnnotation { id:string; sheet_id:string; revision:string; text:string; by:Stamp }
+export interface PlanAnnotation { id:string; sheet_id:string; revision:string; x:number; y:number; text:string; by:Stamp }
 export interface PlanRecipient { id:string; name:string; acknowledged_by?:Stamp }
 export interface PlanSet { id:string; title:string; issue_on:string; sheets:PlanSheet[]; prepared_by:Stamp; approved_by?:Stamp; recipients:PlanRecipient[]; annotations:PlanAnnotation[] }
 export interface PlanSheetView extends PlanSheet { current:boolean; superseded_by?:{set_id:string;sheet_id:string;revision:string}; href:string }

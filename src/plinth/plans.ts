@@ -55,7 +55,8 @@ export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,i
   need(set.approved_by,'Approve the source revision before annotation',409,'unapproved')
   const sheet=find(set.sheets,text(input.sheet_id,'Exact source sheet',100))
   need(set.annotations.length<1000,'This set has reached its annotation limit')
-  const annotation={id:crypto.randomUUID(),sheet_id:sheet.id,revision:sheet.revision,text:text(input.text,'Annotation',4000),by:stamp(actor)}
+  for(const [coordinate,limit] of [['x',sheet.width],['y',sheet.height]] as const)need(typeof input[coordinate]==='number'&&Number.isFinite(input[coordinate])&&(input[coordinate] as number)>=0&&(input[coordinate] as number)<=limit,'Place the annotation within its source PDF page')
+  const annotation={x:input.x as number,y:input.y as number,id:crypto.randomUUID(),sheet_id:sheet.id,revision:sheet.revision,text:text(input.text,'Annotation',4000),by:stamp(actor)}
   set.annotations.push(annotation);return {record:annotation,writes}
  }else need(false,'Unknown plan action',404,'not_found')
  return {record:set,writes}
