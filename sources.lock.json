@@ -4625,7 +4625,7 @@
       "executable": false
     },
     "src/ui/estimate-editor.tsx": {
-      "sha256": "de6cea1ac7462e3fd2810607de75918a260cda154178439c7e130bce4c5db1e0",
+      "sha256": "bcec12226b8f8dfbb0e282aabbe2eecdee8165c29d9d5d0b3ceb494e8b7e5545",
       "executable": false
     },
     "src/ui/estimate-performance.tsx": {
@@ -4689,7 +4689,7 @@
       "executable": false
     },
     "src/ui/invoices.tsx": {
-      "sha256": "ed142199ddefb9b282784e9d7cc02f2ec46f55954c93d8073b9fffd931d0a405",
+      "sha256": "5b8ddfb409b96a4cc6d70b1d5930e0bece357ba7ec40cb19f276a4929128e592",
       "executable": false
     },
     "src/ui/job-customer.tsx": {
@@ -4701,7 +4701,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "6b537a714e8bb23a672b468ef618041078a56645e11f66536641f0fc9a75f4c6",
+      "sha256": "36dc002473f3337414f66a76702ad5bc8035af66c14a0265576a817714f0105b",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -4853,7 +4853,7 @@
       "executable": false
     },
     "src/ui/scope.tsx": {
-      "sha256": "88e3441514460d0148fc337387cc630cb3c1da500478cfbdcb7f133e1556fb54",
+      "sha256": "ba2c6a1ba05923f4ed0199c88332c6d4fbb06231f55aa6abca5a8f6bcbf5b149",
       "executable": false
     },
     "src/ui/selection-decisions.tsx": {
@@ -4865,11 +4865,11 @@
       "executable": false
     },
     "src/ui/shared.tsx": {
-      "sha256": "70f279598a318b26e2716c3e1f2e497d62d828e7a424f4e2908b174630fbde3d",
+      "sha256": "f3d828b637d6b2a3711e58ecaf18d6b44ea720bf4cda43d1a8078d885125e2b1",
       "executable": false
     },
     "src/ui/shell.tsx": {
-      "sha256": "3c97d0766f205e680ce68e8a61f9fa3100c8bca27554f8b27e72db002308359b",
+      "sha256": "7e488bcf355a549109278049a2176eaade10e37883e8327f63e86a8e26ef16cb",
       "executable": false
     },
     "src/ui/signed-changes.tsx": {
@@ -4881,7 +4881,7 @@
       "executable": false
     },
     "src/ui/sov.tsx": {
-      "sha256": "debdf3f1b6b2d0d430f78efd212f38b8718e0dd334b890066bd13781c4efec48",
+      "sha256": "b9b2bf0660b9cd9c92fea1260caf29b46000244b6a0259e50156a4d838f18686",
       "executable": false
     },
     "src/ui/subcontractor-records.tsx": {
@@ -4961,7 +4961,7 @@
       "executable": false
     },
     "src/ui/workspace-shell.css": {
-      "sha256": "83c8e44a98c34fb56e773aeef15a340331d05fd61553de542cd2b09d5362c2cc",
+      "sha256": "dc47613526104528b6c9fae02e6c41a2fa7a45637e29f9d9ad68ce098d12df5d",
       "executable": false
     },
     "src/ui/workspace.css": {
@@ -4969,7 +4969,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "cea3d158e9dc37dda79a7cfa6893dd150688d5b2d237db377b08c0ba37ef080d",
+      "sha256": "193c3601cc3ac19ccd41f618a5a9f3cb6e4632867e35efc3f1f5cf5ca2ee0d2c",
       "executable": false
     },
     "test-budget.json": {
