@@ -7,3 +7,6 @@
 @import './workspace-job.css';
 @import './workspace-gantt.css';
 @import './workspace-records.css';
+
+.document-library .record, .document-library .row-main { min-width: 0; overflow-wrap: anywhere; }
+.document-checksum { overflow-wrap: anywhere; font-size: 13px; }
