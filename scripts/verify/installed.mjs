@@ -24,7 +24,7 @@ try {
  provider = await providerEdge()
  worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
  if (name === 'office') {
-  const root = resolve('dist/site')
+  const root = resolve('./dist/site')
   site = createServer(async (request, response) => {
    const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
    const file = join(root, pathname === '/' ? 'index.html' : pathname.replace(/^\//, '') + (extname(pathname) ? '' : '.html'))

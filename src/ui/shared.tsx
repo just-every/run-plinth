@@ -40,7 +40,7 @@ export function Field({ label, name, type = 'text', required = true, ...props }:
 export function Form({ children, action, submit = 'Save', reset = true }: {children: ReactNode; action: (form: FormData) => Promise<unknown>; submit?: string; reset?: boolean}) {
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('')
   const id = useId(), formRef = useRef<HTMLFormElement>(null), errorRef = useRef<HTMLParagraphElement>(null)
-  const [invalid, setInvalid] = useState<string[]>([]), [elapsed, setElapsed] = useState(0)
+  const [invalid, setInvalid] = useState<string[]>([]), [elapsed, setElapsed] = useState(0), [completed, setCompleted] = useState('')
   useEffect(() => {
     if (!busy) return
     const start = performance.now(), timer = setInterval(() => setElapsed((performance.now() - start) / 1000), 100)
@@ -69,13 +69,13 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
     }
     const data = new FormData(form), start = performance.now(), fallback = form.closest('.card,.record')?.querySelector<HTMLElement>('summary,h2,h3')
     const focused = document.activeElement instanceof HTMLElement && form.contains(document.activeElement) ? document.activeElement : form.querySelector<HTMLButtonElement>('button[type=submit]')
-    setInvalid([]); setBusy(true); setError(''); setMessage(''); setElapsed(0)
+    setInvalid([]); setBusy(true); setError(''); setMessage(''); setElapsed(0); setCompleted('')
     let saved = false
-    try { await action(data); if (reset) form.reset(); setMessage(`Saved in ${((performance.now() - start) / 1000).toFixed(1)} seconds.`); saved = true }
+    try { await action(data); if (reset) form.reset(); setMessage('Saved.'); setCompleted(((performance.now() - start) / 1000).toFixed(1)); saved = true }
     catch (e) { setInvalid(e instanceof FieldError && e.field ? [e.field] : []); setError(e instanceof Error ? e.message : 'Could not save.'); }
     finally { setBusy(false); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
   }
-  return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-busy={busy} aria-describedby={error ? id : undefined}><fieldset disabled={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset><p role="status" aria-live="polite">{busy ? `Saving… ${elapsed.toFixed(1)} seconds elapsed. Keep this page open.` : message}</p>{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error} Your entries are still here. Review them and try again.</p>}</form>
+  return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-describedby={error ? id : undefined}><fieldset disabled={busy} aria-busy={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset><p role="status" aria-live="polite">{busy ? <>Saving… <span aria-hidden="true">{elapsed.toFixed(1)} seconds elapsed. </span>Keep this page open.</> : message}</p>{message && <p role="timer" aria-label="Request duration">Completed in {completed} seconds.</p>}{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error} Your entries are still here. Review them and try again.</p>}</form>
 }
 
 export function ReadState({ label, error, retry, loading }: { label: string; error?: string; retry: () => Promise<void>; loading: boolean }) {
@@ -85,13 +85,13 @@ export function ReadState({ label, error, retry, loading }: { label: string; err
     setElapsed(0); const start = performance.now(), timer = setInterval(() => setElapsed((performance.now() - start) / 1000), 100)
     return () => clearInterval(timer)
   }, [loading])
-  return <section className="read-state" aria-label={label} aria-busy={loading}>{loading ? <p role="status">{label}… {elapsed.toFixed(1)} seconds elapsed.</p> : error ? <><p role="alert" className="error">{error} No empty or up-to-date result is confirmed.</p><button type="button" className="secondary" onClick={() => { void retry().catch(() => {}) }}>Retry {label.toLowerCase()}</button></> : null}</section>
+  return <section className="read-state" aria-label={label}>{loading ? <p role="status">{label}… <span aria-hidden="true">{elapsed.toFixed(1)} seconds elapsed.</span></p> : error ? <><p role="alert" className="error">{error} No empty or up-to-date result is confirmed.</p><button type="button" className="secondary" onClick={() => { void retry().catch(() => {}) }}>Retry {label.toLowerCase()}</button></> : null}</section>
 }
 export function Action({ children, action, className = '' }: {children: ReactNode; action: () => Promise<unknown>; className?: string}) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const errorRef = useRef<HTMLSpanElement>(null)
   useEffect(() => { if (error) errorRef.current?.focus() }, [error])
-  return <span className="action" aria-busy={busy}><button className={className} disabled={busy} onClick={async event => {
+  return <span className="action"><button className={className} disabled={busy} aria-busy={busy} onClick={async event => {
     const button = event.currentTarget, fallback = button.closest('.record')?.querySelector<HTMLElement>('summary,h3,h2')
     setBusy(true); setError('')
     try {
