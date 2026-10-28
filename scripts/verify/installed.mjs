@@ -10,7 +10,7 @@ import { nativeSignIn } from './native-signin.mjs'
 import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
-assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'followup-rules'].includes(name), 'Choose an installed product journey')
+assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'followup-rules', 'professional-prerequisites'].includes(name), 'Choose an installed product journey')
 assert.equal(process.env.HOME, userInfo().homedir, 'Browser-driving Node uses the real account HOME')
 const shots = resolve(process.env.PLINTH_SCREENSHOTS_ROOT ?? 'artifacts/installed', name)
 await mkdir(shots, { recursive: true })
@@ -21,7 +21,7 @@ const stop = () => signal('SIGTERM')
 process.once('SIGTERM', stop); process.once('SIGINT', stop)
 try {
  provider = await providerEdge()
- worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
+ worker = await installedWorker(provider.outboundService, ['settlements','portfolio','report-packets','bid-follow-up','estimate-performance','followup-rules','plans','professional-prerequisites'].includes(name) ? {now: Date.parse('2026-10-27T15:00:00Z')} : {})
  const ownerState = join(scratch, 'owner.json'), clientState = join(scratch, 'client.json')
  Object.assign(process.env, {
   PLINTH_URL: worker.origin, PLINTH_STATE: ownerState, PLINTH_CLIENT_STATE: clientState,
@@ -49,7 +49,7 @@ try {
  await client.storageState({ path: clientState })
  await browser.close(); browser = undefined
  console.log(`Installed ${name}: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic`)
- for(const journeyName of name==='plans'?['plans','submittals']:[name]){
+ for(const journeyName of name==='plans'?['plans','submittals','professional-prerequisites']:[name]){
  journey = spawn(process.execPath, [`tests/journeys/${journeyName}.mjs`], { env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
  // Assertion stacks must never disclose a native confirmation URL or token.
  const redact = line => line.replace(/https?:\/\/[^\s"'<>]*\/auth\/confirm[^\s"'<>]*/g, '[native confirmation withheld]').replace(/(?:pi|seti)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+/g, '[provider secret withheld]')

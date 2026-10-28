@@ -208,6 +208,11 @@ test('Professional inspection prerequisites hold work until exact signed qualifi
   for(const credentials of [{cookie:client},{token:agent}]){assert.equal((await f.json(c.register,credentials)).status,403);assert.equal((await c.request('/professional-prerequisites',{},credentials)).status,403)}
   const held=async()=>{const before=await c.read();const r=await c.request(`/schedules/${task.id}/approve`);assert.equal(r.status,409,JSON.stringify(r.value));assert.deepEqual(await c.read(),before);assert.equal(c.job.schedules[0].status,'draft')}
   await held()
+  const calendar={weekdays:[1,2,3,4,5],start_hour:8,end_hour:17,holidays:[]},tasks=[{...c.job.schedules[0],owner:'Synthetic accountable manager',duration_minutes:60},{id:'synthetic-plinth-successor',trade:'Synthetic finishing',owner:'Synthetic accountable manager',description:'Finish after inspected framing',start:'2031-11-02T08:00:00Z',duration_minutes:60,predecessors:[{id:task.id,lag_minutes:0}]}]
+  const preview=await c.request('/schedule/preview',{calendar,tasks});assert.equal(preview.status,200)
+  const beforePublish=await c.read()
+  assert.equal((await c.request('/schedule/publish',{calendar,tasks:preview.value.preview.tasks,digest:preview.value.preview.digest})).value.error,'professional_hold','Planner publication cannot bypass the prerequisite or release its successor')
+  assert.deepEqual(await c.read(),beforePublish)
   const submit=async extra=>row=await c.act(`/professional-prerequisites/${row.id}/evidence`,await c.evidence(row,{reviewer_id:reviewer.id,...extra}))
   const decide=async(extra={},credentials={cookie:admin})=>c.request(`/professional-prerequisites/${row.id}/review`,await c.review(row,extra),credentials)
   for(const extra of [{signed:false},{expires_on:'2031-10-27'},{effective_on:'2032-01-01'}]){await submit(extra);const before=await c.read();assert.equal((await decide()).status,409);assert.deepEqual(await c.read(),before);await held()}
@@ -239,6 +244,17 @@ test('Professional inspection prerequisites hold work until exact signed qualifi
   assert.equal((await c.request(`/schedules/${task.id}/move`,move)).status,200)
   await c.act('/schedule-constraints/'+constraint.id,{action:'held',reason:'Inspection result withdrawn'})
   assert.equal((await c.request(`/schedules/${task.id}/move`,{start:'2031-11-04T08:00:00Z',end:'2031-11-04T09:00:00Z'})).status,409,'Native inspection holds still apply')
+  const allWork=await c.act('/schedule-constraints',{kind:'inspection',title:'Whole-site professional prerequisite',jurisdiction:'Synthetic jurisdiction',accountable:'Synthetic inspector',task_ids:[],reason:'New job work needs professional release'})
+  await c.act('/schedule-constraints/'+allWork.id,{action:'cleared',reason:'Original whole-site inspection received',documents:[professionalFiles[0]]})
+  await c.act('/professional-prerequisites',{title:'Review before any new work',source:{kind:'inspection',source_id:allWork.id},task_ids:[],due_on:'2031-11-01'})
+  const beforeNewWork=await c.read()
+  assert.equal((await c.request('/schedules',{trade:'Synthetic unallocated crew',description:'New work before professional release',start:'2031-11-05T08:00:00Z',end:'2031-11-05T09:00:00Z'})).value.error,'professional_hold','A prerequisite can hold first publication before any task exists')
+  assert.deepEqual(await c.read(),beforeNewWork)
+  const hold=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:c.job.id,kind:'legal_hold',reason:'Preserve exact professional decisions',confirm:true}});assert.equal(hold.status,201)
+  const retained=await c.read()
+  assert.equal((await f.json(c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).value.error,'retention_hold')
+  assert.deepEqual(await c.read(),retained,'Professional review cannot bypass existing retention holds')
+  assert.equal((await f.json(`/api/plinth/holds/${hold.value.hold.id}/release`,{method:'POST',cookie:f.owner,body:{reason:'Owner records the reasoned release'}})).status,200)
   const version=c.job.version
   assert.equal((await f.json(c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:version,confirm:c.job.name}})).status,200)
   assert.equal((await decide({}, {cookie:f.owner})).status,404,'Captured review cannot resurrect erased work')

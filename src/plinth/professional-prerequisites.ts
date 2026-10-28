@@ -1,3 +1,4 @@
+import { digest } from './attachments'
 import { requireOwner } from './auth'
 import { today } from './compliance'
 import { decisionDownload, decisionFiles } from './decision-files'
@@ -22,8 +23,8 @@ export interface ProfessionalPrerequisite {
 export function professionalAccess(actor: Actor, job: Job) { need(!actor.credential_id && !actor.agent_door, 'A signed-in office person is required', 403, 'human_required'); submittalAccess(actor, job) }
 export async function professionalReviewers(db: D1Database, job: Job) {
  const people = await submittalReviewers(db, job)
- // A custom reviewer must also retain independent permission to approve affected work.
- return people
+ // Reviewers must retain native access to all three source-original doors. Scoped delegation remains a separate boundary.
+ return people.filter(person => person.team_version === 0)
 }
 async function currentReviewer(db: D1Database, job: Job, evidence: ProfessionalEvidence) {
  const current = (await professionalReviewers(db, job)).find(p => p.id === evidence.reviewer.id)
@@ -34,16 +35,16 @@ async function sourceState(db: D1Database, job: Job, source: ProfessionalSource)
   const row = find(job.schedule_constraints ?? [], source.source_id)
   need(row.kind === 'inspection' || row.kind === 'permit', 'Choose an inspection or permit requirement')
   const event = row.events.at(-1)!
-  return { ready: event.action === 'cleared', document: event.documents[0], href: `/api/plinth/jobs/${job.id}/schedule-documents/${event.documents[0]?.id}`, identity: JSON.stringify({ id: row.id, event }) }
+  return { ready: event.action === 'cleared', document: event.documents[0], href: `/api/plinth/jobs/${job.id}/schedule-documents/${event.documents[0]?.id}`, identity: await digest(new TextEncoder().encode(JSON.stringify({ id: row.id, event }))) }
  }
  const sub = find(job.subcontracts ?? [], source.subcontract_id ?? '')
  if (source.kind === 'coverage') {
   const vendor = await getVendor(db, sub.vendor_id), record = find(vendor.compliance ?? [], source.source_id), on = await today(db)
-  return { ready: record.review?.decision === 'verified' && record.effective_on <= on && on <= record.expires_on, document: record.document, href: `/api/plinth/vendors/${vendor.id}/compliance/${record.id}`, identity: JSON.stringify({ subcontract_id: sub.id, vendor_id: vendor.id, record }) }
+  return { ready: record.review?.decision === 'verified' && record.effective_on <= on && on <= record.expires_on, document: record.document, href: `/api/plinth/vendors/${vendor.id}/compliance/${record.id}`, identity: await digest(new TextEncoder().encode(JSON.stringify({ subcontract_id: sub.id, vendor_id: vendor.id, record }))) }
  }
  const waiver = (sub.draws ?? []).flatMap(d => d.waivers).find(w => w.id === source.source_id)
  need(waiver, 'Choose a waiver from this subcontract', 404, 'not_found')
- return { ready: waiver.status === 'accepted' && !!waiver.release, document: waiver.release?.document, href: `/api/plinth/jobs/${job.id}/lien-waiver-files/${waiver.release?.document.id}`, identity: JSON.stringify({ subcontract_id: sub.id, waiver }) }
+ return { ready: waiver.status === 'accepted' && !!waiver.release, document: waiver.release?.document, href: `/api/plinth/jobs/${job.id}/lien-waiver-files/${waiver.release?.document.id}`, identity: await digest(new TextEncoder().encode(JSON.stringify({ subcontract_id: sub.id, waiver }))) }
 }
 async function accepted(db: D1Database, job: Job, row: ProfessionalPrerequisite) {
  const evidence = row.evidence.at(-1), on = await today(db)
@@ -53,7 +54,7 @@ async function accepted(db: D1Database, job: Job, row: ProfessionalPrerequisite)
  need(source.ready && source.document && source.identity === evidence.source.identity && source.document.id === evidence.source.document.id && source.document.checksum === evidence.source.document.checksum, 'Professional prerequisite source is unverified, expired or changed; obtain a new exact-source review', 409, 'professional_source')
 }
 export function professionalAffected(row: ProfessionalPrerequisite, tasks: Schedule[]) {
- const affected = new Set(row.task_ids)
+ const affected = new Set(row.task_ids.length || row.source.subcontract_id ? row.task_ids : tasks.map(t => t.id))
  let changed = true
  while (changed) { changed = false; for (const task of tasks) if (!affected.has(task.id) && task.predecessors?.some(p => affected.has(p.id))) { affected.add(task.id); changed = true } }
  return affected
@@ -76,7 +77,6 @@ export async function professionalAction(db: D1Database, job: Job, actor: Actor,
   const source: ProfessionalSource = { kind: raw.kind as ProfessionalSource['kind'], source_id: text(raw.source_id, 'Existing source', 100), ...(raw.subcontract_id ? { subcontract_id: text(raw.subcontract_id, 'Subcontract', 100) } : {}) }
   const ids = input.task_ids ?? []
   need(Array.isArray(ids) && ids.length <= 200 && ids.every(id => typeof id === 'string' && job.schedules.some(t => t.id === id)), 'Choose existing affected job tasks')
-  need(ids.length || source.subcontract_id, 'Link an affected task or subcontract release')
   if (source.subcontract_id) find(job.subcontracts ?? [], source.subcontract_id)
   await sourceState(db, job, source)
   row = { id: crypto.randomUUID(), title: text(input.title, 'Prerequisite title', 300), source, task_ids: [...new Set(ids as string[])], due_on: day(input.due_on, 'Decision deadline'), created_by: stamp(actor), evidence: [] }
