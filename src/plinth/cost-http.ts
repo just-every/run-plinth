@@ -56,6 +56,6 @@ export async function costResponse(request:Request,original:Bindings):Promise<Re
 export async function protectCosts(response:Response,actor?:Actor){
  if(!response.headers.get('content-type')?.includes('application/json'))return response
  const office=actor&&!actor.permissions&&(actor.role==='owner'||actor.role==='admin')
- const scrub=(value:unknown,key=''):unknown=>Array.isArray(value)?value.filter(v=>key!=='approvals'||office||!v?.kind?.startsWith('cost.')).map(v=>scrub(v)):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='report_schedules'&&k!=='field_time'&&k!=='cost_records'&&k!=='accounting_authority'&&(office||k!=='cost_billing')&&(office||k!=='source_digest'||!('kind' in value)||value.kind!=='cost_plus')&&(office||k!=='cost_ledger')).map(([k,v])=>[k,scrub(v,k)])):value
+ const scrub=(value:unknown,key=''):unknown=>Array.isArray(value)?value.filter(v=>key!=='approvals'||office||!v?.kind?.startsWith('cost.')&&!v?.kind?.startsWith('estimate.performance.')).map(v=>scrub(v)):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='estimate_performance'&&k!=='report_schedules'&&k!=='field_time'&&k!=='cost_records'&&k!=='accounting_authority'&&(office||k!=='cost_billing')&&(office||k!=='source_digest'||!('kind' in value)||value.kind!=='cost_plus')&&(office||k!=='cost_ledger')).map(([k,v])=>[k,scrub(v,k)])):value
  return new Response(JSON.stringify(scrub(await response.json())),{status:response.status,headers:response.headers})
 }

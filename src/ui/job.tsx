@@ -1,3 +1,4 @@
+import { FollowupPreferences } from './followup-rules'
 import { PlanWorkspace } from './plans'
 import { Submittals } from './submittals'
 import { Satisfaction } from './satisfaction'
@@ -56,6 +57,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   const props: JobProps = { job, manager, role, mutate, refresh, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
+    {['owner','admin','project_manager','client'].includes(role)&&<FollowupPreferences jobId={job.id}/>}
     <header className="job-head">
       <h1>{job.name}</h1>
       <ul className="chips" aria-label="Job facts">

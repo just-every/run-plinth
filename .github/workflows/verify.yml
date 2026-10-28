@@ -57,6 +57,12 @@ jobs:
       - run: pnpm run build
       - name: Exercise emitted Worker and native sign-in at 1440 and 390
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs ${{ matrix.journey }}
+      - name: Exercise installed estimate comparisons and catalog review
+        if: matrix.journey == 'portfolio'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs estimate-performance
+      - name: Exercise installed owner follow-up rules
+        if: matrix.journey == 'bid-follow-up'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs followup-rules
       - name: Exercise settlement script against the processor boundary
         if: matrix.journey == 'settlements'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/live-proof/settlement-sandbox.mjs "$RUNNER_TEMP/plinth-settlement" --provider-edge
@@ -65,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: installed-${{ matrix.journey }}
-          path: artifacts/installed/${{ matrix.journey }}/*.png
+          path: artifacts/installed
           if-no-files-found: warn
       - name: Preserve settlement boundary receipt
         if: always() && matrix.journey == 'settlements'
