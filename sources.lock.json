@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "03e7f4725fb3fe6665d3633d9ea26dae8d7caa4cd5aa92dd1636142c2c8c42d1",
+      "sha256": "c13dab4c633ff36e59edfa8fc420051014da0201964c23ac4232b09c1b7c9893",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "8bba90e7e1120d2938382320902cfd26be7531024e4fcdb1edf7c1d6d276e380",
+      "sha256": "f15b39c2d3f67054b0a00007bde8a8c3164a638b9a28932efa7f051fdeac4109",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f0bf1e459239f74bd2033dc174c9119e8821a6cf9889443508e6ee802551bbcc",
+      "sha256": "b73ccecb56525a527bf35ad8b919c71d195914093e6498f3f08ed51ed79f96c1",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -1001,7 +1001,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "204028fbe6c1eec675aa06cae477256e25a2858304e176f01cda5af841581f20",
+      "sha256": "926ba3d929e6dd82fa505a56a3f002c7841d5137199b19513492a60289c0d12b",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4625,7 +4625,7 @@
       "executable": false
     },
     "src/ui/estimate-editor.tsx": {
-      "sha256": "bcec12226b8f8dfbb0e282aabbe2eecdee8165c29d9d5d0b3ceb494e8b7e5545",
+      "sha256": "0747b0a32a6925175e95563597e52370ebbc24a54bc3f218bff319eb9162de41",
       "executable": false
     },
     "src/ui/estimate-performance.tsx": {
@@ -4865,7 +4865,7 @@
       "executable": false
     },
     "src/ui/shared.tsx": {
-      "sha256": "0b3d7ccc5d2a014d108107f377b1933fd1bcaf6a6118268322cde2a230efc3aa",
+      "sha256": "0cc4b3670e9a295ffaa45cdf226cb612a0f01ba05e01308176d9b53c778d35fb",
       "executable": false
     },
     "src/ui/shell.tsx": {
@@ -5133,7 +5133,7 @@
       "executable": false
     },
     "tests/journeys/estimates.mjs": {
-      "sha256": "6446cba14f97110cad2dfe1d52b0aaa2c6389e7efbc1ddb722b4bc3189e07659",
+      "sha256": "f3f7042158b13a59498c4e6103353eea3f3b2202152f62e70667d080c3691b50",
       "executable": false
     },
     "tests/journeys/field-day.mjs": {
@@ -5157,7 +5157,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "f41a9e1a7f2272c174c78b817aa3f50cc3d980f577d2e810591a23cc68aa2add",
+      "sha256": "767185848e15487aa341047aeb4f9b5af58cb4574cc0a345b54dff0bc224b959",
       "executable": false
     },
     "tests/journeys/invoice-correction-sources.mjs": {
@@ -5169,7 +5169,7 @@
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
-      "sha256": "846b3a938fa370395f37e1ed85e4d2be95e1d9ce5f6839a3167c88a64cecf9bb",
+      "sha256": "e8c934873ee5f5956ad126cc7e42031a1b3c51c87e5611318d844febd02ca8bf",
       "executable": false
     },
     "tests/journeys/legacy-attachment-search.mjs": {
