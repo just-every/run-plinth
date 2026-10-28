@@ -22,7 +22,7 @@ const recordCollections = ['quotes', 'schedules', 'diary', 'variations', 'orders
 export function documentTargets(job: Job) {
  return recordCollections.flatMap(kind => {
   const value = kind === 'handover' ? job.handover?.packages.filter(p => !p.completion) : kind === 'punch' ? job.punch?.issues : kind === 'warranties' ? job.warranties?.components : job[kind]
-  return (value ?? []).map((record: any) => ({ kind, id: String(record.id), label: String(record.title ?? record.description ?? record.name ?? record.number ?? record.id) }))
+  return (value ?? []).map((record: any) => ({ kind, id: String(record.id), label: String(record.title ?? record.description ?? record.name ?? record.number ?? (record.revision ? 'Revision '+record.revision : record.id)) }))
  })
 }
 function tags(value: unknown) { need(Array.isArray(value) && value.length <= 20, 'Use up to twenty tags'); return [...new Set(value.map(v => text(v, 'Tag', 80)))] }

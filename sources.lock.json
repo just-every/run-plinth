@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "554542ce937ad211be73291b45fdcea0eee0133197bdca86dce6c0b903331f7f",
+      "sha256": "de020fcfc1eaac13ed19dfe696fcd9a2043c293eebc14bc6dea12c9a534a6858",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "69a9866d3497c266027dbb8891ea64e3845143e2176bbcafbabe9efb2e66b855",
+      "sha256": "8a503fbadc408c9acbc49c42f2faefa7e40986ab0a073e785f541cd77f0fa5b8",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "79af00fec5f2bc08ba6b3139ec164fb7f257f5a07518491e316846b0007f9ce0",
+      "sha256": "7d8d9108f84205422d51371a07c29babafc1a514d4200a645460b90aadc64a32",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -190,6 +190,10 @@
     },
     "docs/IMPORT.md": {
       "sha256": "c556028e0a5d13a3547d180642ff7e3a28e19e5ad7b0bc1af1b3a64121002c2d",
+      "executable": false
+    },
+    "docs/JOB-DOCUMENTS.md": {
+      "sha256": "d79d84410816f3307f6dd182b8732f500282bcba323abba4c4659fee98e89134",
       "executable": false
     },
     "docs/MAIN-FLOWS.md": {
@@ -3249,7 +3253,7 @@
       "executable": false
     },
     "src/plinth/job-documents.ts": {
-      "sha256": "834f67a349221dc85fb7d0a931904774fdbc09eaf1c5988b81dc95b3704894d5",
+      "sha256": "52b58c415ecfc57a1f32da599f50419031d6c461f652a10902057370be7cf912",
       "executable": false
     },
     "src/plinth/job-request.ts": {
@@ -4717,7 +4721,7 @@
       "executable": false
     },
     "tests/journeys/documents.mjs": {
-      "sha256": "4d4f1f1f1d6699f6eb252742542a309a8018e113118b2bab95ef19e4753458b6",
+      "sha256": "0eaaf0e26095a059b5bd04bf4fecfd8caae3aa5adc41a3a8a1270f6e37d8bc1d",
       "executable": false
     },
     "tests/journeys/estimate-performance.mjs": {
