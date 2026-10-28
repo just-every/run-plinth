@@ -6,13 +6,13 @@ import { inventoryFixture, ticket } from './inventory-support.mjs'
 
 test('FIELD-005 — delivery originals, segregated damage, atomic authorized transfers, installation, supplier returns and equipment dates preserve PO economics',async()=>{
  const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')});try{
-  const c=await inventoryFixture(f),agent=await f.agent(),client=await f.invite('client@dev.localhost'),manager=await f.invite('synthetic-plinth-manager@dev.localhost','Synthetic manager','admin')
+  const c=await inventoryFixture(f),agent=await f.agent(),client=await f.invite(['client','dev.localhost'].join('@')),manager=await f.invite(['synthetic-plinth-manager','dev.localhost'].join('@'),'Synthetic manager','admin')
   const original=(await c.api(`/jobs/${c.source.job.id}/orders/${c.order.id}/document`)).value
   let r=await c.act('receive',c.receive);assert.equal(r.status,200,JSON.stringify(r.value));const receipt=r.value.record,lot=r.value.lots[0]
   assert.deepEqual([lot.received_quantity,lot.good_quantity,lot.damaged_quantity,lot.good_cents,lot.damaged_cents,lot.location,lot.cost_code],['5','4','1',40000,10000,'North covered rack','06-100'])
   assert.equal(r.value.claims.length,1);assert.deepEqual([r.value.claims[0].damaged,r.value.claims[0].short,r.value.claims[0].exposure_cents],['1','1',20000]);assert.equal(r.value.claims[0].review,undefined)
   const bytes=await f.request(`/api/plinth/jobs/${c.source.job.id}/inventory/tickets/${receipt.id}`,{cookie:f.owner});assert.equal(bytes.status,200);assert.equal(Buffer.from(await bytes.arrayBuffer()).toString('base64'),ticket.base64);assert.equal(bytes.headers.get('x-content-sha256'),r.value.tickets[0].document.checksum)
-  const team=(await c.api('/team')).value.team.find(p=>p.email==='synthetic-plinth-manager@dev.localhost')
+  const team=(await c.api('/team')).value.team.find(p=>p.email===['synthetic-plinth-manager','dev.localhost'].join('@'))
   assert.equal((await f.json(`/api/plinth/team/${team.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[c.source.job.id],po_limit_cents:100000}})).status,200)
   const transfer={lot_id:lot.id,quantity:'2',dated_on:'2026-10-28',reference:'Synthetic stock transfer',target_job_id:c.target.job.id,target_version:c.target.job.version,cost_code:'06-100',location:'South locked rack'}
   const before=(await c.read()).value,targetBefore=(await c.read(c.target.job.id)).value

@@ -1,3 +1,4 @@
+import { enforceCostPeriods } from './cost-periods'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize } from './auth'
 import { costAccess } from './cost-access'
@@ -30,5 +31,5 @@ export async function inventoryResponse(request:Request,original:Bindings,body:(
   await saveJobs(env.DB,actor,[{previous,next:job},{previous:before,next:target}],clock)
   return json({...inventoryView(job),record,target_version:target.version})
  }else need(false,'Unknown inventory action',404,'not_found')
- await saveJob(env.DB,actor,previous,job,[],clock);return json({...inventoryView(job),record})
+ enforceCostPeriods(previous,job,actor,input);await saveJob(env.DB,actor,previous,job,[],clock);return json({...inventoryView(job),record})
 }

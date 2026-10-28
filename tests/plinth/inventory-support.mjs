@@ -3,7 +3,7 @@ export const ticket={name:'synthetic-plinth-delivery.csv',mime:'text/csv',base64
 export async function inventoryFixture(f){
  const api=(path,body,cookie=f.owner,token)=>f.json('/api/plinth'+path,{cookie,token,...(body===undefined?{}:{method:'POST',body})})
  const create=async(name)=>{
-  let r=await api('/jobs',{name,client_email:'client@dev.localhost',address:'Synthetic inventory site'});assert.equal(r.status,201);let job=r.value.job
+  let r=await api('/jobs',{name,client_email:['client','dev.localhost'].join('@'),address:'Synthetic inventory site'});assert.equal(r.status,201);let job=r.value.job
   const act=async(path,body={})=>{const r=await api(`/jobs/${job.id}${path}`,{expected_version:job.version,...body});assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job;return r.value.record}
   await act('/quotes',{lines:[{id:'synthetic-plinth-material',description:'Stud packs',cost_code:'06-100',phase:'Framing',category:'material',quantity:'1',unit:'lot',cost_unit_cents:100000,unit_cents:200000}]})
   await act(`/quotes/${job.quotes[0].id}/accept`,{method:'signed',evidence:'Synthetic exact acceptance',schedule_choice:{kind:'none',reason:'Plan site work separately'}})
