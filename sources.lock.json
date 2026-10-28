@@ -4897,7 +4897,7 @@
       "executable": false
     },
     "tests/plinth/estimates.test.mjs": {
-      "sha256": "323521daf2c7e5e164e67d44fcebddbb126c5d02b5144b0c3c2fc04186cef1b2",
+      "sha256": "1c6d6481deb8da05365b4360053483b1d9b382d39666d6f5a94038c9087bbdf6",
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
