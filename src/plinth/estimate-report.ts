@@ -38,6 +38,6 @@ export function costCodeCsv(report: CostCodeReport): string {
 /** Apply to both job quotes and approval snapshots at the authorized client boundary. */
 export function projectEstimateCosts<T>(value: T): T {
  if (Array.isArray(value)) return value.map(projectEstimateCosts) as T
- if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('cost_') && !['phase', 'category', 'pricing', 'pricing_direction', 'takeoff_source'].includes(key) && !key.toLowerCase().includes('margin')).map(([key, child]) => [key, projectEstimateCosts(key === 'product_source' && child && typeof child==='object' ? Object.fromEntries(Object.entries(child).filter(([field])=>field!=='evidence')) : key === 'lines' && Array.isArray(child) ? child.filter(line => !line || typeof line !== 'object' || line.included !== false) : child)])) as T
+ if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('cost_') && !['phase', 'category', 'pricing', 'pricing_direction', 'takeoff_source', 'import_evidence'].includes(key) && !key.toLowerCase().includes('margin')).map(([key, child]) => [key, projectEstimateCosts(key === 'product_source' && child && typeof child==='object' ? Object.fromEntries(Object.entries(child).filter(([field])=>field!=='evidence')) : key === 'lines' && Array.isArray(child) ? child.filter(line => !line || typeof line !== 'object' || line.included !== false) : child)])) as T
  return value
 }

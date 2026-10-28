@@ -3485,7 +3485,7 @@
       "executable": false
     },
     "src/plinth/estimate-report.ts": {
-      "sha256": "3558eaeb3e1186f7be0476098c902f0e613edee565e7c9034bee884e3b0ea15d",
+      "sha256": "eb82069f6eb0cacafd198d334eb32489dc25e50c39f3c0ec6b0793ae9913213c",
       "executable": false
     },
     "src/plinth/field-geofence.ts": {
@@ -3533,7 +3533,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "2afc2d3e5829fe6dcb8f17e45ec5e437600d1a392f2abd6c89a1c4cd6b5e7979",
+      "sha256": "daa1255a3a7f6ce1eab9f4a3ab10b7f8325b082cf9ab92c70033e33f5e3d222f",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3545,7 +3545,7 @@
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
-      "sha256": "97049bb43df1b3b6a3ee15f9755484bef38282c281512b1fe327e3b9d2433b10",
+      "sha256": "10ea8f5e9474ea1118b7246cf0a227e1c94274d07bf6b4eb2f4a4f85d6d03314",
       "executable": false
     },
     "src/plinth/import-retirement.ts": {
@@ -3553,7 +3553,7 @@
       "executable": false
     },
     "src/plinth/import-source.ts": {
-      "sha256": "d5b255a5c68f0a0a3c1cdc4a3d3286ff20630add83cf9fe80688fb58ea8572f9",
+      "sha256": "7283fe1232a322d634356b92e81504966fe3ab66be789c1c9eab7350639d38c0",
       "executable": false
     },
     "src/plinth/import-targets.ts": {
@@ -3561,7 +3561,7 @@
       "executable": false
     },
     "src/plinth/imports.ts": {
-      "sha256": "69da419053f44e8a0a019e03bcb40b669249ae78d250ffb4f3be57b61835e032",
+      "sha256": "141bb567b3c6c91ab9497ccb328a6c77853e1daa0825aa32fc9d3c1246a42d99",
       "executable": false
     },
     "src/plinth/invoice-correction-pricing.ts": {
@@ -4657,7 +4657,7 @@
       "executable": false
     },
     "src/ui/imports.tsx": {
-      "sha256": "2ad46e18334009373f9219b5bc5efbb9c44683803a060f9b3f4edfc465a08a98",
+      "sha256": "9223ebebdba6f8a9463344c365b7b45548b0e0636e5d076192df84533cf2197a",
       "executable": false
     },
     "src/ui/invoice-corrections.tsx": {
@@ -5329,7 +5329,7 @@
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
-      "sha256": "020d70dfe30a96260a1a5ad9f62d4d0d2aa9372d870bf3347b2de6150222e260",
+      "sha256": "e94382d0275e10b30ab3c8519160f3b9db7630331f302a91d300e39d7d99efb3",
       "executable": false
     },
     "tests/plinth/invoices.test.mjs": {
