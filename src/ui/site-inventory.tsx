@@ -8,7 +8,8 @@ export function SiteInventory({job,manager,mutate}:JobProps){
  const [stock,setStock]=useState<View>(),[error,setError]=useState(''),[targets,setTargets]=useState<{id:string;name:string}[]>([])
  const root='/jobs/'+job.id+'/inventory'
  const load=async()=>{try{setStock(await api(root));setError('');setTargets((await api('/jobs')).jobs.filter((j:{id:string;status:string})=>j.id!==job.id&&j.status==='active'))}catch(e){setError(e instanceof Error?e.message:'Unable to read inventory')}}
- useEffect(()=>{setStock(undefined);if(manager)void load()},[job.id,job.version,manager])
+ useEffect(()=>{setStock(undefined)},[job.id])
+ useEffect(()=>{if(manager)void load()},[job.id,job.version,manager])
  const save=async(action:string,input:Record<string,unknown>)=>{try{const r=await mutate('/inventory/'+action,{operation_id:crypto.randomUUID(),...input});setStock(r);return r}catch(e){await load();throw e}}
  if(!manager)return null
  return <section className="card" aria-label="Site stock custody"><h2>Site inventory</h2><p className="card-lead">Keep usable stock separate from damage. Delivery originals, movements and reviewed claims retain their own history; the issued order stays fixed.</p>{error&&<p role="alert">{error}</p>}{stock&&<>
