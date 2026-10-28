@@ -202,6 +202,14 @@ test('SUB-003 — owner insurance and license rules hold an award with expired e
   r = await act(`/subcontracts/${award.id}/release`); assert.equal(r.status, 409); assert.deepEqual(r.value.details.holds, [{ kind: 'general_liability', problem: 'below_limit' }])
   r = await post('/compliance', coi('general_liability')); const replacement = r.value.record
   r = await act(`/subcontracts/${award.id}/release`); assert.deepEqual(r.value.details.holds, [{ kind: 'general_liability', problem: 'unverified' }])
+  const {professionalClient}=await import('./professional-support.mjs')
+  const professional=await professionalClient(f,job)
+  let prerequisite=await professional.act('/professional-prerequisites',{title:'Qualified coverage release',source:{kind:'coverage',source_id:replacement.id,subcontract_id:award.id},due_on:'2099-12-01',task_ids:[]})
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/evidence`,await professional.evidence(prerequisite))
+  const unverified=await professional.read()
+  assert.equal((await professional.request(`/professional-prerequisites/${prerequisite.id}/review`,await professional.review(prerequisite))).value.error,'professional_source','Unverified coverage cannot be approved by uploading signed professional evidence')
+  assert.deepEqual(await professional.read(),unverified)
+  job=professional.job
   // An administrator reviews only once the owner names them as a compliance reviewer.
   const reviewerEmail = 'compliance-admin@example.com', reviewer = await f.invite(reviewerEmail, 'Jordan Lee', 'admin')
   const decision = { decision: 'verified', note: 'Replacement GL certificate confirmed with carrier; additional insured endorsement present' }
@@ -210,6 +218,11 @@ test('SUB-003 — owner insurance and license rules hold an award with expired e
   assert.equal((await api('/compliance-rules', { expected_version: 1, reviewers: [reviewerEmail], requirements }, { method: 'PUT' })).status, 200)
   assert.equal((await post(`/compliance/${replacement.id}/review`, decision, { cookie: reviewer })).status, 200)
   assert.equal((await act(`/subcontracts/${award.id}/release`, {}, { token: agent })).status, 403)
+  assert.equal((await act(`/subcontracts/${award.id}/release`)).value.error,'professional_hold','Native coverage verification alone cannot release a professional prerequisite')
+  await professional.refresh()
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/evidence`,await professional.evidence(prerequisite))
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/review`,await professional.review(prerequisite))
+  job=professional.job
   r = await act(`/subcontracts/${award.id}/release`); assert.equal(r.status, 200, JSON.stringify(r.value))
   assert.equal(r.value.record.status, 'released'); assert.deepEqual(r.value.record.compliance.holds, [])
   assert.ok(job.approvals.some(a => a.kind === 'subcontract.release' && a.approved_by.role === 'owner'))
@@ -260,6 +273,12 @@ test('SUB-004 — conditional waiver for a sub draw, exact signed release, recor
   r = await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 800_000, reference: 'Check 1041' }); assert.equal(r.value.error, 'waiver_required')
   assert.deepEqual(r.value.details.missing.map(p => p.party_id), [vendor.id, 'wire'])
 
+  const {professionalClient}=await import('./professional-support.mjs')
+  const professional=await professionalClient(f,job)
+  let prerequisite=await professional.act('/professional-prerequisites',{title:'Qualified waiver release',source:{kind:'waiver',source_id:conditional.id,subcontract_id:sub},due_on:'2099-12-01',task_ids:[]})
+  const missingOriginal=await professional.evidence(prerequisite)
+  assert.equal((await professional.request(`/professional-prerequisites/${prerequisite.id}/evidence`,missingOriginal)).value.error,'professional_source','Unsigned waiver without an original cannot be used as the reviewed source')
+  job=professional.job
   // Signed release: through-date or amount that differs from the request is refused without a write.
   const pdf = Buffer.from('%PDF-1.7\nConditional waiver signed by Lee Park\n%%EOF'), signed = (extra = {}) => ({ signer_name: 'Lee Park', amount_cents: 800_000, through_date: '2026-10-31', document: { name: 'conditional-1.pdf', base64: pdf.toString('base64') }, ...extra })
   const release = id => `${waivers}/${id}/release`, before = job.version
@@ -272,6 +291,10 @@ test('SUB-004 — conditional waiver for a sub draw, exact signed release, recor
   const file = (credentials) => f.request(`/api/plinth/jobs/${job.id}/lien-waiver-files/${r.value.record.release.document.id}`, credentials)
   let response = await file({ cookie: f.owner }); assert.equal(response.status, 200); assert.deepEqual(Buffer.from(await response.arrayBuffer()), pdf, 'The signed original returns unchanged')
   for (const credentials of [{ token: agent }, { cookie: client }]) assert.equal((await file(credentials)).status, 403)
+  await professional.refresh()
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/evidence`,await professional.evidence(prerequisite))
+  assert.equal((await professional.request(`/professional-prerequisites/${prerequisite.id}/review`,await professional.review(prerequisite))).value.error,'professional_source','Receiving a signed waiver is not accepting it')
+  job=professional.job
   // The reviewer signs off by restating the exact figures.
   assert.equal((await act(`${waivers}/${conditional.id}/accept`, { amount_cents: 800_000, through_date: '2026-10-30' })).value.error, 'waiver_mismatch')
   r = await act(`${waivers}/${conditional.id}/accept`, { amount_cents: 800_000, through_date: '2026-10-31' }, { cookie: admin }); assert.equal(r.status, 200); assert.equal(r.value.record.accepted_by.role, 'admin')
@@ -288,6 +311,11 @@ test('SUB-004 — conditional waiver for a sub draw, exact signed release, recor
   assert.equal((await act(release(supplier.id), signed({ signer_name: 'Sam Wire', amount_cents: 250_000 }))).status, 200)
   assert.equal((await act(`${waivers}/${supplier.id}/accept`, { amount_cents: 250_000, through_date: '2026-10-31' })).status, 200)
 
+  assert.equal((await act(`/subcontracts/${sub}/draws/${draw}/payment`,{paid_on:'2026-11-05',amount_cents:800_000,reference:'Synthetic held payment'})).value.error,'professional_hold','A complete native waiver packet still needs its professional decision')
+  await professional.refresh()
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/evidence`,await professional.evidence(prerequisite))
+  prerequisite=await professional.act(`/professional-prerequisites/${prerequisite.id}/review`,await professional.review(prerequisite))
+  job=professional.job
   // Settle the payment, then request the matching unconditional release.
   assert.equal((await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 700_000, reference: 'Check 1041' })).value.error, 'payment_amount')
   r = await act(`/subcontracts/${sub}/draws/${draw}/payment`, { paid_on: '2026-11-05', amount_cents: 800_000, reference: 'Check 1041' }); assert.equal(r.status, 200)

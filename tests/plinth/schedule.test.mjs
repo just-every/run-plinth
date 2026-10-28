@@ -191,3 +191,57 @@ test('SCH-005 — a superintendent reads today, tomorrow and the look-ahead with
   assert.equal(preview.completion_after, forecast.completion_after); assert.equal(preview.tasks.find(t => t.id === drywall).start, forecast.tasks.find(t => t.id === drywall).start)
  } finally { await f.close() }
 })
+
+test('Professional inspection prerequisites hold work until exact signed qualified review, preserve decisions and refuse revoked authority and replay',async()=>{
+ const f=await createFixture({now:Date.parse('2031-10-28T12:00:00Z')})
+ try{
+  const {professionalClient,professionalFiles,professionalOriginal}=await import('./professional-support.mjs')
+  const c=await professionalClient(f,await createActiveJob(f,'Synthetic professional inspection'))
+  const email=['synthetic-plinth-reviewer','example.invalid'].join('@'),admin=await f.invite(email,'Synthetic office reviewer','admin'),client=await f.invite(['client','example.com'].join('@')),agent=await f.agent()
+  const reviewer=(await c.read()).reviewers.find(p=>p.name==='Synthetic office reviewer')
+  const task=await c.act('/schedules',{trade:'Synthetic inspection',start:'2031-11-02T08:00:00Z',end:'2031-11-02T09:00:00Z',description:'Inspect framing before enclosure'},{token:agent})
+  const constraint=await c.act('/schedule-constraints',{kind:'inspection',title:'Framing inspection',jurisdiction:'Synthetic jurisdiction',accountable:'Synthetic inspector',task_ids:[task.id],reason:'Inspection needed'})
+  let row=await c.act('/professional-prerequisites',{title:'Professional inspection release',source:{kind:'inspection',source_id:constraint.id},task_ids:[task.id],due_on:'2031-11-01'})
+  await c.act('/schedule-constraints/'+constraint.id,{action:'cleared',reason:'Inspection result received',documents:[professionalFiles[0]]})
+  const originalJob=(await f.json(c.root,{cookie:f.owner})).value.job
+  assert.equal(originalJob.professional_prerequisites,undefined,'General job and agent projections omit private professional evidence')
+  for(const credentials of [{cookie:client},{token:agent}]){assert.equal((await f.json(c.register,credentials)).status,403);assert.equal((await c.request('/professional-prerequisites',{},credentials)).status,403)}
+  const held=async()=>{const before=await c.read();const r=await c.request(`/schedules/${task.id}/approve`);assert.equal(r.status,409,JSON.stringify(r.value));assert.deepEqual(await c.read(),before);assert.equal(c.job.schedules[0].status,'draft')}
+  await held()
+  const submit=async extra=>row=await c.act(`/professional-prerequisites/${row.id}/evidence`,await c.evidence(row,{reviewer_id:reviewer.id,...extra}))
+  const decide=async(extra={},credentials={cookie:admin})=>c.request(`/professional-prerequisites/${row.id}/review`,await c.review(row,extra),credentials)
+  for(const extra of [{signed:false},{expires_on:'2031-10-27'},{effective_on:'2032-01-01'}]){await submit(extra);const before=await c.read();assert.equal((await decide()).status,409);assert.deepEqual(await c.read(),before);await held()}
+  await submit({})
+  let before=await c.read()
+  assert.equal((await decide({}, {cookie:f.owner})).status,403,'Owner cannot substitute for the designated reviewer')
+  assert.equal((await decide({source_document_id:'synthetic-plinth-mismatch'})).status,409)
+  assert.deepEqual(await c.read(),before)
+  assert.equal((await decide({disposition:'rejected',reason:'Signed source does not approve this work'})).status,200)
+  row=(await c.read()).register[0];const rejected=structuredClone(row.evidence.at(-1));await held()
+  assert.equal((await decide()).status,409,'A reasoned rejection cannot be overwritten')
+  await submit({})
+  assert.equal((await decide()).status,200)
+  row=(await c.read()).register[0]
+  assert.deepEqual(row.evidence.at(-2),rejected);assert.equal(row.evidence.at(-1).decision.by.id,reviewer.id)
+  assert.equal((await c.request(`/professional-prerequisites/${row.id}/review`,await c.review(row))).status,409,'Replay cannot duplicate the decision')
+  for(const attachment of row.evidence.at(-1).attachments){const r=await f.request(c.register+'/files/'+attachment.id,{cookie:f.owner});assert.equal(r.status,200);assert.deepEqual(Buffer.from(await r.arrayBuffer()),professionalOriginal);assert.equal((await f.request(c.register+'/files/'+attachment.id,{cookie:client})).status,403)}
+  assert.equal((await c.request(`/schedules/${task.id}/approve`)).status,200,'Current qualified signed review permits the ordinary native release')
+  const approved=structuredClone((await c.read()).register)
+  const person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email)
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
+  assert.equal((await decide()).status,401,'Revoked reviewer session cannot write')
+  const move={start:'2031-11-03T08:00:00Z',end:'2031-11-03T09:00:00Z'}
+  assert.equal((await c.request(`/schedules/${task.id}/move`,move)).value.error,'professional_authority')
+  assert.deepEqual((await c.read()).register.map(r=>r.evidence),approved.map(r=>r.evidence))
+  // Rerouting is explicit, keeps historical decisions and remains inert until reviewed again.
+  await submit({reviewer_id:(await c.read()).person_id})
+  assert.equal((await decide({}, {cookie:f.owner})).status,200)
+  assert.equal((await c.request(`/schedules/${task.id}/move`,move)).status,200)
+  await c.act('/schedule-constraints/'+constraint.id,{action:'held',reason:'Inspection result withdrawn'})
+  assert.equal((await c.request(`/schedules/${task.id}/move`,{start:'2031-11-04T08:00:00Z',end:'2031-11-04T09:00:00Z'})).status,409,'Native inspection holds still apply')
+  const version=c.job.version
+  assert.equal((await f.json(c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:version,confirm:c.job.name}})).status,200)
+  assert.equal((await decide({}, {cookie:f.owner})).status,404,'Captured review cannot resurrect erased work')
+  assert.equal((await f.request(c.register+'/files/'+row.evidence.at(-1).attachments[0].id,{cookie:f.owner})).status,404)
+ }finally{await f.close()}
+})

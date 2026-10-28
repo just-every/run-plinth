@@ -1,3 +1,4 @@
+import { ProfessionalPrerequisites } from './professional-prerequisites'
 import { ScheduleCapacity } from './schedule-capacity'
 import { ScheduleConstraints } from './schedule-constraints'
 import { useEffect, useRef, useState } from 'react'
@@ -73,6 +74,7 @@ export function Schedule(props: JobProps) {
         <ScheduleTemplates job={job} mutate={mutate} onPreview={(proposal, input) => { generation.current++; setPreview(proposal); setTemplateInput(input); setDirty(false) }} />
       </>}
       {manager && job.status === 'active' && <ScheduleConstraints job={job} mutate={mutate} />}
+      {manager && job.status === 'active' && <ProfessionalPrerequisites job={job} refresh={props.refresh}/>}
       <ScheduleCapacity {...props}/>
       <ScheduleBaselines job={job} mutate={mutate} manager={manager} forecast={preview?.tasks} />
       <JobLog job={job} go={go} limit={4} />

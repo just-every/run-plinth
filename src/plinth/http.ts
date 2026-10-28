@@ -1,3 +1,4 @@
+import { professionalAction, professionalFile, professionalView, requireProfessionalGate } from './professional-prerequisites'
 import { followupResponse } from './followup-rules'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
@@ -109,7 +110,7 @@ function display(job:Job,actor:Actor):any {
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
  if(actor.role!=='owner'){job={...job};delete job.followup}
- job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,professional_prerequisites:undefined,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('professional.')&&a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -160,6 +161,11 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  // Observe the installation clock before reading any cross-job schedule state.
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1])
  if(actor.role==='member'){const feature=clientRouteFeature(parts[2]);if(feature)requirePortalFeature(previous,'client',feature)}
+ if(parts[2]==='professional-prerequisites'&&method==='GET'){
+  if(parts.length===3)return json(await professionalView(env.DB,previous,actor))
+  if(parts.length===5&&parts[3]==='files')return professionalFile(env.DB,previous,actor,parts[4]!)
+  return json({error:'not_found'},404)
+ }
  if(parts[2]==='submittals'&&method==='GET'){
   submittalAccess(actor,previous)
   if(parts.length===3)return json({version:previous.version,person_id:actor.id,manage:actor.role==='owner',register:previous.submittals??[],reviewers:await submittalReviewers(env.DB,previous),orders:previous.orders})
@@ -241,7 +247,8 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ if(category==='professional-prerequisites'&&(parts.length===3||parts.length===5)){const result=await professionalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
  else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
  else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
@@ -277,7 +284,9 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  else if(parts.length===3&&['schedule-baseline','schedule-actuals'].includes(category))record=await scheduleBaselineAction(job,actor,input,category==='schedule-baseline'?'baseline':'actuals',await jobs(env.DB))
  else if(parts.length===3){switch(category){case 'customer':record=await linkCustomer(env.DB,job,actor,input);break;case 'subcontracts':{const awarded=await awardSubcontract(env.DB,job,actor,input);record=awarded.row;writes=awarded.writes;break}case 'quotes':record=prepareQuote(job,actor,input);break;case 'schedules':record=prepareSchedule(job,actor,input,await jobs(env.DB));break;case 'diary':{const prepared=await prepareDiary(env.DB,job,actor,input);record=prepared.row;writes=prepared.writes;break}case 'variations':record=prepareVariation(job,actor,input);break;case 'orders':record=prepareOrder(job,actor,input);break;case 'claims':{const claim=prepareClaim(job,actor,input);linkContinuityClaim(job,claim);record=claim;break;}default:throw new DomainError('not_found','Unknown action',404)}}
  else if(parts.length===5){switch(category+'/'+action){case 'quotes/accept':{record=acceptQuote(job,actor,id,input);const choice=object(input.schedule_choice);if(choice.kind==='template'){const schedule=object(choice.input);await applyScheduleTemplate(job,actor,schedule,await getScheduleTemplate(env.DB,String(schedule.template_id)),await jobs(env.DB));await applyJobTemplateTodos(env.DB,job,actor)}const budget=freezeOriginalBudget(job,actor,input);enqueueContinuity(job,actor,budget);break;}case 'schedules/move':case 'schedules/cancel':record=changeSchedule(job,actor,id,input,action,await jobs(env.DB));break;case 'schedules/approve':record=approveSchedule(job,actor,id,await jobs(env.DB));break;case 'diary/approve':record=approveDiary(job,actor,id);break;case 'variations/approve':record=approveVariation(job,actor,id);reviseBudget(job,actor,record as import('./model').Variation);const budget=job.budgets?.at(-1);if(budget)enqueueContinuity(job,actor,budget);break;case 'orders/issue':record=issueOrder(job,actor,id);break;case 'orders/receive':record=receiveOrder(job,actor,id,input);break;case 'orders/acknowledge':case 'orders/promise':case 'orders/ship':case 'orders/return':case 'orders/cancel':case 'orders/amend':case 'orders/approve-amendment':record=orderAction(job,actor,id!,action!,input);break;case 'claims/approve':record=approveClaim(job,actor,id);break;case 'subcontracts/release':record=await releaseSubcontract(env.DB,job,actor,id);break;case 'claims/issue':need(findSovClaim(job,id),'Only SOV applications use issue',409,'sov_required');record=exportClaim(job,actor,id,await today(env.DB));break;case 'claims/export':record=exportClaim(job,actor,id,await today(env.DB));break;default:throw new DomainError('not_found','Unknown action',404)}}else throw new DomainError('not_found','Unknown action',404)
- if(JSON.stringify(previous.schedules)!==JSON.stringify(job.schedules))await requireResources(env.DB,job,await jobs(env.DB),actor)
+ if(JSON.stringify(previous.schedules)!==JSON.stringify(job.schedules)){await requireResources(env.DB,job,await jobs(env.DB),actor);await requireProfessionalGate(env.DB,job,{tasks:job.schedules.filter(t=>t.status==='booked'&&JSON.stringify(t)!==JSON.stringify(previous.schedules.find(p=>p.id===t.id)))})}
+ if(['schedule','schedule-template'].includes(category)&&['publish','apply'].includes(id??''))await requireProfessionalGate(env.DB,job,{tasks:job.schedules.filter(t=>t.status==='booked')})
+ if(category==='subcontracts'&&(action==='release'||action==='retainage'&&parts[5]==='release'||action==='draws'&&parts.at(-1)==='payment'))await requireProfessionalGate(env.DB,previous,{subcontract_id:id})
  enforceCostPeriods(previous,job,actor,input)
  refreshCostExceptions(job)
  if(category==='orders'&&['issue','approve-amendment','receive','ship'].includes(action??''))await requireSubmittalGate(env.DB,job,job.orders.find(o=>o.id===id)!,false,actor)

@@ -20,10 +20,10 @@ function matches(row: TargetRow | null, destination: string, kind: string, id: s
   const current = value(row)
   const parts = ['EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND data=? AND version=? AND import_revision IS ?)', '(SELECT COUNT(*) FROM pl_attachments WHERE job_id=?)=?', 'NOT EXISTS(SELECT 1 FROM pl_erased_jobs WHERE job_id=?)']
   const params: unknown[] = [id, current.data, current.version, row.revision || null, id, current.attachments.length, id]
-  for (const attachment of current.attachments) {
-    parts.push(`EXISTS(SELECT 1 FROM pl_attachments WHERE ${attachmentColumns.map(k => `${k === 'bytes_hex' ? 'hex(bytes)' : k}=?`).join(' AND ')})`)
-    params.push(...attachmentColumns.map(k => attachment[k]))
-  }
+  // Keep the exact original-byte comparison within D1's parameter ceiling as a job accumulates review originals.
+  // The count plus one anti-join checks every stored metadata field and byte value, including unexpected files.
+  parts.push(`NOT EXISTS(SELECT 1 FROM json_each(?) expected WHERE NOT EXISTS(SELECT 1 FROM pl_attachments WHERE ${attachmentColumns.map((k,i) => `${k === 'bytes_hex' ? 'hex(bytes)' : k}=json_extract(expected.value,'$[${i}]')`).join(' AND ')}))`)
+  params.push(JSON.stringify(current.attachments.map(file => attachmentColumns.map(k => file[k]))))
   return sql(parts.map(p => `(${p})`).join(' AND '), ...params)
 }
 

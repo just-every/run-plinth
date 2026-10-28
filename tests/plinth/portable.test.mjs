@@ -1,3 +1,4 @@
+import { professionalFixture } from './professional-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
 import { stripeEdge, intent } from './payment-fixture.mjs'
@@ -51,6 +52,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await planAct(`/${archiveSetId}/annotate`,{sheet_id:archiveSheet.id,x:80,y:120,text:'Retained source-revision field annotation'})
     const archiveDistribution=(await planAct(`/${archiveSetId}/acknowledge`,{})).plans.sets[0]
     const archivedSubmittal=await submittalFixture(f,job);job=archivedSubmittal.job
+    const archivedProfessional=await professionalFixture(f,job);job=archivedProfessional.job
     // Current decision, capacity and RFI records use the same public doors before private recovery.
     const current=async(path,input={})=>{const r=await f.json(`/api/plinth/jobs/${job.id}${path}`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,...input}});assert.equal(r.status,200,JSON.stringify(r.value));job=r.value.job;return r.value.record}
     await f.invite('archive-designer@example.com','Archive designer')
@@ -245,6 +247,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.deepEqual(rows(restored),expected)
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
     const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
+    assert.deepEqual(recoveredPortalJob.professional_prerequisites,[archivedProfessional.row],'Professional source decisions and qualification originals survive private CLI recovery')
+    for(const file of archivedProfessional.row.evidence[0].attachments)assert.ok(restoredRows.some(r=>r.table==='pl_attachments'&&r.row.id===file.id&&r.row.job_id===job.id))
     assert.deepEqual(recoveredPortalJob.submittals,[archivedSubmittal.row],'DOC-004 exact rejected and approved cycles, originals, annotations, reviewer authority and deviations survive CLI recovery')
     assert.equal(recoveredPortalJob.orders.find(o=>o.id===archivedSubmittal.order.id).submittal_release.cycle_id,archivedSubmittal.row.cycles[1].id)
     assert.deepEqual(recoveredPortalJob.meetings,job.meetings,'DOC-005 private meeting, assigned completion and immutable work snapshot survive CLI recovery');assert.deepEqual(recoveredPortalJob.meeting_shares,originalRows.filter(r=>r.table==='pl_jobs'&&r.row.id===job.id).map(r=>JSON.parse(r.row.data).meeting_shares)[0],'DOC-005 extracts and prior recipient consent survive privately while pending delivery remains inert')
