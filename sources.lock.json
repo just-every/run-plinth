@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "dce44c8b7479d385552c95d1e3c1f8c90c9d3a37ac3f109f21b1eafe567f7733",
+      "sha256": "8dcc2d28f5b44673f5500b82e9b45f3ee93138abb16c4963e3448a7bf73d2bbe",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "158457ea708ac42818ca41f6cac1ceffc1872a55bf2d56cd36a841a951a47e02",
+      "sha256": "ae4c0c7c38ccd7df93405bfce193e52a8786330532ce74dcb5e094f2fd668ece",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "946a27b7d22ab6babe71acd9c4776251b02fa201f881f9715409f9dcd07aa6b7",
+      "sha256": "6f3689727c8c859835c13e7f986cde5998f730a9733edd0cb49d6340d5aab5d2",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -4245,7 +4245,7 @@
       "executable": false
     },
     "src/ui/estimate-performance.tsx": {
-      "sha256": "a2a798946c009daee942f709f2e4d0249842a1ce04828f342bc7237e5bc55e06",
+      "sha256": "373e324af2c784b7aa39cf3109acf334869806a81464b4915851c33ef99eaba0",
       "executable": false
     },
     "src/ui/estimate-pricing.tsx": {
@@ -4705,7 +4705,7 @@
       "executable": false
     },
     "tests/journeys/estimate-performance.mjs": {
-      "sha256": "7f862b55b2adaf9c477022636c4eb4a31753366489c6278bb9bd351f779c1603",
+      "sha256": "d0947ac8918643d2f58d347f82881c562109042a8b62e0851889b01e345266fb",
       "executable": false
     },
     "tests/journeys/estimates.mjs": {
