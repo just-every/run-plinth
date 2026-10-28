@@ -50,7 +50,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
   const open = section ?? (role === 'bookkeeper' || role === 'reader' ? 'Financial review' : role === 'estimator' ? 'Quote' : limited(role) ? 'Today' : job.status === 'active' ? 'Schedule' : 'Quote')
   const clientSection:Partial<Record<Section,string>>={Quote:'contracts',Schedule:'schedule','Daily logs':'photos',Changes:'changes',Selections:'selections',Billing:'billing','To-dos':'todos',Handover:'handover',Punch:'punch'}
   const roleSections:Record<string,readonly Section[]>={estimator:['Quote','Bids','To-dos'],superintendent:['Today','Schedule','Daily logs','Punch','To-dos'],crew:['Today','Schedule','Daily logs','Punch','To-dos'],bookkeeper:['Financial review'],reader:['Financial review']}
-  const sectionAllowed=(s:Section)=>s==='Meetings'?true:limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||s==='Decision search'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
+  const sectionAllowed=(s:Section)=>s==='Meetings'?true:s==='Handover'&&role==='client'?(!job.portal_features||job.portal_features.includes('handover')||job.portal_features.includes('warranty')):limited(role)?roleSections[role]!.includes(s):manager||s==='History'||s==='Messages'||s==='Decision search'||!job.portal_features||!!clientSection[s]&&job.portal_features.includes(clientSection[s]!)
   const props: JobProps = { job, manager, role, mutate, refresh, go: setSection }
   const changes = job.variations.filter(v => v.status === 'draft').length
   return <div className="job">
@@ -80,7 +80,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Bids' && (manager || role === 'estimator') && <><Bids {...props}/>{manager&&<BidComparisons {...props}/>}</>}
       {open === 'Today' && (manager || limited(role)) && <DailyWork {...props}/>}
       {open === 'To-dos' && <Todos job={job}/>}
-      {open === 'Handover' && <Handover {...props}/>}
+      {open === 'Handover' && <>{(!job.portal_features||job.portal_features.includes('handover'))&&<Handover {...props}/>}<Satisfaction {...props}/></>}
       {open === 'Messages' && <Correspondence {...props}/>}
       {open === 'Meetings' && <Meetings {...props}/>}
       {open === 'Decision search' && <DecisionSearch {...props}/>}

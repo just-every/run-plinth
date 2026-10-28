@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "152d9058794b801f32878a70e74743cbfb7721f246d8003ca5b6dfea89169a94",
+      "sha256": "9907f5dba6606c56bb6823678892e2d544129599589e25d5f34359faa006f586",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "098e84eadc0a399354f1ee9c267bf642d8b38574039be58babad3d97d05ee70a",
+      "sha256": "4fe70755725adcc1625b90d3701b275f521fdd8c417e4174a98bfc49d2d8c1f8",
       "executable": false
     },
     "AGENTS.md": {
@@ -137,7 +137,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "56da41318ca269f39f4b136e1555ab37f09a8c464eb98b0229d4d765a4483170",
+      "sha256": "71b39ce0ef108a35752158623986ddef2a2b4b7579c8f8be2e4e69b246763939",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f5a3ce91b92019501384699596a6f179c0ca5bb5e19e2bd6b3390178443d4bc2",
+      "sha256": "4839c7f93331a4b80955188025a038f526d2fba98eac5cc988506f91cdb67553",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -234,6 +234,10 @@
     },
     "docs/RFIS.md": {
       "sha256": "3894a9f473804bbb239b69c9d7b37b9670907d031c8bcc453401a0a33fe85ec0",
+      "executable": false
+    },
+    "docs/SATISFACTION.md": {
+      "sha256": "497db63e3140c5ae5da172e7a9d10f368dc5364af2c9c84357e6244c8c2ed434",
       "executable": false
     },
     "docs/SCHEDULING.md": {
@@ -949,7 +953,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "c66072ab27b17ad0e5015a7ed5154e33fdf967f38adffef70cc2a91caa43252a",
+      "sha256": "9e0da796f9e465196c0783284c72f575b43570a91d535454ee9e7cc9542042b6",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -3477,7 +3481,7 @@
       "executable": false
     },
     "src/plinth/satisfaction.ts": {
-      "sha256": "4c5e86801ae5d270acc4f1f462082aeb2bed248dcdd95b802bb95c85f82a644c",
+      "sha256": "0a7109f8ecc985cf112942cfbd85b5c811574cfba62aea664bc604a8bdd979f6",
       "executable": false
     },
     "src/plinth/schedule-baseline-model.ts": {
@@ -4245,7 +4249,7 @@
       "executable": false
     },
     "src/ui/job.tsx": {
-      "sha256": "2ad8575474fe84126b4314f5168a27d4ad420db082642b068d4922a46591633d",
+      "sha256": "8202faa0e9c448a898ec722fc06550f575ff4918bac87e98516c7763b0da06da",
       "executable": false
     },
     "src/ui/jobs.tsx": {
@@ -4341,7 +4345,7 @@
       "executable": false
     },
     "src/ui/satisfaction.tsx": {
-      "sha256": "1eca366d893ae6b4a521bd2f4f932251e1fd61bf2fe250e4c5a06665184ae81a",
+      "sha256": "57286581926f9566777225b9acd01171a39253396fb0ea4d90846d38a1920c1d",
       "executable": false
     },
     "src/ui/schedule-baseline-forms.tsx": {
@@ -4736,6 +4740,10 @@
       "sha256": "805a41523d8a996ce80dc795576fc0a0521c3a11185a742182cf878de6448222",
       "executable": false
     },
+    "tests/journeys/satisfaction.mjs": {
+      "sha256": "78f82b1ce028efd354c3b3cbabfacda1eb4bf1b9318c858fbe9166411fab6c3b",
+      "executable": false
+    },
     "tests/journeys/schedule-baselines.mjs": {
       "sha256": "3cc7ad3fb6e48e3d1a7fb1210053c141f58b26d58a0e11328fef384999b6d43f",
       "executable": false
@@ -4845,7 +4853,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "159c9845037bee5df69c703b5f84f4290830b9dfbe182680b4fdf22840f3e7e1",
+      "sha256": "956513d3dca7296034c45358db6c7b6bd60cc6f25ea48b87251eef7c87f515a9",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
@@ -4909,7 +4917,7 @@
       "executable": false
     },
     "tests/plinth/warranties.test.mjs": {
-      "sha256": "b533b1fd820ef3be5e382920c7902fbec57d5ec175ff738184167ccaeccba9fb",
+      "sha256": "d96f794ecb49e789646d425711fa012bde98b6cd6b7057b69c85bef8f1b98f30",
       "executable": false
     },
     "tests/site.test.mjs": {

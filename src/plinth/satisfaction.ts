@@ -56,6 +56,7 @@ export async function satisfactionResponse(request:Request,env:Bindings,actor:Ac
  need(actor.role==='member'||['owner','admin','project_manager'].includes(actor.role),'Surveys require a signed-in client or office person',403,'forbidden')
  need(!actor.permissions||actor.permissions.matrix.documents.view,'Surveys are unavailable',403,'forbidden')
  const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,parts[1]!),generation=await warrantyGeneration(env.DB)
+ if(actor.permissions)need(actor.team?.job_ids.includes(previous.id),'Job not found',404,'not_found')
  if(actor.role==='member')need(surveyFeature(previous,'handover')||surveyFeature(previous,'warranty'),'Surveys unavailable',404,'not_found')
  if(request.method==='GET'){
   need(parts.length===3,'Unknown survey route',404,'not_found')
