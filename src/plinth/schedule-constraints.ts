@@ -3,10 +3,11 @@ import { requireJobManager } from './auth'
 import { digest, fromBase64 } from './attachments'
 import { active, find, need, object, recordApproval, stamp, text, type Actor, type Attachment, type Input, type Job, type Schedule } from './model'
 import type { ConstraintEvent, ScheduleBlocker, ScheduleConstraint } from './schedule-constraint-model'
+import { bidProcurementBlockers } from './bid-follow-up'
 
 /** Holds apply to their tasks and every successor, across every publication door. */
 export function scheduleBlockers(job: Job, tasks: Schedule[]): ScheduleBlocker[] {
- const result: ScheduleBlocker[] = []
+ const result: ScheduleBlocker[] = bidProcurementBlockers(job,tasks)
  for (const constraint of job.schedule_constraints ?? []) {
   const status = constraint.events.at(-1)!.action
   if (status === 'cleared') continue
