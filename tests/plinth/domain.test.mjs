@@ -1,3 +1,4 @@
+import { weatherEdge, proveDailyRecords } from './daily-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
@@ -5,7 +6,7 @@ import assert from 'node:assert/strict'
 import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
 // Six public business flows share one real Worker to keep local resource use small.
 test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
- const f=await createFixture();try{
+ const f=await createFixture({weatherEdge});try{
  const client=await f.invite('client@example.com'),other=await f.invite('other@example.com','Other client'),agent=await f.agent();let job=await createActiveJob(f)
  const path=(suffix='')=>`/api/plinth/jobs/${job.id}${suffix}`
  const mutate=async(suffix,body={},credentials={cookie:f.owner})=>f.json(path(suffix),{method:'POST',...credentials,body:{expected_version:job.version,...body}})
@@ -44,6 +45,7 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   assert.equal((await f.request(photo(),{cookie:other})).status,404)
   assert.equal((await mutate('/diary',{note:'Unsafe upload',attachments:[{name:'unsafe.svg',mime:'image/svg+xml',base64:Buffer.from('<svg/>').toString('base64')}]})).status,400)
  })
+ job=await proveDailyRecords(f,job,client,agent)
  await t.test('supplier commitments, partial receipts and cumulative claim approval/export reconcile once',async()=>{
   let r=await mutate('/orders',{supplier:'Build Supplies',description:'Stone and cabinetry',amount_cents:250_000},{token:agent});assert.equal(r.status,200);job=r.value.job;const order=r.value.record.id
   assert.equal((await mutate(`/orders/${order}/issue`,{},{token:agent})).status,403)

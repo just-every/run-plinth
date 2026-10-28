@@ -1,3 +1,6 @@
+import { dailyLogAccess, dailyLogAction, dailyLogFile, dailyLogView } from './daily-logs'
+import { dailyWeather } from './daily-weather'
+import { day as dailyDay } from './purchase-order-model'
 import { followupResponse } from './followup-rules'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
@@ -109,7 +112,7 @@ function display(job:Job,actor:Actor):any {
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
  if(actor.role!=='owner'){job={...job};delete job.followup}
- job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
+ job={...job,daily_logs:undefined,daily_log_settings:undefined,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>a.kind!=='plans.approve'&&!a.kind.startsWith('daily-log.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
  if(actor.role==='bookkeeper'||actor.role==='reader')return roleJobView(job,actor)
@@ -213,6 +216,12 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===4&&parts[2]==='rfi-files'&&method==='GET')return rfiFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='decision-files'&&method==='GET')return selectionDecisionFile(env.DB,previous,actor,parts[3]!)
  if(parts.length===4&&parts[2]==='product-images'&&method==='GET')return productImage(env.DB,previous,actor,parts[3]!)
+ if(parts[2]==='daily-logs'){
+  dailyLogAccess(actor,previous)
+  if(parts.length===3&&method==='GET')return json(dailyLogView(previous,actor))
+  if(parts.length===4&&parts[3]==='weather'&&method==='GET')return json({weather:await dailyWeather(previous,dailyDay(new URL(request.url).searchParams.get('date'),'Log date'))})
+  if(parts.length===6&&parts[4]==='files'&&method==='GET')return dailyLogFile(env.DB,previous,actor,parts[3]!,parts[5]!)
+ }
  if(parts.length===2&&method==='GET'){const shown=display((await named(env.DB,[previous]))[0]!,actor);return json({job:isFieldRole(actor)?{...shown,site_contacts:await siteContacts(env.DB,previous.id)}:shown,role:role(actor)})}
  if(parts[2]==='diary'&&parts[4]==='attachments'&&parts.length===6&&method==='GET')return serveAttachment(env.DB,previous,actor,parts[3],parts[5])
  if(parts.length===2&&method==='DELETE'){
@@ -241,7 +250,8 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)
- if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ if(category==='daily-logs'&&(parts.length===3||parts.length===4||parts.length===5)){const result=await dailyLogAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
+ else if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
  else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
  else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
@@ -285,7 +295,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(actor.role==='member'&&category==='invoices')record=invoiceProjection(job,actor).find(invoice=>invoice.id===id)
  if(actor.role==='member'&&category==='selections')record=selectionProjection(job,true).find(s=>s.id===id)
  if(actor.role==='member')record=projectEstimateCosts(record)
- return json({job:display((await named(env.DB,[job]))[0]!,actor),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
+ return json({job:display((await named(env.DB,[job]))[0]!,actor),...(category==='daily-logs'?{daily_logs:dailyLogView(job,actor)}:{}),record,role:role(actor),...(category==='claims'&&action==='export'?{report:(record as {export:unknown}).export}:{})})
 }
 /** Each direct API request authenticates independently of document-route guards. */
 export async function plinthResponse(request:Request,env:Bindings):Promise<Response|null>{if(!new URL(request.url).pathname.startsWith('/api/plinth/'))return null;try{const response=await mailPublicResponse(request,runtimeBindings(env)) ?? await payPublicResponse(request,runtimeBindings(env)) ?? await fieldTimeResponse(request,env) ?? await costResponse(request,env) ?? await selectionDelegationsResponse(request,env) ?? await warrantyServiceResponse(request,env) ?? await bidComparisonResponse(request,env) ?? await todosResponse(request,env) ?? await bidsResponse(request,env) ?? await handoverResponse(request,env) ?? await punchResponse(request,env) ?? await customersResponse(request,env) ?? await vendorsResponse(request,env) ?? await calendarFeed(request,env) ?? await handle(request,env);await auditExport(request,runtimeBindings(env).DB,authenticated.get(request),response.status);return await protectCosts(response,authenticated.get(request))}catch(error){if(error instanceof DomainError){const response=json({error:error.code,message:error.message,...(error.details?{details:error.details}:{})},error.status);if(error.status===429)response.headers.set('retry-after','60');return response;}const e=error as {status?:number;code?:string;message?:string};if(e.status&&e.status<500)return json({error:e.code??'forbidden',message:e.message??'Request refused'},e.status);console.error('Plinth request failed',error instanceof Error?error.message:'unknown error');return json({error:'server_error',message:'The request could not be completed'},500)}}

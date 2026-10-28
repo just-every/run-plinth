@@ -1,3 +1,4 @@
+import { DailyProductionInputs } from './daily-records'
 import { FollowupPreferences } from './followup-rules'
 import { PlanWorkspace } from './plans'
 import { Submittals } from './submittals'
@@ -69,10 +70,10 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
     </header>
     {!sectionAllowed(open)?<p role="alert" className="notice">This feature is not available for your access.</p>:<div className="job-body">
       {open !== 'Schedule' && !limited(role) && <DecisionStrip job={job} manager={manager} go={setSection} />}
-      {open === 'Financial review' && <FinancialAccess {...props}/>}
+      {open === 'Financial review' && <><FinancialAccess {...props}/>{manager&&<DailyProductionInputs job={job}/>}</>}
       {open === 'Plans' && <PlanWorkspace jobId={job.id}/>}
       {open === 'Quote' && <Quotes {...props} />}
-      {open === 'Schedule' && <Schedule {...props} />}
+      {open === 'Schedule' && <><Schedule {...props}/>{manager&&<DailyProductionInputs job={job}/>}</>}
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Selections' && <Selections {...props} />}

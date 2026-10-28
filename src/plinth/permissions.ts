@@ -13,7 +13,7 @@ const feature: Record<string, Feature> = {
  variations: 'changes', 'variation-pricing': 'changes', 'allowance-changes': 'changes',
  submittals: 'documents', orders: 'orders', subcontracts: 'orders', 'lien-waiver-files': 'orders', 'lien-waiver-templates': 'orders',
  schedules: 'schedule', schedule: 'schedule', 'schedule-template': 'schedule', 'schedule-templates': 'schedule', 'schedule-baseline': 'schedule', 'schedule-actuals': 'schedule', 'schedule-constraints': 'schedule', 'schedule-documents': 'schedule', capacity: 'schedule', forecast: 'schedule', calendar: 'schedule', resources: 'schedule', 'trade-confirmations': 'schedule',
- diary: 'logs', time: 'time',
+ 'daily-logs': 'logs', diary: 'logs', time: 'time',
  'plan-inbox':'documents', plans:'documents', 'meeting-inbox': 'documents', rfis: 'documents', 'rfi-access': 'documents', 'rfi-files': 'documents', 'rfi-inbox': 'documents', punch: 'documents', handover: 'documents', satisfaction: 'documents', continuity: 'documents', warranties: 'documents', 'warranty-reminders': 'documents', 'portal-policy': 'company',
  payments: 'invoices', invoices: 'invoices', remittances: 'invoices', retainage: 'invoices', sov: 'invoices', claims: 'invoices', receivables: 'invoices',
  'report-schedules':'reports', reports: 'reports', audit: 'reports', holds: 'reports',
@@ -38,6 +38,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
+ if(job&&parts[2]==='daily-logs'&&parts[4]==='review')return {feature:'logs',action:'approve'}
  if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':parts[4]==='review'||parts[4]==='release'?'approve':parts.length===3?'create':'edit',financial:true}
  const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = Object.hasOwn(feature, category) ? feature[category] : undefined
  if (!area) return null

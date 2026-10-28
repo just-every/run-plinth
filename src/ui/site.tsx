@@ -1,3 +1,4 @@
+import { DailyRecords } from './daily-records'
 import { Badge, Action, calendarDay, Field, Form } from './shared'
 import type { JobProps } from './job'
 import { logging } from './authority'
@@ -5,7 +6,7 @@ import { logging } from './authority'
 /** Today's date where the viewer is, YYYY-MM-DD (not the UTC date). */
 const localDate = () => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10) }
 
-export function DailyLogs({job,manager,role,mutate}: JobProps) {
+function PublishedDailyLogs({job,manager,role,mutate}: JobProps) {
   return <div className="split"><section className="card"><div className="card-head"><h2>Daily logs</h2><span className="muted">{job.diary.length} {job.diary.length === 1 ? 'entry' : 'entries'}</span></div>
     {job.diary.length === 0 && <p className="empty">No daily logs yet. Record what happened on site, with photos.</p>}
     <ol className="timeline">{[...job.diary].sort((a, b) => b.date.localeCompare(a.date)).map(d => <li className="log-entry" key={d.id}><div className="log-date"><time dateTime={d.date}>{calendarDay(d.date)}</time><Badge>{d.status}</Badge></div><div className="log-body"><p className="pre-wrap">{d.note}</p><p className="muted">{d.prepared_by.name}</p>{d.attachments.length > 0 && <div className="photos">{d.attachments.map(a => <a key={a.id} href={'/api/plinth/jobs/'+job.id+'/diary/'+d.id+'/attachments/'+a.id} target="_blank" rel="noreferrer"><img src={'/api/plinth/jobs/'+job.id+'/diary/'+d.id+'/attachments/'+a.id} alt={a.name} /><span>{a.name}</span></a>)}</div>}{manager && d.status === 'draft' && <Action className="primary" action={() => mutate('/diary/'+d.id+'/approve')}>Publish daily log</Action>}</div></li>)}</ol></section>
@@ -19,3 +20,5 @@ export function DailyLogs({job,manager,role,mutate}: JobProps) {
     return mutate('/diary',{date:f.get('date'),note:f.get('note'),attachments})
   }}><Field label="Log date" name="date" type="date" defaultValue={localDate()} /><label>Work, conditions and decisions<textarea name="note" required rows={5} /></label><label>Photos (PNG or JPEG, up to 2 MB each)<input type="file" name="photos" accept="image/png,image/jpeg" multiple /></label></Form></aside>}</div>
 }
+
+export function DailyLogs(props:JobProps){return <div className="stack">{['owner','admin','project_manager','superintendent','crew'].includes(props.role)&&<DailyRecords job={props.job} refresh={props.refresh}/>}<PublishedDailyLogs {...props}/></div>}

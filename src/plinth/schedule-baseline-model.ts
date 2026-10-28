@@ -76,3 +76,6 @@ export async function templateTaskId(jobId: string, templateId: string, localId:
  const bytes = new TextEncoder().encode(JSON.stringify([jobId, templateId, localId]))
  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)
 }
+
+/** Reviewed field quantities are planning inputs; they never rewrite task dates or actual time. */
+export { dailyProduction as reviewedDailyProduction } from './daily-logs-model'
