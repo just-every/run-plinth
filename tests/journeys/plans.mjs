@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { chromium, expect } from '@playwright/test'
-import { takeoffPlan } from '../fixtures/takeoff-plan.mjs'
+import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import { nativeSignIn } from '../../scripts/verify/native-signin.mjs'
 const base=process.env.PLINTH_URL,state=process.env.PLINTH_STATE,shots=process.env.PLINTH_SCREENSHOTS
 assert.ok(base&&state&&shots,'Use the disposable installed application')
@@ -22,7 +22,7 @@ try{
   const panel=page.getByRole('region',{name:'Versioned plans'}),form=panel.locator('form').last()
   await form.getByLabel('Plan set title',{exact:true}).fill(title)
   await form.getByLabel('Issue date',{exact:true}).fill(changed?'2026-10-10':'2026-10-01')
-  await form.getByLabel('Original plan PDFs',{exact:true}).setInputFiles([{name:'synthetic-plinth-plan.pdf',mimeType:'application/pdf',buffer:takeoffPlan(changed)},{name:'synthetic-plinth-spec.pdf',mimeType:'application/pdf',buffer:takeoffPlan()},{name:'synthetic-plinth-addendum.pdf',mimeType:'application/pdf',buffer:takeoffPlan()}])
+  await form.getByLabel('Original plan PDFs',{exact:true}).setInputFiles([{name:'synthetic-plinth-plan.pdf',mimeType:'application/pdf',buffer:changed?scannedPlan():takeoffPlan()},{name:'synthetic-plinth-spec.pdf',mimeType:'application/pdf',buffer:takeoffPlan()},{name:'synthetic-plinth-addendum.pdf',mimeType:'application/pdf',buffer:takeoffPlan()}])
   for(const [i,number,kind] of [[1,'A1','plan'],[2,'S1','specification'],[3,'AD1','addendum']]){
    await form.getByLabel('Sheet number '+i,{exact:true}).fill(number);await form.getByLabel('Revision number '+i,{exact:true}).fill(revision);await form.getByLabel('Document kind '+i,{exact:true}).selectOption(kind)
   }
@@ -68,7 +68,7 @@ try{
   await fp.screenshot({path:`${shots}/DOC-001-${label}-${width}.png`,fullPage:true,animations:'disabled'})
  }}
  await capture('current')
- const currentFile=await field.request.get(base+`/api/plinth/jobs/${job.id}/plans/${sets[1].id}/files/${newSheet.id}`);assert.deepEqual(await currentFile.body(),takeoffPlan(true))
+ const currentFile=await field.request.get(base+`/api/plinth/jobs/${job.id}/plans/${sets[1].id}/files/${newSheet.id}`);assert.deepEqual(await currentFile.body(),scannedPlan())
  await fp.setViewportSize({width:1440,height:1000});await fp.goto(base+old.href)
  await expect(drawing.getByRole('heading',{name:'A1 · revision A',exact:true})).toBeVisible()
  await expect(drawing.getByText('Superseded history',{exact:true})).toBeVisible()

@@ -1,9 +1,17 @@
 import { requireJobManager } from './auth'
-import { digest, fromBase64 } from './attachments'
+import { digest } from './attachments'
 import { find, need, object, recordApproval, stamp, text, type Actor, type Input, type Job } from './model'
 import { planManager, planRecipientAllowed, planSetVisible } from './plan-access'
 import { planLink, type PlanSet, type PlanSheet, type PlanView } from './plan-model'
 
+/** Plan originals have a document limit independent of daily-log photos. The request door also bounds the whole set. */
+function planBytes(value:unknown){
+ const limit=10*1024*1024
+ need(typeof value==='string'&&value.length>0&&value.length<=4*Math.ceil(limit/3)&&/^[A-Za-z0-9+/]*={0,2}$/.test(value),'Upload a base64 PDF of at most 10 MB')
+ let raw:string;try{raw=atob(value)}catch{need(false,'Invalid base64 PDF')}
+ need(btoa(raw!)===value,'PDF base64 must be canonical')
+ const bytes=Uint8Array.from(raw!,c=>c.charCodeAt(0));need(bytes.length>0&&bytes.length<=limit,'Each plan PDF must be at most 10 MB');return bytes
+}
 const key=(sheet:PlanSheet)=>sheet.kind+':'+sheet.number.toLowerCase()
 export async function planView(db:D1Database,job:Job,actor:Actor):Promise<PlanView>{
  const sets=job.plan_sets??[],latest=new Map<string,{set:PlanSet;sheet:PlanSheet}>()
@@ -21,7 +29,7 @@ export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,i
   need(Array.isArray(input.sheets)&&input.sheets.length>0&&input.sheets.length<=40,'Upload one to forty sheets')
   const set:PlanSet={id:crypto.randomUUID(),title:text(input.title,'Plan set title',200),issue_on,sheets:[],prepared_by:stamp(actor),recipients:[],annotations:[]}
   for(const raw of input.sheets){
-   const value=object(raw),file=object(value.document),bytes=fromBase64(file.base64),name=text(file.name,'Original filename',240)
+   const value=object(raw),file=object(value.document),bytes=planBytes(file.base64),name=text(file.name,'Original filename',240)
    need(new TextDecoder().decode(bytes.slice(0,5))==='%PDF-'&&(!file.mime||file.mime==='application/pdf'),'Upload an original PDF')
    need(!/[\x00-\x1f/\\]/.test(name),'Invalid PDF filename')
    need(['plan','specification','addendum'].includes(String(value.kind)),'Choose plan, specification or addendum')
@@ -31,7 +39,8 @@ export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,i
    need(!set.sheets.some(s=>key(s)===key(sheet)),'A set cannot repeat a sheet number in the same document kind')
    need(!(job.plan_sets??[]).some(s=>s.sheets.some(old=>key(old)===key(sheet)&&old.revision===sheet.revision)),'Use a new revision number for an existing sheet')
    set.sheets.push(sheet)
-   writes.push(db.prepare('INSERT INTO pl_attachments(id,job_id,entry_id,name,mime,checksum,size,bytes) VALUES(?,?,?,?,?,?,?,?)').bind(sheet.document.id,job.id,set.id,name,'application/pdf',sheet.document.checksum,bytes.length,bytes.buffer))
+   if(bytes.length<=2_097_152)writes.push(db.prepare('INSERT INTO pl_attachments(id,job_id,entry_id,name,mime,checksum,size,bytes) VALUES(?,?,?,?,?,?,?,?)').bind(sheet.document.id,job.id,set.id,name,'application/pdf',sheet.document.checksum,bytes.length,bytes.buffer))
+   else for(let at=0,position=0;at<bytes.length;at+=524288,position++)writes.push(db.prepare('INSERT INTO pl_plan_file_chunks(file_id,job_id,set_id,position,bytes) VALUES(?,?,?,?,?)').bind(sheet.document.id,job.id,set.id,position,bytes.slice(at,at+524288).buffer))
   }
   ;(job.plan_sets??=[]).push(set);return {record:set,writes}
  }
@@ -64,7 +73,15 @@ export async function planAction(db:D1Database,job:Job,actor:Actor,input:Input,i
 export async function planFile(db:D1Database,job:Job,actor:Actor,setId:string,sheetId:string){
  const set=find(job.plan_sets??[],setId);need(planSetVisible(actor,set),'Plan set not found',404,'not_found')
  const sheet=find(set.sheets,sheetId),file=sheet.document
- const row=await db.prepare('SELECT bytes FROM pl_attachments WHERE id=? AND job_id=? AND entry_id=?').bind(file.id,job.id,set.id).first<{bytes:ArrayBuffer}>();need(row,'Plan original missing',503,'document_missing')
- const bytes=new Uint8Array(row.bytes);need(bytes.length===file.size&&await digest(bytes)===file.checksum,'Plan integrity check failed',503,'document_integrity')
+ const row=await db.prepare('SELECT bytes FROM pl_attachments WHERE id=? AND job_id=? AND entry_id=?').bind(file.id,job.id,set.id).first<{bytes:ArrayBuffer}>()
+ let bytes:Uint8Array<ArrayBuffer>
+ if(row)bytes=new Uint8Array(row.bytes)
+ else{
+  const {results:chunks}=await db.prepare('SELECT position,bytes FROM pl_plan_file_chunks WHERE file_id=? AND job_id=? AND set_id=? ORDER BY position').bind(file.id,job.id,set.id).all<{position:number;bytes:ArrayBuffer}>()
+  need(chunks.length,'Plan original missing',503,'document_missing');bytes=new Uint8Array(file.size);let at=0
+  for(const [position,chunk] of chunks.entries()){const part=new Uint8Array(chunk.bytes);need(chunk.position===position&&at+part.length<=bytes.length,'Plan integrity check failed',503,'document_integrity');bytes.set(part,at);at+=part.length}
+  need(at===file.size,'Plan integrity check failed',503,'document_integrity')
+ }
+ need(bytes.length===file.size&&await digest(bytes)===file.checksum,'Plan integrity check failed',503,'document_integrity')
  return new Response(bytes,{headers:{'content-type':'application/pdf','content-disposition':`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"sandbox; default-src 'none'"}})
 }

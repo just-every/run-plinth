@@ -344,3 +344,176 @@ test('CARE-002 — client photo request, scoped visits, rejected repair, two-par
   }
  }finally{await f.close()}
 })
+
+test('CARE-004 — two completed jobs retain configurable high and low survey responses, assigned follow-up, manager and trade reports and separate ungated review permission',async()=>{
+ const {surveyJob,surveyAddress,surveySettings}=await import('./satisfaction-support.mjs')
+ const f=await createFixture()
+ try{
+  const first=await f.invite(surveyAddress(401),'Synthetic high-score client'),second=await f.invite(surveyAddress(402),'Synthetic low-score client'),foreign=await f.invite(surveyAddress(403),'Synthetic unrelated client'),pm=await f.invite(surveyAddress(404),'Synthetic project manager','admin'),crew=await f.invite(surveyAddress(405),'Synthetic crew lead','admin'),agent=await f.agent()
+  const a=await surveyJob(f,'Synthetic Plinth first job',surveyAddress(401),first),b=await surveyJob(f,'Synthetic Plinth second job',surveyAddress(402),second)
+  const team=(await a.call('/team')).value.team,manager=team.find(p=>p.email===surveyAddress(404)),worker=team.find(p=>p.email===surveyAddress(405))
+  for(const [person,role] of [[manager,'project_manager'],[worker,'crew']])assert.equal((await a.call('/team/'+person.id,{expected_version:0,role,job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  for(const [j,n,trade] of [[a,406,'Plumbing'],[b,407,'Electrical']]){
+   await j.read();const released=await createReleasedScope(f,j.job,surveyAddress(n),trade);await j.read()
+   if(j===a){const secondScope=await j.ok('/subcontracts',{vendor_id:released.vendor.id,trade,scope:'Synthetic second scope for the same company and trade',contact_ids:released.scope.contact_ids,awarded_on:'2026-10-21'});await j.ok('/subcontracts/'+secondScope.id+'/release')}
+  }
+  for(const [j,cookie,address] of [[a,first,surveyAddress(401)],[b,second,surveyAddress(402)]]){
+   assert.equal((await j.act('/satisfaction/consent',{email_surveys:true})).status,403,'Owner cannot impersonate client consent')
+   assert.equal((await j.act('/satisfaction/settings',surveySettings,pm)).status,403)
+   await j.ok('/satisfaction/settings',surveySettings)
+   const send={...j.source,recipient_email:address,follow_up_id:manager.id,confirm:true}
+   assert.equal((await j.act('/satisfaction/send',send)).status,403,'No survey without client email consent')
+   await j.ok('/satisfaction/consent',{email_surveys:true},cookie)
+   assert.equal((await j.act('/satisfaction/send',{...send,confirm:false})).status,400)
+   assert.equal((await j.act('/satisfaction/send',{...send,source_id:'synthetic-plinth-missing'})).status,409)
+   assert.equal((await j.act('/satisfaction/send',send,pm)).status,403)
+   assert.equal((await j.act('/satisfaction/send',send,cookie)).status,403)
+   const r=await j.ok('/satisfaction/send',send);assert.equal(r.surveys.length,1);assert.equal(r.surveys[0].invitation.status,'accepted')
+   assert.equal((await j.act('/satisfaction/send',send)).status,409,'Source and recipient cannot be resent')
+   const row=r.surveys[0];assert.deepEqual(row.settings.questions,surveySettings.questions);assert.deepEqual(row.context.managers,[{id:manager.id,name:'Synthetic project manager'}]);assert.deepEqual(row.context.crew,[{id:worker.id,name:'Synthetic crew lead'}])
+   await j.ok('/satisfaction/settings',{...surveySettings,questions:['Later questions cannot replace a sent survey'],review_url:'https://www.houzz.com/pro/synthetic-plinth-401'})
+   assert.deepEqual((await j.survey()).surveys[0].settings,row.settings,'Sent survey retains its exact configuration')
+   assert.equal((await j.act('/satisfaction/'+row.id+'/respond',{score:8,answers:['Good','Good']},foreign)).status,404)
+  }
+  const sa=(await a.survey()).surveys[0],sb=(await b.survey()).surveys[0]
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:0,answers:['Good','Good']},first)).status,400)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:9,answers:['Only one answer']},first)).status,400)
+  await a.ok('/satisfaction/'+sa.id+'/respond',{score:9,answers:['Clear updates','Excellent finish'],comment:'Synthetic positive feedback'},first)
+  await b.ok('/satisfaction/'+sb.id+'/respond',{score:3,answers:['Updates arrived late','Finish needs attention'],comment:'Synthetic unresolved trim defect'},second)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/respond',{score:1,answers:['Replacement','Replacement']},first)).status,409)
+  const ar=(await a.survey()).surveys[0],br=(await b.survey()).surveys[0]
+  assert.equal(ar.response.score,9);assert.equal(ar.follow_up,undefined);assert.equal(br.response.score,3);assert.equal(br.response.comment,'Synthetic unresolved trim defect');assert.ok(br.follow_up,'A low response opens an assigned follow-up');assert.equal(br.follow_up.assignee_id,manager.id)
+  const tasks=await a.call('/jobs/'+b.job.id+'/todos',undefined,pm);assert.equal(tasks.status,200);const follow=tasks.value.todos.find(t=>t.id===br.follow_up.todo_id);assert.ok(follow);assert.equal(follow.items[0].assignee.email,manager.email);assert.equal(follow.items[0].completed,false);assert.ok(follow.notes.includes(br.response.comment))
+  const report=(await a.call('/reports/satisfaction')).value
+  assert.deepEqual(report.managers.map(r=>({id:r.id,count:r.count,average:r.average_score,low:r.low_scores})),[{id:manager.id,count:2,average:6,low:1}])
+  assert.deepEqual(report.trades.map(r=>[r.trade,r.count,r.average_score]).sort(),[['Electrical',1,3],['Plumbing',1,9]])
+  assert.equal(report.crew[0].count,2);assert.equal(report.crew[0].average_score,6)
+  const records=(await a.call('/reports/records?record_scope=job')).value.records
+  assert.equal(records.find(r=>r.id===a.job.id).values['native.satisfaction_count'],1);assert.equal(records.find(r=>r.id===b.job.id).values['native.satisfaction_score'],3)
+  assert.equal((await a.call('/reports/satisfaction',undefined,first)).status,403)
+  const before=f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).length
+  assert.equal((await b.act('/satisfaction/'+sb.id+'/request-review',{confirm:true})).status,403)
+  await a.ok('/satisfaction/'+sa.id+'/review-permission',{allowed:true},first)
+  assert.equal((await a.act('/satisfaction/'+sa.id+'/request-review',{confirm:false})).status,400)
+  await a.ok('/satisfaction/'+sa.id+'/request-review',{confirm:true})
+  const reviews=f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).slice(before)
+  assert.equal(reviews.length,1);assert.deepEqual(reviews[0].to,[surveyAddress(401)]);assert.ok(reviews[0].text.includes(surveySettings.review_url));assert.ok(!reviews[0].text.includes('houzz'))
+  await b.ok('/satisfaction/'+sb.id+'/review-permission',{allowed:true},second)
+  await b.ok('/satisfaction/'+sb.id+'/request-review',{confirm:true})
+  assert.equal(f.messages.filter(m=>m.subject.startsWith('Public review invitation:')).length,before+2,'A low score is equally eligible after permission')
+  assert.equal((await b.act('/satisfaction/'+sb.id+'/request-review',{confirm:true})).status,409)
+  await a.read();assert.equal((await f.json('/api/plinth/jobs/'+a.job.id+'/satisfaction',{token:agent})).status,403)
+  assert.equal((await f.json('/api/plinth/reports/satisfaction',{token:agent})).status,403)
+  const view=(await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,first)).value
+  assert.equal(view.surveys.length,1);assert.equal(view.surveys[0].context,undefined);assert.equal(view.surveys[0].follow_up,undefined);assert.equal(view.consents,undefined)
+  await a.call('/team/'+manager.id,{expected_version:1,role:'project_manager',job_ids:[a.job.id],po_limit_cents:0},f.owner,'PUT')
+  const narrowed=(await a.call('/reports/satisfaction',undefined,pm)).value
+  assert.deepEqual(narrowed.responses.map(r=>r.job_id),[a.job.id]);assert.equal(narrowed.managers[0].count,1);assert.equal(narrowed.managers[0].average_score,9)
+  const customCookie=await f.invite(surveyAddress(408),'Synthetic custom survey manager','admin'),customPerson=(await a.call('/team')).value.team.find(p=>p.email===surveyAddress(408))
+  const copied=await a.call('/roles',{copy_of:'project_manager',name:'Synthetic restricted survey manager',permissions:{documents:{view:false}}});assert.equal(copied.status,201)
+  const customRole=copied.value.role
+  assert.equal((await a.call('/team/'+customPerson.id,{expected_version:0,role:'custom',role_id:customRole.id,job_ids:[a.job.id]},f.owner,'PUT')).status,200)
+  assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,403)
+  assert.equal((await a.call('/reports/satisfaction',undefined,customCookie)).status,403)
+  assert.equal((await a.call('/roles/'+customRole.id,{expected_version:1,permissions:{documents:{view:true}}},f.owner,'PUT')).status,200)
+  assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,200)
+  assert.equal((await a.call('/jobs/'+b.job.id+'/satisfaction',undefined,customCookie)).status,404)
+  assert.deepEqual((await a.call('/reports/satisfaction',undefined,customCookie)).value.responses.map(r=>r.job_id),[a.job.id])
+  assert.equal((await a.call('/reports/records?record_scope=job',undefined,customCookie)).value.records.find(r=>r.id===a.job.id).values['native.satisfaction_count'],1)
+  const adminCopy=await a.call('/roles',{copy_of:'administrator',name:'Synthetic scoped survey administrator'});assert.equal(adminCopy.status,201)
+  assert.equal((await a.call('/team/'+customPerson.id,{expected_version:1,role:'custom',role_id:adminCopy.value.role.id,job_ids:[]},f.owner,'PUT')).status,200)
+  const hiddenMetrics=(await a.call('/reports/records?record_scope=job',undefined,customCookie)).value.records
+  for(const record of hiddenMetrics){assert.equal(record.values['native.satisfaction_count'],null,'Custom administrator copies receive no survey totals outside current job assignments');assert.equal(record.values['native.satisfaction_score'],null);assert.equal(record.values['native.satisfaction_low'],null)}
+  assert.equal((await a.call('/jobs/'+a.job.id+'/satisfaction',undefined,customCookie)).status,404)
+  assert.deepEqual((await a.call('/reports/satisfaction',undefined,customCookie)).value.responses,[])
+  assert.equal((await a.call('/team/'+manager.id,{expected_version:2,role:'project_manager',job_ids:[a.job.id,b.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  await b.read();const document=b.job.handover.documents[0],replacement=await b.ok('/handover/packages',{title:'Synthetic later closeout',documents:[{document_id:document.id,revision_id:document.revisions[0].id}]})
+  await b.ok('/handover/packages/'+replacement.id+'/complete',{digest:replacement.digest,confirm:true,client_safe:true,statement:'Builder completed later closeout'})
+  await b.ok('/handover/packages/'+replacement.id+'/accept',{digest:replacement.digest,confirm:true,exception_ids:[],statement:'Client accepts later closeout'},second)
+  const fallbackSent=await b.ok('/satisfaction/send',{source_kind:'handover',source_id:replacement.id,recipient_email:surveyAddress(402),follow_up_id:manager.id,confirm:true}),fallbackSurvey=fallbackSent.surveys.at(-1)
+  assert.equal((await a.call('/team/'+manager.id,{expected_version:3,role:'project_manager',job_ids:[a.job.id],po_limit_cents:0},f.owner,'PUT')).status,200)
+  await b.ok('/satisfaction/'+fallbackSurvey.id+'/respond',{score:2,answers:['Synthetic later answer'],comment:'Synthetic callback after manager removal'},second)
+  const assigned=(await b.survey()).surveys.at(-1).follow_up
+  const actualOwner=(await a.call('/team')).value.team.find(p=>p.role==='owner')
+  assert.equal(assigned.assignee_id,actualOwner.id);assert.equal(assigned.assignee_name,actualOwner.name)
+  const fallbackTasks=(await b.call('/jobs/'+b.job.id+'/todos')).value.todos;assert.equal(fallbackTasks.find(t=>t.id===assigned.todo_id).items[0].assignee.email,actualOwner.email)
+ }finally{await f.close()}
+})
+
+test('CARE-004 — warranty-visit surveys honor current client consent, optional-mail suppression, feature revocation and private response boundaries',async()=>{
+ const {surveyAddress,surveySettings}=await import('./satisfaction-support.mjs')
+ const f=await createFixture()
+ try{
+  const j=await noRepairJourney(f),trade=await f.invite(surveyAddress(410),'Synthetic warranty trade'),other=await f.invite(surveyAddress(411),'Synthetic other client')
+  const released=await createReleasedScope(f,j.job,surveyAddress(410),'Plumbing');await j.read()
+  const owner=(await j.api('/team')).value.team.find(p=>p.role==='owner'),clientEmail=j.job.client_email
+  await j.act(j.path('acknowledge-owner'),{reason:'Builder owns warranty service'})
+  await j.act(j.path('assign'),{subcontract_id:released.scope.id,email:surveyAddress(410),reason:'Released plumber visits'})
+  assert.equal((await j.act(j.path('book'),{start:'2031-04-03T10:00:00Z',end:'2031-04-03T11:00:00Z',reason:'Agreed repair appointment'})).status,200)
+  const visit=j.item().service.visits[0]
+  assert.equal((await j.act('/satisfaction/settings',surveySettings)).status,200)
+  assert.equal((await j.act('/satisfaction/consent',{email_surveys:true},j.client)).status,200)
+  const send={source_kind:'warranty',source_id:visit.id,recipient_email:clientEmail,follow_up_id:owner.id,confirm:true}
+  assert.equal((await j.act('/satisfaction/send',send)).status,409,'A booking alone cannot trigger a post-visit survey')
+  assert.equal((await j.api(`/warranty-service/${j.job.id}/${j.id}/submit`,{expected_version:j.job.version,visit_id:visit.id,reason:'Completed visit with original repair evidence',attachments:[noRepairPhoto]},trade)).status,200);await j.read()
+  assert.equal((await j.act('/satisfaction/consent',{email_surveys:false},j.client)).status,200)
+  assert.equal((await j.act('/satisfaction/send',send)).status,403)
+  assert.equal((await j.act('/satisfaction/consent',{email_surveys:true},j.client)).status,200)
+  let r=await j.act('/satisfaction/send',send);assert.equal(r.status,200);const s=r.value.surveys[0]
+  assert.equal(s.source.kind,'warranty');assert.equal(s.source.id,visit.id);assert.equal(s.invitation.status,'accepted');assert.deepEqual(s.context.subs,[{id:released.vendor.id,name:released.vendor.name,trade:'Plumbing'}])
+  assert.equal((await j.act('/satisfaction/'+s.id+'/respond',{score:4,answers:['Synthetic warranty answer','Synthetic repair answer'],comment:'Synthetic private follow-up'},j.client)).status,200)
+  const response=(await j.api(`/jobs/${j.job.id}/satisfaction`,undefined,j.client)).value.surveys[0].response
+  assert.equal((await j.act('/satisfaction/'+s.id+'/respond',{score:10,answers:['Rewrite','Rewrite']},f.owner)).status,404,'Office cannot alter a client response')
+  for(const route of [`/jobs/${j.job.id}/satisfaction`,`/jobs/${j.job.id}/satisfaction/${s.id}/respond`])assert.equal((await j.api(route,route.endsWith('respond')?{expected_version:j.job.version,score:10,answers:['Wrong','Wrong']}:undefined,other)).status,404)
+  for(const cookie of [trade,other])assert.equal((await j.api('/reports/satisfaction',undefined,cookie)).status,403)
+  for(const route of ['/jobs','/jobs/'+j.job.id,'/search?q=Synthetic']){
+   const r=await j.api(route,undefined,j.client);assert.equal(r.status,200);const serialized=JSON.stringify(r.value);assert.ok(!serialized.includes('follow_up_owner'));assert.ok(!serialized.includes('Synthetic private follow-up'))
+  }
+  assert.equal((await j.act('/satisfaction/'+s.id+'/review-permission',{allowed:true},j.client)).status,200)
+  assert.equal((await j.act('/satisfaction/'+s.id+'/review-permission',{allowed:false},j.client)).status,200)
+  assert.equal((await j.act('/satisfaction/'+s.id+'/request-review',{confirm:true})).status,403,'Revoked review permission prevents an invitation')
+  assert.equal((await j.act('/satisfaction/'+s.id+'/review-permission',{allowed:true},j.client)).status,200)
+  const message=f.messages.find(m=>m.subject.startsWith('Satisfaction survey:')),unsubscribe=message.text.match(/https?:\/\/[^\s<>]+/g).find(u=>new URL(u).pathname.includes('/mail/unsubscribe/'))
+  assert.equal((await fetch(unsubscribe,{method:'POST',body:'List-Unsubscribe=One-Click',headers:{'content-type':'application/x-www-form-urlencoded'}})).status,200)
+  const sentBefore=f.messages.length
+  r=await j.act('/satisfaction/'+s.id+'/request-review',{confirm:true});assert.equal(r.status,200);assert.equal(r.value.surveys[0].review_request.status,'cancelled');assert.equal(f.messages.length,sentBefore,'Optional-mail suppression also applies after review permission')
+  await setPortalFeatures(f,j.job.id,['warranty']);await j.read()
+  r=await j.api('/jobs/'+j.job.id+'/satisfaction',undefined,j.client);assert.equal(r.status,200);assert.deepEqual(r.value.surveys,[])
+  assert.equal((await j.act('/satisfaction/'+s.id+'/review-permission',{allowed:true},j.client)).status,404)
+  const preserved=(await j.api('/jobs/'+j.job.id+'/satisfaction')).value.surveys[0];assert.deepEqual(preserved.response,response)
+  const people=(await f.json('/auth/operators',{cookie:f.owner})).value,person=people.find(p=>p.email===clientEmail)
+  assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:person.id,status:'inactive'}})).status,200)
+  assert.equal((await j.api('/jobs/'+j.job.id+'/satisfaction',undefined,j.client)).status,401)
+ }finally{await f.close()}
+})
+
+test('CARE-004 — one durable survey attempt preserves refused and unknown outcomes and cannot recreate erased jobs on completion or replay',async()=>{
+ const {surveyJob,surveyAddress,surveySettings}=await import('./satisfaction-support.mjs')
+ for(const mode of ['refused','unknown','erased']){
+  let f,j
+  f=await createFixture({mailResponse:async message=>{
+   if(!message.subject.startsWith('Satisfaction survey:'))return Response.json({id:'synthetic-plinth-420'})
+   if(mode==='erased'){await j.read();assert.equal((await f.request('/api/plinth/jobs/'+j.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:j.job.version}})).status,200);return Response.json({id:'synthetic-plinth-421'})}
+   return new Response(null,{status:mode==='refused'?403:503})
+  }})
+  try{
+   const client=await f.invite(surveyAddress(420),'Synthetic provider-boundary client')
+   j=await surveyJob(f,'Synthetic '+mode+' survey',surveyAddress(420),client)
+   const owner=(await j.call('/team')).value.team.find(p=>p.role==='owner')
+   await j.ok('/satisfaction/settings',surveySettings);await j.ok('/satisfaction/consent',{email_surveys:true},client)
+   const input={...j.source,recipient_email:surveyAddress(420),follow_up_id:owner.id,confirm:true}
+   const before=f.messages.length,r=await j.act('/satisfaction/send',input)
+   assert.equal(r.status,mode==='erased'?404:200)
+   assert.equal(f.messages.length,before+1,'Exactly one provider instruction')
+   if(mode==='erased'){
+    assert.equal((await j.call('/jobs/'+j.job.id+'/satisfaction')).status,404)
+    const repeat=await j.call('/jobs/'+j.job.id+'/satisfaction/send',{expected_version:j.job.version,...input});assert.equal(repeat.status,404)
+    assert.equal((await j.call('/reports/satisfaction')).value.responses.length,0)
+   }else{
+    assert.equal(r.value.surveys[0].invitation.status,mode)
+    assert.equal((await j.act('/satisfaction/send',input)).status,409)
+   }
+   assert.equal(f.messages.length,before+1,'A replay never sends again or resurrects an erased capture')
+  }finally{await f.close()}
+ }
+})
