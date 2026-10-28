@@ -1,3 +1,4 @@
+import { backgroundWorkResponse } from './background-work'
 import { performanceResponse } from './estimate-performance'
 import { satisfactionReport } from './satisfaction-report'
 import { portfolioJobs, parsePortfolioScope, type PortfolioScope } from './portfolio-scope'
@@ -75,6 +76,7 @@ export async function reportsResponse(request:Request,db:D1Database,actor:Actor,
   if(method==='GET'){const record=(await recordsFor(scope)).find(r=>r.id===id);need(record,'Record not found',404,'not_found');return json({record})}
  }
  const all=(await db.prepare('SELECT id,version,data FROM pl_report_views ORDER BY rowid DESC').all<{id:string;version:number;data:string}>()).results.map(r=>({version:r.version,view:JSON.parse(r.data) as ReportView}))
+ const background=await backgroundWorkResponse(request,db,actor,parts,body,all,run,recordsFor);if(background)return background
  const canRead=async(view:ReportView)=> {
   if(!(view.sharing==='shared'||view.created_by===actor.id)||!scopes.includes(view.scope.record_scope))return false
   const columns=reportColumns(visibleFields,view.scope.record_scope,actor),ids=new Set(columns.map(column=>column.id))
