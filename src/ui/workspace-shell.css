@@ -81,7 +81,8 @@
 .workspace .skip-link { position: fixed; top: 8px; left: 12px; z-index: 100; transform: translateY(-150%); padding: 10px 14px; border: 1px solid var(--blue); border-radius: var(--radius); background: var(--paper); }
 .workspace .skip-link:focus { transform: none; }
 .workspace :is(h1, .job-name, .recent button, .record, .reconciliation dt) { overflow-wrap: anywhere; }
-.workspace :is(.waiting-chip, .count, .photos a, .lockup [data-rer-name]::after, .trades .badge) { font-size: 13px; }
+.workspace.workspace :is(.waiting-chip, .count, .photos a, .trades .badge, .lines thead th, pre, .id) { font-size: 13px; }
+.workspace .lockup [data-rer-name]::after { font-size: 13px; }
 .workspace .notice { border: 1px solid var(--line); }
 .workspace [aria-invalid=true] { border-color: var(--ox); }
 .workspace form > [role=alert]:focus { outline: 2px solid var(--ox); outline-offset: 4px; }
