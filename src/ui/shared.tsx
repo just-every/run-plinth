@@ -67,13 +67,13 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
       setInvalid(invalidControls.map(control => control.name))
       setError(invalidControls.map(control => `${control.labels?.[0]?.textContent?.trim() || control.name}: ${control.validationMessage}`).join(' ')); setMessage(''); return
     }
-    const data = new FormData(form), start = performance.now()
+    const data = new FormData(form), start = performance.now(), fallback = form.closest('.card,.record')?.querySelector<HTMLElement>('summary,h2,h3')
     const focused = document.activeElement instanceof HTMLElement && form.contains(document.activeElement) ? document.activeElement : form.querySelector<HTMLButtonElement>('button[type=submit]')
     setInvalid([]); setBusy(true); setError(''); setMessage(''); setElapsed(0)
     let saved = false
     try { await action(data); if (reset) form.reset(); setMessage(`Saved in ${((performance.now() - start) / 1000).toFixed(1)} seconds.`); saved = true }
     catch (e) { setInvalid(e instanceof FieldError && e.field ? [e.field] : []); setError(e instanceof Error ? e.message : 'Could not save.'); }
-    finally { setBusy(false); if (saved) requestAnimationFrame(() => { if (focused?.isConnected) focused.focus() }) }
+    finally { setBusy(false); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
   }
   return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-busy={busy} aria-describedby={error ? id : undefined}><fieldset disabled={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset><p role="status" aria-live="polite">{busy ? `Saving… ${elapsed.toFixed(1)} seconds elapsed. Keep this page open.` : message}</p>{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error} Your entries are still here. Review them and try again.</p>}</form>
 }

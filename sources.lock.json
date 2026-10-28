@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "133e8e197b54733513e400cfb116794efd0cafe90d450258a31968cc68edbdc8",
+      "sha256": "e410307eacebdd7f6e1f0f48d78bfff85d9aa9520bf647c9f90446a7b6e72fd9",
       "executable": false
     },
     ".gitignore": {
@@ -997,7 +997,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "5b57ea38406c805da46754cc00d05efced8622ab72f16966b08061b28a8860df",
+      "sha256": "d721e7c85beccc99545b74a6faa1b228741ba53e3ed2665d1e04c91e142f34ea",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -4833,7 +4833,7 @@
       "executable": false
     },
     "src/ui/shared.tsx": {
-      "sha256": "f3d828b637d6b2a3711e58ecaf18d6b44ea720bf4cda43d1a8078d885125e2b1",
+      "sha256": "0b3d7ccc5d2a014d108107f377b1933fd1bcaf6a6118268322cde2a230efc3aa",
       "executable": false
     },
     "src/ui/shell.tsx": {
@@ -5097,7 +5097,7 @@
       "executable": false
     },
     "tests/journeys/estimates.mjs": {
-      "sha256": "ccb4ad04e1236924bfd91964f22975c0a59e3defd0a9859d7849b9f14f1bc55e",
+      "sha256": "6446cba14f97110cad2dfe1d52b0aaa2c6389e7efbc1ddb722b4bc3189e07659",
       "executable": false
     },
     "tests/journeys/field-day.mjs": {
@@ -5121,7 +5121,7 @@
       "executable": false
     },
     "tests/journeys/installed.mjs": {
-      "sha256": "82957541d0b06f0dd84c15895ad46bc4db0a5087febdf1645e6dfc07514e9a25",
+      "sha256": "f41a9e1a7f2272c174c78b817aa3f50cc3d980f577d2e810591a23cc68aa2add",
       "executable": false
     },
     "tests/journeys/invoice-correction-sources.mjs": {
@@ -5133,7 +5133,7 @@
       "executable": false
     },
     "tests/journeys/invoices.mjs": {
-      "sha256": "626f9505c1178a9892ccec7313fe731e207c57d507551ae7ab323308b0315abd",
+      "sha256": "846b3a938fa370395f37e1ed85e4d2be95e1d9ce5f6839a3167c88a64cecf9bb",
       "executable": false
     },
     "tests/journeys/legacy-attachment-search.mjs": {
