@@ -10,7 +10,7 @@ export interface StockLot {
  quantity:number; good:number; damaged:number; installed:number; returned:number; transferred:number; good_cents:number; damaged_cents:number; value_cents:number;
 }
 export interface StockMovement { id:string; operation_id:string; kind:'receive'|'transfer-out'|'transfer-in'|'install'|'return'; lot_id:string; quantity:string; amount_cents:number; dated_on:string; reference:string; by:Stamp; transfer_id?:string; other_job_id?:string; condition?:'good'|'damaged' }
-export interface InventoryClaim { id:string; order_id:string; receipt_id:string; line_id:string; cost_code:string; supplier:string; damaged:string; short:string; exposure_cents:number; reference:string; by:Stamp; review?:{forecast_impact_cents:number;reason:string;by:Stamp} }
+export interface InventoryClaim { id:string; order_id:string; receipt_id:string; line_id:string; cost_code:string; supplier:string; damaged:string; short:string; exposure_cents:number; reference:string; by:Stamp; review?:{forecast_impact_cents:number;reason:string;by:Stamp}; adjustments?:{id:string;forecast_impact_cents:number;reason:string;by:Stamp}[] }
 export interface EquipmentAllocation { id:string; equipment:string; location:string; cost_code:string; from:string; through:string; reference:string; by:Stamp }
 export interface InventoryState { lots:StockLot[]; movements:StockMovement[]; tickets:{receipt_id:string;document:CostDocument}[]; claims:InventoryClaim[]; equipment:EquipmentAllocation[]; operations:string[] }
 export const inventory=(job:Job):InventoryState=>job.site_inventory??={lots:[],movements:[],tickets:[],claims:[],equipment:[],operations:[]}
@@ -60,7 +60,7 @@ export function moveStock(job:Job,actor:Actor,input:Input,kind:'install'|'return
  }
  if(kind==='return'){
   need(lot.origin_job_id===job.id,'Return transferred stock to its originating job before returning it to the supplier',409,'inventory_origin')
-  const order=find(job.orders,lot.order_id);orderAction(job,actor,order.id,'return',{lines:[{line_id:lot.line_id,quantity:show(quantity)}],reason:reference,reference},true);lot.returned+=quantity
+  const order=find(job.orders,lot.order_id);orderAction(job,actor,order.id,'return',{lines:[{line_id:lot.line_id,quantity:show(quantity)}],reason:reference,reference,returned_on:dated_on},true);lot.returned+=quantity
  }else lot.installed+=quantity
  return movement(job,actor,input,{kind,lot_id:lot.id,quantity:show(quantity),amount_cents:amount,dated_on,reference,condition})
 }
@@ -70,8 +70,11 @@ export function allocateEquipment(job:Job,actor:Actor,input:Input,all:Job[]){
  const row={id:crypto.randomUUID(),equipment,from,through,cost_code:costCode(job,input.cost_code),location:text(input.location,'Equipment location',200),reference:text(input.reference,'Allocation reference',1000),by:stamp(actor)}
  inventory(job).equipment.push(row);recordApproval(job,actor,'inventory.equipment',{id:row.id,prepared_by:row.by},row);return row
 }
-export function reviewClaim(job:Job,actor:Actor,input:Input){
- need(actor.role==='owner'||actor.role==='admin','An owner or administrator reviews forecast impact',403,'forbidden')
- const row=find(inventory(job).claims,text(input.claim_id,'claim_id',100));need(!row.review,'This claim review is immutable',409,'immutable');need(input.confirm===true,'Explicitly confirm the reviewed forecast impact')
- row.review={forecast_impact_cents:cents(input.forecast_impact_cents,'Forecast impact'),reason:text(input.reason,'Forecast review reason',1000),by:stamp(actor)};recordApproval(job,actor,'inventory.claim-review',{id:row.id,prepared_by:row.by},row);return row
+export const claimImpact=(claim:InventoryClaim)=>claim.adjustments?.at(-1)?.forecast_impact_cents??claim.review?.forecast_impact_cents??0
+export function reviewClaim(job:Job,actor:Actor,input:Input,adjust=false){
+ requireJobManager(actor)
+ const row=find(inventory(job).claims,text(input.claim_id,'claim_id',100));need(adjust?row.review:!row.review,adjust?'Review the original claim before adjusting its remaining exposure':'This claim review is immutable',409,'immutable');need(input.confirm===true,'Explicitly confirm the reviewed forecast impact')
+ const review={forecast_impact_cents:cents(input.forecast_impact_cents,'Forecast impact'),reason:text(input.reason,'Forecast review reason',1000),by:stamp(actor)}
+ if(adjust)(row.adjustments??=[]).push({id:crypto.randomUUID(),...review});else row.review=review
+ recordApproval(job,actor,adjust?'inventory.claim-adjust':'inventory.claim-review',{id:row.id,prepared_by:row.by},row);return row
 }

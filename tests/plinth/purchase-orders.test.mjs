@@ -13,7 +13,12 @@ test('FIELD-005 — delivery originals, segregated damage, atomic authorized tra
   const bytes=await f.request(`/api/plinth/jobs/${c.source.job.id}/inventory/tickets/${receipt.id}`,{cookie:f.owner});assert.equal(bytes.status,200);assert.equal(Buffer.from(await bytes.arrayBuffer()).toString('base64'),ticket.base64);assert.equal(bytes.headers.get('x-content-sha256'),r.value.tickets[0].document.checksum)
   const team=(await c.api('/team')).value.team.find(p=>p.email===['synthetic-plinth-manager','dev.localhost'].join('@'))
   assert.equal((await f.json(`/api/plinth/team/${team.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'project_manager',job_ids:[c.source.job.id],po_limit_cents:100000}})).status,200)
-  const transfer={lot_id:lot.id,quantity:'2',dated_on:'2026-10-28',reference:'Synthetic stock transfer',target_job_id:c.target.job.id,target_version:c.target.job.version,cost_code:'06-100',location:'South locked rack'}
+  const transfer={lot_id:lot.id,quantity:'2',dated_on:'2026-10-28',reference:'Synthetic stock transfer',operation_id:'synthetic-plinth-transfer-once',target_job_id:c.target.job.id,target_version:c.target.job.version,cost_code:'06-100',location:'South locked rack'}
+  const csv='external_id,title,client_email,site_address,quote_cents,accepted_on,currency\r\nsynthetic-plinth-aud,Synthetic historical site,'+['synthetic-plinth-aud','dev.localhost'].join('@')+',Synthetic address,100000,2020-01-01,AUD\r\n'
+  const previewImport=await c.api('/imports/preview',{csv});assert.equal(previewImport.status,200);assert.equal((await c.api('/imports/commit',{csv,fingerprint:previewImport.value.fingerprint})).status,200)
+  let historical=(await c.api('/jobs')).value.jobs.find(j=>j.import_evidence?.external_id==='synthetic-plinth-aud')
+  r=await c.api(`/jobs/${historical.id}/quotes/${historical.quotes[0].id}/accept`,{expected_version:historical.version,method:'signed',evidence:'Synthetic historical acceptance retained in AUD',schedule_choice:{kind:'none',reason:'Historical work'}});assert.equal(r.status,200);historical=r.value.job
+  assert.equal((await c.act('transfer',{...transfer,target_job_id:historical.id,target_version:historical.version,cost_code:'Unassigned'})).value.error,'currency','A transfer cannot relabel USD stock value as historical AUD')
   const before=(await c.read()).value,targetBefore=(await c.read(c.target.job.id)).value
   for(const options of [{...transfer,quantity:'5'},{...transfer,condition:'damaged'},{...transfer,target_version:c.target.job.version-1}])assert.equal((await c.act('transfer',options)).status,409)
   assert.equal((await c.act('transfer',transfer,manager)).status,404,'An assigned manager needs both jobs')
@@ -31,8 +36,9 @@ test('FIELD-005 — delivery originals, segregated damage, atomic authorized tra
   assert.deepEqual((await c.read()).value,before);assert.deepEqual((await c.read(c.target.job.id)).value,targetBefore)
 
   r=await c.act('transfer',transfer);assert.equal(r.status,200,JSON.stringify(r.value));const incoming=r.value.record
-  assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].transferred_quantity,r.value.lots[0].good_cents],['2','2',20000]);const destination=(await c.read(c.target.job.id)).value
+  assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].transferred_quantity,r.value.lots[0].good_cents],['2','2',20000]);const destination=(await c.read(c.target.job.id)).value;assert.equal(destination.lots.length,1,'A transfer credits exactly one destination lot')
   assert.deepEqual([destination.lots[0].good_quantity,destination.lots[0].location,destination.lots[0].good_cents],['2','South locked rack',20000]);assert.equal(destination.movements[0].transfer_id,r.value.movements.at(-1).transfer_id)
+  assert.equal((await c.act('transfer',{...transfer,target_version:destination.version})).value.error,'inventory_replay');assert.deepEqual((await c.read(c.target.job.id)).value,destination,'A replay cannot duplicate destination stock')
   const installBody={expected_version:destination.version,operation_id:'synthetic-plinth-install',lot_id:incoming.id,quantity:'1.5',dated_on:'2026-10-29',reference:'Synthetic installation record'}
   r=await c.api(`/jobs/${c.target.job.id}/inventory/install`,installBody);assert.equal(r.status,200);assert.deepEqual([r.value.lots[0].good_quantity,r.value.lots[0].installed_quantity,r.value.lots[0].good_cents,r.value.movements.at(-1).amount_cents],['0.5','1.5',5000,15000]);assert.equal((await c.api(`/jobs/${c.target.job.id}/inventory/install`,{...installBody,expected_version:r.value.version})).value.error,'inventory_replay')
   assert.equal((await c.act('install',{lot_id:lot.id,quantity:'1',condition:'damaged',dated_on:'2026-10-28',reference:'Unsafe damage installation'})).value.error,'damaged_stock')
@@ -44,6 +50,20 @@ test('FIELD-005 — delivery originals, segregated damage, atomic authorized tra
   for(const path of [`/jobs/${c.source.job.id}/inventory`,`/jobs/${c.source.job.id}/inventory/tickets/${receipt.id}`])assert.equal((await f.request('/api/plinth'+path,{cookie:client})).status,403)
   const projection=(await c.api(`/jobs/${c.source.job.id}`,undefined,client)).value;assert.ok(!JSON.stringify(projection).includes('North covered rack'));assert.equal(projection.job.site_inventory,undefined)
   const generic=(await c.api(`/jobs/${c.source.job.id}`)).value.job;assert.ok(generic.approvals.some(a=>a.kind==='inventory.transfer-out'&&a.approved_by.role==='owner'))
+  const accountant=await f.invite(['synthetic-plinth-accountant','dev.localhost'].join('@'),'Synthetic stock accountant','admin'),person=(await c.api('/team')).value.team.find(p=>p.name==='Synthetic stock accountant')
+  assert.equal((await f.json(`/api/plinth/team/${person.id}`,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'bookkeeper',job_ids:[c.source.job.id]}})).status,200)
+  const officePost=async(path,body,cookie=f.owner)=>c.api(`/jobs/${c.source.job.id}${path}`,{expected_version:(await c.read()).value.version,...body},cookie)
+  assert.equal((await officePost('/costs/accountant',{accountant_id:person.id,reason:'Synthetic independent period review'})).status,200)
+  const close={period:'2026-10',opening_cash_cents:0,months:1},preview=(await c.api(`/jobs/${c.source.job.id}/costs/period-preview?period=2026-10&opening_cash_cents=0&months=1`,undefined,accountant)).value
+  r=await officePost('/costs/period-reviews',{...close,confirm:true,digest:preview.digest,reference:'Synthetic exact accountant close review'},accountant);assert.equal(r.status,200,JSON.stringify(r.value));const reviewId=r.value.record.id
+  r=await officePost('/costs/periods',{...close,native_review_id:reviewId});assert.equal(r.status,200,JSON.stringify(r.value));const closed=r.value.record
+  const late={operation_id:'synthetic-plinth-late-return',lot_id:lot.id,quantity:'1',condition:'good',dated_on:'2026-10-29',reference:'Synthetic late supplier return'}
+  const heldStock=(await c.read()).value
+  assert.equal((await officePost('/inventory/return',late)).value.error,'cost_period_closed');assert.deepEqual((await c.read()).value,heldStock,'Closed-period refusal consumes no stock')
+  assert.equal((await officePost('/inventory/return',{...late,posting_period:'2026-10',adjustment_reference:'Still closed'})).value.error,'cost_period_closed')
+  r=await officePost('/inventory/return',{...late,posting_period:'2026-11',adjustment_reference:'Late original after accountant close'});assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.record.dated_on,'2026-10-29')
+  const lateOrder=(await c.api(`/jobs/${c.source.job.id}`)).value.job.orders[0],back=lateOrder.returns.at(-1);assert.equal(back.returned_on,'2026-10-29');const ledger=(await c.api(`/jobs/${c.source.job.id}/costs`)).value;const posted=ledger.rows[0].sources.procurement.find(p=>p.receipt_id===back.id);assert.deepEqual([posted.dated_on,posted.period,posted.amount_cents],['2026-10-29','2026-11',-10000]);assert.deepEqual((await c.api(`/jobs/${c.source.job.id}/costs/periods`)).value.periods[0],closed)
+
  }finally{await f.close()}
 })
 

@@ -1,4 +1,4 @@
-import { inventory } from './site-inventory'
+import { inventory, claimImpact } from './site-inventory'
 import { cents, need, object, recordApproval, stamp, sum, text, type Actor, type Input, type Job } from './model'
 import { costs, costCode, digest, type CostForecast } from './cost-model'
 import { actualEntries, costLedger } from './cost-ledger'
@@ -8,14 +8,14 @@ const thousandths=(value:unknown,name:string)=>{const s=String(value);need(/^\d{
 export async function forecastAction(job:Job,actor:Actor,input:Input):Promise<CostForecast>{
  need(inventory(job).claims.every(c=>c.review),'Review inventory discrepancy claims before forecasting',409,'inventory_forecast_unreviewed')
  const reviewed=inventory(job).claims.filter(c=>c.review),submitted=input.inventory_claims??[]
- need(Array.isArray(submitted)&&submitted.length===reviewed.length&&reviewed.every(c=>submitted.some((v:unknown)=>{const r=object(v);return r.claim_id===c.id&&r.forecast_impact_cents===c.review!.forecast_impact_cents}))&&new Set(submitted.map((v:unknown)=>object(v).claim_id)).size===submitted.length,'Review every current inventory claim impact exactly',409,'inventory_forecast_stale')
+ need(Array.isArray(submitted)&&submitted.length===reviewed.length&&reviewed.every(c=>submitted.some((v:unknown)=>{const r=object(v);return r.claim_id===c.id&&r.forecast_impact_cents===claimImpact(c)}))&&new Set(submitted.map((v:unknown)=>object(v).claim_id)).size===submitted.length,'Review every current inventory claim impact exactly',409,'inventory_forecast_stale')
  const ledger=costLedger(job),rows=input.codes
  need(Array.isArray(rows)&&rows.length>0&&rows.length<=100,'Provide one to 100 code assumptions')
  const assumptions=rows.map(value=>{const a=object(value),cost_code=text(a.cost_code,'cost_code',80),source=ledger.rows.find(r=>r.cost_code===cost_code)!,remaining=thousandths(a.remaining_quantity,'remaining_quantity'),minutes=thousandths(a.minutes_per_unit,'minutes_per_unit'),rate=cents(a.labor_hour_cents,'labor_hour_cents'),numerator=remaining*minutes*BigInt(rate),denominator=60_000_000n,labor=cents(Number((numerator*2n+denominator)/(2n*denominator)))
   need(source,'Choose a code present in the current ledger',409,'cost_code')
   const committed=cents(a.outstanding_commitment_cents,'outstanding_commitment_cents');need(committed===source.open_commitment_cents&&committed>=0,'Review the current unconsumed commitments exactly; consumed costs cannot enter again',409,'cost_forecast_stale')
   const pending=cents(a.pending_change_cents??0,'pending_change_cents',true);need(!pending||input.scenario==='pending','Pending cost needs an explicit pending scenario')
-  const inventory_impact_cents=sum(reviewed.filter(c=>c.cost_code===cost_code).map(c=>c.review!.forecast_impact_cents));const unbought=cents(a.unbought_cents,'unbought_cents'),risk=cents(a.risk_cents,'risk_cents'),remaining_cents=sum([labor,committed,unbought,risk,pending,inventory_impact_cents]);need(remaining_cents>=0,'Remaining cost cannot be negative')
+  const inventory_impact_cents=sum(reviewed.filter(c=>c.cost_code===cost_code).map(claimImpact));const unbought=cents(a.unbought_cents,'unbought_cents'),risk=cents(a.risk_cents,'risk_cents'),remaining_cents=sum([labor,committed,unbought,risk,pending,inventory_impact_cents]);need(remaining_cents>=0,'Remaining cost cannot be negative')
   return {cost_code,inventory_impact_cents,remaining_quantity:String(a.remaining_quantity),minutes_per_unit:String(a.minutes_per_unit),labor_hour_cents:rate,labor_cents:labor,outstanding_commitment_cents:committed,unbought_cents:unbought,risk_cents:risk,pending_change_cents:pending,remaining_cents,reference:text(a.reference,'Assumption source',2000)}
  })
  need(new Set(assumptions.map(a=>a.cost_code)).size===assumptions.length,'A code appears once per forecast')
