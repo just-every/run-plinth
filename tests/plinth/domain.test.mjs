@@ -1,4 +1,5 @@
 import {setPortalFeatures} from './helpers.mjs'
+import { documentFixture, documentOriginal, documentRevision } from './document-support.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -878,5 +879,52 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   assert.equal((await read()).status,404)
   assert.equal((await f.request(root+'/submittals/files/'+first.attachments[0].id,{cookie:f.owner})).status,404)
   assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
+ }finally{await f.close()}
+})
+
+test('Private document libraries keep exact versions, record links and company originals behind owner authority',async()=>{
+ const f=await createFixture();try{
+ const d=await documentFixture(f),client=await f.invite(d.job.client_email),admin=await f.invite(['synthetic-plinth-doc-office','example.com'].join('@'),'Synthetic office','admin'),other=await f.invite(['synthetic-plinth-doc-other','example.com'].join('@')),agent=await f.agent()
+ const second=await createActiveJob(f,'Second document job',['synthetic-plinth-doc-other','example.com'].join('@'))
+ const sub=await f.invite(['synthetic-plinth-doc-sub','example.com'].join('@')),scope=await createReleasedScope(f,d.job,['synthetic-plinth-doc-sub','example.com'].join('@'),'plumbing')
+ const current=await d.read();assert.equal(current.library.folders.length,4);assert.equal(current.library.folders.find(r=>r.id===d.nested.id).parent_id,d.folders[0].id)
+ const original=current.library.files.find(r=>r.id===d.contract.id);assert.equal(original.versions.length,2);assert.notEqual(original.versions[0].file.checksum,original.versions[1].file.checksum)
+ for(const [version,bytes] of [[original.versions[0],documentOriginal],[original.versions[1],documentRevision],[d.permit.versions[0],documentOriginal],[d.warranty.versions[0],documentOriginal]]){
+  const parent=version===original.versions[0]||version===original.versions[1]?original:version===d.permit.versions[0]?d.permit:d.warranty
+  const response=await f.request(d.root+'/files/'+parent.id+'/'+version.id,{cookie:f.owner});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
+  assert.ok(version.by.id);assert.ok(version.by.at);assert.equal(version.file.size,bytes.length)
+ }
+ assert.equal((await d.read('?q=contract&tag=signed')).library.files[0].id,d.contract.id)
+ assert.deepEqual((await d.read('?q=permit&tag=closeout')).library.files,[])
+ assert.equal((await d.read('?tag=closeout')).library.files[0].id,d.warranty.id)
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64'),video=Buffer.from([0,0,0,24,102,116,121,112,105,115,111,109,0,0,0,0])
+ for(const [area,bytes,name] of [['Photos',png,'synthetic-plinth-1.png'],['Videos',video,'synthetic-plinth-1.mp4']]){const folder=await d.change('/folders',{name:'Site originals',area});const item=await d.change('/files',{folder_id:folder.id,name:area+' original',tags:['site'],file:{name,base64:bytes.toString('base64')}});const response=await f.request(d.root+'/files/'+item.id+'/'+item.versions[0].id,{cookie:f.owner});assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)}
+ // Linking to a draft package does not add a public handover original or grant access.
+ let job=(await f.json('/api/plinth/jobs/'+d.job.id,{cookie:f.owner})).value.job
+ const handoverFile=await f.json('/api/plinth/jobs/'+job.id+'/handover/documents',{method:'POST',cookie:f.owner,body:{expected_version:job.version,title:'Public manual',kind:'manual',tags:[],reference:'Synthetic reviewed manual',file:{name:'synthetic-plinth-manual.pdf',base64:documentRevision.toString('base64')}}});assert.equal(handoverFile.status,200)
+ const manual=handoverFile.value.record
+ const draft=await f.json('/api/plinth/jobs/'+job.id+'/handover/packages',{method:'POST',cookie:f.owner,body:{expected_version:handoverFile.value.version,title:'Draft closeout',documents:[{document_id:manual.id,revision_id:manual.revisions[0].id}]}});assert.equal(draft.status,200)
+ await d.change('/links',{document_id:d.warranty.id,version_id:d.warranty.versions[0].id,kind:'handover',record_id:draft.value.record.id})
+ assert.equal((await d.read()).library.links.length,2)
+ const complete=await f.json('/api/plinth/jobs/'+job.id+'/handover/packages/'+draft.value.record.id+'/complete',{method:'POST',cookie:f.owner,body:{expected_version:(await d.read()).version,digest:draft.value.record.digest,confirm:true,client_safe:true,statement:'The public manual is reviewed; private links remain private'}});assert.equal(complete.status,200)
+ const clientPackage=await f.json('/api/plinth/jobs/'+job.id+'/handover',{cookie:client});assert.equal(clientPackage.status,200);assert.ok(!JSON.stringify(clientPackage.value).includes(d.warranty.id))
+ const download=d.root+'/files/'+d.contract.id+'/'+d.contract.versions[0].id
+ const before=await d.read()
+ for(const credentials of [{cookie:client},{cookie:sub},{cookie:other},{cookie:admin},{token:agent},{}]){
+  for(const route of [d.root,d.root+'?q=contract',download,'/api/plinth/documents','/api/plinth/documents/files/'+d.template.id+'/'+d.template.versions[0].id])assert.ok([401,403,404].includes((await f.request(route,credentials)).status))
+  assert.ok([401,403,404].includes((await f.request(d.root+'/files/'+d.contract.id+'/versions',{method:'POST',...credentials,body:{expected_version:before.version,file:{name:'synthetic-plinth-denied.pdf',base64:documentRevision.toString('base64')}}})).status))
+ }
+ assert.equal((await f.request('/api/plinth/jobs/'+second.id+'/documents/files/'+d.contract.id+'/'+d.contract.versions[0].id,{cookie:f.owner})).status,404)
+ assert.equal((await f.request(d.root+'/links',{method:'POST',cookie:f.owner,body:{expected_version:before.version,document_id:d.contract.id,version_id:d.contract.versions[0].id,kind:'quotes',record_id:second.quotes[0].id}})).status,404)
+ assert.equal((await f.request(d.root+'/links',{method:'POST',cookie:f.owner,body:{expected_version:before.version,document_id:d.contract.id,version_id:d.contract.versions[0].id,kind:'handover',record_id:draft.value.record.id}})).status,404)
+ assert.equal((await f.request(d.root+'/files/'+d.contract.id+'/versions',{method:'POST',cookie:f.owner,body:{expected_version:before.version-1,file:{name:'synthetic-plinth-stale.pdf',base64:documentRevision.toString('base64')}}})).status,409)
+ assert.deepEqual(await d.read(),before,'Denied, cross-job and stale attempts change nothing')
+ for(const cookie of [client,admin,sub]){const listing=await f.json('/api/plinth/jobs',{cookie});assert.ok(!JSON.stringify(listing.value).includes(d.contract.id),'General job projections never expose private metadata')}
+ const originalRoute='/api/plinth/jobs/'+job.id+'/handover/files/'+d.contract.versions[0].file.id
+ assert.equal((await f.request(originalRoute,{cookie:client})).status,404,'A record link cannot bypass private download authority')
+ const company=await f.request('/api/plinth/documents/files/'+d.template.id+'/'+d.template.versions[0].id,{cookie:f.owner});assert.deepEqual(Buffer.from(await company.arrayBuffer()),documentOriginal)
+ const credential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0]
+ assert.equal((await f.request('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
+ assert.equal((await f.request(download,{token:agent})).status,401)
  }finally{await f.close()}
 })
