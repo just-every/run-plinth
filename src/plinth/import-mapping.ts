@@ -1,5 +1,6 @@
 import { canonicalJson, sha256, type ImportMapping } from '../modules/import-kit/src/d1/index.ts'
 import type { Actor, Job, Stamp } from './model.ts'
+import type { WorkbookDraft } from './workbook-import.ts'
 import { IMPORT_NAMESPACE, IMPORT_VERSION, type AcceptedJobRow } from './import-source.ts'
 
 /** Source acceptance is evidence only. Every imported quote remains a draft.
@@ -8,6 +9,17 @@ import { IMPORT_NAMESPACE, IMPORT_VERSION, type AcceptedJobRow } from './import-
 export function acceptedJobsMapping(actor: Actor): ImportMapping { return {
   version: IMPORT_VERSION,
   map(record) {
+    if (record.kind === 'coded-workbook') {
+      const draft = record.payload as unknown as WorkbookDraft
+      const id = `import-${sha256(`${IMPORT_NAMESPACE}:${record.sourceId}`).slice(0,32)}`
+      const source: Stamp = { id: `source:${record.artifactHash}`, name: 'Reviewed workbook source', role: 'agent', at: 'source-undated' }
+      const job: Job = { id,version:1,name:draft.name,client_email:draft.client_email,address:draft.address,status:'quoting',created_by:source,currency:draft.currency,
+        quotes:[{id:`${id}-quote`,revision:1,lines:draft.lines,total_cents:draft.total_cents,...(draft.cost_total_cents===undefined?{}:{cost_total_cents:draft.cost_total_cents}),status:'draft',notes:'Imported coded estimate. Native approval is required before work or financial adoption.',prepared_by:source}],
+        schedules:[],diary:[],variations:[],orders:[],claims:[],approvals:[],
+        import_evidence:{format:'coded-workbook-v1',artifact_sha256:record.artifactHash,source_name:draft.source_name,mapping:draft.mapping,provenance:draft.provenance,diagnostics:draft.diagnostics,source_totals:draft.source_totals,acceptance_verified:false,reviewed_by:{id:actor.id,name:actor.name,role:actor.role}},
+      }
+      return {effects:[{targetKind:'construction-project',targetId:id,value:{data:canonicalJson(job),version:1,attachments:[]}}]}
+    }
     const row = record.payload as unknown as AcceptedJobRow
     const id = `import-${sha256(`${IMPORT_NAMESPACE}:${row.external_id}`).slice(0, 32)}`
     const source: Stamp = { id: `source:${IMPORT_NAMESPACE}`, name: 'CSV source (unverified)', role: 'agent', at: row.accepted_on }

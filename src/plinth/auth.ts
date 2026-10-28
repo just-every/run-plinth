@@ -56,7 +56,8 @@ export function requireFieldLog(actor:Actor,allowAgent=false){need(actor.role===
 export const isTeamRole=(role:string):role is TeamRole=>role==='project_manager'||role==='estimator'||role==='superintendent'||role==='crew'||role==='bookkeeper'||role==='reader'
 export const isFieldRole=(actor:Actor)=>actor.role==='superintendent'||actor.role==='crew'
 /** Keep the sponsor's native role semantics when a draft call carries agent attribution. */
-export function assignedJob(actor:Actor,job:Job){return !isTeamRole(actor.agent_native_role??actor.role)||!!actor.team?.job_ids.includes(job.id)}
+export const privateWorkbookDraft=(job:Job)=>job.import_evidence?.format==='coded-workbook-v1'&&job.status==='quoting'
+export function assignedJob(actor:Actor,job:Job){if(privateWorkbookDraft(job)&&actor.role!=='owner')return false;return !isTeamRole(actor.agent_native_role??actor.role)||!!actor.team?.job_ids.includes(job.id)}
 export function visible(actor:Actor,job:Job){need(assignedJob(actor,job),'Job not found',404,'not_found');need(actor.role!=='member'||(actor.email.toLowerCase()===job.client_email||actor.client_job_id===job.id),'Job not found',404,'not_found')}
 export function actorPredicate(actor:Actor):{sql:string;params:unknown[]} {
  const person="EXISTS(SELECT 1 FROM oa_operators WHERE id=? AND version=? AND status='active' AND role=?)"

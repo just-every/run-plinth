@@ -1,3 +1,4 @@
+import { assignedJob } from './auth'
 import { jobs } from './store'
 import { need, object, text, type Actor, type Job } from './model'
 import { localDate } from './remittances'
@@ -16,7 +17,7 @@ export async function portfolioManagers(db:D1Database) {
  return rows.map(r=>({id:r.operator_id,...JSON.parse(r.data) as {role:string;job_ids:string[]}})).filter(r=>r.role==='project_manager')
 }
 export async function portfolioJobs(db:D1Database,actor:Actor,selection?:PortfolioScope) {
- const current=(await jobs(db)).filter(j=>actor.role!=='project_manager'||actor.team?.job_ids.includes(j.id))
+ const current=(await jobs(db)).filter(j=>assignedJob(actor,j)&&(actor.role!=='project_manager'||actor.team?.job_ids.includes(j.id)))
  let rows:{job:Job;manager_ids:string[];captured_at:string}[]
  if(selection?.snapshot_id){
   const saved=(await db.prepare('SELECT job_id,data FROM pl_portfolio_snapshots WHERE snapshot_id=?').bind(selection.snapshot_id).all<{job_id:string;data:string}>()).results

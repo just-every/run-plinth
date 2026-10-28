@@ -1,5 +1,5 @@
 import {runtimeBindings,type Bindings} from '../auth.server'
-import {authorize,requireJobManager,requireManager} from './auth'
+import {authorize,assignedJob,requireJobManager,requireManager} from './auth'
 import {DomainError,find,need,object,type Input} from './model'
 import {jobs,readClock,saveJob} from './store'
 import {bidComparisonAction} from './bid-comparison-actions'
@@ -14,7 +14,7 @@ async function body(request:Request):Promise<Input>{need(request.headers.get('co
 export async function bidComparisonResponse(request:Request,original:Bindings):Promise<Response|null>{
  const match=/^\/api\/plinth\/bid-comparisons\/([^/]+)(?:\/([^/]+)\/([^/]+))?$/.exec(new URL(request.url).pathname);if(!match)return null
  try{const env=runtimeBindings(original),actor=await authorize(request,env);requireJobManager(actor);if(request.method!=='GET')requireManager(actor)
-  const clock=request.method==='GET'?undefined:await readClock(env.DB),previous=find(await jobs(env.DB) as BidComparisonJob[],match[1]!);need(actor.role!=='project_manager'||actor.team!.job_ids.includes(previous.id),'Job not found',404,'not_found')
+  const clock=request.method==='GET'?undefined:await readClock(env.DB),previous=find(await jobs(env.DB) as BidComparisonJob[],match[1]!);need(assignedJob(actor,previous)&&(actor.role!=='project_manager'||actor.team!.job_ids.includes(previous.id)),'Job not found',404,'not_found')
   if(request.method==='GET'){need(!match[2],'Unknown comparison route',404,'not_found');return json({source:bidComparisonSource(previous)})}
   need(request.method==='POST','Method not allowed',405,'method_not_allowed');const input=await body(request);need(input.expected_version===previous.version,'The comparison job changed; reload',409,'stale_version')
   const job=structuredClone(previous),result=await bidComparisonAction(env.DB,job,actor,input,match[2],match[3]);await saveJob(env.DB,actor,previous,job,result.writes,clock);return json({source:bidComparisonSource(job),record_id:result.record.id},match[2]?200:201)
