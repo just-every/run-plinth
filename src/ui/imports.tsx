@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Badge, Action, api, Form, money } from './shared'
+import { OpeningImport } from './opening-import'
 import { WorkbookImport } from './workbook-import'
 import { Page } from './shell'
 
 export function Imports({onChange}: {onChange: () => Promise<void>}) {
   const [csv, setCsv] = useState(''), [preview, setPreview] = useState<any>(), [jobs, setJobs] = useState<any[]>([]), [loaded,setLoaded] = useState(false)
   async function refresh() { const result = await api('/imports'); setJobs(result.jobs); setLoaded(true) }
-  return <Page title="Move in" lead="Review imported jobs and coded estimates before adopting inert drafts."><WorkbookImport onChange={async()=>{await refresh();await onChange()}}/><div className="split">
+  return <Page title="Move in" lead="Review imported jobs and coded estimates before adopting inert drafts."><WorkbookImport onChange={async()=>{await refresh();await onChange()}}/><OpeningImport onChange={async()=>{await refresh();await onChange()}}/><div className="split">
     <section className="card"><div className="card-head"><h2>Preview your file</h2><span className="muted">Accepted jobs CSV</span></div><p className="card-lead">Use the documented columns below. Imported jobs remain drafts until you confirm their source acceptance.</p><code className="csv-header">external_id,title,client_email,site_address,quote_cents,accepted_on</code><p className="muted">Money is whole USD cents; dates use YYYY-MM-DD. Maximum 100 rows. No accounts are created and no messages sent.</p>
       <Form submit="Dry run CSV" reset={false} action={async f => { const file=f.get('csv'); if (!(file instanceof File) || !file.size) throw new Error('Choose a CSV file.'); const content=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(await file.arrayBuffer()); setCsv(content); setPreview(await api('/imports/preview',{csv:content})); await refresh() }}><label>Jobs CSV<input name="csv" type="file" accept=".csv,text/csv" required /></label></Form>
       {preview && <div className="preview"><h3>Dry-run result</h3><ol className="rows">{preview.rows?.map((r:any,i:number) => <li className="row" key={i}><div className="row-main"><strong>{r.title}</strong><span className="muted">{r.client_email}</span></div><div className="row-end"><strong className="amount">{money(Number(r.quote_cents), r.currency)}</strong></div></li>)}</ol><details><summary>Counts and diagnostics</summary><pre>{JSON.stringify({counts:preview.counts,diagnostics:preview.diagnostics},null,2)}</pre></details><p>Approval applies only to this exact file and mapping.</p><Action className="primary" action={async () => { await api('/imports/commit',{csv,fingerprint:preview.fingerprint}); setPreview(undefined); setCsv(''); await refresh(); await onChange() }}>Approve and import drafts</Action></div>}

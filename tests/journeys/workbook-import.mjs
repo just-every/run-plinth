@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
+import {openingInput} from '../fixtures/workbook-opening.mjs'
+import {openingJob as createOpeningJob} from '../plinth/opening-support.mjs'
 import {legacyWorkbook} from '../fixtures/workbook-xls.mjs'
-import {workbookInput,catalogInput,costInput} from '../fixtures/workbook-estimate.mjs'
+import {workbookInput,catalogInput,costInput,billInput} from '../fixtures/workbook-estimate.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS,state=process.env.PLINTH_STATE
 assert.ok(base&&shots&&state,'Use the installed application with native sign-in')
 await mkdir(shots,{recursive:true})
@@ -120,10 +122,61 @@ try{
  await proof('cost-workbook-preview')
  await surface.getByRole('checkbox',{name:'Approve this exact file, mapping and row resolution',exact:true}).check()
  await surface.getByRole('button',{name:'Import cost drafts once',exact:true}).click()
- await expect(surface.getByText('Time and expense drafts imported.',{exact:false})).toBeVisible()
+ await expect(surface.getByText('Time expense and supplier bill drafts imported.',{exact:false})).toBeVisible()
  native=await call(`/jobs/${imported.id}/costs/sources`);assert.equal(native.status,200);assert.equal(native.value.sources.length,2);assert.ok(native.value.sources.every(row=>!row.approved_by));assert.deepEqual(native.value.sources.map(row=>row.amount_cents),[12501,5000])
  assert.equal((await call(`/jobs/${imported.id}/costs`)).value.totals.posted_actual_cents,0,'Importing draft sources never posts an actual cost')
  const untouched=(await call('/jobs/'+job.id)).value.job;assert.deepEqual({quotes:untouched.quotes,budgets:untouched.budgets,sov:untouched.sov},economics)
+ const billSource=billInput((await call('/jobs/'+imported.id)).value.job,'synthetic-plinth-browser-bills')
+ await upload(billSource)
+ await surface.getByLabel('Cost import title',{exact:true}).fill(billSource.title)
+ await surface.getByRole('button',{name:'Load accepted jobs',exact:true}).click()
+ await surface.getByRole('combobox',{name:'Destination job',exact:true}).selectOption(imported.id)
+ await surface.getByLabel('Code mappings',{exact:true}).fill('BILL=09-200')
+ await surface.getByLabel('Unit mappings',{exact:true}).fill('each=each')
+ await surface.getByRole('combobox',{name:'Duplicate rows',exact:true}).selectOption('skip-identical')
+ await surface.getByLabel('Excluded rows and reasons',{exact:true}).fill('4=Invalid supplier cost code held for correction')
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('Review supplier tax rates and taxable amounts before importing bills',{exact:false})).toBeVisible()
+ await expect(surface.getByRole('button',{name:'Import cost drafts once',exact:true})).toHaveCount(0)
+ await surface.getByRole('checkbox',{name:'I reviewed supplier tax rates',exact:false}).check()
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('1 cost drafts · Actual $13.57',{exact:true})).toBeVisible()
+ await expect(surface.getByText('Source rows before omissions: Net before tax $29.68 · Cost Unknown',{exact:true})).toBeVisible()
+ await proof('supplier-bill-workbook-preview')
+ await surface.getByRole('checkbox',{name:'Approve this exact file, mapping and row resolution',exact:true}).check()
+ await surface.getByRole('button',{name:'Import cost drafts once',exact:true}).click()
+ await expect(surface.getByText('Time expense and supplier bill drafts imported.',{exact:false})).toBeVisible()
+ const bills=(await call(`/jobs/${imported.id}/costs/bills`)).value.bills;assert.equal(bills.length,1);assert.equal(bills[0].amount_cents,1357);assert.equal(bills[0].tax.tax_cents,123);assert.equal(bills[0].status,'draft')
+ assert.equal((await call(`/jobs/${imported.id}/costs`)).value.totals.posted_actual_cents,0,'Importing supplier bills never posts actuals')
+ const openingCase=await createOpeningJob({owner:'native-browser-owner',json:(path,options={})=>call(path.slice('/api/plinth'.length),options.body,options.method??'GET')})
+ const openingSource=await openingInput(openingCase.job,{tag:'synthetic-plinth-browser-opening'}),openingSurface=page.getByRole('region',{name:'Opening balances and SOV',exact:true})
+ for(const [label,button,file] of [['Opening source workbook','Inspect opening source workbook',openingSource],['Supplied ledger snapshot','Inspect supplied ledger snapshot',openingSource.ledger]]){
+  await openingSurface.getByLabel(label,{exact:true}).setInputFiles({name:file.name,mimeType:file.name.endsWith('.xlsx')?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/csv',buffer:Buffer.from(file.base64,'base64')})
+  const response=page.waitForResponse(r=>r.url().endsWith('/imports/workbook/inspect'));await openingSurface.getByRole('button',{name:button,exact:true}).click();assert.equal((await response).status(),200)
+ }
+ await openingSurface.getByRole('button',{name:'Load jobs with a priced SOV',exact:true}).click()
+ await openingSurface.getByRole('combobox',{name:'Opening destination job',exact:true}).selectOption(openingCase.job.id)
+ await openingSurface.getByLabel('Opening as-of date',{exact:true}).fill('2026-10-01')
+ await openingSurface.getByLabel('Open posting period',{exact:true}).fill('2026-10')
+ await openingSurface.getByLabel('Source code mappings',{exact:true}).fill('FRAME=06-100\nLABOR=01-100')
+ await openingSurface.getByLabel('Ledger code mappings',{exact:true}).fill('06-100=06-100\n01-100=01-100')
+ await openingSurface.getByLabel('Source excluded rows and reasons',{exact:true}).fill('4=Invalid code held for explicit source correction')
+ await openingSurface.getByRole('checkbox',{name:'I reviewed source formula caches.',exact:true}).check()
+ await openingSurface.getByRole('button',{name:'Preview opening reconciliation',exact:true}).click()
+ await expect(openingSurface.getByText('Explicitly review the separately supplied ledger before financial adoption',{exact:true})).toBeVisible()
+ await expect(openingSurface.getByRole('button',{name:'Adopt reconciled opening once',exact:true})).toHaveCount(0)
+ await openingSurface.getByRole('checkbox',{name:'I reviewed these separately supplied source and ledger snapshots.',exact:true}).check()
+ await openingSurface.getByRole('button',{name:'Preview opening reconciliation',exact:true}).click()
+ const actualRow=openingSurface.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Actual costs',exact:true})})
+ await expect(actualRow.getByRole('cell').nth(0)).toHaveText('$285.00');await expect(actualRow.getByRole('cell').nth(1)).toHaveText('$280.00');await expect(actualRow.getByRole('cell').nth(2)).toHaveText('$280.00')
+ await proof('opening-reconciliation')
+ await openingSurface.getByRole('checkbox',{name:'Approve these exact source and ledger snapshots and this destination',exact:true}).check()
+ await openingSurface.getByRole('button',{name:'Adopt reconciled opening once',exact:true}).click()
+ await expect(openingSurface.getByText('Reconciled historical opening adopted once.',{exact:false})).toBeVisible()
+ const openingLedger=await call(`/jobs/${openingCase.job.id}/costs`);assert.equal(openingLedger.status,200);assert.equal(openingLedger.value.totals.posted_actual_cents,28000);assert.equal(openingLedger.value.totals.recorded_supplier_payment_cents,20000);assert.equal(openingLedger.value.totals.supplier_retained_cents,1000);assert.equal(openingLedger.value.totals.payable_cents,7000);assert.equal(openingLedger.value.totals.client_billed_cents,55000);assert.equal(openingLedger.value.totals.client_collected_cents,33000)
+ for(const [label,bytes] of [['Download opening source original',openingSource.base64],['Download supplied ledger original',openingSource.ledger.base64]]){const event=page.waitForEvent('download');await openingSurface.getByRole('button',{name:label,exact:true}).click();const downloaded=await event,stream=await downloaded.createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString('base64'),bytes)}
+ const ledgerDownload=page.waitForEvent('download');await openingSurface.getByRole('link',{name:'Download current cost ledger',exact:true}).click();const ledgerStream=await(await ledgerDownload).createReadStream(),ledgerChunks=[];for await(const chunk of ledgerStream)ledgerChunks.push(chunk);const downloadedLedger=JSON.parse(Buffer.concat(ledgerChunks).toString());assert.equal(downloadedLedger.totals.posted_actual_cents,28000);assert.equal(downloadedLedger.opening.rows.reduce((total,row)=>total+row.paid_cents,0),20000)
+ const appDownload=page.waitForEvent('download');await openingSurface.getByRole('link',{name:'Download historical SOV sources',exact:true}).click();const appStream=await(await appDownload).createReadStream(),appChunks=[];for await(const chunk of appStream)appChunks.push(chunk);const downloadedApp=JSON.parse(Buffer.concat(appChunks).toString());assert.equal(downloadedApp.application.total_cents,55000);assert.equal(downloadedApp.application.retainage.held_cents,2750)
  await owner.close()
  console.log('Workbook import PASS: native upload, two sheets, coded fractional preview and exports, cache review and invalid-row resolution, stale mapping refusal, exact originals, replay and unchanged accepted economics; legacy XLS, dated catalog rates and native time and expense drafts; screens 1440 and 390')
 }finally{await browser.close()}

@@ -6,7 +6,7 @@ import type { SovApplication, SovApplicationLine, SovClaim, SovJob, SovLine, Sov
 
 const purpose = 'Commercial schedule of values and progress application for external books. Not an invoice, licensed AIA form, or legal certification.'
 /** Stable object order makes source comparisons independent of JSON property ordering. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
  if (value && typeof value === 'object') return `{${Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`
  return JSON.stringify(value) ?? 'null'
