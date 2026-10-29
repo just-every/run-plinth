@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e97ff9c858b0e5ae651cdb742fd1abd228a65eea1ec59462ca6d56e2ee9e0d5f",
+      "sha256": "a78b722d7af75d54e71e3fdbc8c4d664e23a89c43f5c6ff8331f6e98c61560e0",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "afef2400e122fb31d56fb307f1c57b4f055ee045b57b01fa30a39003cac0d58e",
+      "sha256": "11fe0ffd505514114bd5d93df22cab9d34660a543b981b76be0a833dc7ad9dfc",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DECISIONS.md": {
-      "sha256": "acae684f8e6e2fef07e946d9b631812af23061d2d7d2946b6e38701297059fd8",
+      "sha256": "fce85e2999cdf9f6ae0b23fc1c57978cbb042cf4af55c7b0212277114b628dc8",
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
@@ -3464,6 +3464,10 @@
       "sha256": "41e34020eaa70ef7df68b900772b168e69ea1a06c82cb238ba97ad29779b35b7",
       "executable": false
     },
+    "src/plinth/decision-replay.ts": {
+      "sha256": "f0385e01753872d1485236e2515f97311cd10897585671c07c2031963ab01685",
+      "executable": false
+    },
     "src/plinth/decision-search.ts": {
       "sha256": "5819c78a6024fffcf51944f792959cab7e3e0ddd43d36f5b0c9435401e2d57d0",
       "executable": false
@@ -3565,7 +3569,7 @@
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
-      "sha256": "cfa4cd27f39bd3b30448218e40f76cf9ab093f6bbb921627052e5cbaa50f0669",
+      "sha256": "1272e712a203429b67db123208156e44f018641eaca87569bce3de072a60e490",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -4029,7 +4033,7 @@
       "executable": false
     },
     "src/plinth/store.ts": {
-      "sha256": "235627342161c56625d90ac5e3087e2841ce9ce549e1176edfd08a0a67649160",
+      "sha256": "cee085ea1706b13ed252d76bb1b943fc37ab4bb3d6ceb8d769ce636760b4cada",
       "executable": false
     },
     "src/plinth/subcontractor-portal.ts": {
@@ -5477,7 +5481,7 @@
       "executable": false
     },
     "tests/plinth/selections.test.mjs": {
-      "sha256": "4f3e89542f48b4be9066387d7e2651b8ec0228ac8af9b355d8eae731d55b043c",
+      "sha256": "e58d5265b66d4482a0660bfb3c36b01c044c77953eebe3059bf4372edc8cc1c0",
       "executable": false
     },
     "tests/plinth/signed-change-support.mjs": {

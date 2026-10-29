@@ -478,8 +478,8 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
   const policy = await f.json('/agents/api/policy', {method: 'PUT', cookie: f.owner, body: {document: {schema: 'rer-agent-policy/1', catalogue: 'rer-agent-classes/1', rules: [{id: 'owner-reviewed-drafts', class: '*', do: 'autonomous'}], spend: {none: true}}}})
   assert.equal(policy.status, 200, JSON.stringify(policy.value))
   let sequence = 0
-  const mcp = async (name, args) => {
-   const r = await f.json('/mcp', {method: 'POST', token, headers: {accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25', 'mcp-method': 'tools/call', 'mcp-name': name}, body: {jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: {name, arguments: args}}})
+  const mcp = async (name, args, requestState) => {
+   const r = await f.json('/mcp', {method: 'POST', token, headers: {accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2026-07-28', 'mcp-method': 'tools/call', 'mcp-name': name}, body: {jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: {name, arguments: args, ...(requestState ? {requestState} : {}), _meta: {'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {elicitation: {url: {}}}}}}})
    return r
   }
   await d.act('/selections', {...d.terms, category: 'Unselected private choice', options: [{name: 'Unselected confidential option', supplier: 'Private supplier', specifications: 'Unselected office notes', price_cents: 50000}]})
@@ -505,6 +505,7 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
   const changed = await d.act('/products/' + d.alternate.id + '/revise', {...d.productTerms, name: 'Changed alternate', cost_quote_cents: 9000})
   await d.act('/products/' + d.alternate.id + '/review', {revision_id: changed.revisions.at(-1).id, confirm: true})
   assert.equal((await get(d.packet.id)).value.current, false)
+  assert.equal((await mcp('plinth.decisions.draft', draftArgs)).value.result.isError, true, 'A source change retires a completed draft replay')
   assert.equal((await get(d.packet.id)).value.record.facts[0].comparisons[0].supplier_quote_cents, 7500, 'Historical comparison remains immutable')
   r = await mcp('plinth.decisions.read', args); assert.equal(r.value.result._meta['com.runeditrun/error'].code, 'decision_source_stale')
   r = await mcp('plinth.decisions.draft', {...draftArgs, request_id: 'synthetic-plinth-stale', idempotency_key: crypto.randomUUID()}); assert.equal(r.value.result.isError, true)
@@ -539,10 +540,45 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
   assert.equal((await d.review([freeLink])).facts[0].case_closed, false, 'A rounded one-cent receipt still requires every physical quantity')
   const foreign = await createActiveJob(f, 'Other decision job', address)
   assert.equal((await f.json('/api/plinth/jobs/' + foreign.id + '/decision-graphs/' + delivered.id, {cookie: f.owner})).status, 404)
+  const latestPacket = await d.review([withOrder]), latestArgs = {job_id: d.job.id, packet_id: latestPacket.id}
+  const setAgentPolicy = async rule => {
+   const response = await f.json('/agents/api/policy', {method: 'PUT', cookie: f.owner, body: {document: {schema: 'rer-agent-policy/1', catalogue: 'rer-agent-classes/1', rules: [{id: 'private-evidence', class: '*', ...rule}], reviewers: ['sponsor'], spend: {none: true}}}})
+   assert.equal(response.status, 200, JSON.stringify(response.value))
+  }
+  await setAgentPolicy({do: 'approval', approver: ['sponsor'], wait: 'PT1H'})
+  const pendingRead = await mcp('plinth.decisions.read', latestArgs)
+  assert.equal(pendingRead.value.result.resultType, 'input_required')
+  const approvalId = pendingRead.value.result._meta['com.runeditrun/approval'].id
+  const approval = (await f.json('/agents/api/approvals/' + approvalId, {cookie: f.owner})).value.approval
+  assert.equal((await f.json('/agents/api/approvals/' + approvalId + '/approve', {method: 'POST', cookie: f.owner, body: {revision: approval.revision, summary_sha256: approval.summary_sha256}})).status, 200)
+  assert.equal((await mcp('plinth.decisions.read', latestArgs, pendingRead.value.result.requestState)).value.result.isError, false)
+  const pendingList = await mcp('plinth.decisions.list', {job_id: d.job.id})
+  assert.equal(pendingList.value.result.resultType, 'input_required')
+  const listApprovalId = pendingList.value.result._meta['com.runeditrun/approval'].id
+  const listApproval = (await f.json('/agents/api/approvals/' + listApprovalId, {cookie: f.owner})).value.approval
+  assert.equal((await f.json('/agents/api/approvals/' + listApprovalId + '/approve', {method: 'POST', cookie: f.owner, body: {revision: listApproval.revision, summary_sha256: listApproval.summary_sha256}})).status, 200)
+  assert.equal((await mcp('plinth.decisions.list', {job_id: d.job.id}, pendingList.value.result.requestState)).value.result.isError, false)
+  await setAgentPolicy({do: 'review'})
+  const reviewArgs = {...latestArgs, request_id: 'synthetic-plinth-review-draft', idempotency_key: crypto.randomUUID()}
+  const reviewedDraft = await mcp('plinth.decisions.draft', reviewArgs)
+  assert.equal(reviewedDraft.value.result.isError, false, JSON.stringify(reviewedDraft.value))
+  assert.ok((await f.json('/agents/api/reviews', {cookie: f.owner})).value.reviews.some(review => review.summary?.target?.id === latestPacket.id))
+  await d.read()
+  assert.equal((await f.json(d.root, {method: 'DELETE', cookie: f.owner, body: {expected_version: d.job.version}})).status, 200)
+  const erasedReplay = await mcp('plinth.decisions.draft', draftArgs)
+  assert.equal(erasedReplay.value.result?.isError, true, 'Erasure must retire an already completed MCP result before replay')
+  assert.ok(!JSON.stringify(erasedReplay.value).includes('Original fixture'), 'A cached draft cannot expose erased packet evidence')
+  assert.equal((await mcp('plinth.decisions.draft', reviewArgs)).value.result.isError, true)
+  const erasedRead = await mcp('plinth.decisions.read', latestArgs, pendingRead.value.result.requestState)
+  assert.equal(erasedRead.value.result.isError, true); assert.ok(!JSON.stringify(erasedRead.value).includes('Original fixture'))
+  assert.equal((await f.json('/agents/api/approvals/' + approvalId, {cookie: f.owner})).status, 404)
+  const erasedList = await mcp('plinth.decisions.list', {job_id: d.job.id}, pendingList.value.result.requestState)
+  assert.equal(erasedList.value.result.isError, true); assert.ok(!JSON.stringify(erasedList.value).includes(latestPacket.id))
+  assert.equal((await f.json('/agents/api/approvals/' + listApprovalId, {cookie: f.owner})).status, 404)
+  assert.ok(!(await f.json('/agents/api/reviews', {cookie: f.owner})).value.reviews.some(review => review.summary?.target?.id === latestPacket.id))
   const creds = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials
   for (const credential of creds) assert.equal((await f.json('/api/plinth/agent-credentials/' + credential.id + '/revoke', {method: 'POST', cookie: f.owner, body: {}})).status, 200)
   assert.equal((await mcp('plinth.decisions.read', {job_id: d.job.id, packet_id: delivered.id})).status, 401)
-  assert.equal((await f.json(d.root, {method: 'DELETE', cookie: f.owner, body: {expected_version: d.job.version}})).status, 200)
   assert.equal((await get(delivered.id)).status, 404)
  } finally { await f.close() }
 })

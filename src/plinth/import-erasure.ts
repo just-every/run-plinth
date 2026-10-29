@@ -1,3 +1,4 @@
+import { retireDecisionReplay } from './decision-replay'
 import { actorPredicate, requireOwner } from './auth.ts'
 import { need, type Actor, type Job } from './model.ts'
 import { retireImportedJob } from './import-retirement.ts'
@@ -16,6 +17,7 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
   return retireImportedJob(db, actor, job, [
     { sql: `INSERT INTO pl_guard(ok) SELECT CASE WHEN (${current.sql}) AND EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=? AND data=?) AND NOT ${held.sql} THEN 1 ELSE 0 END`, params: [...current.params, job.id, job.version, row.data, ...held.params] },
     audit,
+    ...retireDecisionReplay(job),
     { sql: "DELETE FROM rer_mail_event_receipts WHERE event_namespace='job-mail' AND json_extract(event_json,'$.deliveryId') IN (SELECT id FROM pl_mail_messages WHERE job_id=?)", params: [job.id] },
     { sql: "DELETE FROM rer_mail_event_states WHERE event_namespace='job-mail' AND provider_message_id IN (SELECT provider_message_id FROM pl_mail_messages WHERE job_id=? AND provider_message_id IS NOT NULL)", params: [job.id] },
     { sql: 'DELETE FROM pl_payment_events WHERE attempt_id IN (SELECT id FROM pl_payment_attempts WHERE job_id=?)', params: [job.id] },
