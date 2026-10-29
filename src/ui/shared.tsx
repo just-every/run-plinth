@@ -38,7 +38,7 @@ export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slic
 export function Field({ label, name, type = 'text', required = true, ...props }: {label: string; name: string; type?: string; required?: boolean; [key: string]: unknown}) {
   return <label>{label}<input name={name} type={type} required={required} {...props} /></label>
 }
-export function Form({ children, action, submit = 'Save', reset = true }: {children: ReactNode; action: (form: FormData) => Promise<unknown>; submit?: string; reset?: boolean}) {
+export function Form({ children, action, submit = 'Save', reset = true, success = 'Saved.' }: {children: ReactNode; action: (form: FormData) => Promise<unknown>; submit?: string; reset?: boolean; success?: string}) {
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('')
   const id = useId(), formRef = useRef<HTMLFormElement>(null), errorRef = useRef<HTMLParagraphElement>(null)
   const [invalid, setInvalid] = useState<string[]>([]), [elapsed, setElapsed] = useState(0), [completed, setCompleted] = useState('')
@@ -72,7 +72,7 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
     const focused = document.activeElement instanceof HTMLElement && form.contains(document.activeElement) ? document.activeElement : form.querySelector<HTMLButtonElement>('button[type=submit]')
     setInvalid([]); setBusy(true); setError(''); setMessage(''); setElapsed(0); setCompleted('')
     let saved = false
-    try { await action(data); if (reset) form.reset(); setMessage('Saved.'); setCompleted(((performance.now() - start) / 1000).toFixed(1)); saved = true }
+    try { await action(data); if (reset) form.reset(); setMessage(success); setCompleted(((performance.now() - start) / 1000).toFixed(1)); saved = true }
     catch (e) { setInvalid(e instanceof FieldError && e.field ? [e.field] : []); setError(e instanceof Error ? e.message : 'Could not save.'); }
     // A frame can run before React commits: enable the controls before restoring focus.
     finally { flushSync(() => setBusy(false)); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
