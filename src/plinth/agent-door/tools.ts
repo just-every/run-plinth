@@ -1,4 +1,5 @@
 import { recoveryEvidenceTools } from './recovery-evidence'
+import { answerTools } from './answers'
 import { defineTool, type ToolContext, type ToolDefinition, type JsonSchemaObject } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
 import { nativeCall, nativeVersion, safe } from './native'
@@ -56,6 +57,7 @@ export function tools(env: Bindings):ToolDefinition[] {
  definitions.push(defineTool({name:'plinth.catalogs.list',title:'List native catalog identities',description:'List catalog record identities for authorized draft pricing.',scope:'drafts:read',readOnly:true,inputSchema:{type:'object',properties:{}},outputSchema:{type:'object',properties:{entries:{type:'array'}},required:['entries']},classes:['standard'],clauses:['EST-002'],classify:()=>[{class:'standard',facts:{measure:1}}],async run(_,ctx){const value=await nativeCall(env,ctx.person,'estimate-catalog','GET',undefined,ctx);return {result:{entries:(value.entries as Array<{id:string;kind:string;version:number}>).map(({id,kind,version})=>({id,kind,version}))}}}}))
  definitions.push(defineTool({name:'plinth.pricing.rates',title:'List native tax rate identities',description:'List already reviewed native tax-rate identities for a draft preview.',scope:'drafts:read',readOnly:true,inputSchema:{type:'object',properties:{}},outputSchema:{type:'object',properties:{rates:{type:'array'}},required:['rates']},classes:['standard'],clauses:['EST-003'],classify:()=>[{class:'standard',facts:{measure:1}}],async run(_,ctx){const value=await nativeCall(env,ctx.person,'pricing-rates','GET',undefined,ctx);return {result:{rates:(value.rates as Array<{id:string;version:number}>).map(({id,version})=>({id,version}))}}}}))
  definitions.push(...learningTools(env))
+ definitions.push(...answerTools(env))
  definitions.push(...recoveryEvidenceTools(env))
  return definitions
 }

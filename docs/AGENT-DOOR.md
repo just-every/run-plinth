@@ -23,3 +23,20 @@ The dedicated private case door retains reviewed packets and dated assessments. 
 A trade confirmation is separate from delivery. Installed quantities and actual finishes remain attributed human records. Forecast margin is separate from revenue less posted native costs, which may be incomplete. Missing evidence keeps restoration unverified; a later contradiction reopens an earlier supported native comparison and retains its history. Independently reconciled external actuals and the final human recovery decision remain required, even when all selected native comparisons are supported. There is no final-close action.
 
 The owner can revoke a case. Current source and owner authority are checked when reading, assessing and replaying an MCP response. Private archives retain the case history, but exclude the installation's evidence-review grants; restoration requires fresh explicit owner review before agent access or another assessment. Erasing the source job removes its case and local grants.
+
+## Owner-reviewed project questions
+
+A signed-in owner can create a question packet with `POST /api/plinth/jobs/{job_id}/agent-answers`, supplying the current `expected_version`, a `question`, `confirm: true` and explicitly selected `sources`. The supported references are:
+
+- `kind: plan` with `set_id` and `sheet_id`, retaining that exact sheet, original reference, reviewed text and annotations.
+- `kind: bid` with `package_id`, `invitation_id` and `response_id`, retaining the selected private response and its revision context.
+- `kind: decision` with `decision_id`, referring to a native change decision, including its unresolved draft state.
+- `kind: cost` with `entry_id`, retaining only the selected posted entry's amount, currency, coding, dates and source identities. Individual pay details and the full ledger are excluded.
+
+The owner reviews these facts for this question; an agent cannot create packets or grant itself source access. `plinth.answers.read` lists currently usable packet identities for one job, or reads an exact `packet_id`. Every read rechecks the current owner sponsor, packet consent and source fingerprints. Changed sources require a newly reviewed packet. The owner revokes a packet with `POST /api/plinth/jobs/{job_id}/agent-answers/{packet_id}/revoke` and the current job version.
+
+An MCP client supplies analysis to `plinth.answers.retain`, with `job_id`, `packet_id`, `packet_digest` and `analysis`. Analysis has separate `facts`, `conflicts`, `assumptions` and `unresolved` arrays. Each statement supplies `text` and `citations`; each citation contains an exact packet `source_id` and its `digest`. Recorded facts need a citation, conflicts need two distinct cited sources, and assumptions may be explicitly uncited. Fabricated or inaccessible citations are refused. Analysis remains an attributed draft; citation membership does not establish that its interpretation is correct. Earlier answers remain retained.
+
+`plinth.answers.prepare` accepts the exact packet digest and retained `answer_id`, then an `input` naming `kind: diary` with `date` and `note`, or `kind: schedule` with `trade`, `start`, `end` and `description`. It uses native draft preparation and records one linked draft per answer, including across retries with different transport keys. It neither publishes nor approves. Both write tools also require the shared door's `idempotency_key`. Shared approval summaries contain references only. Source checks precede cached answer replay, and job erasure removes both native packets and copied answer payloads from the shared door.
+
+This owner-only workflow grants no manager or client question access, raw agent cost access, external audience or provider authority. Broader question answering, source coverage, estimate and change preparation, and demonstrated answer quality remain AGENT-007 work in the contract.

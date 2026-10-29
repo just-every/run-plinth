@@ -138,6 +138,6 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | AGENT-004 | missing | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | AGENT-005 | missing | No cost-match agent or actual-cost correction packets exist. |
 | AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |
-| AGENT-007 | missing | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
+| AGENT-007 | partial | Conservative default ADOPTED: a personally signed-in owner explicitly selects and reviews each immutable same-job question packet; only that current owner and their currently authorized MCP analysis may consume it. Complete manager and client Q&A, broad source coverage, complete estimate, change, daily-log and task preparation, and demonstrated answer quality remain owed. ROLE-003 exact-policy confirmation, conservative owner-only per-job external-feature default and same-job client precedence, ROLE-006 copied-preset ceiling, owner-only assignment, administrator and external scope and delivery-grant approval, and ROLE-005 recorded retention and erasure policy duties remain unchanged. No external audience, raw agent cost access, provider authority, approval or publication is granted. |
 | AGENT-008 | missing | No scheduled AI runner, source grants or outcome and budget controls exist. |
 | AGENT-009 | done |  |

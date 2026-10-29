@@ -55,11 +55,12 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
       else control.removeAttribute('aria-invalid')
       if (descriptions.length) control.setAttribute('aria-describedby', descriptions.join(' ')); else control.removeAttribute('aria-describedby')
     })
-    if (error) {
+    // An error can commit while the fieldset is disabled; recover focus when it is enabled.
+    if (error && !busy) {
       const first = [...(controls ?? [])].find(control => invalid.includes(control.name))
       ;(first ?? errorRef.current)?.focus()
     }
-  }, [error, invalid, id])
+  }, [error, invalid, id, busy])
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget
     if (busy) return

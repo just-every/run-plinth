@@ -1,3 +1,4 @@
+import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -1058,3 +1059,4 @@ test('Private recovery packets fence MCP evidence, replay, source decisions, rev
   assert.deepEqual(await replayPayloads(),[],'A captured request cannot recreate erased private replay data')
  }finally{await f.close()}
 })
+test('AGENT-007 — reviewed question packets retain cited analysis and one inert draft while source, sponsor, replay and erasure fences hold',async()=>{const f=await createFixture();try{await proveQuestionAnswers(f)}finally{await f.close()}})

@@ -4,6 +4,48 @@
   "specialist": "Construction project coordinator",
   "tools": [
     {
+      "name": "plinth.answers.prepare",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-007",
+        "NATIVE-008",
+        "ROLE-006"
+      ]
+    },
+    {
+      "name": "plinth.answers.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-007",
+        "NATIVE-008",
+        "ROLE-006"
+      ]
+    },
+    {
+      "name": "plinth.answers.retain",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-007",
+        "NATIVE-008",
+        "ROLE-006"
+      ]
+    },
+    {
       "name": "plinth.catalogs.list",
       "scope": "drafts:read",
       "readOnly": true,
@@ -381,6 +423,260 @@
           "class": "standard",
           "facts": {
             "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "questions",
+      "tool": "plinth.answers.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "question",
+      "tool": "plinth.answers.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "packet_id": {
+          "$from": "questions",
+          "pointer": "/record/packets/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "tool": "plinth.answers.retain",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "packet_id": {
+          "$from": "question",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "question",
+          "pointer": "/record/digest"
+        },
+        "analysis": {
+          "facts": [
+            {
+              "text": "A completion decision remains in draft",
+              "citations": [
+                {
+                  "source_id": {
+                    "$from": "question",
+                    "pointer": "/record/sources/0/id"
+                  },
+                  "digest": {
+                    "$from": "question",
+                    "pointer": "/record/sources/0/digest"
+                  }
+                }
+              ]
+            }
+          ],
+          "conflicts": [],
+          "assumptions": [],
+          "unresolved": [
+            "No approved cause or final completion is established"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-draft",
+      "tool": "plinth.answers.prepare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "packet_id": {
+          "$from": "question",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "question",
+          "pointer": "/record/digest"
+        },
+        "answer_id": {
+          "$from": "answer",
+          "pointer": "/record/id"
+        },
+        "input": {
+          "kind": "diary",
+          "date": "2026-10-28",
+          "note": "Review the unresolved completion evidence with the owner"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "questions-sensitive",
+      "tool": "plinth.answers.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "question-sensitive",
+      "tool": "plinth.answers.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "packet_id": {
+          "$from": "questions-sensitive",
+          "pointer": "/record/packets/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-sensitive",
+      "tool": "plinth.answers.retain",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "packet_id": {
+          "$from": "question-sensitive",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "question-sensitive",
+          "pointer": "/record/digest"
+        },
+        "analysis": {
+          "facts": [
+            {
+              "text": "A completion decision remains in draft",
+              "citations": [
+                {
+                  "source_id": {
+                    "$from": "question-sensitive",
+                    "pointer": "/record/sources/0/id"
+                  },
+                  "digest": {
+                    "$from": "question-sensitive",
+                    "pointer": "/record/sources/0/digest"
+                  }
+                }
+              ]
+            }
+          ],
+          "conflicts": [],
+          "assumptions": [],
+          "unresolved": [
+            "No approved cause or final completion is established"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-draft-sensitive",
+      "tool": "plinth.answers.prepare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "packet_id": {
+          "$from": "question-sensitive",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "question-sensitive",
+          "pointer": "/record/digest"
+        },
+        "answer_id": {
+          "$from": "answer-sensitive",
+          "pointer": "/record/id"
+        },
+        "input": {
+          "kind": "diary",
+          "date": "2026-10-28",
+          "note": "Review the unresolved completion evidence with the owner"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
           }
         }
       ]
