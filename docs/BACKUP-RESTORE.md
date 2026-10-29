@@ -38,6 +38,47 @@ Replace `/private/path/plinth.rer` with the archive's actual private path. Enter
 
 Check **Jobs**, accepted quotes, approvals and downloaded daily-log photos. Open **Move in → Import journal** to inspect retained imports. Use the destination's new owner session to manage retained imports.
 
+## Compare a native recovery inventory
+
+As the signed-in owner, open **People & access → Settings → Backup recovery comparison**.
+Choose **Download recovery manifest** before stopping the app for the CLI export.
+Keep that JSON file with the private archive. It contains record identities, revision
+references, original-file byte sizes and SHA-256 checksums, table coverage and
+financial control totals. It is confidential and does not contain the original
+record bodies or file bytes. It cannot restore data or grant access.
+
+After the existing CLI import into an empty installation and owner setup, open
+the same Settings control, choose the source JSON file and select **Compare recovery
+manifest**. The report lists missing, extra and changed records and originals,
+source and current financial totals, and any changed coverage or exclusions.
+A supplied manifest is an unverified claim; a match does not establish its origin.
+Compare immediately after restoration: later edits, downloads that add audit
+events, erasures or other native activity can produce legitimate differences.
+
+Control totals group each currency separately. Issued gross, signed corrections,
+net receipts including reversals, deposit applications, write-offs and posted
+cost entries are added from their native source facts independently of the
+ordinary report and balance projections. These totals are controls, not a current
+receivable balance or independent external accounting verification. Draft invoices
+and unposted costs contribute no issued or posted amount. File checksums are
+calculated from retained bytes, including inline originals and assembled chunks.
+
+The owner can also download `./api/plinth/recovery/manifest.json` with a session
+and submit that JSON as the `manifest` field to
+`./api/plinth/recovery/reconcile`. The comparison changes no data or authority,
+performs no provider operation, reconnects no receiver and resumes no pending send.
+Clients, administrators and bearer credentials are refused. An old manifest cannot
+restore erased content or bypass the CLI's later-journal refusal described below.
+
+The semantic inventory covers currently implemented native product and import
+custody records. Its exclusions explicitly retain Base account and bootstrap
+metadata, provider state, live connector grants and queues, credentials, sessions,
+private settings and standing consent outside comparison. The existing CLI remains
+the archive and restore door; its account custody and ownership rules are unchanged.
+Complete target-wide recovery, future entities, differently owned installation
+handoff, external accounting reconciliation and complete human PDF, CSV and XLSX
+reports remain owed. Restored tasks still need explicit destination-owner review.
+
 ## Reconnect native receivers
 
 Backups retain an inert checklist of receiver origins, job IDs, event types and
