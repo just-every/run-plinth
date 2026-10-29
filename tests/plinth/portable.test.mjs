@@ -243,6 +243,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const savedQuestion=(await f.json(archivedQuestion.root+'/agent-answers/'+archivedQuestion.packet.id,{cookie:f.owner})).value.record
     const sourceManifestResponse=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(sourceManifestResponse.status,200)
     const sourceManifest=await sourceManifestResponse.json()
+    assert.ok(!sourceManifest.tables.some(table=>table.name==='pl_learning_consents'),'Recovery comparison excludes nonportable agent-learning consent')
     const control=sourceManifest.controls.find(row=>row.currency==='USD')
     assert.equal(control.issued_invoices,3);assert.equal(control.posted_cost_cents,74500+6000+9000);assert.equal(control.receipts_cents,5500);assert.equal(control.deposit_applications_cents,4000);assert.equal(control.write_offs_cents,1000);assert.equal(control.corrections_cents,-2500)
     assert.ok(sourceManifest.files.some(file=>file.sha256===archivedRoom.revisions[0].files[0].checksum&&file.size===roomFiles()[0].bytes.length),'Inventory measures actual original bytes independently')
