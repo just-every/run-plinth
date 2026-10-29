@@ -9,7 +9,7 @@ import type {PortalSubmission} from './subcontractor-portal'
 import {jobOf,jobs,readClock,saveJob} from './store'
 
 export interface BillReviewLine {order_id:string;line_id:string;cost_code:string;description:string;subtotal_cents:number;taxable:boolean}
-export interface BillReviewCycle {id:string;reference:string;note:string;amount_cents:number;attachments:Attachment[];by:Stamp;received_submission_id?:string;replacement_reason?:string;decision?:{id:string;outcome:'accepted'|'rejected';reason:string;by:Stamp;commitment_digest:string;commitments:unknown;lines:BillReviewLine[];draft?:Input};handoff?:{bill_id:string;by:Stamp}}
+export interface BillReviewCycle {id:string;reference:string;note:string;amount_cents:number;attachments:Attachment[];by:Stamp;received_submission_id?:string;replacement_reason?:string;reopened_from?:string;decision?:{id:string;outcome:'accepted'|'rejected';reason:string;by:Stamp;commitment_digest:string;commitments:unknown;lines:BillReviewLine[];draft?:Input};handoff?:{bill_id:string;by:Stamp}}
 export interface SubcontractorBillReview {id:string;subcontract_id:string;vendor_id:string;cycles:BillReviewCycle[]}
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown)=>Response.json(value,{headers})
@@ -22,7 +22,12 @@ function commitment(job:Job,row:SubcontractorBillReview){
  const award=find(job.subcontracts??[],row.subcontract_id)
  return {award:{id:award.id,vendor_id:award.vendor_id,vendor_name:award.vendor_name,scope:award.scope,amount_cents:award.amount_cents,status:award.status,awarded_on:award.awarded_on,awarded_by:award.awarded_by},orders:job.orders.filter(o=>o.source?.kind==='award'&&o.source.subcontract_id===award.id&&o.status==='issued').map(o=>({id:o.id,description:o.description,supplier:o.supplier,amount_cents:o.amount_cents,lines:o.lines??[],issued_by:o.issued_by,amendment_ids:o.amendments?.filter(a=>a.status==='approved').map(a=>a.id)??[]}))}
 }
-async function view(job:Job){return {version:job.version,register:await Promise.all(register(job).map(async row=>{const terms=commitment(job,row),latest=row.cycles.at(-1)!;return {...row,commitments:terms,commitment_digest:await digest(terms),status:latest.handoff?'Draft prepared':latest.decision?.outcome==='accepted'?'Accepted, draft not prepared':latest.decision?.outcome==='rejected'?'Revision required':'Awaiting review'}})),unresolved:register(job).filter(r=>!r.cycles.at(-1)!.decision||r.cycles.at(-1)!.decision!.outcome==='rejected').length}}
+async function view(job:Job){
+ const rows=await Promise.all(register(job).map(async row=>{const terms=commitment(job,row),latest=row.cycles.at(-1)!,fingerprint=await digest(terms),source_changed=!!latest.decision&&latest.decision.commitment_digest!==fingerprint
+  return {...row,commitments:terms,commitment_digest:fingerprint,source_changed,status:latest.handoff?'Draft prepared':source_changed&&latest.decision?.outcome==='accepted'?'Commitment changed; fresh review required':latest.decision?.outcome==='accepted'?'Accepted, draft not prepared':latest.decision?.outcome==='rejected'?'Revision required':'Awaiting review'}
+ }))
+ return {version:job.version,register:rows,unresolved:rows.filter(r=>{const c=r.cycles.at(-1)!;return !c.decision||c.decision.outcome==='rejected'||!c.handoff&&r.source_changed}).length}
+}
 async function original(db:D1Database,job:Job,cycle:BillReviewCycle,id:string){
  const file=find(cycle.attachments,id),response=await decisionDownload(db,job,cycle.attachments,id),bytes=new Uint8Array(await response.arrayBuffer())
  // The native COST-002 draft retains the selected exact received original, not caller-supplied replacement bytes.
@@ -37,7 +42,7 @@ function itemization(job:Job,row:SubcontractorBillReview,input:Input):BillReview
   need(!seen.has(key),'Itemize each commitment line once');seen.add(key)
   need(typeof l.subtotal_cents==='number'&&Number.isSafeInteger(l.subtotal_cents)&&l.subtotal_cents>0,'Itemized subtotal must be positive integer cents')
   need(typeof l.taxable==='boolean','Review the taxable or exempt choice for every item')
-  const reserved=sum((job.subcontractor_bill_reviews??[]).filter(r=>r.id!==row.id).flatMap(r=>r.cycles.flatMap(c=>c.decision?.outcome==='accepted'?c.decision.lines.filter(x=>x.order_id===order.id&&x.line_id===source.id).map(x=>x.subtotal_cents):[])))
+  const reserved=sum((job.subcontractor_bill_reviews??[]).filter(r=>r.id!==row.id).flatMap(r=>r.cycles.flatMap(c=>c===r.cycles.at(-1)&&c.decision?.outcome==='accepted'?c.decision.lines.filter(x=>x.order_id===order.id&&x.line_id===source.id).map(x=>x.subtotal_cents):[])))
   need(sum([reserved,l.subtotal_cents])<=source.total_cents,'Accepted itemization exceeds this exact commitment line',409,'review_overbill')
   return {order_id:order.id,line_id:source.id,cost_code:source.cost_code,description:source.description,subtotal_cents:l.subtotal_cents,taxable:l.taxable}
  })
@@ -52,13 +57,19 @@ export async function subcontractorBillReviewResponse(request:Request,env:Bindin
   if(tail.length===2&&tail[0]==='files')return decisionDownload(env.DB,previous,register(previous).flatMap(r=>r.cycles.flatMap(c=>c.attachments)),tail[1]!)
   need(!tail.length,'Unknown review route',404,'not_found');return json(await view(previous))
  }
- need(request.method==='POST'&&tail.length===2&&['review','replace','prepare-draft'].includes(tail[1]!),'Unknown review action',404,'not_found');active(previous);usdOnly(previous)
+ need(request.method==='POST'&&tail.length===2&&['review','replace','prepare-draft','reopen'].includes(tail[1]!),'Unknown review action',404,'not_found');active(previous);usdOnly(previous)
  const input=await jobRequest(request,15_000_000);need(input.expected_version===previous.version,'Job changed; reload the review register',409,'stale_version')
  const job=structuredClone(previous),root=find(register(job),tail[0]!),row=job.subcontractor_bill_reviews?.find(r=>r.id===root.id)??structuredClone(root)
  if(!job.subcontractor_bill_reviews?.some(r=>r.id===root.id))(job.subcontractor_bill_reviews??=[]).push(row)
  const cycle=row.cycles.at(-1)!;need(input.cycle_id===cycle.id,'Review the current submission revision',409,'review_revision')
  const writes:D1PreparedStatement[]=[];let record:unknown
- if(tail[1]==='replace'){
+ if(tail[1]==='reopen'){
+  need(cycle.decision?.outcome==='accepted'&&!cycle.handoff,'Only an accepted submission without a draft can reopen',409,'review_state')
+  need(await digest(commitment(job,row))!==cycle.decision.commitment_digest,'Reopen only after the awarded commitment changes',409,'review_source')
+  need(input.confirm===true,'Confirm a fresh review of the retained original');need(row.cycles.length<50,'At most 50 retained submission revisions')
+  const replacement:BillReviewCycle={id:crypto.randomUUID(),reference:cycle.reference,note:cycle.note,amount_cents:cycle.amount_cents,attachments:structuredClone(cycle.attachments),by:stamp(actor),reopened_from:cycle.id,replacement_reason:text(input.reason,'Fresh review reason',2000)}
+  row.cycles.push(replacement);record=replacement
+ }else if(tail[1]==='replace'){
   need(cycle.decision?.outcome==='rejected','Only a rejected submission receives a linked replacement',409,'review_state');need(row.cycles.length<50,'At most 50 retained submission revisions')
   const reason=text(input.reason,'Reason for linking this replacement',2000);let replacement:BillReviewCycle
   if(input.received_submission_id){

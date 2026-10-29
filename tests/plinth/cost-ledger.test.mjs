@@ -87,3 +87,37 @@ test('COST-002 — subcontract invoices bind exact released progress, preserve w
   assert.ok((await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value.items.some(e=>e.kind==='unmatched_payment'&&e.amount_cents===10000))
  }finally{await f.close()}
 })
+
+
+test('Reviewed subcontractor handoff remains a draft behind native cost approval, duplicate and separation gates',async()=>{
+ const f=await createFixture()
+ try{
+  const {billReviewFixture}=await import('./subcontractor-bill-support.mjs'),email=['synthetic-plinth-cost-sub','example.invalid'].join('@'),sub={email,cookie:await f.invite(email)}
+  const api=(path,body,who)=>f.json('/api/plinth'+path,{cookie:who?.cookie??f.owner,...(body===undefined?{}:{method:'POST',body})})
+  const c=await billReviewFixture(api,{sub}),accepted=c.accept()
+  accepted.lines[0].subtotal_cents=50000;accepted.lines[1].subtotal_cents=22000
+  assert.equal((await c.review('/review',accepted)).status,200,'50000 plus 5000 tax plus 22000 labor reconciles the received 77000')
+  const firstDecision=structuredClone(c.source.register[0].cycles[0].decision)
+  assert.equal((await api('/jobs/'+c.job.id+'/subcontracts/'+c.scope.id+'/access',{expected_version:c.source.version,hold:true,reason:'Synthetic scope held pending current commitment review'})).status,200)
+  await c.read();assert.equal(c.source.unresolved,1);assert.equal(c.source.register[0].source_changed,true)
+  assert.equal((await c.review('/prepare-draft',{cycle_id:c.submission,decision_id:firstDecision.id,confirm:true})).value.error,'review_source')
+  assert.equal((await c.review('/reopen',{cycle_id:c.submission,reason:'Fresh review after scope hold',confirm:true})).status,200)
+  assert.deepEqual(c.source.register[0].cycles[0].decision,firstDecision)
+  assert.equal((await api('/jobs/'+c.job.id+'/subcontracts/'+c.scope.id+'/release',{expected_version:c.source.version})).status,200)
+  await c.read();const fresh=c.accept();fresh.lines[0].subtotal_cents=50000;fresh.lines[1].subtotal_cents=22000
+  assert.equal((await c.review('/review',fresh)).status,200)
+  const cycle=c.source.register[0].cycles[1]
+  assert.equal((await c.review('/prepare-draft',{cycle_id:cycle.id,decision_id:cycle.decision.id,confirm:true})).status,200)
+  const billId=c.source.record.bill_id,before=(await api('/jobs/'+c.job.id+'/costs')).value
+  const post=async(body)=>api('/jobs/'+c.job.id+'/costs/bills/'+billId+'/post',{expected_version:c.source.version,...body})
+  assert.equal((await post({})).value.error,'cost_review','The office review never preapproves missing receipts')
+  assert.deepEqual((await api('/jobs/'+c.job.id+'/costs')).value,before)
+  assert.equal((await api('/jobs/'+c.job.id+'/costs/bills/'+billId+'/review',{expected_version:c.source.version,reason:'Separate native review of missing receipt exception'})).status,200)
+  await c.read()
+  assert.equal((await post({})).value.error,'cost_separation','The office acceptance never waives the native different-person approval policy')
+  const afterRefusal=(await api('/jobs/'+c.job.id+'/costs')).value;assert.deepEqual({...afterRefusal,version:before.version},before,'Only the explicit native exception review changed the version; refused posting changes no ledger balance')
+  const bills=(await api('/jobs/'+c.job.id+'/costs/bills')).value.bills;assert.equal(bills.length,1);assert.equal(bills[0].status,'draft');assert.equal(bills[0].amount_cents,77000)
+  assert.deepEqual(bills[0].subcontractor_review,{submission_id:c.submission,cycle_id:cycle.id,decision_id:cycle.decision.id})
+  assert.equal((await api('/jobs/'+c.job.id+'/costs/bills',{expected_version:c.source.version,vendor:c.vendor.name,reference:cycle.reference})).value.error,'cost_duplicate','Native entry cannot duplicate the prepared handoff')
+ }finally{await f.close()}
+})

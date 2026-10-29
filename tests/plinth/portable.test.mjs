@@ -1,3 +1,4 @@
+import {billReviewFixture,billFile,correctedBytes} from './subcontractor-bill-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
 import { stripeEdge, intent } from './payment-fixture.mjs'
@@ -169,6 +170,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     r=await f.json(`/api/plinth/subcontractor-portal/${job.id}/compliance`,{method:'POST',cookie:portalContact,body:{...portalInput,expected_version:job.version,kind:'license',issuer:'Synthetic state licensing authority',effective_on:'2026-01-01',expires_on:'2099-12-31'}});assert.equal(r.status,200,JSON.stringify(r.value));job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     const archivePortal=structuredClone(job.portal_submissions),portalCompliance=archivePortal.find(s=>s.kind==='compliance')
     r=await f.json(`/api/plinth/jobs/${job.id}/portal-policy`,{method:'POST',cookie:f.owner,body:{expected_version:job.version,disabled:{client:['photos'],subcontractor:['bills']},reason:'Archived owner access restriction'}});assert.equal(r.status,200);job=r.value.job
+    const billArchiveApi=(path,body,who)=>f.json('/api/plinth'+path,{cookie:who?.cookie??f.owner,...(body===undefined?{}:{method:'POST',body})})
+    const billReviewArchive=await billReviewFixture(billArchiveApi,{sub:{email:['synthetic-plinth-portal','example.com'].join('@'),cookie:portalContact}})
+    assert.equal((await billReviewArchive.review('/review',{cycle_id:billReviewArchive.submission,commitment_digest:billReviewArchive.source.register[0].commitment_digest,outcome:'rejected',reason:'Synthetic original requires corrected coded labor',confirm:true})).status,200)
+    assert.equal((await billReviewArchive.review('/replace',{cycle_id:billReviewArchive.submission,reference:'synthetic-plinth-archive-corrected',reason:'Owner linked the exact corrected company original',note:'Synthetic corrected company bill',amount_cents:64000,attachments:[billFile(correctedBytes)]})).status,200)
+    assert.equal((await billReviewArchive.review('/review',billReviewArchive.accept())).status,200)
+    const acceptedBillCycle=billReviewArchive.source.register[0].cycles[1]
+    assert.equal((await billReviewArchive.review('/prepare-draft',{cycle_id:acceptedBillCycle.id,decision_id:acceptedBillCycle.decision.id,confirm:true})).status,200)
+    const archivedBillReviews=structuredClone(billReviewArchive.source.register),archivedBillId=archivedBillReviews[0].cycles[1].handoff.bill_id
     // COST-001..006 share this same private archive and erasure journey.
     const c=await costFixture(f)
     let costResponse=await c.ok('/costs/bills',c.bill());await c.ok(`/costs/bills/${costResponse.record.id}/review`,{reason:'Archive reviewed original'});await c.ok(`/costs/bills/${costResponse.record.id}/post`)
@@ -251,6 +260,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     }
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id).row.data);assert.deepEqual(recovered.estimate_performance,archivedPerformance);assert.deepEqual(recovered.quotes,performanceSource.job.quotes)}
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id).row.data);assert.deepEqual(recovered.signed_changes,archivedChanges,'Signed documents, two exact signatures and once-only application links survive CLI recovery');assert.deepEqual(recovered.budgets,signedArchive.job.budgets);assert.deepEqual(recovered.sov,signedArchive.job.sov);assert.deepEqual(recovered.invoices,signedArchive.job.invoices.map(({balance,...invoice})=>invoice))}
+    for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===billReviewArchive.job.id).row.data);assert.deepEqual(recovered.subcontractor_bill_reviews,archivedBillReviews.map(({commitments,commitment_digest,status,...row})=>row),'SUB-002 immutable reasons, exact commitment snapshots and linked originals survive native CLI recovery');assert.equal(recovered.cost_records.bills[0].id,archivedBillId);assert.equal(recovered.cost_records.entries.length,0)}
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
@@ -264,7 +274,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
     const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
     assert.deepEqual(recoveredPortalJob.room_boards,[archivedRoom],'Room measurements, immutable revisions and pinned product snapshots survive CLI recovery')
-    for(const original of roomFiles()){
+    const recoveredBillRegister=await recoveredSearch.json('/api/plinth'+billReviewArchive.root,{cookie:receivingCookie});assert.equal(recoveredBillRegister.status,200);assert.deepEqual(recoveredBillRegister.value.register,archivedBillReviews);for(const cycle of archivedBillReviews[0].cycles){const download=await recoveredSearch.request('/api/plinth'+billReviewArchive.root+'/files/'+cycle.attachments[0].id,{cookie:receivingCookie});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),cycle.id===billReviewArchive.submission?Buffer.from(billFile().base64,'base64'):correctedBytes)}const repeatedHandoff=await recoveredSearch.json('/api/plinth'+billReviewArchive.root+'/'+billReviewArchive.submission+'/prepare-draft',{method:'POST',cookie:receivingCookie,body:{expected_version:recoveredBillRegister.value.version,cycle_id:acceptedBillCycle.id,decision_id:acceptedBillCycle.decision.id,confirm:true}});assert.equal(repeatedHandoff.status,409);assert.equal(repeatedHandoff.value.error,'review_handoff');for(const original of roomFiles()){
       const file=archivedRoom.revisions[0].files.find(f=>f.name===original.name),beforeFile=originalRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id),afterFile=restoredRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id)
       assert.ok(beforeFile);assert.deepEqual(afterFile,beforeFile,'Every original room file survives the complete binary archive stream')
     }
@@ -312,6 +322,11 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await proveConnectorRecovery(destination,cookie,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:[job.id],event_types:['job.updated'],revoked_at:null},revokedConnector.value.subscription.id,connectorCredential.id,connector.value.signing_key)
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
+    const currentBillReview=(await f.json('/api/plinth/jobs/'+billReviewArchive.job.id,{cookie})).value.job
+    assert.equal((await f.json('/api/plinth/jobs/'+billReviewArchive.job.id,{method:'DELETE',cookie,body:{expected_version:currentBillReview.version}})).status,200)
+    assert.equal((await f.json('/api/plinth'+billReviewArchive.root,{cookie})).status,404)
+    assert.equal((await f.request('/api/plinth'+billReviewArchive.root+'/files/'+acceptedBillCycle.attachments[0].id,{cookie})).status,404)
+    assert.equal((await f.json('/api/plinth'+billReviewArchive.root+'/'+billReviewArchive.submission+'/prepare-draft',{method:'POST',cookie,body:{expected_version:currentBillReview.version,cycle_id:acceptedBillCycle.id,decision_id:acceptedBillCycle.decision.id,confirm:true}})).status,404,'SUB-002 an erased job cannot be recreated by a replayed capture')
     const signedCurrent=(await f.json('/api/plinth/jobs/'+signedArchive.job.id,{cookie})).value.job;assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id,{method:'DELETE',cookie,body:{expected_version:signedCurrent.version}})).status,200);assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id+'/signed-changes',{cookie})).status,404)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
     const performanceCurrent=(await f.json('/api/plinth/jobs/'+performanceSource.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+performanceSource.job.id,{method:'DELETE',cookie,body:{expected_version:performanceCurrent.version}})).status,200)

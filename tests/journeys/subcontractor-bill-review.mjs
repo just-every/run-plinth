@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict'
+import {mkdir} from 'node:fs/promises'
+import {chromium,expect} from '@playwright/test'
+import {nativeSignIn} from '../../scripts/verify/native-signin.mjs'
+import {billReviewFixture,billBytes,correctedBytes} from '../plinth/subcontractor-bill-support.mjs'
+const base=process.env.PLINTH_URL,state=process.env.PLINTH_STATE,shots=process.env.PLINTH_SCREENSHOTS,edge=process.env.PLINTH_PROVIDER_EDGE_URL
+assert.ok(base&&state&&shots&&edge,'Use the disposable installed application and synthetic provider boundary')
+await mkdir(shots,{recursive:true})
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLINTH_CHROMIUM_PATH,args:['--use-mock-keychain','--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])]})
+try{
+ const owner=await browser.newContext({storageState:state,viewport:{width:1440,height:1000}}),page=await owner.newPage(),subContext=await browser.newContext(),subPage=await subContext.newPage()
+ const sub={email:['synthetic-plinth-bill-contact','example.invalid'].join('@'),context:subContext}
+ const invitation=await owner.request.post(base+'/auth/invite',{headers:{origin:base},data:{email:sub.email,displayName:'Synthetic framing contact',role:'member',returnTo:'/app'}});assert.equal(invitation.status(),202)
+ await nativeSignIn(subPage,sub.email)
+ const api=async(path,body,who)=>{const context=who?.context??owner,r=body===undefined?await context.request.get(base+'/api/plinth'+path):await context.request.post(base+'/api/plinth'+path,{headers:{origin:base},data:body});return {status:r.status(),value:await r.json()}}
+ const c=await billReviewFixture(api,{sub}),before=(await api('/subcontractor-portal/'+c.job.id,undefined,sub)).value.source
+ const effects=async()=>(await (await owner.request.get(edge+'/effects')).json()).requests,effectsBefore=await effects()
+ await page.goto(base+`/app?job=${c.job.id}&tab=Purchasing`)
+ const panel=page.getByRole('region',{name:'Subcontractor bill review',exact:true}),record=panel.getByRole('article',{name:'Bill review synthetic-plinth-original-1',exact:true})
+ await record.getByText('Review this submission',{exact:true}).click()
+ const review=()=>record.getByRole('form',{name:'Record bill decision',exact:true})
+ await review().getByLabel('Bill review reason',{exact:true}).fill('Unsupported charge in original; corrected material and labor required')
+ await review().getByRole('checkbox').check();await review().getByRole('button',{name:'Record bill decision',exact:true}).click()
+ await expect(record.getByText('Rejected; corrected revision required',{exact:false})).toBeVisible()
+ await expect(panel.getByRole('status').filter({hasText:'1 submission needs review or a corrected revision.'})).toBeVisible()
+ const capture=async(label)=>{for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await panel.scrollIntoViewIfNeeded();await page.screenshot({path:`${shots}/SUB-002-${label}-${width}.png`,fullPage:true,animations:'disabled'})}await page.setViewportSize({width:1440,height:1000})}
+ await capture('rejected-original')
+ await record.getByText('Link a corrected submission',{exact:true}).click()
+ const replacement=record.getByRole('form',{name:'Link corrected bill',exact:true})
+ await replacement.getByLabel('Corrected bill reference',{exact:true}).fill('synthetic-plinth-corrected-2')
+ await replacement.getByLabel('Owner receipt note',{exact:true}).fill('Corrected company original received and retained by owner')
+ await replacement.getByLabel('Corrected bill amount (USD)',{exact:true}).fill('640')
+ await replacement.getByLabel('Corrected bill originals',{exact:true}).setInputFiles({name:'synthetic-plinth-corrected.pdf',mimeType:'application/pdf',buffer:correctedBytes})
+ await replacement.getByLabel('Replacement link reason',{exact:true}).fill('Same awarded company corrected the unsupported charge')
+ await replacement.getByRole('button',{name:'Link corrected bill',exact:true}).click()
+ const second=record.getByRole('region',{name:'Bill revision 2',exact:true})
+ await second.getByText('Review this submission',{exact:true}).click()
+ await review().getByLabel('Review disposition',{exact:true}).selectOption('accepted')
+ await review().getByLabel('Bill review reason',{exact:true}).fill('Exact original reconciles to 400 materials, 200 labor and 40 reviewed tax')
+ await review().getByLabel('Billed subtotal · Framing materials',{exact:true}).fill('400')
+ await review().getByLabel('Billed subtotal · Framing labor',{exact:true}).fill('200')
+ await review().getByLabel('Taxable · Framing materials',{exact:true}).check()
+ await review().getByLabel('Bill date',{exact:true}).fill('2026-10-23');await review().getByLabel('Bill due date',{exact:true}).fill('2026-11-23');await review().getByLabel('Accounting period',{exact:true}).fill('2026-10')
+ await review().getByLabel('Reviewed tax percent',{exact:true}).fill('10')
+ await review().getByLabel('Tax rate source',{exact:true}).fill('Synthetic reviewed jurisdiction rate')
+ await review().getByLabel('Exemption source for any exempt line',{exact:true}).fill('Synthetic labor exemption source')
+ await review().getByLabel('I reviewed the tax rate and taxable or exempt split.',{exact:true}).check()
+ await review().getByLabel('Record this reasoned decision permanently for this exact revision.',{exact:true}).check()
+ await review().getByRole('button',{name:'Record bill decision',exact:true}).click()
+ await expect(second.getByText('Accepted for draft review',{exact:false})).toBeVisible()
+ await c.read();const cycle=c.source.register[0].cycles[1],handoff={cycle_id:cycle.id,decision_id:cycle.decision.id,confirm:true},beforeRefusal=structuredClone(c.source)
+ for(const body of [{...handoff,expected_version:c.source.version-1},{...handoff,cycle_id:c.submission}])assert.equal((await c.review('/prepare-draft',body)).status,409)
+ assert.equal((await c.review('/prepare-draft',handoff,sub)).status,403);assert.deepEqual(await c.read(),beforeRefusal,'Unsafe handoff attempts change nothing')
+ const prepare=record.getByRole('form',{name:'Prepare native bill draft',exact:true})
+ await prepare.getByRole('checkbox').check();await prepare.getByRole('button',{name:'Prepare native bill draft',exact:true}).click()
+ await expect(record.getByText('Native bill draft prepared.',{exact:false})).toBeVisible()
+ await page.reload();await expect(record.getByText('Native bill draft prepared.',{exact:false})).toBeVisible()
+ await expect(record.getByText('Unsupported charge in original; corrected material and labor required',{exact:false})).toBeVisible()
+ await expect(second.getByText('06-100 · Framing materials · $400.00 subtotal · taxable',{exact:true})).toBeVisible()
+ await expect(second.getByText('01-100 · Framing labor · $200.00 subtotal · exempt',{exact:true})).toBeVisible()
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Populated bill review fits the desktop')
+ for(const font of await panel.locator('h2,h3,h4,p,label,input,button,li,a,select,summary').evaluateAll(elements=>elements.filter(e=>e.getClientRects().length).map(e=>parseFloat(getComputedStyle(e).fontSize))))assert.ok(font>=13,'Visible review text is at least 13px')
+ await c.read();assert.equal(c.source.register[0].cycles.length,2);assert.equal(c.source.unresolved,0)
+ assert.equal((await c.review('/prepare-draft',handoff)).value.error,'review_handoff')
+ const bills=(await api('/jobs/'+c.job.id+'/costs/bills')).value.bills.filter(b=>b.subcontractor_review?.submission_id===c.submission)
+ assert.equal(bills.length,1);assert.equal(bills[0].status,'draft');assert.equal(bills[0].amount_cents,64000);assert.equal(bills[0].tax.tax_cents,4000);assert.equal(bills[0].lines.reduce((n,l)=>n+l.subtotal_cents,0),60000)
+ const ledger=(await api('/jobs/'+c.job.id+'/costs')).value;assert.equal(ledger.totals.posted_actual_cents,0);assert.equal(ledger.totals.payable_cents,0)
+ for(const [revision,bytes] of [[c.source.register[0].cycles[0],billBytes],[c.source.register[0].cycles[1],correctedBytes]]){const original=await owner.request.get(base+'/api/plinth'+c.root+'/files/'+revision.attachments[0].id);assert.equal(original.status(),200);assert.deepEqual(await original.body(),bytes)}
+ const after=(await api('/subcontractor-portal/'+c.job.id,undefined,sub)).value.source;assert.deepEqual({...after,version:before.version},before)
+ assert.equal(await effects(),effectsBefore,'Review creates no outbound provider effects')
+ await capture('retained-revisions-and-draft')
+ const originalPath=c.root+'/files/'+cycle.attachments[0].id
+ assert.equal((await api(originalPath,undefined,sub)).status,403)
+ assert.equal((await owner.request.post(base+'/auth/signout',{headers:{origin:base},data:{}})).status(),204)
+ assert.equal((await api(c.root)).status,401);assert.equal((await c.review('/prepare-draft',handoff)).status,401,'Revoked owner session cannot replay draft preparation')
+ await owner.close();await subContext.close()
+ console.log('SUB-002 PASS: installed owner rejection, retained original, linked correction, exact coded itemization and tax, one native draft, stale and revoked and nonowner refusals, unchanged external response, no posting or provider calls; screens at 1440 and 390')
+}finally{await browser.close()}

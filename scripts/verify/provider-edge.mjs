@@ -4,9 +4,10 @@ import { stripeEdge, intent } from '../../tests/plinth/payment-fixture.mjs'
 
 // Only external provider records live here. No application responses are replaced.
 export async function providerEdge() {
- let refuseNext=false
+ let refuseNext=false,requests=0
  const messages = [], stripe = stripeEdge()
  const outboundService = async request => {
+  requests++
   if (new URL(request.url).origin === 'https://api.stripe.com') return stripe.handler(request)
   assert.equal(request.url, 'https://api.resend.com/emails', 'Unexpected Worker egress')
   assert.equal(request.method, 'POST')
@@ -19,6 +20,7 @@ export async function providerEdge() {
   const reply = (status, value) => { response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); response.end(JSON.stringify(value)) }
   try {
    const url = new URL(request.url, 'http://127.0.0.1')
+   if (request.method==='GET'&&url.pathname==='/effects')return reply(200,{requests})
    if (request.method === 'GET' && url.pathname === '/mail/latest') return reply(200, { message: latest(url.searchParams.get('email')) ?? null })
    assert.equal(request.method, 'POST')
    const chunks = []; for await (const chunk of request) chunks.push(chunk)

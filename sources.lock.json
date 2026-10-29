@@ -1001,7 +1001,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "926ba3d929e6dd82fa505a56a3f002c7841d5137199b19513492a60289c0d12b",
+      "sha256": "0ff16d61e30d41748e8de4fa5276f3c2999abfe9cc152677b2938c829b3ad064",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -1009,7 +1009,7 @@
       "executable": false
     },
     "scripts/verify/provider-edge.mjs": {
-      "sha256": "e37be087997b42f6d05827404add03447c6f72eccbf401f3e060f4cce9cc2596",
+      "sha256": "b6ca908c2df71becdbd481ad63f6e346d44e5ad7dae6eb39062c824b504f659d",
       "executable": false
     },
     "SEED-COMMAND-CONTRACT.md": {
@@ -4013,7 +4013,7 @@
       "executable": false
     },
     "src/plinth/subcontractor-bill-review.ts": {
-      "sha256": "08d3f7eb7a62ba2b62f66507dd2399f536f2c26a0d78aaca7ef3a039b8914274",
+      "sha256": "b0c4e2446c9655e9abebd299ce76e1b0e5278d68d0d6ec50c20729a90c4fe478",
       "executable": false
     },
     "src/plinth/subcontractor-portal.ts": {
@@ -4889,7 +4889,7 @@
       "executable": false
     },
     "src/ui/subcontractor-bill-review.tsx": {
-      "sha256": "78109831fb0b9f86f41601a84699119ea8b9ecc792f696ea36afc849e3f06c0e",
+      "sha256": "82938b91e04fb3c5281504dd840e91b198f28de46527fcba0ee9b5b5b5e72050",
       "executable": false
     },
     "src/ui/subcontractor-records.tsx": {
@@ -5296,6 +5296,10 @@
       "sha256": "31af1419509fadc26d116c3e2df8cc6d9907167f24e3c582658519187ef7b3ac",
       "executable": false
     },
+    "tests/journeys/subcontractor-bill-review.mjs": {
+      "sha256": "4c338ed6ed5acb25851509347da3ca597628c52eb2d3db221ce1b34197fa4e67",
+      "executable": false
+    },
     "tests/journeys/submittals.mjs": {
       "sha256": "b536cafaf55f9c6b9a17586a5b65f1851b33abcd020297f572f644d7ea4f5004",
       "executable": false
@@ -5341,7 +5345,7 @@
       "executable": false
     },
     "tests/plinth/cost-ledger.test.mjs": {
-      "sha256": "c587b201de6f7194c5f9ddca2d1c7ff91cd131a0f4ba9a98418a90e990578113",
+      "sha256": "b183abe76036df2703c4effa907452a836aa48633c18474dbf84c469a746198b",
       "executable": false
     },
     "tests/plinth/cost-periods.test.mjs": {
@@ -5401,7 +5405,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "60f4b6d5c2d6319c8963d89058d096f842e1d5ed60aaf67f8deefb8549358272",
+      "sha256": "62422ce77dd33b6957a31837c51767be48be64db79c695b4be790868d1986455",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
