@@ -3568,8 +3568,12 @@
       "sha256": "e36fccb51553232b8fe2d73235c17393fd90f739f85bb437fec1d6dddbcaf773",
       "executable": false
     },
+    "src/plinth/import-retention.ts": {
+      "sha256": "3fcf2d0b962aa801816e5dcea1c8b70cb584df7e59f11f1cc56453d99cdf583a",
+      "executable": false
+    },
     "src/plinth/import-retirement.ts": {
-      "sha256": "29719f0c5095c64bfce948a82bf20868046a7403a26bdb25fe36ee552e1bc8f7",
+      "sha256": "589ba85c68f7445694341afe9dc90498c0e77f34d4221f5111c062c4c95e0f62",
       "executable": false
     },
     "src/plinth/import-source.ts": {
@@ -5409,7 +5413,7 @@
       "executable": false
     },
     "tests/plinth/import-history-support.mjs": {
-      "sha256": "e8470d58b6c1c865ff44f6a57c1248319f78b549954f9e420fdf3f7b6e939df6",
+      "sha256": "f01e134932a9c55bcb0000501ce63635cb5688998a364ea74e5b487484cd7731",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
