@@ -4793,7 +4793,7 @@
       "executable": false
     },
     "src/ui/recovery-reconciliation.tsx": {
-      "sha256": "f4a5184eb5b482fcc9e7ce83124d69a43ea6df88787f15c33d5929679d29bcc7",
+      "sha256": "f0c6689b912b0008d7b72a82108a564ddfd1b661b8cf6fa3e03ca7ddf8ba588b",
       "executable": false
     },
     "src/ui/report-schedules.tsx": {
@@ -4885,7 +4885,7 @@
       "executable": false
     },
     "src/ui/shared.tsx": {
-      "sha256": "f29b8c5641954e6648a7fb0a3c786a3a899753014209e6822d6a9f305d731679",
+      "sha256": "2989e8ded95d36e062cd2a47c00221890db3dffa3200e1478ec29bdf156e4833",
       "executable": false
     },
     "src/ui/shell.tsx": {
@@ -5249,7 +5249,7 @@
       "executable": false
     },
     "tests/journeys/recovery-reconciliation.mjs": {
-      "sha256": "bd3453d487fd02e86c5f67fb9610ffcdef932ec1172d548a681d5c692469d2be",
+      "sha256": "b1368e4e5d9eccb3b14c36185d8ca9c8bc34a6a5d4d5130d61e4899e141e9803",
       "executable": false
     },
     "tests/journeys/report-packets.mjs": {
