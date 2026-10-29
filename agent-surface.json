@@ -92,6 +92,44 @@
       ]
     },
     {
+      "name": "plinth.learning.list",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "AGENT-009",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.learning.prepare",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-009",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.learning.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-009",
+        "NATIVE-008"
+      ]
+    },
+    {
       "name": "plinth.orders.prepare",
       "scope": "drafts:write",
       "readOnly": false,
@@ -1446,6 +1484,107 @@
               "pointer": "/record/id"
             }
           ]
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "learning-packets",
+      "tool": "plinth.learning.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "learning-read-standard",
+      "tool": "plinth.learning.read",
+      "args": {
+        "packet_id": {
+          "$from": "learning-packets",
+          "pointer": "/packets/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "learning-prepare-standard",
+      "tool": "plinth.learning.prepare",
+      "args": {
+        "packet_id": {
+          "$from": "learning-packets",
+          "pointer": "/packets/0/id"
+        },
+        "input": {
+          "request_id": "synthetic-plinth-conformance-0",
+          "reason": "Reviewed completed remodels",
+          "dimension_percent": {
+            "length": 10
+          }
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "learning-read-sensitive",
+      "tool": "plinth.learning.read",
+      "args": {
+        "packet_id": {
+          "$from": "learning-packets",
+          "pointer": "/packets/1/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "learning-prepare-sensitive",
+      "tool": "plinth.learning.prepare",
+      "args": {
+        "packet_id": {
+          "$from": "learning-packets",
+          "pointer": "/packets/1/id"
+        },
+        "input": {
+          "request_id": "synthetic-plinth-conformance-1",
+          "reason": "Reviewed completed remodels",
+          "dimension_percent": {
+            "length": 10
+          }
         }
       },
       "expect": [

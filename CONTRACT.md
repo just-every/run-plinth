@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -524,4 +524,4 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `AGENT-006` | Keep handover and warranty promises | push-further | missing |  | No handover/warranty agent or closure workflow exists. |
 | `AGENT-007` | Cited project answers and draft actions | push-further | missing |  | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | `AGENT-008` | Scheduled agents with human control | push-further | missing |  | No scheduled AI runner, source grants or outcome/budget controls exist. |
-| `AGENT-009` | Learn estimating accuracy from completed jobs | push-further | missing |  | No completed-job learning, replay or catalog proposal agent exists. |
+| `AGENT-009` | Learn estimating accuracy from completed jobs | push-further | partial | `tests/plinth/estimates.test.mjs` — “Owner-consented completed-job MCP learning replays retained dimensions and keeps approval, erasure and revocation authoritative” proves explicit owner review of two completed same-currency jobs, exact source and catalog revisions, approved-labor productivity of five and four feet per hour, unknown production denominators, bounded productivity and rate and risk allowance proposals, independently reconciled counterfactual cost and margin at retained dimensions, rejected-draft history, immutable signed estimates and actuals, and future pricing changes only through the existing human lesson approval. It also refuses changed sources and catalogs, revoked consent and credentials, and erased inputs including cached MCP replay. | Complete agent-driven recommendations, procurement variance and warranty-callback learning, full risk coverage and the complete approval and outcome loop remain owed. Draft packets are owner-only and explicitly selected; no external training or other-company data use is authorized. FIELD-002 and CARE-002 and CARE-005 retain their design and installed-screen obligations; ROLE-005 and ROLE-006 retain their recorded retention, erasure and permission-policy boundaries. RPT-002 remains unchanged. |

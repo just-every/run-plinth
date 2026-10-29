@@ -435,3 +435,24 @@ test('Room boards retain original geometry, finish revisions and exact signed so
   assert.equal((await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{expected_version:otherBoard.value.job.version,...roomInput()}})).status,401,'A revoked session cannot replay a new board capture')
  }finally{await f.close()}
 })
+
+test('Owner-consented completed-job MCP learning replays retained dimensions and keeps approval, erasure and revocation authoritative',async()=>{
+ const {performanceFixture,learningJourney}=await import('./performance-support.mjs'),f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await performanceFixture(f),proof=await learningJourney(f,c),first=c.jobs[0],second=c.jobs[1]
+  const freshInput={catalog_id:c.assembly.id,catalog_version:2,sources:[first,second].map(j=>({id:j.job.id,version:j.job.version}))},preview=await proof.request('/preview',freshInput)
+  assert.equal(preview.status,200);const made=await proof.request('/packets',{...freshInput,digest:preview.value.preview.digest,confirm:true,reason:'Fresh exact source review'}),id=made.value.packet.id
+  assert.equal((await proof.request('/packets/'+id+'/revoke',{confirm:true})).status,200)
+  const revoked=await proof.mcp('plinth.learning.read',{packet_id:id});assert.equal(revoked.value.error.data.code,'consent_required')
+  const again=await proof.request('/packets',{...freshInput,digest:preview.value.preview.digest,confirm:true,reason:'Catalog version refusal proof'}),catalogId=again.value.packet.id
+  const entry=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id)
+  await c.call('/estimate-catalog/'+entry.id,{expected_version:entry.version,name:entry.name,reason:'Independent reviewed catalog revision',value:entry.revisions.at(-1).value})
+  const staleCatalog=await proof.mcp('plinth.learning.read',{packet_id:catalogId});assert.equal(staleCatalog.value.error.data.code,'stale_catalog')
+  assert.equal((await f.request('/api/plinth/jobs/'+second.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:second.job.version}})).status,200)
+  assert.equal((await proof.request('/packets/'+proof.packet.id)).status,404)
+  const replay=await proof.mcp('plinth.learning.prepare',proof.prepareInput);assert.equal(replay.value.error.data.code,'not_found','Erased source cannot return a cached draft')
+  const credential=(await c.call('/agent-credentials')).credentials.find(r=>!r.revoked_at)
+  await c.call('/agent-credentials/'+credential.id+'/revoke',{})
+  assert.equal((await proof.mcp('plinth.learning.list')).status,401)
+ }finally{await f.close()}
+})
