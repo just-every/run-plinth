@@ -1,4 +1,6 @@
-import { wallClock } from './time-zone'
+import { wallClock, zonedInstant } from './time-zone'
+import { addWork, workingMinutes } from './schedule-calendar'
+import { latestActual } from './schedule-baseline-model'
 import { activeHolds } from './holds'
 import { costLedger } from './cost-ledger'
 import { costs, digest } from './cost-model'
@@ -66,7 +68,11 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  const labor=codes.find(c=>c.cost_code===request.labor_cost_code)
  need(labor&&Number(labor.remaining_quantity)>0&&Number(labor.minutes_per_unit)>0,'Review positive remaining labor and productivity for the overrun code')
  const laborTask=find(schedule.tasks,request.labor_task_id),catalog=await resources(db),units=sum((laborTask.resources??[]).filter(a=>catalog.some(r=>r.id===a.resource_id&&r.kind==='crew')).map(a=>a.units))
- const required=forecastThousandths(labor.remaining_quantity,'Remaining labor quantity')*forecastThousandths(labor.minutes_per_unit,'Labor minutes per unit'),available=(laborTask.duration_minutes??0)*units
+ // Actual starts stay historical in the native preview. Only future working time after
+ // material and recorded predecessors are ready can satisfy remaining labor.
+ const remainingStart=Math.max(zonedInstant(request.as_of,0,job.time_zone??'UTC'),Date.parse(laborTask.start),Date.parse(delivery.end),...(laborTask.predecessors??[]).map(p=>addWork(Date.parse(find(schedule.tasks,p.id).end),p.lag_minutes,schedule.calendar)))
+ const available=latestActual(job,laborTask.id)?.actual_finish?0:Math.floor(workingMinutes(remainingStart,Date.parse(laborTask.end),schedule.calendar)*units)
+ const required=forecastThousandths(labor.remaining_quantity,'Remaining labor quantity')*forecastThousandths(labor.minutes_per_unit,'Labor minutes per unit')
  const labor_capacity={task_id:laborTask.id,required_minutes:(required/1_000_000n).toString()+((required%1_000_000n)?'.'+(required%1_000_000n).toString().padStart(6,'0').replace(/0+$/,''):''),available_minutes:available,sufficient:required<=BigInt(available)*1_000_000n}
  const candidate=structuredClone(job),forecast=await previewCostForecast(candidate,actor,{...forecastInput,as_of:request.as_of,codes})
  forecast.id='recovery-'+id;forecast.source_version=request.sources.source_version

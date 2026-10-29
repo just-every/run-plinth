@@ -13,6 +13,8 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
   // A shared analysis is also evidence of its other selected jobs.
   const linked = (await db.prepare('SELECT DISTINCT job_id FROM pl_learning_sources WHERE packet_id IN (SELECT packet_id FROM pl_learning_sources WHERE job_id=?)').bind(job.id).all<{job_id:string}>()).results
   for (const source of linked) if (source.job_id !== job.id) await requireNoHold(db, actor, 'job', source.job_id)
+  const recoveryLinked = (await db.prepare('SELECT DISTINCT source_id AS job_id FROM pl_recovery_packet_sources WHERE request_id IN (SELECT request_id FROM pl_recovery_packet_sources WHERE source_id=?)').bind(job.id).all<{job_id:string}>()).results
+  for (const source of recoveryLinked) if (source.job_id !== job.id) await requireNoHold(db, actor, 'job', source.job_id)
   const row = await db.prepare('SELECT data,version FROM pl_jobs WHERE id=?').bind(job.id).first<{ data: string; version: number }>()
   need(row && row.version === job.version && canonicalJson(JSON.parse(row.data)) === canonicalJson(job), 'Job changed. Reload before erasing.', 409, 'conflict')
   const current = actorPredicate(actor), held = heldSql('job', job.id), audit = auditSql(actor, { kind: 'erasure', action: 'jobs.erase', subject_kind: 'job', subject_id: job.id, job_id: job.id, version_before: job.version, before_ref: await jobRef(row.data), detail: { erased: ['job record', 'photos and documents', 'correspondence and its files', 'import custody'] } })
@@ -32,6 +34,10 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
     { sql: 'DELETE FROM pl_mail_messages WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_attachments WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_lien_waiver_files WHERE job_id=?', params: [job.id] },
+    // Remove this job's copied MCP answer payloads; the shared decision audit keeps references only.
+    { sql: "DELETE FROM agent_door_calls WHERE json_extract(outcome,'$.result.record.id') IN (SELECT value FROM json_each(?)) OR decision_id IN (SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.args.job_id')=?)", params: [JSON.stringify((job.agent_answers??[]).flatMap(p=>[p.id,...p.answers.map(a=>a.id)])),job.id] },
+    { sql: "DELETE FROM agent_door_reviews WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.summary.target.id') IN (SELECT value FROM json_each(?))", params: [JSON.stringify((job.agent_answers??[]).map(p=>p.id))] },
+    { sql: "DELETE FROM agent_door_approvals WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.args.job_id')=?", params: [job.id] },
     { sql: 'DELETE FROM pl_jobs WHERE id=?', params: [job.id] },
     { sql: "INSERT INTO pl_erased_jobs(job_id,erased_at) VALUES(?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params: [job.id] },
     { sql: 'UPDATE pl_clock SET version=version+1 WHERE id=1' },

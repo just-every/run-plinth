@@ -1,3 +1,4 @@
+import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -1014,3 +1015,48 @@ test('Signed window changes freeze two exact consents, private costs and calenda
   assert.equal((await d.act('/signed-changes/'+revoked.id+'/apply',{digest:revoked.digest,confirm:true,...d.billing(revoked)})).status,404);assert.equal((await d.api('/jobs/'+d.job.id+'/signed-changes/'+revoked.id+'/document.json')).status,404,'An erased job cannot be reconstructed by replaying a captured signature or application')
  }finally{await f.close()}
 })
+
+test('Private recovery packets fence MCP evidence, replay, source decisions, revocation and erasure',async()=>{
+ const f=await createFixture({now:Date.parse('2026-11-07T12:00:00Z')});try{
+  const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),r=await recoveryEvidenceFixture(f),c=r.c,agent=await f.agent()
+  const policy=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}}});assert.equal(policy.status,200,JSON.stringify(policy.value))
+  const mcp=async(name,args,token=agent)=>f.json('/mcp',{method:'POST',token,headers:{Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2026-07-28','Mcp-Method':'tools/call','Mcp-Name':name},body:{jsonrpc:'2.0',id:52,method:'tools/call',params:{name,arguments:args,_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}}})
+  const error=response=>response.value.result?._meta?.['com.runeditrun/error']?.code??response.value.error?.data?.code
+  const args={job_id:c.job.id,case_id:r.recovery.id},read=await mcp('plinth.recovery.get',args)
+  assert.equal(read.status,200,JSON.stringify(read.value));assert.ok(read.value.result.structuredContent,JSON.stringify(read.value));assert.equal(read.value.result.structuredContent.record.packet.evidence.approval.kind,'schedule.publish');assert.equal(read.value.result.structuredContent.record.packet.evidence.accounting.forecast.margin_cents,180000)
+  const capture={...args,...r.observation(),idempotency_key:'synthetic-plinth-capture-52'},first=await mcp('plinth.recovery.assess',capture)
+  assert.ok(first.value.result.structuredContent,JSON.stringify(first.value));assert.equal(first.value.result.structuredContent.record.comparison.overall_restoration,'unverified');assert.equal(first.value.result.structuredContent.record.by.agent.name,'Scoped draft agent')
+  const repeat=await mcp('plinth.recovery.assess',capture);assert.equal(repeat.value.result.structuredContent.record.id,first.value.result.structuredContent.record.id)
+  const setPolicy=async action=>{const value=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:action}],spend:{none:true}}}});assert.equal(value.status,200)}
+  await setPolicy('blocked');assert.equal(error(await mcp('plinth.recovery.assess',capture)),'policy_changed','A cached response cannot outlive its policy revision');assert.equal(error(await mcp('plinth.recovery.get',args)),'policy_blocked');await setPolicy('autonomous')
+  let stored=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${r.recovery.id}`)).value.case;assert.equal(stored.assessments.length,1)
+  await c.read();const sourceBefore=structuredClone(c.job),casePath=`/recovery-evidence/${r.recovery.id}`
+  assert.equal((await c.api(`/jobs/${c.job.id}/costs`,undefined,undefined,agent)).status,403,'Explicit packets grant no raw agent cost access')
+  assert.equal((await c.api(`/jobs/${c.job.id}/recovery-evidence/${r.recovery.id}`,undefined,undefined,agent)).status,403,'Ordinary bearer job projection never grants reviewed finance access')
+  for(const [path,body] of [[`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'2'}],reference:'Agent claims delivery'}],['/schedule-actuals',{task_id:r.criteria.tasks[0].task_id,actual_start:'2026-11-06T08:00:00Z',evidence:'Agent claims completion'}],[casePath+'/review',{digest:r.recovery.packets[0].digest,confirm:true}],[casePath+'/close',{confirm:true}]])assert.ok((await c.act(path,body,undefined,agent)).status>=400,path+' cannot turn a draft into human evidence')
+  const admin=await f.invite(['synthetic-plinth-office','example.invalid'].join('@'),'Office person','admin');assert.equal((await c.api(`/jobs/${c.job.id}/recovery-evidence/${r.recovery.id}`,undefined,admin)).status,403)
+  for(const credentials of [{cookie:f.owner},{cookie:admin},{token:agent}]){const value=await f.json('/api/plinth/jobs/'+c.job.id,credentials);assert.equal(value.value.job.recovery_evidence,undefined,'Generic projections contain no private packet')}
+  const other=await createActiveJob(f,'Unrelated recovery job');assert.equal(error(await mcp('plinth.recovery.get',{...args,job_id:other.id})),'not_found')
+  assert.equal((await c.act('/recovery-evidence/preview',{criteria:{...r.criteria,schedule_approval_id:other.approvals[0].id}})).status,404)
+  assert.equal((await c.act('/recovery-evidence/preview',{criteria:{...r.criteria,minimum_margin_cents:0}})).value.error,'recovery_approval','An owner-entered target cannot replace the approved native margin')
+  const after=await c.read();for(const key of ['orders','schedules','schedule_actuals','approvals','budgets'])assert.deepEqual(after[key],sourceBefore[key])
+  await c.ok(`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'1'}],reference:'Human partial delivery'})
+  assert.equal(error(await mcp('plinth.recovery.get',args)),'recovery_stale');assert.equal(error(await mcp('plinth.recovery.assess',capture)),'recovery_stale','A cached MCP response cannot expose stale evidence')
+  await r.refresh();assert.equal(error(await mcp('plinth.recovery.assess',capture)),'recovery_stale','Fresh review cannot revive an old captured result')
+  const newArgs={...args,...r.observation(),idempotency_key:'synthetic-plinth-capture-53'},next=await mcp('plinth.recovery.assess',newArgs);assert.ok(next.value.result.structuredContent,JSON.stringify(next.value));await c.read()
+  await c.ok(casePath+'/revoke',{});assert.equal(error(await mcp('plinth.recovery.get',args)),'recovery_revoked');assert.equal(error(await mcp('plinth.recovery.assess',newArgs)),'recovery_revoked');assert.equal((await c.act(casePath+'/review',{digest:r.recovery.packets.at(-1).digest,confirm:true})).status,403)
+  stored=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${r.recovery.id}`)).value.case;assert.equal(stored.assessments.length,2);assert.deepEqual(stored.assessments[0],first.value.result.structuredContent.record)
+  const replayPayloads=async()=>(await f.db.prepare('SELECT key,outcome FROM agent_door_calls WHERE key IN (?,?) ORDER BY key').bind(capture.idempotency_key,newArgs.idempotency_key).all()).results
+  const beforeErasure=await replayPayloads();assert.equal(beforeErasure.length,2)
+  for(const {key,outcome} of beforeErasure){const record=JSON.parse(outcome).result.record;assert.equal(record.observation,capture.observation);assert.deepEqual(record,key===capture.idempotency_key?first.value.result.structuredContent.record:next.value.result.structuredContent.record)}
+  const otherCapture={job_id:other.id,input:{date:'2026-11-07',note:'synthetic-plinth-retained-other-job'},idempotency_key:'synthetic-plinth-retained-other-job'}
+  const otherDraft=await mcp('plinth.diary.prepare',otherCapture);assert.ok(otherDraft.value.result.structuredContent,JSON.stringify(otherDraft.value))
+  const unrelated=await f.db.prepare('SELECT outcome FROM agent_door_calls WHERE key=?').bind(otherCapture.idempotency_key).first()
+  assert.equal((await f.json('/api/plinth/jobs/'+c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).status,200)
+  assert.deepEqual(await replayPayloads(),[],'Job erasure removes private observations and financial comparisons from every historical MCP replay')
+  assert.deepEqual(await f.db.prepare('SELECT outcome FROM agent_door_calls WHERE key=?').bind(otherCapture.idempotency_key).first(),unrelated,'Erasure preserves another job’s replay')
+  assert.equal(error(await mcp('plinth.recovery.assess',newArgs)),'not_found');assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_recovery_evidence_grants WHERE case_id=?').bind(r.recovery.id).first()).n,0)
+  assert.deepEqual(await replayPayloads(),[],'A captured request cannot recreate erased private replay data')
+ }finally{await f.close()}
+})
+test('AGENT-007 — reviewed question packets retain cited analysis and one inert draft while source, sponsor, replay and erasure fences hold',async()=>{const f=await createFixture();try{await proveQuestionAnswers(f)}finally{await f.close()}})

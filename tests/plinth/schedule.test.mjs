@@ -243,6 +243,36 @@ test('Recovery packets retain dependency and hold refusals, reject unavailable c
   response=await mcp('plinth.recovery.read',args());assert.equal(response.error,'recovery_stale')
   response=await mcp('plinth.recovery.requests',{job_id:c.job.id});assert.deepEqual(response.record,[],'Revoked and stale packets are absent from the agent inventory')
   const history=(await f.json(root+requestPath(),{cookie:f.owner})).value;assert.equal(history.stale,true);assert.equal(history.record.proposals[0].id,held.id)
+  // Another job's booked work is copied into a new owner-reviewed packet and its conflict evidence.
+  let source=await createActiveJob(f,'Synthetic private source booking')
+  const sourceRoot='/api/plinth/jobs/'+source.id,privateBooking='synthetic-plinth-private-booking-88'
+  r=await f.json(sourceRoot+'/schedules',{method:'POST',cookie:f.owner,body:{expected_version:source.version,trade:'Synthetic separate source trade',description:privateBooking,start:'2026-11-09T08:00:00Z',end:'2026-11-09T16:00:00Z',resources:[{resource_id:c.resource.id,units:1}]}});assert.equal(r.status,200,JSON.stringify(r.value));source=r.value.job
+  const booking=source.schedules.at(-1)
+  if(booking.status==='draft'){r=await f.json(sourceRoot+'/schedules/'+booking.id+'/approve',{method:'POST',cookie:f.owner,body:{expected_version:source.version}});assert.equal(r.status,200,JSON.stringify(r.value));source=r.value.job}
+  const unaffected=(await c.read()).recovery_requests
+  await c.review();const linkedArgs=args(),linkedRequest=c.request.id
+  response=await mcp('plinth.recovery.compare',{...linkedArgs,key:'linked-source-comparison',alternatives:c.alternatives});assert.ok(response.record,JSON.stringify(response.value))
+  response=await mcp('plinth.recovery.read',linkedArgs);assert.ok(JSON.stringify(response.record).includes(privateBooking));assert.ok(response.record.proposals[0].alternatives.some(a=>a.schedule.conflicts.some(conflict=>conflict.job_id===source.id)))
+  r=await f.json('/api/plinth/reports/snapshots',{method:'POST',cookie:f.owner,body:{name:'Recovery packet before source erasure'}});assert.equal(r.status,201);const snapshot=r.value.snapshot.id
+  assert.ok((await f.db.prepare('SELECT data FROM pl_portfolio_snapshots WHERE snapshot_id=? AND job_id=?').bind(snapshot,c.job.id).first()).data.includes(privateBooking))
+  assert.equal((await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'approval',approver:['sponsor'],wait:'PT1H'}],spend:{none:true}}}})).status,200)
+  response=await mcp('plinth.recovery.read',linkedArgs);const linkedPending=response.value.result,linkedApproval=linkedPending._meta['com.runeditrun/approval']
+  const pendingRead=(await f.json('/agents/api/approvals/'+linkedApproval.id,{cookie:f.owner})).value.approval
+  r=await f.json('/agents/api/approvals/'+linkedApproval.id+'/approve',{method:'POST',cookie:f.owner,body:{revision:pendingRead.revision,summary_sha256:pendingRead.summary_sha256}});assert.equal(r.value.approval.state,'executed')
+  const cached=(await f.db.prepare('SELECT result FROM agent_door_approvals WHERE id=?').bind(linkedApproval.id).first()).result;assert.ok(cached.includes(privateBooking))
+  const nativeLinked=await c.read()
+  r=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:c.job.id,kind:'legal_hold',reason:'Preserve the exact shared recovery evidence',confirm:true}});assert.equal(r.status,201);const sharedHold=r.value.hold.id
+  r=await f.json(sourceRoot,{method:'DELETE',cookie:f.owner,body:{expected_version:source.version}});assert.equal(r.value.error,'retention_hold','A held recovery packet protects all of its copied sources')
+  assert.deepEqual(await c.read(),nativeLinked);assert.equal((await f.json(sourceRoot,{cookie:f.owner})).status,200)
+  r=await f.json('/api/plinth/holds/'+sharedHold+'/release',{method:'POST',cookie:f.owner,body:{reason:'Owner reviewed and released the shared evidence hold'}});assert.equal(r.status,200)
+  r=await f.json(sourceRoot,{method:'DELETE',cookie:f.owner,body:{expected_version:source.version}});assert.equal(r.status,200,JSON.stringify(r.value))
+  assert.equal((await f.json(root+'/recovery/requests/'+linkedRequest,{cookie:f.owner})).status,404,'Erasing a booked source retires the entire copied packet, including historical owner access')
+  const cleaned=await c.read();assert.deepEqual(cleaned.recovery_requests,unaffected,'Unrelated immutable packets remain exact')
+  for(const field of ['schedules','orders','variations','invoices','approvals','budgets'])assert.deepEqual(cleaned[field],nativeLinked[field],field+' survives linked source erasure')
+  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_portfolio_snapshots WHERE snapshot_id=? AND job_id=?').bind(snapshot,c.job.id).first()).n,0,'Portfolio copies of erased private bookings are withdrawn')
+  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM agent_door_approvals WHERE id=?').bind(linkedApproval.id).first()).n,0,'Completed approval copies are erased with their referenced source')
+  response=await mcp('plinth.recovery.read',linkedArgs,token,linkedPending.requestState);assert.equal(response.error,'not_found','A completed approval cannot replay an erased source packet')
+  assert.equal((await f.db.prepare("SELECT count(*) AS n FROM pl_jobs WHERE instr(data,?)>0").bind(privateBooking).first()).n,0,'Persisted jobs cannot export the erased private booking')
   const lastJob=await c.read();assert.equal((await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:lastJob.version}})).status,200)
   assert.equal((await f.db.prepare('SELECT count(*) AS n FROM agent_door_approvals WHERE id=?').bind(approval.id).first()).n,0,'Erasure removes cached private approval results along with the packet')
   response=await mcp('plinth.recovery.compare',{...args(),key:'synthetic-plinth-mcp',alternatives:c.alternatives});assert.equal(response.error,'not_found','An erased packet cannot return through a cached draft reply')

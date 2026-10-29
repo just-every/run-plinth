@@ -105,3 +105,11 @@
 .workspace .table-scroll .lines td:last-child, .workspace .table-scroll .lines th:last-child { text-align: left; }
 
 .workspace #submittals .notice { border: 1px solid var(--line); }
+
+/* The source report uses the existing owner workspace typography and borders. */
+.workspace .import-workspace :is(.id,pre) { font-size: 13px; }
+.workspace .import-coverage { min-width: 0; overflow-wrap: anywhere; }
+.workspace .import-coverage dl { display: grid; gap: 4px; margin-block: 12px; }
+.workspace .import-coverage dd { margin: 0 0 8px; }
+.workspace .import-coverage .record { padding: 10px 0; border: 0; }
+.workspace .import-coverage ol.rows { list-style: none; }

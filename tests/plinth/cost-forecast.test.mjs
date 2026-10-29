@@ -60,6 +60,25 @@ test('COST-006 — owner limits and separated approval assign budget and missing
  }finally{await f.close()}
 })
 
+test('Recovery evidence compares confirmation, delivery, installed progress and adverse costs without certifying restoration',async()=>{
+ const f=await createFixture({now:Date.parse('2026-11-07T12:00:00Z')});try{
+  const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),r=await recoveryEvidenceFixture(f),c=r.c
+  const before=await c.read(),first=await r.assess()
+  assert.equal(first.comparison.tasks[0].confirmed,true);assert.equal(first.comparison.deliveries[0].state,'unknown');assert.equal(first.comparison.deliveries[0].received_cents,0);assert.equal(first.comparison.forecast_margin_cents,180000);assert.equal(first.comparison.posted_actual_cents,0);assert.equal(first.comparison.overall_restoration,'unverified');assert.ok(first.comparison.missing.some(s=>s.startsWith('Delivery ')))
+  await c.ok(`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'2'}],reference:'synthetic-plinth-delivery-52',received_on:'2026-11-06'})
+  const stale=await c.act(`/recovery-evidence/${r.recovery.id}/assess`,r.observation());assert.equal(stale.status,409);assert.equal(stale.value.error,'recovery_stale')
+  await r.refresh();const deliveryOnly=await r.assess();assert.equal(deliveryOnly.comparison.deliveries[0].state,'supported');assert.equal(deliveryOnly.comparison.tasks[0].quantity_state,'unknown');assert.equal(deliveryOnly.comparison.overall_restoration,'unverified');assert.ok(deliveryOnly.comparison.missing.some(s=>s.startsWith('Installed quantity ')))
+  await c.ok('/schedule-actuals',{task_id:r.criteria.tasks[0].task_id,actual_start:'2026-11-06T08:00:00Z',actual_finish:'2026-11-06T09:00:00Z',installed:{quantity:'2',unit:'pack',cost_code:'06-100'},evidence:'Human records the exact installed units'})
+  await c.ok('/costs/reconcile',{period:'2026-11',balances:[],reference:'Synthetic native balance review; not independent accounting proof'})
+  await r.forecast();await r.refresh();const second=await r.assess()
+  assert.equal(second.comparison.deliveries[0].state,'supported');assert.equal(second.comparison.tasks[0].date_state,'supported');assert.equal(second.comparison.tasks[0].quantity_state,'supported');assert.equal(second.comparison.native_status,'supported');assert.equal(second.comparison.overall_restoration,'unverified');assert.equal(second.comparison.forecast_margin_cents,180000);assert.equal(second.comparison.observed_margin_cents,300000);assert.equal(second.risks[0].owner_id,c.job.created_by.id)
+  const posted=await c.ok('/costs/bills',{...c.bill('synthetic-plinth-adverse-52'),tax:{percent:'0',reference:'Synthetic exempt adjustment',exemption_reference:'Synthetic source',human_reviewed:true},lines:[{cost_code:'06-100',description:'Adverse native cost adjustment',subtotal_cents:220000,taxable:false,matches:[]}]});await c.ok(`/costs/bills/${posted.record.id}/review`,{reason:'Human checks adverse original'});await c.ok(`/costs/bills/${posted.record.id}/post`)
+  await r.refresh();const third=await r.assess()
+  assert.equal(third.comparison.posted_actual_cents,220000);assert.equal(third.comparison.observed_margin_cents,80000);assert.equal(third.comparison.forecast_margin_cents,null);assert.equal(third.comparison.margin_state,'contradicted');assert.equal(third.comparison.native_status,'contradicted');assert.equal(third.reopened,true);assert.equal(third.comparison.overall_restoration,'unverified')
+  assert.deepEqual(r.recovery.assessments.slice(0,3),[first,deliveryOnly,second]);assert.equal(r.recovery.packets.length,4)
+  const after=await c.read();for(const key of ['schedules','budgets','quotes','trade_invitations'])assert.deepEqual(after[key],before[key],key+' decisions remain immutable');assert.equal(after.approvals.filter(a=>a.kind==='schedule.publish').length,1)
+ }finally{await f.close()}
+})
 
 test('Recovery comparison reconciles two immutable date, margin and expected-cash alternatives without executing decisions',async()=>{
  const f=await createFixture();try{
@@ -89,5 +108,36 @@ test('Recovery comparison reconciles two immutable date, margin and expected-cas
   const ledgerAfter=await call(c.root+'/costs',undefined,'GET');assert.deepEqual({...ledgerAfter,version:0},{...ledgerBefore,version:0});assert.equal(f.messages.length,messages)
   const different=structuredClone(c.alternatives);different[0].forecast.codes[1].minutes_per_unit='119'
   assert.equal((await f.json('/api/plinth/'+c.root+'/recovery/requests/'+c.request.id+'/compare',{method:'POST',cookie:f.owner,body:{expected_version:after.version,key:'synthetic-plinth-1',alternatives:different}})).value.error,'recovery_replay')
+  await c.act('/schedule-actuals',{task_id:c.install,actual_start:'2026-11-02T08:00:00Z',installed:{quantity:'2',unit:'pack',cost_code:'01-100'},evidence:'Installation began with the early partial delivery; eight units still await material'})
+  await c.review()
+  const started=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'started-before-delay',alternatives:c.alternatives})).record
+  assert.deepEqual(started.alternatives.map(a=>a.labor_capacity.available_minutes),[0,0],'Historical installation time before remaining material arrives is not remaining crew capacity')
+  assert.ok(started.alternatives.every(a=>!a.native_feasible),'Neither alternative can finish remaining installation before its package arrives')
+  const nativeStarted=await c.read()
+  for(const alternative of started.alternatives){
+   const refusal=await f.json('/api/plinth/'+c.root+'/recovery/requests/'+c.request.id+'/review/'+started.id,{method:'POST',cookie:f.owner,body:{expected_version:c.job.version,digest:started.digest,alternative_id:alternative.id,decision:'retain',reason:'Cannot retain work that finishes before delivery'}})
+   assert.equal(refusal.value.error,'recovery_infeasible');assert.deepEqual(await c.read(),nativeStarted,'Refused review writes nothing')
+  }
+  const extended=structuredClone(c.alternatives)
+  extended[0].schedule.tasks[1].duration_minutes=3360
+  extended[1].schedule.tasks[1].duration_minutes=2400
+  const resumed=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'resume-after-delivery',alternatives:extended})).record
+  assert.deepEqual(resumed.alternatives.map(a=>a.labor_capacity.available_minutes),[960,960],'Only working time after each arrival can satisfy the remaining sixteen crew hours')
+  assert.deepEqual(resumed.alternatives.map(a=>a.schedule.completion_after),['2026-11-10T16:00:00.000Z','2026-11-06T16:00:00.000Z'])
+  assert.ok(resumed.alternatives.every(a=>a.native_feasible))
+  await c.act('/recovery/requests/'+c.request.id+'/review/'+resumed.id,{digest:resumed.digest,alternative_id:'wait',decision:'retain',reason:'Remaining working time is explicitly available after delivery'})
+  const retained=await c.read();assert.deepEqual(retained.schedules,nativeStarted.schedules);assert.deepEqual(retained.orders,nativeStarted.orders);assert.deepEqual(retained.schedule_actuals,nativeStarted.schedule_actuals)
+  const lagged=structuredClone(extended);for(const alternative of lagged)alternative.schedule.tasks[1].predecessors[0].lag_minutes=480
+  const laggedProposal=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'remaining-dependency-lag',alternatives:lagged})).record
+  assert.deepEqual(laggedProposal.alternatives.map(a=>a.labor_capacity.available_minutes),[480,0]);assert.ok(laggedProposal.alternatives.every(a=>!a.native_feasible),'Recorded predecessor lag also consumes the remaining window')
+  await c.review('2026-11-10')
+  const later=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'later-reviewed-date',alternatives:extended})).record
+  assert.deepEqual(later.alternatives.map(a=>a.labor_capacity.available_minutes),[480,0]);assert.ok(later.alternatives.every(a=>!a.native_feasible),'Working time before the reviewed date is already past')
+  await c.act('/schedule-actuals',{task_id:c.install,actual_start:'2026-11-02T08:00:00Z',actual_finish:'2026-11-03T16:00:00Z',installed:{quantity:'2',unit:'pack',cost_code:'01-100'},evidence:'Human records this installation task complete; unfinished package work needs a new reviewed task'})
+  await c.review()
+  const complete=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'completed-work-is-not-remaining',alternatives:extended})).record
+  assert.deepEqual(complete.alternatives.map(a=>a.labor_capacity.available_minutes),[0,0]);assert.ok(complete.alternatives.every(a=>!a.native_feasible),'Completed actual work cannot supply capacity for remaining labor')
+
+
  }finally{await f.close()}
 })

@@ -148,6 +148,12 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   const currentVendor=(await api(`/vendors/${scopeSetup.vendor.id}`)).value.vendor
   assert.equal((await api(`/vendors/${currentVendor.id}`,{expected_version:currentVendor.version,contacts:[]})).status,200)
   assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[],'Removing the awarded company contact revokes inbox access on the next request')
+  const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),recovery=await recoveryEvidenceFixture(f)
+  const recoveryRoot='/jobs/'+recovery.c.job.id+'/recovery-evidence/'+recovery.recovery.id,priorPacket=recovery.recovery.packets[0]
+  r=await api('/vendors/'+recovery.vendor.id,{expected_version:recovery.vendor.version+1,contacts:[]});assert.equal(r.status,200)
+  assert.equal((await api(recoveryRoot)).value.stale,true,'Revoking a native awarded contact invalidates the exact evidence packet')
+  await recovery.refresh();const reassessed=await recovery.assess()
+  assert.equal(reassessed.comparison.tasks[0].confirmed,false);assert.equal(reassessed.comparison.overall_restoration,'unverified');assert.deepEqual(recovery.recovery.packets[0],priorPacket,'Earlier attributed confirmation remains historical evidence')
   const fourth=await createActiveJob(f,'Atomic A'),fifth=await createActiveJob(f,'Atomic B')
   const race=await Promise.all([act(fourth,'/schedules',booking('Trade A','17','18',[{resource_id:crew.id,units:1}])),act(fifth,'/schedules',booking('Trade B','17','18',[{resource_id:crew.id,units:1}]))]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409])
   const {recoveryFixture}=await import('./recovery-support.mjs'),{c:recoveryCase,post:recoveryPost}=await recoveryFixture(f,{name:'Recovery against current shared crew leave'})

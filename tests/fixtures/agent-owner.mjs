@@ -6,6 +6,7 @@ export default async function({request,origin,claim,displayName,returnTo}) {
  if(bootstrap.status!==303)throw Error('Native owner bootstrap returned '+bootstrap.status)
  const cookie=bootstrap.headers.getSetCookie().map(value=>value.split(';',1)[0]).join('; ')
  const call=async(path,body,method='POST')=>{const response=await request(origin+'/api/plinth/'+path,{method,headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(body)})});const value=await response.json();if(!response.ok)throw Error('Native fixture '+path+' HTTP '+response.status+': '+JSON.stringify(value));return value}
+ const questionJobs=[]
  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
  for(const name of ['A Active','B Active sensitive','C Quoting','D Quoting sensitive']){
   let job=(await call('jobs',{name,client_email:['synthetic-client','example.com'].join(String.fromCharCode(64)),address:'100 Synthetic Avenue, Portland OR 97201'})).job
@@ -17,6 +18,13 @@ export default async function({request,origin,claim,displayName,returnTo}) {
    job=(await call(`jobs/${job.id}/products/${product.id}/review`,{expected_version:job.version,revision_id:product.revisions[0].id,confirm:true})).job
   }
   if(name.includes('Active'))job=(await call(`jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'email',evidence:'Synthetic client acceptance of exact scope',schedule_choice:{kind:'none',reason:'Field dates pending'}})).job
+  if(name.includes('Active'))questionJobs.push(job)
+ }
+ for(let n=0;n<questionJobs.length;n++){
+  let job=questionJobs[n]
+  const response=await call(`jobs/${job.id}/variations`,{expected_version:job.version,description:'Synthetic unanswered completion decision',amount_cents:100})
+  job=response.job
+  await call(`jobs/${job.id}/agent-answers`,{expected_version:job.version,question:n?'Synthetic SSN 123-45-6789':'Why did completion move? Cause remains unresolved.',sources:[{kind:'decision',decision_id:response.record.id}],confirm:true})
  }
  const catalog=async(kind,value)=>(await call('estimate-catalog',{kind,name:'Synthetic '+kind,reason:'Reviewed synthetic conformance source',value})).entry
  for(const sensitive of [false,true]) {
@@ -45,8 +53,23 @@ export default async function({request,origin,claim,displayName,returnTo}) {
   await call('agent-learning/packets',{...input,digest:preview.digest,confirm:true,reason:'Owner reviewed only these completed synthetic jobs'})
  }
  await call('pricing-rates',{kind:'sales',percent:'0',jurisdiction:'Synthetic reviewed jurisdiction',effective_on:'2026-01-01',reference:'Synthetic rate source',human_reviewed:true})
+ try {
+ // A separate native job keeps the explicitly reviewed recovery sources stable during other draft journeys.
+ let recoveryJob=(await call('jobs',{name:'H Recovery',client_email:['synthetic-plinth-recovery','example.invalid'].join('@'),address:'Synthetic recovery site'})).job
+ const recoveryCall=async(path,input)=>{const value=await call('jobs/'+recoveryJob.id+path,{expected_version:recoveryJob.version,...input});if(value.job)recoveryJob=value.job;else if(value.version)recoveryJob={...recoveryJob,version:value.version};return value}
+ await recoveryCall('/quotes',{lines:[{id:'recovery-source',description:'Synthetic recovery scope',quantity:'1',unit_cents:100000,cost_code:'06',cost_unit_cents:30000,phase:'Framing',category:'material',unit:'lot'}]})
+ await recoveryCall('/quotes/'+recoveryJob.quotes[0].id+'/accept',{method:'signed',evidence:'Native exact human acceptance',schedule_choice:{kind:'none',reason:'Separate native recovery publication'}})
+ const calendar={weekdays:[1,2,3,4,5],start_hour:0,end_hour:24,holidays:[]},tasks=[{id:'synthetic-plinth-recovery-conformance',trade:'Recovery crew',description:'Synthetic native recovery work',owner:'Builder',start:'2026-11-06T08:00:00Z',duration_minutes:60}]
+ const plan=await recoveryCall('/schedule/preview',{calendar,tasks});await recoveryCall('/schedule/publish',{calendar,tasks:plan.preview.tasks,digest:plan.preview.digest})
+ const order=await recoveryCall('/orders',{supplier:'Synthetic recovery supplier',description:'Unreceived recovery package',source:{kind:'budget',cost_code:'06'},lines:[{id:'recovery-lot',description:'Native recovery lot',cost_code:'06',quantity:'1',unit:'lot',unit_cents:20000}]})
+ await recoveryCall('/orders/'+order.record.id+'/issue',{})
+ await recoveryCall('/costs/forecasts',{as_of:'2026-11-07',source_as_of:'Native fixture only; external actuals unknown',codes:[{cost_code:'06',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:20000,unbought_cents:10000,risk_cents:0,reference:'Synthetic native remaining costs'}]})
+ recoveryJob=(await call('jobs/'+recoveryJob.id,undefined,'GET')).job
+ const criteria={schedule_approval_id:recoveryJob.approvals.findLast(a=>a.kind==='schedule.publish').id,budget_id:recoveryJob.budgets[0].id,promised_finish:'2026-11-06T09:00:00.000Z',minimum_margin_cents:70000,tasks:[{task_id:tasks[0].id,quantity:'1',unit:'lot',cost_code:'06'}],order_ids:[order.record.id]}
+ const packet=await recoveryCall('/recovery-evidence/preview',{criteria});await recoveryCall('/recovery-evidence',{title:'Synthetic private recovery evidence',criteria,digest:packet.digest,confirm:true})
+ } catch(error) { console.error('Native recovery fixture: '+error.message); throw error }
  const recoveryCases=[]
- for(const sensitive of [false,true])recoveryCases.push(await recoveryNative(call,{name:sensitive?'I Recovery sensitive':'H Recovery',client:['synthetic-plinth-recovery','example.invalid'].join('@'),sensitive}))
+ for(const sensitive of [false,true])recoveryCases.push(await recoveryNative(call,{name:sensitive?'J Recovery sensitive':'I Recovery comparison',client:['synthetic-plinth-recovery','example.invalid'].join('@'),sensitive}))
  for(const recovery of recoveryCases)await recovery.review()
  return bootstrap
 }
