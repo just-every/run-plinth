@@ -3,7 +3,7 @@ import { need, type Actor, type Input } from './model'
 import { readClock, transaction } from './store'
 import { fieldConfig, reportAudit } from './report-store'
 import { reportColumns, reportRecords, type FieldRecord } from './report-records'
-import { queryReport, reportCsv, reportCsvCell, type ReportResult, type ReportView } from './report-query'
+import { reportCsv, reportCsvCell, type ReportResult, type ReportView } from './report-query'
 import { reportXlsxSheet, xlsxRows } from './report-xlsx'
 
 const chunkSize=25, maxBytes=2_000_000, encoder=new TextEncoder()
@@ -66,7 +66,7 @@ export async function backgroundWorkResponse(request:Request,db:D1Database,actor
   const id=crypto.randomUUID(),writes=[db.prepare('INSERT INTO pl_background_work(id,version,state,owner_id,format,created_at,data,total) VALUES(?,1,\'paused\',?,?,?,?,?)').bind(id,actor.id,input.format,created_at,JSON.stringify(snapshot),report.rows.length),db.prepare('INSERT INTO pl_background_reviews(task_id,owner_id,digest) VALUES(?,?,?)').bind(id,actor.id,snapshot.digest)]
   // Zero-row reports still need a finalization checkpoint.
   for(let at=0;at<Math.max(1,report.rows.length);at+=chunkSize)writes.push(db.prepare('INSERT INTO pl_background_chunks(task_id,sequence,source) VALUES(?,?,?)').bind(id,at/chunkSize,JSON.stringify(report.rows.slice(at,at+chunkSize))))
-  for(const r of sources)writes.push(db.prepare('INSERT INTO pl_background_sources(task_id,record_scope,record_id,job_id) VALUES(?,?,?,?)').bind(id,r.record_scope,r.id,r.job_id??null))
+  writes.push(db.prepare("INSERT INTO pl_background_sources(task_id,record_scope,record_id,job_id) SELECT ?,json_extract(value,'$.record_scope'),json_extract(value,'$.id'),json_extract(value,'$.job_id') FROM json_each(?)").bind(id,JSON.stringify(sources.map(r=>({id:r.id,record_scope:r.record_scope,job_id:r.job_id??null})))))
   await transaction(db,actor,null,[...writes,reportAudit(db,actor,'export',null,{work_id:id,view_id:savedView.view.id,format:input.format,digest:snapshot.digest})],clock)
   const work=(await db.prepare('SELECT * FROM pl_background_work WHERE id=?').bind(id).first<Work>())!
   return json({task:await summary(db,work,actor)},201)

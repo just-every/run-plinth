@@ -3,7 +3,7 @@ import type { ReportResult } from './report-query'
 const xml=(v:unknown)=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'')
 const utf8=new TextEncoder()
 function crc32(bytes:Uint8Array){let crc=0xffffffff;for(const b of bytes){crc^=b;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return (crc^0xffffffff)>>>0}
-export function zip(files:Record<string,string>):Uint8Array {
+function zip(files:Record<string,string>):Uint8Array {
  const chunks:Uint8Array[]=[],central:Uint8Array[]=[];let offset=0,size=0
  for(const [path,content] of Object.entries(files)){
   const name=utf8.encode(path),data=utf8.encode(content),crc=crc32(data),local=new Uint8Array(30+name.length),l=new DataView(local.buffer)
