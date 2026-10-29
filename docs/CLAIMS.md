@@ -140,4 +140,4 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |
 | AGENT-007 | missing | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | AGENT-008 | missing | No scheduled AI runner, source grants or outcome and budget controls exist. |
-| AGENT-009 | missing | No completed-job learning, replay or catalog proposal agent exists. |
+| AGENT-009 | done |  |
