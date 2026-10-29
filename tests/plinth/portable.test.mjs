@@ -1,3 +1,4 @@
+import {closeoutFixture,closeoutMcp} from './closeout-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
@@ -232,6 +233,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(roomCreated.status,200);job=roomCreated.value.job
     const archivedRoom=structuredClone(job.room_boards[0])
     const archivedExport=await archiveExportWork(f,job)
+    const closeout=await closeoutFixture(f,job),closeoutPacket=await closeout.capture()
+    await closeout.review(closeoutPacket)
+    const closeoutDraft=await closeout.ok('/agent-closeout/'+closeoutPacket.id+'/drafts',closeout.draft(closeoutPacket))
+    const archivedCloseout=(await closeout.list()).value.packets;job=await closeout.read()
     const cookie=f.owner; await f.close();f=undefined
     const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -276,6 +281,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.deepEqual(rows(restored),expected)
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
     const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
+    assert.deepEqual(recoveredPortalJob.agent_closeout,archivedCloseout,'Exact closeout packets, original source references, review attribution and unsent history survive CLI recovery')
     assert.deepEqual(recoveredPortalJob.room_boards,[archivedRoom],'Room measurements, immutable revisions and pinned product snapshots survive CLI recovery')
     for(const original of roomFiles()){
       const file=archivedRoom.revisions[0].files.find(f=>f.name===original.name),beforeFile=originalRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id),afterFile=restoredRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id)
@@ -286,7 +292,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(recoveredPortalJob.orders.find(o=>o.id===archivedSubmittal.order.id).submittal_release.cycle_id,archivedSubmittal.row.cycles[1].id)
     assert.deepEqual(recoveredPortalJob.meetings,job.meetings,'DOC-005 private meeting, assigned completion and immutable work snapshot survive CLI recovery');assert.deepEqual(recoveredPortalJob.meeting_shares,originalRows.filter(r=>r.table==='pl_jobs'&&r.row.id===job.id).map(r=>JSON.parse(r.row.data).meeting_shares)[0],'DOC-005 extracts and prior recipient consent survive privately while pending delivery remains inert')
     for(const table of ['pl_mail_messages','pl_mail_files','pl_mail_originals','pl_decision_metadata','pl_file_transcriptions']){const records=records=>records.filter(r=>r.table===table&&r.row.job_id===job.id);assert.ok(records(originalRows).length>0);assert.deepEqual(records(restoredRows),records(originalRows),'DOC-005 private original email, file bytes, checksums and annotations survive recovery')}
-    const recoveredSearch=await createFixture({persistTo:destination,ownerCookie:cookie});try{assert.equal((await recoveredSearch.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@')}})).status,202);const confirmation=new URL(recoveredSearch.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(value=>new URL(value).pathname==='/auth/confirm'));const signedIn=await recoveredSearch.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);const receivingCookie=signedIn.headers.get('set-cookie').split(';')[0];await proveRecoveredWork(recoveredSearch,receivingCookie,archivedExport);
+    const recoveredSearch=await createFixture({persistTo:destination,ownerCookie:cookie});try{assert.equal((await recoveredSearch.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@')}})).status,202);const confirmation=new URL(recoveredSearch.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(value=>new URL(value).pathname==='/auth/confirm'));const signedIn=await recoveredSearch.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);const receivingCookie=signedIn.headers.get('set-cookie').split(';')[0];await proveRecoveredWork(recoveredSearch,receivingCookie,archivedExport);const closeoutRoot='/api/plinth/jobs/'+job.id+'/agent-closeout';const restoredCloseout=await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie});assert.deepEqual(restoredCloseout.value.packets,archivedCloseout);const refusedCloseout=await recoveredSearch.json(closeoutRoot+'/'+closeoutPacket.id+'/drafts',{method:'POST',cookie:receivingCookie,body:{expected_version:restoredCloseout.value.version,...closeout.draft(closeoutPacket),request_id:'synthetic-plinth-restored-draft'}});assert.equal(refusedCloseout.status,409,'Restored review consent cannot authorize new drafting');assert.equal(refusedCloseout.value.error,'closeout_authority');assert.deepEqual((await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie})).value.packets[0].drafts,[closeoutDraft]);
       const recoveredCoverage=await recoveredSearch.json('/api/plinth/imports/'+importId+'/coverage',{cookie:receivingCookie});
       assert.equal(recoveredCoverage.status,200,JSON.stringify(recoveredCoverage.value));
       assert.deepEqual(recoveredCoverage.value.coverage,sourceCoverage.value.coverage,'Source declarations, row locations, mapping revision, digest and actual dispositions survive a real CLI round trip');

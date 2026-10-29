@@ -137,7 +137,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | AGENT-003 | missing | No outcome-tracking recovery cases or verification exist. |
 | AGENT-004 | missing | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | AGENT-005 | missing | No cost-match agent or actual-cost correction packets exist. |
-| AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |
+| AGENT-006 | partial | The shipped door is an owner-requested private evidence comparison and unsent follow-up adapter only. Complete handover and warranty agent operation, assigned request follow-through, approved trade booking and repair follow-through through builder acceptance, client acknowledgment and required-document completion, and external publication remain owed. CARE-002 and CARE-005 retain their required br and owner design authorization and every named installed screen and journey. ROLE-003 and ROLE-006 policy holds remain unchanged (including RL-104 scope duties); the conservative owner-only packet consent default does not grant scoped delegation or provider authority. BOUND-002 retains unsigned, unverified, rejected, expired and mismatched evidence holds; licensed inspection, coverage interpretation, work release and acceptance remain named human decisions. |
 | AGENT-007 | missing | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | AGENT-008 | missing | No scheduled AI runner, source grants or outcome and budget controls exist. |
 | AGENT-009 | done |  |
