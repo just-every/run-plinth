@@ -1,3 +1,4 @@
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -11,8 +12,11 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const path=(suffix='')=>`/api/plinth/jobs/${job.id}${suffix}`
  const mutate=async(suffix,body={},credentials={cookie:f.owner})=>f.json(path(suffix),{method:'POST',...credentials,body:{expected_version:job.version,...body}})
  await t.test('private transport, matching client scope and credential authority',async()=>{
+  const reused=await reusedAssemblyEstimate(f)
   const inventory=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(inventory.status,200);assert.match(inventory.headers.get('content-disposition'),/attachment/)
   const manifest=await inventory.json();assert.ok(manifest.records.some(row=>row.kind==='pl_jobs'));assert.ok(manifest.records.some(row=>row.kind==='revision-reference'));assert.ok(manifest.exclusions.length)
+  assert.equal(new Set(manifest.records.map(row=>row.identity)).size,manifest.records.length,'Repeated catalog references retain unique inventory locations')
+  assert.equal(manifest.records.filter(row=>row.kind==='revision-reference'&&row.identity.includes('/assemblies/')&&row.identity.endsWith(encodeURIComponent(reused.assembly.id))).length,4,'Both room assembly references and their immutable approval snapshots remain in the inventory')
   const admin=await f.invite(['synthetic-plinth-admin','example.com'].join('@'),'Synthetic administrator','admin')
   const snapshot=(await f.json(path(),{cookie:f.owner})).value.job,mailCount=f.messages.length
   const same=await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest}});assert.equal(same.status,200);assert.equal(same.value.matches,true)

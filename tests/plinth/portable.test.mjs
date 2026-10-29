@@ -1,3 +1,4 @@
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
@@ -231,6 +232,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const roomCreated=await f.json('/api/plinth/jobs/'+job.id+'/room-boards',{method:'POST',cookie:f.owner,body:{expected_version:job.version,...roomInput(),walkthrough:{title:'Authorized archived tour',url:'https://example.com/synthetic-plinth-tour',confirm_authorized:true},products:[{product_id:supplierProduct.id,revision_id:supplierProduct.revisions[0].id}]}})
     assert.equal(roomCreated.status,200);job=roomCreated.value.job
     const archivedRoom=structuredClone(job.room_boards[0])
+    await reusedAssemblyEstimate(f)
     const archivedExport=await archiveExportWork(f,job)
     const sourceManifestResponse=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(sourceManifestResponse.status,200)
     const sourceManifest=await sourceManifestResponse.json()
