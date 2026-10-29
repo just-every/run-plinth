@@ -435,3 +435,47 @@ test('Room boards retain original geometry, finish revisions and exact signed so
   assert.equal((await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{expected_version:otherBoard.value.job.version,...roomInput()}})).status,401,'A revoked session cannot replay a new board capture')
  }finally{await f.close()}
 })
+
+test('Owner-consented completed-job MCP learning replays retained dimensions and keeps approval, erasure and revocation authoritative',async()=>{
+ const {performanceFixture,learningJourney}=await import('./performance-support.mjs'),f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await performanceFixture(f)
+  for(let i=0;i<2;i++){
+   const source=c.jobs[i],quantity=i?'12':'10'
+   await source.act('/orders',{supplier:'Synthetic timber supplier',description:'Recorded timber package',source:{kind:'budget',cost_code:'06-200'},lines:[{id:'timber',description:'Timber units',cost_code:'06-200',quantity,unit:'each',unit_cents:120}]})
+   const order=source.job.orders.at(-1);await source.act('/orders/'+order.id+'/issue');await source.act('/orders/'+order.id+'/receive',{lines:[{line_id:'timber',quantity:i?'6':'5'}],reference:'synthetic-plinth-received-'+i})
+   await source.act('/warranties',{kind:'component',name:'Wall finish',starts_on:'2026-10-23',ends_on:'2027-10-23',terms:'Recorded signed workmanship terms',signed_terms_reference:'synthetic-plinth-signed-terms-'+i})
+   const component=source.job.warranties.components[0]
+   for(let callback=0;callback<2;callback++)await source.act('/warranties',{kind:'case',component_id:component.id,defect_key:'finish-crack',description:'Recorded callback evidence',reported_on:'2026-10-25',reviewer_email:['builder','example.com'].join(String.fromCharCode(64))})
+   const item=source.job.warranties.cases[1];await source.act('/warranties/'+item.id+'/cost',{amount_cents:i?700:500,cost_code:'06-200',reference:'synthetic-plinth-callback-'+i,description:'Recorded callback materials'})
+  }
+  const warranties=c.jobs.slice(0,2).map(j=>structuredClone(j.job.warranties)),orders=c.jobs.slice(0,2).map(j=>structuredClone(j.job.orders))
+  const proof=await learningJourney(f,c),first=c.jobs[0],second=c.jobs[1]
+  assert.deepEqual(proof.packet.sources.map(s=>{const code=s.evidence.procurement.codes.find(r=>r.cost_code==='06-200');return [code.estimated_cost_cents,code.recorded_commitment_cents,code.recorded_received_cents,code.commitment_variance_cents]}),[[1000,1200,600,200],[1200,1440,720,240]])
+  assert.deepEqual(proof.draft.citations.map(s=>[s.order_ids.length,s.receipt_ids.length,s.callback_case_ids.length,s.callback_cost_ids.length]),[[1,1,2,1],[1,1,2,1]])
+  assert.deepEqual(proof.packet.sources.map(s=>s.evidence.warranty.recorded_cost_cents),[500,700]);assert.ok(proof.packet.sources.every(s=>s.evidence.warranty.callback_probability===null&&s.evidence.warranty.cases[1].repeated))
+  for(let i=0;i<2;i++){assert.deepEqual(c.jobs[i].job.warranties,warranties[i]);assert.deepEqual(c.jobs[i].job.orders,orders[i])}
+  const currentCatalog=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id)
+  const freshInput={catalog_id:c.assembly.id,catalog_version:currentCatalog.version,sources:[first,second].map(j=>({id:j.job.id,version:j.job.version}))},preview=await proof.request('/preview',freshInput)
+  assert.equal(preview.status,200);const made=await proof.request('/packets',{...freshInput,digest:preview.value.preview.digest,confirm:true,reason:'Fresh exact source review'}),id=made.value.packet.id
+  assert.equal((await proof.request('/packets/'+id+'/revoke',{confirm:true})).status,200)
+  const revoked=await proof.mcp('plinth.learning.read',{packet_id:id});assert.equal(revoked.value.error.data.code,'consent_required')
+  const again=await proof.request('/packets',{...freshInput,digest:preview.value.preview.digest,confirm:true,reason:'Catalog version refusal proof'}),catalogId=again.value.packet.id
+  const entry=(await c.call('/estimate-catalog')).entries.find(e=>e.id===c.assembly.id)
+  await c.call('/estimate-catalog/'+entry.id,{expected_version:entry.version,name:entry.name,reason:'Independent reviewed catalog revision',value:entry.revisions.at(-1).value})
+  const staleCatalog=await proof.mcp('plinth.learning.read',{packet_id:catalogId});assert.equal(staleCatalog.value.error.data.code,'stale_catalog')
+  const changed=(await c.call('/estimate-catalog')).entries.find(e=>e.id===entry.id)
+  await c.call('/estimate-catalog/'+entry.id,{expected_version:changed.version,name:changed.name,reason:'Separate native unit revision',value:{...changed.revisions.at(-1).value,unit:'m'}})
+  const incompatible=await proof.request('/preview',{...freshInput,catalog_version:changed.version+1});assert.equal(incompatible.status,409);assert.equal(incompatible.value.error,'incompatible_units')
+  const held=(await c.call('/holds',{subject_kind:'job',subject_id:first.job.id,kind:'legal_hold',reason:'Retain shared source analysis for review',confirm:true})).hold
+  const beforeErase=structuredClone(second.job),refused=await f.json('/api/plinth/jobs/'+second.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:second.job.version}})
+  assert.equal(refused.status,409);assert.equal(refused.value.error,'retention_hold');assert.deepEqual((await c.call('/jobs/'+second.job.id)).job,beforeErase);assert.equal((await proof.request('/packets/'+proof.packet.id)).status,200)
+  await c.call('/holds/'+held.id+'/release',{reason:'Shared analysis review completed; original consent and source fences remain'})
+  assert.equal((await f.request('/api/plinth/jobs/'+second.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:second.job.version}})).status,200)
+  assert.equal((await proof.request('/packets/'+proof.packet.id)).status,404)
+  const replay=await proof.mcp('plinth.learning.prepare',proof.prepareInput);assert.equal(replay.value.error.data.code,'not_found','Erased source cannot return a cached draft')
+  const credential=(await c.call('/agent-credentials')).credentials.find(r=>!r.revoked_at)
+  await c.call('/agent-credentials/'+credential.id+'/revoke',{})
+  assert.equal((await proof.mcp('plinth.learning.list')).status,401)
+ }finally{await f.close()}
+})

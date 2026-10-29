@@ -62,6 +62,7 @@ import { configureRetainage, releaseRetainage, currentRetainageBalance } from '.
 import { configureSupplierRetainage, releaseSupplierRetainage, supplierRetainageBalance } from './supplier-retainage'
 import { applicationDocument } from './sov-document'
 import { previewVariationPricing, preparePricedVariation } from './variation-pricing'
+import { learningResponse } from './agent-learning'
 import { reportsResponse } from './reports'
 import { reportNativeGate } from './report-store'
 import { selectionAction, selectionOrderInput, selectionProjection } from './selections'
@@ -138,6 +139,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  const subPortal=await subcontractorPortalResponse(request,env,actor,parts);if(subPortal)return subPortal
  const scheduledReports=await reportScheduleResponse(request,env,actor,parts,body);if(scheduledReports)return scheduledReports
  const surveys=await satisfactionResponse(request,env,actor,parts,body);if(surveys)return surveys
+ const learning=await learningResponse(request,env.DB,actor,parts,body);if(learning)return learning
  const reports=await reportsResponse(request,env.DB,actor,parts,body);if(reports)return reports
  const team=await teamResponse(request,env.DB,actor,parts,body);if(team)return team
  const history=await auditResponse(request,env.DB,actor,parts);if(history)return history
