@@ -372,3 +372,56 @@ test('Completed estimates reconcile source-linked productivity, native outcomes 
   assert.equal((await f.json('/api/plinth/reports/performance/jobs/'+c.jobs[3].job.id+'/complete',{method:'POST',cookie:f.owner,body:{expected_version:c.jobs[3].job.version,completed_on:'2026-10-23',evidence:'No actual completion',confirm:true}})).status,409)
  }finally{await f.close()}
 })
+
+test('Owner-requested export checkpoints resume once, retain pinned CSV and XLSX sources and refuse revoked, cancelled and erased output',async()=>{
+ const {backgroundFixture,verifyDownload,address}=await import('./background-work-support.mjs'),f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{
+  const c=await backgroundFixture(f),original=(await c.api('/reports/views/'+c.saved.view.id)).value.report
+  let task=await c.create(),first=await c.action(task,'resume');assert.equal(first.status,200);task=first.value.task
+  assert.equal(task.progress,25);assert.equal(task.state,'paused')
+  const racing=await Promise.all([c.action(task,'resume'),c.action(task,'resume')]);assert.deepEqual(racing.map(r=>r.status).sort(),[200,409],'One concurrent continuation commits')
+  task=await c.read(task);assert.equal(task.progress,50)
+  const j=c.jobs[10],changed=await c.api('/jobs/'+j.id+'/quotes',{expected_version:j.version,lines:[{description:'Later quoted source',quantity:1,unit_cents:12345}]});assert.equal(changed.status,200,JSON.stringify(changed.value))
+  let edit=await c.api('/reports/views/'+c.saved.view.id,{...c.saved.view,name:'Changed after capture',expected_version:c.saved.version,selected_columns:['native.contract','native.stage']},{method:'PUT'});assert.equal(edit.status,200)
+  task=await c.finish(task);await verifyDownload(f,task,c.jobs)
+  assert.equal(task.view_version,1);assert.equal(task.progress,61);assert.equal((await c.action(task,'resume')).status,409,'A replay cannot append output')
+  const csv=await (await f.request('/api/plinth/reports/work/'+task.id+'/download',{cookie:f.owner})).text();assert.ok(csv.includes('native.contract'),'Pinned columns survive later view edits');assert.ok(csv.indexOf('native.stage')<csv.indexOf('native.contract'),'Captured column order survives a later view edit')
+  assert.deepEqual(original.rows.map(r=>r.id).sort(),c.jobs.map(j=>j.id).sort())
+  await f.db.prepare("UPDATE pl_background_chunks SET output=output||'changed' WHERE task_id=? AND sequence=0").bind(task.id).run()
+  const corrupted=await c.api('/reports/work/'+task.id+'/download');assert.equal(corrupted.status,409);assert.equal(corrupted.value.error,'checksum','A damaged stored output is refused rather than downloaded')
+  c.saved.version=edit.value.version;c.saved.view=edit.value.view
+  const xlsx=await c.finish(await c.create('xlsx'));await verifyDownload(f,xlsx,c.jobs)
+  // A genuine oversized worksheet chunk records an honest durable failure, never a finished download.
+  const fields=[]
+  for(let n=0;n<6;n++){const r=await c.api('/reports/fields',{expected_version:n,record_scope:'job',name:'Long export notes '+n,type:'text',required_at_stages:[]});assert.equal(r.status,201);fields.push(r.value.fields.find(f=>f.name==='Long export notes '+n).id)}
+  for(const job of c.jobs.slice(0,25)){const r=await c.api('/reports/values/job/'+job.id,{expected_version:0,values:Object.fromEntries(fields.map(id=>[id,'&'.repeat(4000)]))},{method:'PUT'});assert.equal(r.status,200)}
+  const large=await c.api('/reports/views',{expected_version:0,name:'Bounded worksheet failure',sharing:'personal',scope:{record_scope:'job',record_ids:c.jobs.slice(0,25).map(j=>j.id)},filters:[],selected_columns:fields});assert.equal(large.status,201)
+  const queued=await c.api('/reports/work',{view_id:large.value.view.id,expected_view_version:large.value.version,format:'xlsx'});assert.equal(queued.status,201)
+  const failed=await c.action(queued.value.task,'resume');assert.equal(failed.status,200);assert.equal(failed.value.task.state,'failed');assert.equal(failed.value.task.progress,0);assert.match(failed.value.task.error,/exceeds the bounded size/)
+  const retried=await c.action(failed.value.task,'resume');assert.equal(retried.status,200);assert.equal(retried.value.task.state,'failed');assert.equal(retried.value.task.progress,0)
+  assert.equal((await f.request('/api/plinth/reports/work/'+failed.value.task.id+'/download',{cookie:f.owner})).status,409)
+  const narrowed=await c.api('/reports/views/'+large.value.view.id,{...large.value.view,expected_version:large.value.version,selected_columns:[fields[0]]},{method:'PUT'});assert.equal(narrowed.status,200)
+  const replacement=await c.api('/reports/work',{view_id:large.value.view.id,expected_view_version:narrowed.value.version,format:'xlsx'});assert.equal(replacement.status,201);assert.equal((await c.finish(replacement.value.task)).state,'complete')
+  const cancelled=await c.create(),cancel=await c.action(cancelled,'cancel');assert.equal(cancel.status,200)
+  assert.equal((await c.action(cancel.value.task,'resume')).status,409);assert.equal((await f.request('/api/plinth/reports/work/'+cancelled.id+'/download',{cookie:f.owner})).status,409)
+  const client=await f.invite(address('viewer')),admin=await f.invite(address('admin'),'Office','admin'),agent=await f.agent()
+  for(const auth of [{cookie:client},{cookie:admin},{cookie:undefined,token:agent}]){
+   for(const path of ['/reports/work','/reports/work/'+task.id,'/reports/work/'+task.id+'/download'])assert.equal((await c.api(path,undefined,auth)).status,403)
+   assert.equal((await c.api('/reports/work/'+task.id+'/resume',{expected_version:task.version},auth)).status,403)
+  }
+  const credentials=(await c.api('/agent-credentials')).value.credentials
+  await c.api('/agent-credentials/'+credentials[0].id+'/revoke',{})
+  assert.equal((await c.api('/reports/work/'+task.id+'/download',undefined,{cookie:undefined,token:agent})).status,401)
+  const oldOwner=f.owner
+  assert.equal((await f.request('/auth/signout',{method:'POST',cookie:oldOwner,body:{}})).status,204)
+  assert.equal((await f.request('/api/plinth/reports/work/'+task.id+'/download',{cookie:oldOwner})).status,401)
+  assert.equal((await f.request('/api/plinth/reports/work/'+task.id+'/resume',{method:'POST',cookie:oldOwner,body:{expected_version:task.version}})).status,401)
+  assert.equal((await f.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@'),returnTo:'/app'}})).status,202)
+  const confirmation=new URL(f.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(url=>new URL(url).pathname==='/auth/confirm'))
+  const signedIn=await f.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);f.owner=signedIn.headers.get('set-cookie').split(';')[0]
+  const stale=(await c.api('/jobs/'+j.id)).value.job
+  assert.equal((await c.api('/jobs/'+j.id,{expected_version:stale.version},{method:'DELETE'})).status,200)
+  for(const t of [task,xlsx,cancelled]){assert.equal((await c.api('/reports/work/'+t.id)).status,404);assert.equal((await c.api('/reports/work/'+t.id+'/resume',{expected_version:t.version})).status,404);assert.equal((await f.request('/api/plinth/reports/work/'+t.id+'/download',{cookie:f.owner})).status,404)}
+  assert.equal((await c.api('/reports/work')).value.tasks.length,0)
+ }finally{await f.close()}
+})

@@ -160,3 +160,42 @@ imports the D1 entry point and requires `nodejs_compat`. The vendored runtime is
 copied from the committed Base reference. Local integration checks establish
 local behavior only; hosted upload, Worker resource and provider acceptance are
 not claimed.
+
+## Optional historical source package
+
+The same preview and commit doors accept an optional `history` string containing
+the exact UTF-8 bytes of an owner-prepared JSON sidecar. Move in accepts that
+file in **Historical source JSON (optional)**. It is a documented neutral
+custody format, not an exporter or a verified mapping for any named provider.
+
+The sidecar has `version: 1` and a `jobs` array. Each job names one existing CSV
+`externalId`, a `files` array and a `records` array. Files contain `id`, `name`,
+`mediaType` and canonical `base64` original bytes. Records contain `id`, `kind`,
+`occurredAt` (a UTC timestamp), `description` and `fileIds`. JSON pointers preserve
+each original relationship. The supported historical categories are `note`,
+`schedule`, `signed-change`, `invoice`, `payment` and `approval`. Every category
+is unverified historical evidence only. No category creates a native signature,
+schedule, financial entry, approval or outbound action.
+
+Coverage lists every occurrence. Exact repeated record IDs are duplicates;
+different records claiming the same ID refuse the whole upload. Unknown kinds
+are explicitly unsupported and retained for assisted capture. Absent referenced
+files are explicitly missing; no bytes, signature or file relationship are
+invented. Invalid structure, unknown fields, conflicting IDs or invalid bytes
+refuse the whole intake before any peer is adopted. The sidecar allows at most
+100 jobs, 100 records and 20 files per job, 128 KiB of JSON and 64 KiB of decoded
+originals across the package.
+
+The retained source plan holds the historical metadata; it grants no additional
+job access. The owner can inspect records, download a present file from its
+journal coverage, and retrieve the exact sidecar through the originals door.
+Changing any sidecar byte or original requires fresh fingerprint approval.
+Repeating approval retains the same journal and preserves subsequent native
+work. CLI archives include this custody. Erasing any member job withdraws all
+package originals, including the sidecar, so shared history cannot recover that
+job's personal content. Surviving peers keep their own reviewed metadata.
+
+Native continuation still requires the ordinary current quote approval and all
+applicable source and financial reconciliation. This package neither reconciles
+opening financial balances nor implements the source-specific full-job
+continuation mappings owed by MOVE-001 and MOVE-002 through MOVE-007.

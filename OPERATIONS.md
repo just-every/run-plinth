@@ -95,3 +95,45 @@ account identifier when applicable. Local development suppresses external mail.
 These declarations and local provider-edge checks do not prove live delivery.
 
 Hosted deployment reads MAIL_FROM from the owner’s private deployment input and accepts only a verified sender. MAIL_PROVIDER selects Resend by default; MAIL_RELAY_URL is required for managed mail, and MAIL_ACCOUNT_ID is required for Cloudflare mail. The setup manifest labels every required private field. The supported targets are Workers and container hosting.
+
+
+## Durable native report exports
+
+The owner opens Reports, saves a scoped view, then requests CSV or XLSX under
+Report export work. This captures the exact query revision, authorized source
+identities and versions, selected values and a capture digest. Later source or
+view edits do not rewrite that capture. Existing immediate exports remain available.
+
+Requests capture at most 10,000 records and two million UTF-8 snapshot bytes.
+Each Resume next chunk processes at most 25 captured rows and atomically saves
+its checkpoint. It pauses after each chunk: closing the page, restarting the
+Worker or losing a response never starts automatic work. Refresh shows durable
+progress; a repeated or concurrent continuation of the same revision cannot
+append rows twice. After a lost response, refresh before continuing.
+
+CSV retains the native scope, filter and currency annotations. XLSX uses native
+inline-string cells and retains the capture date. Final packaging is bounded to
+eight million bytes. Size failures retain the last checkpoint and display the
+reason; retry remains explicit, and an oversized capture needs a narrower new
+view. A network failure is displayed without claiming that unsaved progress
+completed. Cancel permanently removes captured rows and output chunks and
+disables every continuation and download.
+
+Only the current owner session may request, inspect, continue, cancel, review or
+download this work. The continuation and download doors recheck current source
+access. Erasing any captured source removes its task, checkpoints and final
+output in the same database operation. A final download is recomputed from the
+stored output chunks and must match its stored SHA-256 checksum; responses are
+private and no-store. The checksum is shown beside the download.
+
+Private archives carry snapshots and checkpoints, but exclude local work
+approvals. After restore, every non-cancelled task is inactive until the
+destination owner explicitly approves its exact capture digest under Report
+export work. Neither restore nor review makes provider calls; review also
+rechecks current source access. Cancelled work cannot be approved or restarted.
+Follow the existing later-erasure journal instructions when restoring an older
+backup. Credentials and standing connector authority remain excluded.
+
+This native export workflow does not qualify credential rotation during large
+drawing or import work, background AI or other drawing and import processing,
+or external provider connector recovery.

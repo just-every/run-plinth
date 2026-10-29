@@ -16,7 +16,7 @@ export async function retireImportedJob(db: D1Database, actor: Actor, job: Job, 
   return retireD1ImportCustody(
     { target: { kind: 'construction-project', id: job.id }, values },
     nativeStatements,
-    importContext(db, actor, { originalErasurePolicy: 'withdraw-affected-artifacts' }),
+    importContext(db, actor, { originalErasurePolicy: 'withdraw-all-job-artifacts' }),
     checkpoint,
   )
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
+import { historicalSource, historicalBytes } from '../fixtures/import-history.mjs'
 import { chromium, expect } from '@playwright/test'
 
 const base=process.env.PLINTH_URL, shots=process.env.PLINTH_SCREENSHOTS
@@ -126,6 +127,40 @@ try {
   await page.keyboard.press('Tab'); await button.focus()
   assert.ok(await button.evaluate(el=>getComputedStyle(el,'::after').opacity==='1'),'Icon tooltip appears on focus')
  }
+ await open()
+ const historyCsv=csv.replaceAll('MOVE-','HISTORY-'),history=historicalSource('HISTORY-001')
+ await page.getByLabel('Historical source JSON (optional)',{exact:true}).setInputFiles({name:'synthetic-plinth-history.json',mimeType:'application/json',buffer:Buffer.from(history)})
+ await upload(historyCsv)
+ await expect(coverage.getByLabel('Historical coverage counts')).toContainText('historical: 6')
+ await expect(coverage.getByLabel('Historical coverage counts')).toContainText('duplicate: 1')
+ await expect(coverage.getByLabel('Historical coverage counts')).toContainText('missing: 1')
+ await expect(coverage).toContainText('Old signed window change')
+ await expect(coverage).toContainText('unsupported-source-kind')
+ await capture('historical-review')
+ const historicalPreview=await(await request('/preview',{csv:historyCsv,history})).json()
+ assert.equal((await request('/commit',{csv:historyCsv,history:history.replaceAll('Old signed window change','Changed source claim'),fingerprint:historicalPreview.fingerprint})).status(),409)
+ await page.getByRole('button',{name:'Approve and import drafts',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Approve and import drafts',exact:true})).toHaveCount(0)
+ const historyJob=(await get('')).jobs.find(job=>job.fingerprint===historicalPreview.fingerprint)
+ assert.ok(historyJob)
+ const historyJournal=page.getByRole('article',{name:'Import '+historyJob.id,exact:true})
+ await historyJournal.getByRole('button',{name:'Inspect coverage',exact:true}).click()
+ await expect(historyJournal.getByLabel('Historical coverage counts')).toContainText('retained: 1')
+ const sourceFile=page.waitForEvent('download')
+ await historyJournal.getByRole('button',{name:'Download synthetic-plinth-signed-change.txt',exact:true}).click()
+ assert.deepEqual(await readFile(await(await sourceFile).path()),historicalBytes)
+ const historicalJobs=(await jobs()).filter(job=>job.import_evidence?.external_id.startsWith('HISTORY-'))
+ assert.equal(historicalJobs.length,2)
+ for(const job of historicalJobs){assert.equal(job.status,'quoting');assert.equal(job.approvals.length,0);assert.equal(job.variations.length,0);assert.equal(job.schedules.length,0);assert.equal(job.invoices?.length??0,0);assert.equal(job.claims.length,0)}
+ await capture('historical-custody')
+ assert.equal((await request('/commit',{csv:historyCsv,history,fingerprint:historicalPreview.fingerprint})).status(),200)
+ const historicalErased=historicalJobs.find(job=>job.import_evidence.external_id==='HISTORY-001')
+ assert.equal((await owner.request.delete(base+'/api/plinth/jobs/'+historicalErased.id,{headers:{origin:base},data:{expected_version:historicalErased.version}})).status(),200)
+ assert.ok((await get('/'+historyJob.id+'/originals')).originals.every(file=>file.original.status==='unavailable'))
+ await historyJournal.getByRole('button',{name:'Inspect coverage',exact:true}).click()
+ await expect(historyJournal.getByText('Old signed window change',{exact:false})).toHaveCount(0)
+ await expect(historyJournal.getByRole('button',{name:'Download synthetic-plinth-signed-change.txt',exact:true})).toHaveCount(0)
+ await capture('historical-erasure')
  assert.deepEqual(await providerMail(),beforeEffects,'Import review, commit, replay, reporting and erasure create no outbound mail or processor operation')
  const signout=await owner.request.post(base+'/auth/signout',{headers:{origin:base},data:{}});assert.equal(signout.status(),204)
  for(const suffix of ['/coverage','/originals'])assert.equal((await owner.request.get(foreign+suffix)).status(),401,'Revoked owner session cannot read retained custody')
