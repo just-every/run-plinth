@@ -95,9 +95,18 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   for(const reference of ['synthetic-plinth-reconcile-1','synthetic-plinth-reconcile-2'])ids.push((await c.ok('/costs/bills',c.bill(reference))).record.id)
   const source=(await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-unposted-crew-day',employee_reference:'synthetic-plinth-private-worker',cost_code:'01-100',dated_on:'2026-10-23',period:'2026-10',minutes:480,hour_cents:3000,burden_bps:2000})).record
   await c.ok('/costs/bills',{...c.bill('synthetic-plinth-unmatched-3'),document:{...original,base64:Buffer.from('%PDF-1.4 synthetic-plinth-unmatched-3').toString('base64')},tax:{percent:'0',reference:'Reviewed zero rate',human_reviewed:true},lines:[{cost_code:'06-100',description:'Unmatched native original',subtotal_cents:7000,taxable:true,matches:[]}]})
+  const quantityRoot='/cost-reconciliation/quantity-evidence',quantitySource={order_id:c.order.id,receipt_id:c.receipts[0].id,order_line_id:'lumber',unit:'pack',dated_on:'2026-10-23'}
+  await c.ok(quantityRoot,{...quantitySource,kind:'bill_read',bill_id:ids[0],bill_line_id:'1',quantity:'3',reference:'Office read three packs from this exact original',supersedes:null})
+  const fieldEmail=['synthetic-plinth-quantity-field','example.com'].join('@'),field=await f.invite(fieldEmail,'Assigned quantity recorder','admin'),fieldId=(await c.api('/team')).value.team.find(p=>p.email===fieldEmail).id
+  assert.equal((await f.json('/api/plinth/team/'+fieldId,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'superintendent',job_ids:[c.job.id],po_limit_cents:0}})).status,200);await c.read()
+  let attested=await c.act(quantityRoot,{...quantitySource,kind:'field_receipt',quantity:'2',reference:'Field recorder counted two packs; original receipt retained',supersedes:null},field);assert.equal(attested.status,200);const fieldFirst=attested.value.record;await c.read()
+  const fieldView=(await c.api(`/jobs/${c.job.id}`+quantityRoot,undefined,field)).value
+  assert.equal(fieldView.evidence.length,1);assert.ok(!JSON.stringify(fieldView).includes('amount_cents'));assert.ok(!JSON.stringify(fieldView).includes(ids[0]),'Field quantity door reveals no private bill identity or amount')
+  assert.equal((await c.act(quantityRoot,{...quantitySource,kind:'bill_read',bill_id:ids[0],bill_line_id:'1',quantity:'9',reference:'No office authority',supersedes:null},field)).status,403)
   const economics=structuredClone({orders:c.job.orders,budgets:c.job.budgets,quotes:c.job.quotes,claims:c.job.claims})
   const before=await c.ledger(),exceptions=(await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value,packet=await reconciliationRequest(c)
   const duplicate=packet.findings.find(f=>f.kind==='suspected_duplicate'),labor=packet.findings.find(f=>f.kind==='unposted_labor'),coding=packet.findings.filter(f=>f.kind==='coding'),receipts=packet.findings.filter(f=>f.kind==='unmatched_receipt')
+  const quantity=packet.findings.find(f=>f.kind==='quantity');assert.deepEqual(quantity.quantities,{bill:'3',recorded_receipt:'3',field:'2',difference:'1',unit:'pack'});assert.ok(quantity.evidence.some(e=>e.id===fieldFirst.id))
   assert.equal(duplicate.amount_cents,43000);assert.deepEqual(duplicate.evidence.map(e=>e.id),ids);assert.equal(new Set(duplicate.evidence.map(e=>e.checksum)).size,1)
   assert.equal(labor.amount_cents,28800,'Eight hours at 3000 cents plus 20 percent burden is a candidate, never actual');assert.equal(labor.evidence[0].id,source.id)
   assert.equal(receipts.reduce((n,r)=>n+r.amount_cents,0),50000,'Draft duplicate matches never consume receipts');assert.deepEqual(receipts.flatMap(r=>r.evidence.filter(e=>e.kind==='receipt_quantity').map(e=>e.quantity)),['3','2'])
@@ -132,7 +141,19 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   await c.ok(`/cost-reconciliation/${packet.id}/revoke`,{digest:packet.digest,reason:'Owner withdraws packet access'})
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',{...args,idempotency_key:'synthetic-plinth-after-revoke'})).value.result.isError,true)
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',args)).value.result.isError,true,'Packet revocation also fences cached replay')
-  const fresh=await reconciliationRequest(c);await reviewReconciliation(c,fresh)
+  const quantityPacket=await reconciliationRequest(c);await reviewReconciliation(c,quantityPacket)
+  const quantityProposal=(await c.ok(`/cost-reconciliation/${quantityPacket.id}/propose`,{digest:quantityPacket.digest})).record,quantityFinding=quantityProposal.findings.find(f=>f.kind==='quantity')
+  await c.ok(`/cost-reconciliation/${quantityPacket.id}/decide`,{digest:quantityPacket.digest,proposal_id:quantityProposal.id,finding_id:quantityFinding.id,decision:'accepted',reason:'Field recorder must revisit this exact receipt quantity'})
+  attested=await c.act(quantityRoot,{...quantitySource,kind:'field_receipt',quantity:'3',reference:'Recorder re-counted three packs; superseded observation remains intact',supersedes:fieldFirst.id},field);assert.equal(attested.status,200);await c.read()
+  assert.equal((await mcp(f,token,'plinth.costs.reconcile',{job_id:c.job.id,packet_id:quantityPacket.id,digest:quantityPacket.digest,idempotency_key:'synthetic-plinth-changed-quantity'})).value.result.isError,true)
+  assert.equal((await c.act(`/cost-reconciliation/${quantityPacket.id}/outcome`,{digest:quantityPacket.digest,proposal_id:quantityProposal.id,finding_id:quantityFinding.id,correction_id:attested.value.record.id,reason:'Agent cannot attest completion'},undefined,token)).status,403)
+  const quantityOutcome=await c.ok(`/cost-reconciliation/${quantityPacket.id}/outcome`,{digest:quantityPacket.digest,proposal_id:quantityProposal.id,finding_id:quantityFinding.id,correction_id:attested.value.record.id,reason:'Current native bill reading, original receipt and field re-count agree'})
+  assert.equal(quantityOutcome.record.native_records[0].id,attested.value.record.id)
+  const quantityHistory=(await c.api(`/jobs/${c.job.id}`+quantityRoot)).value.evidence;assert.equal(quantityHistory.find(r=>r.id===fieldFirst.id).quantity,'2');assert.equal(quantityHistory.at(-1).quantity,'3');assert.equal(c.job.orders.find(o=>o.id===c.order.id).receipts[0].lines[0].quantity,'3')
+  assert.equal((await f.json('/api/plinth/team/'+fieldId,{method:'PUT',cookie:f.owner,body:{expected_version:1,role:'superintendent',job_ids:[],po_limit_cents:0}})).status,200)
+  assert.ok([403,404].includes((await c.act(quantityRoot,{...quantitySource,kind:'field_receipt',quantity:'4',reference:'Revoked assignment cannot append evidence',supersedes:attested.value.record.id},field)).status))
+  assert.equal((await c.api(`/jobs/${c.job.id}`+quantityRoot)).value.evidence.at(-1).quantity,'3')
+  const fresh=await reconciliationRequest(c);assert.equal(fresh.findings.find(f=>f.kind==='quantity_match').quantities.difference,'0');await reviewReconciliation(c,fresh)
   await c.ok(`/costs/sources/${source.id}/approve`)
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',{...args,packet_id:fresh.id,digest:fresh.digest,idempotency_key:'synthetic-plinth-stale-source'})).value.result.isError,true)
   const regenerated=await reconciliationRequest(c);assert.equal(regenerated.findings.filter(f=>f.kind==='unposted_labor').length,0);assert.equal(regenerated.ledger.posted_actual_cents,28800)
@@ -140,7 +161,16 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   const billsBeforeErase=(await c.api(`/jobs/${c.job.id}/costs/bills`)).value.bills;assert.ok(billsBeforeErase.every(b=>b.status==='draft'))
   for(const id of ids){const r=await f.request(`/api/plinth/jobs/${c.job.id}/costs/bills/${id}/original`,{cookie:f.owner});assert.deepEqual(Buffer.from(await r.arrayBuffer()),costOriginal)}
   await reviewReconciliation(c,regenerated)
-  const eraseArgs={job_id:c.job.id,packet_id:regenerated.id,digest:regenerated.digest,idempotency_key:'synthetic-plinth-erased-packet'}
+  const codingProposal=(await c.ok(`/cost-reconciliation/${regenerated.id}/propose`,{digest:regenerated.digest})).record,codingFinding=codingProposal.findings.find(f=>f.kind==='coding'&&f.evidence.some(e=>e.kind==='bill'&&e.id===ids[0]))
+  await c.ok(`/cost-reconciliation/${regenerated.id}/decide`,{digest:regenerated.digest,proposal_id:codingProposal.id,finding_id:codingFinding.id,decision:'accepted',reason:'Accounts reviewer accepts only the evidenced coding correction'})
+  const codingCompletion={digest:regenerated.digest,proposal_id:codingProposal.id,finding_id:codingFinding.id,correction_id:ids[0],reason:'Human recoded and approved the exact original bill'}
+  assert.equal((await c.act(`/cost-reconciliation/${regenerated.id}/outcome`,codingCompletion)).status,409)
+  await c.ok(`/costs/bills/${ids[0]}/recode`,{line_id:'2',cost_code:'06-100',reason:'Accounts reviewer corrects the cited receipt allocation'})
+  assert.equal((await mcp(f,token,'plinth.costs.reconcile',{job_id:c.job.id,packet_id:regenerated.id,digest:regenerated.digest,idempotency_key:'synthetic-plinth-changed-coding'})).value.result.isError,true)
+  await c.ok(`/costs/bills/${ids[0]}/post`)
+  const coded=await c.ok(`/cost-reconciliation/${regenerated.id}/outcome`,codingCompletion);assert.equal(coded.record.native_records.find(r=>r.kind==='posted_bill').id,ids[0]);assert.equal((await c.ledger()).totals.posted_actual_cents,71800)
+  const finalPacket=await reconciliationRequest(c);await reviewReconciliation(c,finalPacket)
+  const eraseArgs={job_id:c.job.id,packet_id:finalPacket.id,digest:finalPacket.digest,idempotency_key:'synthetic-plinth-erased-packet'}
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',eraseArgs)).value.result.isError,false);await c.read()
   assert.equal((await f.request(`/api/plinth/jobs/${c.job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).status,200)
   const erasedReplay=await mcp(f,token,'plinth.costs.reconcile',eraseArgs);assert.equal(erasedReplay.value.result.isError,true);assert.equal(erasedReplay.value.result.structuredContent,undefined,'Erasure fences cached evidence as well as another write')

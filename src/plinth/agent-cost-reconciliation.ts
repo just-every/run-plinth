@@ -1,3 +1,4 @@
+import { quantityEvidenceResponse, quantityFindings } from './agent-cost-quantities'
 import { costs, digest } from './cost-model'
 import { actualEntries, costLedger, procurement } from './cost-ledger'
 import { discrepancies } from './cost-exceptions'
@@ -7,13 +8,14 @@ import { localDate } from './remittances'
 import type { Bindings } from '../auth.server'
 
 interface Evidence { kind:string; id:string; line_id?:string; checksum?:string; reference?:string; amount_cents?:number; cost_code?:string; quantity?:string; unit?:string }
-interface Finding { id:string; kind:string; amount_cents:number; reason:string; uncertainty:string; evidence:Evidence[]; proposed:{action:string; human_door:string} }
+interface Finding { quantities?:{bill:string;recorded_receipt:string;field:string|null;difference:string|null;unit:string}; id:string; kind:string; amount_cents:number; reason:string; uncertainty:string; evidence:Evidence[]; proposed:{action:string; human_door:string} }
 interface Review { digest:string; finding_ids:string[]; by:Stamp; owner_version:number; generation:number; reason:string }
 export interface CostReconciliationPacket {
  id:string; source_version:number; source_digest:string; digest:string; as_of:string; requested_by:Stamp; reason:string;
  findings:Finding[]; uncertainties:string[]; ledger:{posted_actual_cents:number;received_not_billed_cents:number};
  reviews:Review[]; revocations:{by:Stamp;reason:string}[];
  proposals:{id:string; by:Stamp; findings:Finding[]; digest:string; label:string}[];
+ outcomes?:{id:string;proposal_id:string;finding_id:string;source_digest:string;native_records:Evidence[];by:Stamp;reason:string}[];
  decisions:{proposal_id:string; finding_id:string; decision:'accepted'|'rejected'; reason:string; by:Stamp}[];
 }
 const packets=(job:Job)=>costs(job).reconciliation_packets??=[]
@@ -42,8 +44,9 @@ export async function prepareCostReconciliation(job:Job,actor:Actor,input:Input)
  }
  for(const source of state.sources.filter(s=>!s.approved_by))add(source.kind==='time'?'unposted_labor':'unposted_source',source.amount_cents,'A native source exists without approval or a ledger posting.','Recorded source cost is a candidate, not verified payroll. Individual pay rates and employee details are withheld.',[{kind:'source',id:source.id,reference:source.reference,amount_cents:source.amount_cents,cost_code:source.cost_code}],'Have an authorized independent reviewer approve the source at its existing human door.','./costs/sources')
  for(const issue of discrepancies(job).filter(i=>!['unapproved','unmatched'].includes(i.kind)))add('discrepancy',issue.amount_cents,issue.evidence,'Native discrepancy detection is diagnostic; accounting completeness is not established.',[{kind:'exception',id:issue.key}],'Reconcile native and authorized accounting evidence before human exception clearance.','./costs/exceptions')
+ findings.push(...quantityFindings(job))
  const source_digest=await sourceDigest(job),as_of=localDate(input.as_of,'as_of'),reason=text(input.reason,'Diagnostic request reason',2000),source_version=job.version
- const uncertainties=['Accounting and payroll provider observations are unavailable; no live synchronization is claimed.','Physical billed quantities and field attestation are unknown. Amounts across findings overlap and must not be added as a forecast adjustment.']
+ const uncertainties=['Accounting and payroll provider observations are unavailable; no live synchronization is claimed.','Physical quantities remain unknown where no explicit human bill reading and field attestation are recorded. Amounts across findings overlap and must not be added as a forecast adjustment.']
  const snapshot={source_version,source_digest,as_of,reason,findings,uncertainties,ledger:{posted_actual_cents:ledger.totals.posted_actual_cents,received_not_billed_cents:ledger.totals.received_not_billed_cents}}
  return {id:crypto.randomUUID(),...snapshot,digest:await digest(snapshot),requested_by:stamp(actor),reviews:[],revocations:[],proposals:[],decisions:[]}
 }
@@ -51,6 +54,7 @@ const headers={'cache-control':'private, no-store','x-content-type-options':'nos
 const json=(value:unknown)=>Response.json(value,{headers})
 export async function costReconciliationResponse(request:Request,env:Bindings,actor:Actor,parts:string[],body:(request:Request)=>Promise<Input>):Promise<Response|null>{
  if(parts[0]!=='jobs'||parts[2]!=='cost-reconciliation')return null
+ const quantities=await quantityEvidenceResponse(request,env,actor,parts,body);if(quantities)return quantities
  const agent=actor.role==='agent'
  need(actor.role==='owner'&&!actor.permissions||agent&&actor.agent_native_role==='owner'&&actor.agent_door,'Only the signed-in owner or their bounded packet tool may use reconciliation',403,'forbidden')
  need(!agent||parts.length===5&&parts[4]==='propose'&&request.method==='POST'||parts.length===4&&parts[3]==='reviewed'&&request.method==='GET'||parts.length===5&&parts[4]==='reviewed'&&request.method==='GET','The agent may only prepare a reviewed packet',403,'forbidden')
@@ -89,6 +93,32 @@ export async function costReconciliationResponse(request:Request,env:Bindings,ac
    const review=packet.reviews.at(-1)!,findings=packet.findings.filter(f=>review.finding_ids.includes(f.id))
    const proposal={id:crypto.randomUUID(),by:stamp(actor),findings:structuredClone(findings),digest:packet.digest,label:'Proposed only. No bill review, posting, payroll, payment, forecast approval or exception clearance.'}
    packet.proposals.push(proposal);record=proposal
+  }else if(action==='outcome'){
+   need(!agent&&!packet.revocations.length,'Only the owner links an observed correction to an active diagnostic',403,'forbidden')
+   const proposal=find(packet.proposals,text(input.proposal_id,'proposal_id',100)),finding=find(proposal.findings,text(input.finding_id,'finding_id',100))
+   need(packet.decisions.some(d=>d.proposal_id===proposal.id&&d.finding_id===finding.id&&d.decision==='accepted'),'Accept this exact suggestion before linking its human correction',409,'cost_review')
+   need(!(packet.outcomes??[]).some(o=>o.proposal_id===proposal.id&&o.finding_id===finding.id),'Correction outcome is immutable',409,'immutable')
+   const native_records:Evidence[]=[],state=costs(job),source=finding.evidence.find(e=>e.kind==='source')
+   if(finding.quantities){
+    const corrected=find(state.quantity_evidence??[],text(input.correction_id,'correction_id',100)),receipt=finding.evidence.find(e=>e.kind==='receipt_quantity')!,bill=finding.evidence.find(e=>e.kind==='bill_quantity')!
+    need(corrected.receipt_id===receipt.id&&corrected.order_line_id===receipt.line_id&&finding.evidence.some(e=>e.id===corrected.supersedes),'Correction must supersede the exact cited human quantity evidence',409,'cost_scope')
+    const reconciled=quantityFindings(job).find(q=>q.evidence.some(e=>e.kind==='bill_quantity'&&'reference' in e&&e.reference===bill.reference)&&q.evidence.some(e=>e.kind==='receipt_quantity'&&e.id===receipt.id&&'line_id' in e&&e.line_id===receipt.line_id))
+    need(reconciled?.kind==='quantity_match'&&reconciled.evidence.some(e=>e.id===corrected.id),'Current bill reading, receipt and field attestation must agree before a reconciled quantity outcome',409,'cost_unresolved')
+    native_records.push({kind:'quantity_evidence',id:corrected.id,quantity:corrected.quantity,unit:corrected.unit})
+   }else if(source){
+    const corrected=find(state.sources,source.id),entries=state.entries.filter(e=>e.source_id===corrected.id)
+    need(corrected.approved_by&&entries.length&&input.correction_id===corrected.id,'Only the exact source after native human approval and posting can complete this suggestion',409,'cost_unresolved')
+    native_records.push({kind:'approved_source',id:corrected.id,amount_cents:corrected.amount_cents},...entries.map(e=>({kind:'ledger_entry',id:e.id,amount_cents:e.amount_cents,cost_code:e.cost_code})))
+   }else{
+    const corrected=find(state.bills,text(input.correction_id,'correction_id',100)),entries=state.entries.filter(e=>e.source_id===corrected.id)
+    need(corrected.status==='posted'&&corrected.posted_by&&entries.length,'Observe a bill or credit posted through its human approval door',409,'cost_unresolved')
+    if(finding.kind==='suspected_duplicate')need(corrected.kind==='credit'&&finding.evidence.some(e=>e.kind==='bill'&&e.id===corrected.credit_of),'The correction must credit one of these exact duplicate originals',409,'cost_scope')
+    else if(finding.kind==='coding')need(finding.evidence.some(e=>e.kind==='bill'&&e.id===corrected.id&&e.checksum===corrected.document.checksum)&&corrected.lines.some(l=>finding.evidence.some(e=>e.kind==='bill'&&e.line_id===l.id&&e.cost_code!==l.cost_code)&&l.matches.some(m=>m.cost_code===l.cost_code)),'The posted bill must retain the original and correct the suggested allocation',409,'cost_scope')
+    else need(finding.evidence.some(e=>e.kind==='bill'&&e.id===corrected.id)||corrected.lines.some(l=>l.matches.some(m=>finding.evidence.some(e=>e.kind==='receipt'&&e.id===m.receipt_id))),'The posted bill must match the suggested exact source',409,'cost_scope')
+    native_records.push({kind:'posted_bill',id:corrected.id,checksum:corrected.document.checksum,amount_cents:corrected.amount_cents},...entries.map(e=>({kind:'ledger_entry',id:e.id,amount_cents:e.amount_cents,cost_code:e.cost_code})))
+   }
+   const outcome={id:crypto.randomUUID(),proposal_id:proposal.id,finding_id:finding.id,source_digest:current,native_records,by:stamp(actor),reason:text(input.reason,'Human correction follow-through evidence',2000)}
+   ;(packet.outcomes??=[]).push(outcome);record=outcome
   }else if(action==='decide'){
    need(!agent,'Only the owner records a suggestion decision',403,'forbidden');need(packet.source_digest===current&&!packet.revocations.length,'Sources changed or packet revoked; request a new diagnostic',409,'packet_stale')
    const proposal=find(packet.proposals,text(input.proposal_id,'proposal_id',100)),finding_id=text(input.finding_id,'finding_id',100)

@@ -18,6 +18,10 @@ export async function nativeAgentPolicy(f){
 }
 export async function archiveCostPacket(c){
  await c.read()
+ const quantitySource={order_id:c.order.id,receipt_id:c.receipts[0].id,order_line_id:'lumber',unit:'pack',dated_on:'2026-10-23'}
+ await c.ok('/cost-reconciliation/quantity-evidence',{...quantitySource,kind:'bill_read',bill_id:(await c.api(`/jobs/${c.job.id}/costs/bills`)).value.bills[0].id,bill_line_id:'1',quantity:'3',reference:'Archive original bill reading',supersedes:null})
+ const prior=(await c.ok('/cost-reconciliation/quantity-evidence',{...quantitySource,kind:'field_receipt',quantity:'2',reference:'Archive first field count',supersedes:null})).record
+ await c.ok('/cost-reconciliation/quantity-evidence',{...quantitySource,kind:'field_receipt',quantity:'3',reference:'Archive corrected count retains its predecessor',supersedes:prior.id})
  const packet=await reconciliationRequest(c);await reviewReconciliation(c,packet)
  const proposal=(await c.ok(`/cost-reconciliation/${packet.id}/propose`,{digest:packet.digest})).record
  await c.ok(`/cost-reconciliation/${packet.id}/decide`,{digest:packet.digest,proposal_id:proposal.id,finding_id:proposal.findings[0].id,decision:'rejected',reason:'Owner retains the suggestion without taking its proposed action'})
@@ -26,6 +30,7 @@ export async function archiveCostPacket(c){
 export async function proveRestoredCostPacket(f,cookie,jobId,packet){
  const root=`/api/plinth/jobs/${jobId}`,read=await f.json(root+'/cost-reconciliation',{cookie});assert.equal(read.status,200)
  const restored=read.value.packets.find(p=>p.id===packet.id);assert.equal(restored.review_required,true,'Restored history supplies no standing agent consent');assert.deepEqual(restored.decisions,packet.decisions);assert.deepEqual(restored.proposals,packet.proposals)
+ const quantities=await f.json(root+'/cost-reconciliation/quantity-evidence',{cookie});assert.equal(quantities.status,200);assert.deepEqual(quantities.value.evidence.map(r=>r.quantity),['3','2','3']);assert.equal(quantities.value.evidence[2].supersedes,quantities.value.evidence[1].id,'All human observations and exact supersession survive the native CLI archive')
  const before=await f.json(root+'/costs',{cookie})
  const attempt=await f.json(root+'/cost-reconciliation/'+packet.id+'/propose',{method:'POST',cookie,body:{expected_version:read.value.version,digest:packet.digest}});assert.equal(attempt.status,409)
  assert.equal((await f.json(root+'/cost-reconciliation/'+packet.id+'/reviewed',{cookie})).status,409)

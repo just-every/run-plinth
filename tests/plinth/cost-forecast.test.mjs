@@ -25,7 +25,12 @@ test('COST-004 — half-complete framing, worse productivity, posted costs and a
   const labor=proposal.findings.find(f=>f.kind==='unposted_labor')
   await c.ok(`/cost-reconciliation/${diagnostic.id}/decide`,{digest:diagnostic.digest,proposal_id:proposal.id,finding_id:labor.id,decision:'accepted',reason:'Reviewer accepts candidate; native source approval remains separate'})
   assert.equal((await c.ledger()).totals.posted_actual_cents,43000)
+  const completion={digest:diagnostic.digest,proposal_id:proposal.id,finding_id:labor.id,correction_id:unposted.id,reason:'Observed exact native source approval and immutable posting'}
+  assert.equal((await c.act(`/cost-reconciliation/${diagnostic.id}/outcome`,completion)).status,409,'Accepting a suggestion without the native human correction cannot complete it')
   await c.ok(`/costs/sources/${unposted.id}/approve`)
+  const completionResult=await c.ok(`/cost-reconciliation/${diagnostic.id}/outcome`,completion)
+  assert.equal(completionResult.record.native_records.find(r=>r.kind==='approved_source').id,unposted.id);assert.equal(completionResult.record.native_records.find(r=>r.kind==='ledger_entry').amount_cents,6000)
+  assert.equal((await c.act(`/cost-reconciliation/${diagnostic.id}/outcome`,completion)).status,409,'The observed correction is linked once')
   assert.equal((await c.act(`/cost-reconciliation/${diagnostic.id}/propose`,{digest:diagnostic.digest})).status,409)
   const afterCorrection=await c.ok('/costs/forecasts',assumptions);assert.equal(afterCorrection.record.final_cents,186000);assert.equal(afterCorrection.record.codes.find(r=>r.cost_code==='01-100').actual_cents,16000)
   await c.ok('/sov',{});await c.read()

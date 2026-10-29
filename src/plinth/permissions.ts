@@ -38,6 +38,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost
+ if(job&&parts[2]==='cost-reconciliation'&&parts[3]==='quantity-evidence')return {feature:'logs',action:method==='GET'?'view':'create'}
  if(job&&parts[2]==='signed-changes')return {feature:'changes',action:method==='GET'?'view':parts.length===3?'create':'approve',financial:true}
  if(job&&parts[2]==='submittals')return {feature:'documents',action:method==='GET'?'view':parts[4]==='review'||parts[4]==='release'?'approve':parts.length===3?'create':'edit',financial:true}
  const rest = job ? parts.slice(2) : parts, category = rest[0] ?? '', area = Object.hasOwn(feature, category) ? feature[category] : undefined
