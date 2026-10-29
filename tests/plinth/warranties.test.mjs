@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture, createReleasedScope, setPortalFeatures } from './helpers.mjs'
+import {closeoutFixture,closeoutMcp} from './closeout-support.mjs'
 
 const noRepairPhoto={name:'synthetic-plinth-201.png',mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='}
 async function noRepairJourney(f){
@@ -115,6 +116,23 @@ test('CARE-005 — unresolved or covered requests stay open; office, agent and t
   assert.equal((await j.api(`/warranty-service/${j.job.id}/${j.id}/submit`,{expected_version:j.job.version,visit_id:visit.id,reason:'Trade documents the attempted repair',attachments:[{...noRepairPhoto,name:'synthetic-plinth-205.png'}]},trade)).status,200);await j.read()
   assert.equal((await j.act(j.path('review'),{visit_id:visit.id,accepted:false,reason:'Builder found the attempted fix did not resolve the leak'})).status,200)
   const retainedVisits=structuredClone(j.item().service.visits)
+  const c=await closeoutFixture(f,j.job),mcp=await closeoutMcp(f,agent)
+  const packet=await c.capture({source_keys:[...c.sourceKeys,'warranty:'+j.component.id,'service:'+j.id],requirements:[...c.requirements,{id:'service',kind:'service',title:'Unresolved leak repair needs builder acceptance and client acknowledgment',source_keys:['service:'+j.id],proposed_owner:'Plumbing trade',reason:'Client service request remains open'}]})
+  await c.review(packet)
+  const repair=packet.unresolved.find(r=>r.kind==='service'&&r.id===j.id)
+  assert.equal(repair.state,'open');assert.deepEqual(repair.evidence.service.visits,retainedVisits)
+  assert.equal(packet.sources.find(r=>r.key==='warranty:'+j.component.id).reference,j.component.signed_terms_reference)
+  const beforeManual=structuredClone((await c.read()).warranties),messages=f.messages.length
+  const drafted=await mcp('plinth.closeout.followup',{job_id:c.job.id,record_id:packet.id,input:c.draft(packet)})
+  assert.equal(drafted.result.record.status,'unsent',JSON.stringify(drafted.value))
+  const manual=await c.document('manual','Window operating manual')
+  assert.equal((await mcp('plinth.closeout.read',{job_id:c.job.id,record_id:packet.id})).result,undefined,'A newly added original requires fresh owner packet review')
+  const updated=await c.capture({source_keys:[...c.sourceKeys,'document:'+manual.revisions[0].id],requirements:c.requirements.map(r=>r.id==='manual'?{...r,source_keys:['document:'+manual.revisions[0].id]}:r)})
+  assert.equal(updated.comparisons.find(r=>r.requirement_id==='manual').state,'recorded_evidence')
+  assert.equal(updated.unresolved.find(r=>r.id===j.id).state,'open','Adding a manual never completes a repair obligation')
+  assert.deepEqual((await c.read()).warranties,beforeManual,'Packet drafts and document presence cannot interpret coverage, accept repairs or close service cases')
+  assert.equal(f.messages.length,messages,'No follow-up is sent and no service booking occurs')
+  assert.deepEqual((await c.list()).value.packets[0].drafts,[drafted.result.record]);await j.read()
   for(const decision of [null,'needs_evidence','covered']){
    const review=decision?await j.review(decision):null
    assert.equal((await j.act(j.path('resolve-no-repair'),{reason:'Cannot close unresolved or covered request',review_id:review?.id})).status,409)

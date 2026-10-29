@@ -17,6 +17,13 @@ export default async function({request,origin,claim,displayName,returnTo}) {
   }
   if(name.includes('Active'))job=(await call(`jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'email',evidence:'Synthetic client acceptance of exact scope',schedule_choice:{kind:'none',reason:'Field dates pending'}})).job
  }
+ for(const [name,sensitive] of [['E Closeout',false],['F Closeout sensitive',true]]) {
+  let job=(await call('jobs',{name,client_email:['synthetic-plinth-closeout','example.test'].join('@'),address:'100 Synthetic Avenue'})).job
+  job=(await call('jobs/'+job.id+'/quotes',{expected_version:job.version,lines:[{description:'Synthetic closeout scope',quantity:'1',unit_cents:100000}]})).job
+  job=(await call('jobs/'+job.id+'/quotes/'+job.quotes[0].id+'/accept',{expected_version:job.version,method:'signed',evidence:'Reviewed synthetic acceptance',schedule_choice:{kind:'none',reason:'Dates pending separate human review'}})).job
+  const packet=await call('jobs/'+job.id+'/agent-closeout',{expected_version:job.version,title:sensitive?'Synthetic SSN 123-45-6789':'Reviewed closeout packet',source_keys:[],requirements:[{id:'manual',kind:'manual',title:'Missing operating manual',source_keys:[],proposed_owner:'Synthetic supplier',reason:'Recorded closeout requirement'}]})
+  await call('jobs/'+job.id+'/agent-closeout/'+packet.record.id+'/review',{expected_version:packet.version,digest:packet.record.digest,confirm:true,statement:'Owner reviewed the missing evidence and consents to unsent drafting only'})
+ }
  const catalog=async(kind,value)=>(await call('estimate-catalog',{kind,name:'Synthetic '+kind,reason:'Reviewed synthetic conformance source',value})).entry
  for(const sensitive of [false,true]) {
  const rate=await catalog('rate',{vendor:'Synthetic supplier',effective_on:'2026-01-01',unit:'ft',cost_cents:100,sell_cents:200,reference:'Synthetic source quote'})

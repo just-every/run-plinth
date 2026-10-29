@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -521,7 +521,7 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `AGENT-003` | Verify promised date and margin restoration | push-further | missing |  | No outcome-tracking recovery cases or verification exist. |
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | `AGENT-005` | Find missing or duplicate job costs | push-further | missing |  | No cost-match agent or actual-cost correction packets exist. |
-| `AGENT-006` | Keep handover and warranty promises | push-further | missing |  | No handover/warranty agent or closure workflow exists. |
+| `AGENT-006` | Keep handover and warranty promises | push-further | partial | `tests/plinth/domain.test.mjs` — “Closeout packets retain exact private evidence and unsent history; stale, cross-job, revoked and erased MCP requests cannot act” proves owner-recorded requirements, original references, explicit private packet review, immutable successive drafts, changed-source invalidation and current authority through HTTP and MCP; `tests/plinth/warranties.test.mjs` — “CARE-005 — unresolved or covered requests stay open; office, agent and trade cannot replace client closure statements” proves missing-manual comparison alongside an unresolved repair and rejected trade evidence, retained warranty terms and visits, and no service mutation or send when a manual is added; `tests/plinth/portable.test.mjs` — “CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive” proves retained packet sources and unsent draft history with restored consent inactive; `tests/fixtures/agent-owner.mjs` and `agent-surface.json` exercise reviewed closeout reads and bounded follow-up drafts under standard and sensitive MCP policy. | The shipped door is an owner-requested private evidence comparison and unsent follow-up adapter only. Complete handover and warranty agent operation, assigned request follow-through, approved trade booking and repair follow-through through builder acceptance, client acknowledgment and required-document completion, and external publication remain owed. CARE-002 and CARE-005 retain their required br and owner design authorization and every named installed screen and journey. ROLE-003 and ROLE-006 policy holds remain unchanged (including RL-104 scope duties); the conservative owner-only packet consent default does not grant scoped delegation or provider authority. BOUND-002 retains unsigned, unverified, rejected, expired and mismatched evidence holds; licensed inspection, coverage interpretation, work release and acceptance remain named human decisions. |
 | `AGENT-007` | Cited project answers and draft actions | push-further | missing |  | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | `AGENT-008` | Scheduled agents with human control | push-further | missing |  | No scheduled AI runner, source grants or outcome/budget controls exist. |
 | `AGENT-009` | Learn estimating accuracy from completed jobs | push-further | missing |  | No completed-job learning, replay or catalog proposal agent exists. |
