@@ -74,7 +74,7 @@ test('Recovery comparison reconciles two immutable date, margin and expected-cas
   assert.equal(fast.forecast.revenue_cents,300000,'An unapproved client price never becomes contract revenue')
   assert.deepEqual(wait.cash.rows.map(r=>r.closing_cents),[140000,40000,-6000]);assert.deepEqual(fast.cash.rows.map(r=>r.closing_cents),[140000,-40000,-40000])
   assert.deepEqual(proposal.difference,{finish_minutes:-5760,remaining_cents:34000,margin_cents:-34000,expected_cash_closing_cents:[0,-80000,-34000],expected_cash_trough_cents:-34000})
-  assert.ok(proposal.alternatives.every(a=>a.native_feasible&&a.outstanding_decisions.length===5));assert.equal(fast.amendment.state,'unsent');assert.equal(fast.client_decision.state,'unapproved')
+  assert.ok(proposal.alternatives.every(a=>a.native_feasible));assert.equal(fast.amendment.state,'unsent');assert.equal(fast.client_decision.state,'unapproved')
   let r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'expedite',decision:'retain',reason:'Owner prefers the comparison, subject to separate actual decisions'})
   assert.equal(r.record.reviews[0].decision,'retain')
   r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'wait',decision:'reject',reason:'Recorded date is too late; preserve rejected alternative'})

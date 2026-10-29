@@ -1,3 +1,5 @@
+import {recoveryNative} from '../fixtures/recovery-native.mjs'
+import {proveRecoveredPackets} from './recovery-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
@@ -138,6 +140,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const remittance=await bill('/remittances',{amount_cents:12000,received_on:'2026-10-22',reference:'Archive bank remittance BS-106',evidence:'Staff reviewed bank statement and client remittance',method:'bank',confirm:true,allocations:[{invoice_id:archiveInvoice.id,amount_cents:8000}]})
     await bill(`/remittances/${remittance.id}/return`,{returned_on:'2026-10-23',reference:'Archive bank return BS-107',reason:'Bank recorded the returned remittance',confirm:true})
     await bill('/remittances',{amount_cents:10000,received_on:'2026-10-24',reference:'Archive unapplied bank remittance BS-108',evidence:'Staff reviewed a later bank receipt, retained unapplied',method:'check',confirm:true,allocations:[]})
+    const recoveryCall=async(path,body,method='POST')=>{const r=await f.json('/api/plinth/'+path,{cookie:f.owner,method,...(method==='GET'?{}:{body})});assert.equal(r.status,['jobs','resources','pricing-rates'].includes(path)?201:200,JSON.stringify(r.value));return r.value}
+    const recovery=await recoveryNative(recoveryCall,{name:'Archived private recovery case',client:['synthetic-plinth-recovery','example.invalid'].join('@')})
     // BILL-005 decisions and reserved processor instructions use native doors before recovery.
     await bill(`/invoices/${archiveInvoice.id}/credit`,{operation_id:'synthetic-plinth-31',confirm:true,reason:'Synthetic archive reviewed credit',description:'Synthetic agreed invoice correction',lines:[{invoice_line_id:'quote:plumbing',amount_cents:1000}]})
     await bill(`/invoices/${archiveInvoice.id}/write-off`,{operation_id:'synthetic-plinth-32',confirm:true,reason:'Synthetic archive disputed bad debt',dispute_reference:'synthetic-plinth-33',amount_cents:1000})
@@ -228,6 +232,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(roomCreated.status,200);job=roomCreated.value.job
     const archivedRoom=structuredClone(job.room_boards[0])
     const archivedExport=await archiveExportWork(f,job)
+    await recovery.read();await recovery.review()
+    const recoveryProposal=(await recovery.act('/recovery/requests/'+recovery.request.id+'/compare',{key:'archive-comparison',alternatives:recovery.alternatives})).record
+    await recovery.act('/recovery/requests/'+recovery.request.id+'/review/'+recoveryProposal.id,{digest:recoveryProposal.digest,alternative_id:'wait',decision:'reject',reason:'Retain the rejected date and cash proposal for historical evidence'})
+    const archivedRecovery={job:await recovery.read(),request:(await recoveryCall(recovery.root+'/recovery/requests/'+recovery.request.id,undefined,'GET')).record,alternatives:recovery.alternatives}
     const cookie=f.owner; await f.close();f=undefined
     const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -254,6 +262,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     }
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===performanceSource.job.id).row.data);assert.deepEqual(recovered.estimate_performance,archivedPerformance);assert.deepEqual(recovered.quotes,performanceSource.job.quotes)}
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id).row.data);assert.deepEqual(recovered.signed_changes,archivedChanges,'Signed documents, two exact signatures and once-only application links survive CLI recovery');assert.deepEqual(recovered.budgets,signedArchive.job.budgets);assert.deepEqual(recovered.sov,signedArchive.job.sov);assert.deepEqual(recovered.invoices,signedArchive.job.invoices.map(({balance,...invoice})=>invoice))}
+    for(const records of [rows(original),rows(restored)]){const retained=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===recovery.job.id).row.data);assert.deepEqual(retained.recovery_requests.at(-1),archivedRecovery.request);assert.equal(retained.recovery_requests.at(-1).proposals[0].reviews[0].decision,'reject')}
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
@@ -312,18 +321,21 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!serialized.includes(feedPath.split('/').at(-1).replace('.ics','')))
     assert.ok(!restored[0].tables.some(t=>t.name==='pl_calendar_tokens'))
     assert.ok(!serialized.includes('test-session-secret-for-plinth-integration-only-2026'))
+    await proveRecoveredPackets(destination,cookie,archivedRecovery)
     await proveConnectorRecovery(destination,cookie,{id:connector.value.subscription.id,receiver_origin:'https://synthetic-plinth.example',job_ids:[job.id],event_types:['job.updated'],revoked_at:null},revokedConnector.value.subscription.id,connectorCredential.id,connector.value.signing_key)
     f=await createFixture({persistTo:source,ownerCookie:cookie})
     r=await f.json(`/api/plinth/jobs/${job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(r.status,200)
     const signedCurrent=(await f.json('/api/plinth/jobs/'+signedArchive.job.id,{cookie})).value.job;assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id,{method:'DELETE',cookie,body:{expected_version:signedCurrent.version}})).status,200);assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id+'/signed-changes',{cookie})).status,404)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
     const performanceCurrent=(await f.json('/api/plinth/jobs/'+performanceSource.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+performanceSource.job.id,{method:'DELETE',cookie,body:{expected_version:performanceCurrent.version}})).status,200)
+    const recoveryCurrent=(await f.json('/api/plinth/jobs/'+recovery.job.id,{cookie})).value.job;assert.equal((await f.json('/api/plinth/jobs/'+recovery.job.id,{method:'DELETE',cookie,body:{expected_version:recoveryCurrent.version}})).status,200)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
     assert.ok(!erasedRows.some(r=>r.table==='pl_background_work'&&archivedExport.tasks.some(t=>t.id===r.row.id)),'Erasure removes archived export captures and outputs')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===recovery.job.id),'Private recovery facts, proposals and reviews are erased before old-archive replay is fenced')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id),'Signed change artifacts and private costs disappear before old archive recovery is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_plan_file_chunks'&&item.row.job_id===job.id),'DOC-001 erasure removes every large plan chunk')
     assert.ok(!erasedRows.some(item=>item.table==='pl_jobs'&&item.row.id===job.id),'DOC-004 erasure removes the complete register before old-archive replay is fenced')

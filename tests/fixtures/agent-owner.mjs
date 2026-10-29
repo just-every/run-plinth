@@ -1,3 +1,4 @@
+import { recoveryNative } from './recovery-native.mjs'
 // Native owner lifecycle and seed data for the agent door's conformance journey.
 // No SQL, substitute identity, provider call or production credential.
 export default async function({request,origin,claim,displayName,returnTo}) {
@@ -24,5 +25,8 @@ export default async function({request,origin,claim,displayName,returnTo}) {
  await catalog('template',{kind:'remodel',dimensions:{length:'10'},items:[{id:'frame',assembly_id:assembly.id,dimension:'length'}]})
  }
  await call('pricing-rates',{kind:'sales',percent:'0',jurisdiction:'Synthetic reviewed jurisdiction',effective_on:'2026-01-01',reference:'Synthetic rate source',human_reviewed:true})
+ const recoveryCases=[]
+ for(const sensitive of [false,true])recoveryCases.push(await recoveryNative(call,{name:sensitive?'F Recovery sensitive':'E Recovery',client:['synthetic-plinth-recovery','example.invalid'].join('@'),sensitive}))
+ for(const recovery of recoveryCases)await recovery.review()
  return bootstrap
 }

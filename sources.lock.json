@@ -121,11 +121,11 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "54e6a1b9fd0b93c89eacb4270901b2ad5179e451a3f6e9436fa727936328c27e",
+      "sha256": "abc1170e4111178f7fbba2a86ae6401f6d618c4cf605fcb1e8f5225ebadfed84",
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "1c8d7f43d723867c414915637479ce8d07b7f5991d931c16859b737e0e858c44",
+      "sha256": "fdabac4d9cf72b9cd7b1dd369a693c43bd05fb15c043625f511977e270a3c2a7",
       "executable": false
     },
     "AGENTS.md": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "52c8d9974275955d7ab2054ba2b8c548a7abffd23d372fca8e2ac3424556921b",
+      "sha256": "e661c005f8c6f95b41321b01d7e7647f27331ce0a089e02b2c19d0433aff2f5d",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "251b068cfb9e61f7ce3082d57e28755579eab80b7e140a7cf5fc80f5f993f7a9",
+      "sha256": "864bc178553dcab5326a08a7f20517647288f44f0b93aaed8d38ade6a6277874",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -3197,7 +3197,7 @@
       "executable": false
     },
     "src/plinth/agent-door/index.ts": {
-      "sha256": "dddb30e630b60f042accea40a61189bbed9165d3583f46702ff4c91b1f9a8bab",
+      "sha256": "8252bf7e367c46108385ad24059419f63e1794ee44db5345e324bfed39dc26ab",
       "executable": false
     },
     "src/plinth/agent-door/native.ts": {
@@ -3208,8 +3208,12 @@
       "sha256": "7cc171c77a5f626cbd125d99fd9031cabfde86f759f4e3e74e76cc5eb0087612",
       "executable": false
     },
+    "src/plinth/agent-door/recovery-boundary.ts": {
+      "sha256": "77a80bea71c3ce8caad18212ccb0b110bc19cdbbd7ba9ea1d788528dcae71603",
+      "executable": false
+    },
     "src/plinth/agent-door/recovery-tools.ts": {
-      "sha256": "6c33037300ab83ae92bbeabfa0988030f04263e3063d041088ea2873f68606dd",
+      "sha256": "76ae8d2ef189bf892ac1c3d4dcf5fc712cbbbd4123b2d42a2694224185c733a7",
       "executable": false
     },
     "src/plinth/agent-door/tools.ts": {
@@ -3217,7 +3221,7 @@
       "executable": false
     },
     "src/plinth/agent-recovery-http.ts": {
-      "sha256": "9e1f9241e54a4d89ae7b11d9c8dbe753924d67b646e20c2eb89bbb6bca140976",
+      "sha256": "6291cd3953f0ace46f3f800a2263af1f55b3b4a425b84ab282294f06cfd12c80",
       "executable": false
     },
     "src/plinth/agent-recovery-model.ts": {
@@ -3225,7 +3229,7 @@
       "executable": false
     },
     "src/plinth/agent-recovery.ts": {
-      "sha256": "13f3adc68bb5e9790ffb22c68af353b2d8c2a914bc078ebad420e2f85728d44a",
+      "sha256": "41e40c23da5c811f204097807161a1e1dc13b2c06cfbe7e807ffda91a743cf8a",
       "executable": false
     },
     "src/plinth/allowance-changes.ts": {
@@ -3569,7 +3573,7 @@
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
-      "sha256": "cfa4cd27f39bd3b30448218e40f76cf9ab093f6bbb921627052e5cbaa50f0669",
+      "sha256": "d3928be5db753cae4b94cd9bfd8d355d0d783500c046ac8cbd3cb269ab6a3cb4",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -5013,7 +5017,7 @@
       "executable": false
     },
     "tests/fixtures/agent-owner.mjs": {
-      "sha256": "99bffb4b08e3547ecaf03ea6235c2d2d7bc031a3b79a80c4f1f48b641e3b951c",
+      "sha256": "cf92dea829ef1c57700b11899f47007f2411c87ff2ec7c5c6c71603ab7e67b90",
       "executable": false
     },
     "tests/fixtures/chart-document.mjs": {
@@ -5093,7 +5097,7 @@
       "executable": false
     },
     "tests/fixtures/recovery-native.mjs": {
-      "sha256": "5e857cced1b657ff0cd3bb1bcf34d4a2181e0464be0fb46bc592e6881dcaf1c7",
+      "sha256": "1f1651f72c5eb311aba68a0b781e61d73299d3bd61935a1f06d1018eea61d8ad",
       "executable": false
     },
     "tests/fixtures/room-board.mjs": {
@@ -5369,7 +5373,7 @@
       "executable": false
     },
     "tests/plinth/cost-forecast.test.mjs": {
-      "sha256": "156dc6e35b9ae5ff4f5f3044c9d26a21f46b4bdf3af7aa0950f153570515ec87",
+      "sha256": "9198f322883fdd55e158e4c2f2b1d09478b37894a6d262b34e75e12de1d53453",
       "executable": false
     },
     "tests/plinth/cost-labor.test.mjs": {
@@ -5381,7 +5385,7 @@
       "executable": false
     },
     "tests/plinth/cost-periods.test.mjs": {
-      "sha256": "107a224c286bada4f05c09f5a2238cefa69bfed6c7cce7a63ed31d623fed5136",
+      "sha256": "e05bef77861db07b43cd33da8ae1f6b2499c85ebed5c4853596fb9f62eb6ed1e",
       "executable": false
     },
     "tests/plinth/cost-support.mjs": {
@@ -5409,7 +5413,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "07792492ef8b40008953fd188ea3b29b5edd2261216b26b77963822edee2acf6",
+      "sha256": "d55f6e5733e97bc7bb785b002d9ec991bf54cf3e8d6a815ccaff5ce31e50f5a5",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
@@ -5437,7 +5441,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "5e4be9a8c2730ff9df69f0375c143835b1e0b733f4c2b96975df7eabc62c90ff",
+      "sha256": "10aa0fce656fa3611f85990c0bd6fe14eac30876e9d4abb532abbc87327e09cb",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
@@ -5450,6 +5454,10 @@
     },
     "tests/plinth/purchase-orders.test.mjs": {
       "sha256": "e43304d2dd9a588439a3af14d39c9dd32a67305fa42fd27cecc87f26f01f913f",
+      "executable": false
+    },
+    "tests/plinth/recovery-support.mjs": {
+      "sha256": "7062ae7527ccc3bf31afe5a59c2034767b27004a698f9aac02e6e7a2e1c05bdf",
       "executable": false
     },
     "tests/plinth/report-schedule-support.mjs": {
@@ -5473,11 +5481,11 @@
       "executable": false
     },
     "tests/plinth/schedule-travel.test.mjs": {
-      "sha256": "19cefe609e4476e6c5f65a267828fe7b193a5be167113cc2375d54e809ce0d9f",
+      "sha256": "0d7b1efcd09607aa13586bbd58b99a110d63736395349ab5165d81208d0fe3e1",
       "executable": false
     },
     "tests/plinth/schedule.test.mjs": {
-      "sha256": "afa0b28d8b31dc77825ce83e9c021eb6735ec47cd4b97dbdd979938ddd5facf1",
+      "sha256": "680bd0e7f7f4a654ec6e1ed7edbc335bca5a2f33d884c49ff77e9ef937281bb9",
       "executable": false
     },
     "tests/plinth/selections.test.mjs": {

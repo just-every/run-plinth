@@ -14,6 +14,7 @@ export async function recoveryResponse(request:Request,db:D1Database,previous:Jo
  const origin=new URL(request.url).origin,all=await jobs(db)
  const fresh=(row:RecoveryRequest)=>recoveryFresh(db,previous,all,row,origin)
  if(parts.length===4&&parts[3]==='sources'&&request.method==='GET'){requireOwner(actor);return json(await recoverySources(db,previous,all))}
+ need(actor.role==='owner'||actor.role==='agent'&&actor.agent_native_role==='owner'&&actor.agent_door?.sponsor_role==='owner','Only the reviewing owner may use private recovery packets',403,'forbidden')
  need(parts[3]==='requests'&&parts.length>=4&&parts.length<=7,'Recovery route not found',404,'not_found')
  if(parts.length===4&&request.method==='GET'){
   need(actor.role==='owner'||actor.agent_door?.sponsor_role==='owner','Only the owner reads recovery requests',403,'forbidden')

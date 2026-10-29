@@ -183,6 +183,42 @@
       ]
     },
     {
+      "name": "plinth.recovery.compare",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-002"
+      ]
+    },
+    {
+      "name": "plinth.recovery.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-002"
+      ]
+    },
+    {
+      "name": "plinth.recovery.requests",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-002"
+      ]
+    },
+    {
       "name": "plinth.schedule.prepare",
       "scope": "drafts:write",
       "readOnly": false,
@@ -1447,6 +1483,403 @@
             }
           ]
         }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-requests",
+      "tool": "plinth.recovery.requests",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/4/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-read",
+      "tool": "plinth.recovery.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/4/id"
+        },
+        "request_id": {
+          "$from": "recovery-requests",
+          "pointer": "/record/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-compare",
+      "tool": "plinth.recovery.compare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/4/id"
+        },
+        "request_id": {
+          "$from": "recovery-requests",
+          "pointer": "/record/0/id"
+        },
+        "key": "synthetic-plinth-recovery",
+        "alternatives": [
+          {
+            "id": "wait",
+            "name": "Compare supplier and crew assumption",
+            "assumptions": "Synthetic dated owner assumptions; no actual sub, supplier or client confirmation",
+            "schedule": {
+              "calendar": {
+                "$from": "recovery-read",
+                "pointer": "/record/sources/facts/calendar"
+              },
+              "tasks": {
+                "$from": "recovery-read",
+                "pointer": "/record/sources/facts/schedules"
+              }
+            },
+            "forecast": {
+              "source_as_of": "Exact reviewed native sources; no external accounting evidence",
+              "codes": [
+                {
+                  "cost_code": "06-100",
+                  "remaining_quantity": "0",
+                  "minutes_per_unit": "0",
+                  "labor_hour_cents": 0,
+                  "outstanding_commitment_cents": 100000,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Unconsumed issued package"
+                },
+                {
+                  "cost_code": "01-100",
+                  "remaining_quantity": "8",
+                  "minutes_per_unit": "120",
+                  "labor_hour_cents": 6000,
+                  "outstanding_commitment_cents": 0,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Reviewed remaining hours"
+                }
+              ]
+            },
+            "amendment": {
+              "extra_cents": 0,
+              "promised_on": "2026-11-02",
+              "reason": "Unconfirmed supplier proposal; not an actual promised-date change"
+            },
+            "client_decision": {
+              "description": "Actual client decision remains outstanding",
+              "proposed_price_delta_cents": 0
+            },
+            "cash": {
+              "start_period": "2026-10",
+              "months": 3,
+              "opening_cash_cents": 200000,
+              "remaining_dates": [
+                {
+                  "cost_code": "06-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                },
+                {
+                  "cost_code": "01-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                }
+              ]
+            }
+          },
+          {
+            "id": "expedite",
+            "name": "Compare supplier and crew assumption",
+            "assumptions": "Synthetic dated owner assumptions; no actual sub, supplier or client confirmation",
+            "schedule": {
+              "calendar": {
+                "$from": "recovery-read",
+                "pointer": "/record/sources/facts/calendar"
+              },
+              "tasks": {
+                "$from": "recovery-read",
+                "pointer": "/record/sources/facts/schedules"
+              }
+            },
+            "forecast": {
+              "source_as_of": "Exact reviewed native sources; no external accounting evidence",
+              "codes": [
+                {
+                  "cost_code": "06-100",
+                  "remaining_quantity": "0",
+                  "minutes_per_unit": "0",
+                  "labor_hour_cents": 0,
+                  "outstanding_commitment_cents": 100000,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Unconsumed issued package"
+                },
+                {
+                  "cost_code": "01-100",
+                  "remaining_quantity": "8",
+                  "minutes_per_unit": "120",
+                  "labor_hour_cents": 7500,
+                  "outstanding_commitment_cents": 0,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Reviewed remaining hours"
+                }
+              ]
+            },
+            "amendment": {
+              "extra_cents": 10000,
+              "promised_on": "2026-11-02",
+              "reason": "Unconfirmed supplier proposal; not an actual promised-date change"
+            },
+            "client_decision": {
+              "description": "Actual client decision remains outstanding",
+              "proposed_price_delta_cents": 0
+            },
+            "cash": {
+              "start_period": "2026-10",
+              "months": 3,
+              "opening_cash_cents": 200000,
+              "remaining_dates": [
+                {
+                  "cost_code": "06-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                },
+                {
+                  "cost_code": "01-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-requests-sensitive",
+      "tool": "plinth.recovery.requests",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/5/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-read-sensitive",
+      "tool": "plinth.recovery.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/5/id"
+        },
+        "request_id": {
+          "$from": "recovery-requests-sensitive",
+          "pointer": "/record/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recovery-compare-sensitive",
+      "tool": "plinth.recovery.compare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/5/id"
+        },
+        "request_id": {
+          "$from": "recovery-requests-sensitive",
+          "pointer": "/record/0/id"
+        },
+        "key": "synthetic-plinth-recovery-sensitive",
+        "alternatives": [
+          {
+            "id": "wait",
+            "name": "Compare supplier and crew assumption",
+            "assumptions": "Synthetic dated owner assumptions; no actual sub, supplier or client confirmation",
+            "schedule": {
+              "calendar": {
+                "$from": "recovery-read-sensitive",
+                "pointer": "/record/sources/facts/calendar"
+              },
+              "tasks": {
+                "$from": "recovery-read-sensitive",
+                "pointer": "/record/sources/facts/schedules"
+              }
+            },
+            "forecast": {
+              "source_as_of": "Exact reviewed native sources; no external accounting evidence",
+              "codes": [
+                {
+                  "cost_code": "06-100",
+                  "remaining_quantity": "0",
+                  "minutes_per_unit": "0",
+                  "labor_hour_cents": 0,
+                  "outstanding_commitment_cents": 100000,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Unconsumed issued package"
+                },
+                {
+                  "cost_code": "01-100",
+                  "remaining_quantity": "8",
+                  "minutes_per_unit": "120",
+                  "labor_hour_cents": 6000,
+                  "outstanding_commitment_cents": 0,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Reviewed remaining hours"
+                }
+              ]
+            },
+            "amendment": {
+              "extra_cents": 0,
+              "promised_on": "2026-11-02",
+              "reason": "Unconfirmed supplier proposal; not an actual promised-date change"
+            },
+            "client_decision": {
+              "description": "Actual client decision remains outstanding",
+              "proposed_price_delta_cents": 0
+            },
+            "cash": {
+              "start_period": "2026-10",
+              "months": 3,
+              "opening_cash_cents": 200000,
+              "remaining_dates": [
+                {
+                  "cost_code": "06-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                },
+                {
+                  "cost_code": "01-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                }
+              ]
+            }
+          },
+          {
+            "id": "expedite",
+            "name": "Compare supplier and crew assumption",
+            "assumptions": "Synthetic dated owner assumptions; no actual sub, supplier or client confirmation",
+            "schedule": {
+              "calendar": {
+                "$from": "recovery-read-sensitive",
+                "pointer": "/record/sources/facts/calendar"
+              },
+              "tasks": {
+                "$from": "recovery-read-sensitive",
+                "pointer": "/record/sources/facts/schedules"
+              }
+            },
+            "forecast": {
+              "source_as_of": "Exact reviewed native sources; no external accounting evidence",
+              "codes": [
+                {
+                  "cost_code": "06-100",
+                  "remaining_quantity": "0",
+                  "minutes_per_unit": "0",
+                  "labor_hour_cents": 0,
+                  "outstanding_commitment_cents": 100000,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Unconsumed issued package"
+                },
+                {
+                  "cost_code": "01-100",
+                  "remaining_quantity": "8",
+                  "minutes_per_unit": "120",
+                  "labor_hour_cents": 7500,
+                  "outstanding_commitment_cents": 0,
+                  "unbought_cents": 0,
+                  "risk_cents": 0,
+                  "reference": "Reviewed remaining hours"
+                }
+              ]
+            },
+            "amendment": {
+              "extra_cents": 10000,
+              "promised_on": "2026-11-02",
+              "reason": "Unconfirmed supplier proposal; not an actual promised-date change"
+            },
+            "client_decision": {
+              "description": "Actual client decision remains outstanding",
+              "proposed_price_delta_cents": 0
+            },
+            "cash": {
+              "start_period": "2026-10",
+              "months": 3,
+              "opening_cash_cents": 200000,
+              "remaining_dates": [
+                {
+                  "cost_code": "06-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                },
+                {
+                  "cost_code": "01-100",
+                  "expected_on": "2026-11-09",
+                  "reference": "Unconfirmed native payment timing"
+                }
+              ]
+            }
+          }
+        ]
       },
       "expect": [
         {

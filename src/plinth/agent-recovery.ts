@@ -1,3 +1,4 @@
+import { wallClock } from './time-zone'
 import { activeHolds } from './holds'
 import { costLedger } from './cost-ledger'
 import { costs, digest } from './cost-model'
@@ -11,18 +12,18 @@ import type { RecoveryAlternative, RecoveryProposal, RecoveryRequest, RecoverySo
 
 /** Owner review exposes native calculations and revision references, never bill originals or individual pay. */
 export async function recoverySources(db:D1Database,job:Job,all:Job[]):Promise<RecoverySources>{
- const catalog=await resources(db),used=new Set(job.schedules.flatMap(t=>t.resources?.map(r=>r.resource_id)??[])),trades=new Set(job.schedules.map(t=>t.trade.toLowerCase()))
- const bookings=all.filter(j=>j.id!==job.id).flatMap(j=>j.schedules.filter(t=>t.status==='booked'&&(trades.has(t.trade.toLowerCase())||t.resources?.some(r=>used.has(r.resource_id)))).map(t=>({job_id:j.id,task:t})))
+ const catalog=await resources(db)
+ const bookings=all.filter(j=>j.id!==job.id).flatMap(j=>j.schedules.filter(t=>t.status==='booked').map(t=>({job_id:j.id,task:t})))
  const ledger=costLedger(job),state=costs(job)
  const facts={
-  schedules:job.schedules,calendar:job.schedule_calendar??null,actuals:job.schedule_actuals??[],
+  currency:job.currency??'USD',time_zone:job.time_zone??'UTC',status:job.status,schedules:job.schedules,calendar:job.schedule_calendar??null,actuals:job.schedule_actuals??[],
   constraints:job.schedule_constraints??[],rfis:job.rfis??[],bids:job.bids??[],
   resources:catalog,bookings,holds:await activeHolds(db,'job',job.id),
   budget:job.budgets?.at(-1)??null,
   orders:job.orders,variations:job.variations,subcontracts:job.subcontracts??[],trade_confirmations:job.trade_invitations??[],
   selections:job.selections??[],invoices:job.invoices??[],claims:job.claims,remittances:job.remittances??[],
   ledger:ledger.rows.map(r=>({cost_code:r.cost_code,approved_budget_cents:r.approved_budget_cents,posted_actual_cents:r.posted_actual_cents,open_commitment_cents:r.open_commitment_cents})),
-  entries:state.entries.map(e=>({id:e.id,source_id:e.source_id,source_line_id:e.source_line_id,cost_code:e.cost_code,amount_cents:e.amount_cents,dated_on:e.dated_on,period:e.period,matches:e.matches,reversal_of:e.reversal_of})),
+  entries:ledger.rows.flatMap(r=>r.sources.actual).map(e=>({id:e.id,source_id:e.source_id,source_line_id:e.source_line_id,cost_code:e.cost_code,amount_cents:e.amount_cents,dated_on:e.dated_on,period:e.period,matches:e.matches,reversal_of:e.reversal_of})),
   bills:state.bills.map(b=>({id:b.id,status:b.status,kind:b.kind,credit_of:b.credit_of,amount_cents:b.amount_cents,due_on:b.due_on,lines:b.lines,checksum:b.document.checksum})),
   cost_sources:state.sources.map(s=>({id:s.id,kind:s.kind,cost_code:s.cost_code,amount_cents:s.amount_cents,dated_on:s.dated_on,approved_by:s.approved_by,reimbursed:s.reimbursed,payroll_replaced_cents:s.payroll_replaced_cents})),
   cash_dates:state.cash_dates??[],forecasts:state.forecasts,reconciliations:state.reconciliations,
@@ -30,7 +31,7 @@ export async function recoverySources(db:D1Database,job:Job,all:Job[]):Promise<R
  }
  return {job_id:job.id,source_version:job.version,digest:await digest(facts),facts}
 }
-export async function recoveryInstallation(db:D1Database,origin:string){return digest({origin,bootstrap:await db.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first()})}
+export async function recoveryInstallation(db:D1Database,origin:string){return digest({origin,bootstrap:await db.prepare('SELECT claim_id FROM oa_bootstrap WHERE singleton=1').first(),authority:await db.prepare('SELECT generation FROM oa_auth_settings WHERE singleton=1').first()})}
 export async function recoveryFresh(db:D1Database,job:Job,all:Job[],row:RecoveryRequest,origin:string){
  const owner=await db.prepare("SELECT version FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(row.prepared_by.id).first<{version:number}>()
  return !row.revoked_by&&!!owner&&owner.version===row.owner_version&&row.installation===await recoveryInstallation(db,origin)&&(await recoverySources(db,job,all)).digest===row.sources.digest
@@ -44,6 +45,7 @@ function preserveDependencies(job:Job,raw:Input){
  for(const old of job.schedules){
   const candidate=raw.tasks.map(object).find(t=>t.id===old.id)
   need(candidate&&candidate.status!== 'cancelled' || old.status==='cancelled'&&candidate?.status==='cancelled','Recovery cannot cancel recorded work',409,'recovery_dependency')
+  need(!!old.milestone===!!candidate!.milestone,'Recovery preserves recorded milestone semantics',409,'recovery_dependency')
   need(old.status!=='cancelled'||candidate?.status==='cancelled','Cancelled work remains cancelled',409,'recovery_dependency')
   need((old.predecessors??[]).every(p=>Array.isArray(candidate!.predecessors)&&candidate!.predecessors.map(object).some(d=>d.id===p.id&&Number(d.lag_minutes)>=p.lag_minutes)),'Recovery retains every recorded dependency and lag',409,'recovery_dependency')
  }
@@ -56,7 +58,7 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  schedule.conflicts.push(...resourceConflicts(await resources(db),all,{...job,schedules:schedule.tasks}))
  const amendment=object(raw.amendment),extra=cents(amendment.extra_cents,'Amendment extra cents'),promised_on=localDate(amendment.promised_on,'Proposed delivery date'),order=find(job.orders,request.package_order_id)
  const delivery=find(schedule.tasks,request.package_task_id)
- need(delivery.start.slice(0,10)>=promised_on,'Dependent work cannot precede the assumed package arrival',409,'recovery_delivery')
+ need(wallClock(Date.parse(delivery.start),job.time_zone??'UTC').date>=promised_on,'Dependent work cannot precede the assumed package arrival',409,'recovery_delivery')
  const forecastInput=object(raw.forecast)
  need(forecastInput.scenario===undefined||forecastInput.scenario==='approved','Client decisions stay unapproved; use explicit native cost assumptions')
  need(Array.isArray(forecastInput.codes),'Provide reviewed native cost assumptions')
@@ -65,7 +67,7 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  need(labor&&Number(labor.remaining_quantity)>0&&Number(labor.minutes_per_unit)>0,'Review positive remaining labor and productivity for the overrun code')
  const candidate=structuredClone(job),forecast=await previewCostForecast(candidate,actor,{...forecastInput,as_of:request.as_of,codes})
  forecast.id='recovery-'+id;forecast.source_version=request.sources.source_version
- costs(candidate).forecasts=[forecast]
+ costs(candidate).forecasts=[forecast];candidate.version=request.sources.source_version
  const cashInput=object(raw.cash),dates=cashInput.remaining_dates
  need(Array.isArray(dates)&&dates.length===codes.length,'Phase expected remaining cash for every cost code')
  const dated=new Set<string>()

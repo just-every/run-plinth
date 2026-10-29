@@ -43,5 +43,14 @@ test('COST-005 — three-month source cash and WIP expose a delayed collection t
   assert.equal((await c.act(`/invoices/${invoice.id}/receipt`,receipt)).value.error,'cost_period_closed')
   await c.ok(`/invoices/${invoice.id}/receipt`,{...receipt,posting_period:'2026-11',adjustment_reference:'Late bank statement arrived after accountant close'})
   const periods=(await c.api(`/jobs/${c.job.id}/costs/periods`)).value.periods;assert.deepEqual(periods[0],closed);const ledger=await c.ledger();assert.equal(ledger.totals.posted_actual_cents,30500);assert.equal(ledger.rows.flatMap(r=>r.sources.billing).filter(e=>e.kind==='collected')[0].period,'2026-11');const entries=ledger.rows.flatMap(r=>r.sources.actual);assert.equal(entries.filter(e=>e.period==='2026-10').reduce((n,e)=>n+e.amount_cents,0),30000);assert.equal(entries.filter(e=>e.period==='2026-11').reduce((n,e)=>n+e.amount_cents,0),500)
+  const {recoveryFixture}=await import('./recovery-support.mjs'),{c:recoveryCase,post:recoveryPost}=await recoveryFixture(f,{name:'Recovery cash after a native recorded receipt'})
+  const requestId=recoveryCase.request.id
+  await recoveryCase.act('/invoices/'+recoveryCase.invoice.id+'/receipt',{confirm:true,method:'check',reference:'synthetic-plinth-recovery-receipt',received_on:'2026-10-29',amount_cents:10000})
+  assert.equal((await recoveryPost('/recovery/requests/'+requestId+'/compare',{key:'stale-cash',alternatives:recoveryCase.alternatives})).value.error,'recovery_stale','A real receipt invalidates the previously reviewed expected-cash balance')
+  await recoveryCase.review();const receiptBefore=structuredClone((await recoveryCase.read()).invoices[0].receipts)
+  const recovery=(await recoveryPost('/recovery/requests/'+recoveryCase.request.id+'/compare',{key:'receipt-adjusted-cash',alternatives:recoveryCase.alternatives})).value.record
+  assert.deepEqual(recovery.alternatives[0].cash.rows.map(r=>r.closing_cents),[140000,40000,-16000]);assert.deepEqual(recovery.alternatives[1].cash.rows.map(r=>r.closing_cents),[140000,-50000,-50000])
+  assert.deepEqual(recovery.difference.expected_cash_closing_cents,[0,-90000,-34000]);assert.deepEqual((await recoveryCase.read()).invoices[0].receipts,receiptBefore,'Alternative cash calculations do not record or reverse money')
+  assert.deepEqual((await c.api(`/jobs/${c.job.id}/costs/periods`)).value.periods[0],closed,'Recovery leaves the accountant-reviewed historical close unchanged')
  }finally{await f.close()}
 })

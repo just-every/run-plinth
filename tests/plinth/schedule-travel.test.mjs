@@ -150,5 +150,12 @@ test('SCH-003 — crew/equipment calendars, capacity, leave and personally confi
   assert.deepEqual((await api('/trade-confirmations',undefined,trade)).value.invitations,[],'Removing the awarded company contact revokes inbox access on the next request')
   const fourth=await createActiveJob(f,'Atomic A'),fifth=await createActiveJob(f,'Atomic B')
   const race=await Promise.all([act(fourth,'/schedules',booking('Trade A','17','18',[{resource_id:crew.id,units:1}])),act(fifth,'/schedules',booking('Trade B','17','18',[{resource_id:crew.id,units:1}]))]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409])
+  const {recoveryFixture}=await import('./recovery-support.mjs'),{c:recoveryCase,post:recoveryPost}=await recoveryFixture(f,{name:'Recovery against current shared crew leave'})
+  const proposed=structuredClone(recoveryCase.alternatives);proposed[1].schedule.tasks[1].resources=[{resource_id:crew.id,units:1}]
+  const nativeSchedules=structuredClone((await reload(south)).schedules)
+  const comparison=(await recoveryPost('/recovery/requests/'+recoveryCase.request.id+'/compare',{key:'shared-crew-leave',alternatives:proposed})).value.record
+  assert.equal(comparison.alternatives[0].native_feasible,true)
+  assert.equal(comparison.alternatives[1].native_feasible,false);assert.ok(comparison.alternatives[1].schedule.conflicts.some(c=>c.resource_id===crew.id&&c.reason==='leave'),'A recovery cannot treat another reviewed crew as available during recorded leave')
+  assert.deepEqual((await reload(south)).schedules,nativeSchedules,'Recovery comparisons cannot move another job to create capacity')
  }finally{await f.close()}
 })

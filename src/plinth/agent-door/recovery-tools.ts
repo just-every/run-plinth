@@ -16,7 +16,7 @@ export function recoveryTools(env:Bindings):ToolDefinition[]{
    async summary(args){return {target:{id:String(args.request_id??args.job_id),name:'Owner-reviewed recovery packet'},items:[draft?'Prepare an inert comparison of two alternatives':'Read reviewed recovery evidence']}},
    async run(args,ctx){
     const version=await nativeVersion(env,ctx.person,String(args.job_id)),value=draft?await nativeCall(env,ctx.person,path(args)+'/compare','POST',{expected_version:version,key:args.key,alternatives:args.alternatives},ctx):await nativeCall(env,ctx.person,path(args),'GET',undefined,ctx)
-    return {result:{record:safe(value.record??value.requests),version:Number(value.version??version)}}
+    return {result:{record:safe(draft?{id:(value.record as {id:string}).id,request_id:String(args.request_id)}:action==='requests'?(value.requests as Array<{id:string;source_digest:string}>).map(({id,source_digest})=>({id,source_digest})):value.record),version:Number(value.version??version)}}
    },
   })
  })
