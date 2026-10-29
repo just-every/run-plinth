@@ -1,3 +1,4 @@
+import { questionFixture } from './agent-answers-support.mjs'
 import { costFixture } from './cost-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -65,7 +66,17 @@ test('ROLE-001 — owner, administrator and assignment-scoped project manager wi
   assert.equal((await f.request(feed)).status, 404, 'The calendar feed stops with the assignment')
   const audited = await f.db.prepare("SELECT count(*) AS n FROM oa_auth_audit WHERE action='plinth.role' AND value LIKE ?").bind(person.id + ':%').first()
   assert.equal(audited.n, 3, 'Each role change is audited')
-  assert.equal((await api(`/jobs/${job.id}`, { method: 'DELETE', body: { expected_version: job.version } })).status, 200, 'The owner erases')
+  const question=await questionFixture(f,(await api('/jobs/'+job.id)).value.job)
+  const client=await f.invite(assigned.client_email,'Question client')
+  const packetPath='/jobs/'+job.id+'/agent-answers/'+question.packet.id
+  const heldVersion=await version(job.id)
+  for(const cookie of [pm,admin,client]){
+   assert.equal((await api(packetPath,{cookie})).status,403,'Question review grants no new audience')
+   assert.equal((await api('/jobs/'+job.id+'/agent-answers',{method:'POST',cookie,body:{expected_version:heldVersion,question:'Read private sources',sources:question.refs,confirm:true}})).status,403)
+   const projection=await api('/jobs/'+job.id,{cookie});if(projection.status===200)assert.equal(projection.value.job.agent_answers,undefined)
+  }
+  assert.equal(await version(job.id),heldVersion,'Refused source and question access changes nothing')
+  assert.equal((await api(`/jobs/${job.id}`, { method: 'DELETE', body: { expected_version: heldVersion } })).status, 200, 'The owner erases')
  } finally { await f.close() }
 })
 

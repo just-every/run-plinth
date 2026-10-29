@@ -5,6 +5,7 @@ export default async function({request,origin,claim,displayName,returnTo}) {
  if(bootstrap.status!==303)throw Error('Native owner bootstrap returned '+bootstrap.status)
  const cookie=bootstrap.headers.getSetCookie().map(value=>value.split(';',1)[0]).join('; ')
  const call=async(path,body,method='POST')=>{const response=await request(origin+'/api/plinth/'+path,{method,headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(body)})});const value=await response.json();if(!response.ok)throw Error('Native fixture '+path+' HTTP '+response.status+': '+JSON.stringify(value));return value}
+ const questionJobs=[]
  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
  for(const name of ['A Active','B Active sensitive','C Quoting','D Quoting sensitive']){
   let job=(await call('jobs',{name,client_email:'synthetic-client@example.com',address:'100 Synthetic Avenue, Portland OR 97201'})).job
@@ -16,6 +17,13 @@ export default async function({request,origin,claim,displayName,returnTo}) {
    job=(await call(`jobs/${job.id}/products/${product.id}/review`,{expected_version:job.version,revision_id:product.revisions[0].id,confirm:true})).job
   }
   if(name.includes('Active'))job=(await call(`jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'email',evidence:'Synthetic client acceptance of exact scope',schedule_choice:{kind:'none',reason:'Field dates pending'}})).job
+  if(name.includes('Active'))questionJobs.push(job)
+ }
+ for(let n=0;n<questionJobs.length;n++){
+  let job=questionJobs[n]
+  const response=await call(`jobs/${job.id}/variations`,{expected_version:job.version,description:'Synthetic unanswered completion decision',amount_cents:100})
+  job=response.job
+  await call(`jobs/${job.id}/agent-answers`,{expected_version:job.version,question:n?'Synthetic SSN 123-45-6789':'Why did completion move? Cause remains unresolved.',sources:[{kind:'decision',decision_id:response.record.id}],confirm:true})
  }
  const catalog=async(kind,value)=>(await call('estimate-catalog',{kind,name:'Synthetic '+kind,reason:'Reviewed synthetic conformance source',value})).entry
  for(const sensitive of [false,true]) {

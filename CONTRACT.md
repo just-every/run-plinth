@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -522,6 +522,6 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | `AGENT-005` | Find missing or duplicate job costs | push-further | missing |  | No cost-match agent or actual-cost correction packets exist. |
 | `AGENT-006` | Keep handover and warranty promises | push-further | missing |  | No handover/warranty agent or closure workflow exists. |
-| `AGENT-007` | Cited project answers and draft actions | push-further | missing |  | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
+| `AGENT-007` | Cited project answers and draft actions | push-further | partial | `tests/plinth/domain.test.mjs` — “AGENT-007 — reviewed question packets retain cited analysis and one inert draft while source, sponsor, replay and erasure fences hold” proves exact owner-selected plan revisions, private bid response and narrow recorded cost facts, separated facts, conflicts, assumptions and unresolved questions, exact citation validation, retained answers, stale and cross-job refusal, packet and credential revocation, once-only native daily-log draft and no publication or approval; `tests/plinth/roles.test.mjs` — “ROLE-001 — owner, administrator and assignment-scoped project manager with a PO limit; refusals write nothing and a role change applies on the next request” proves the conservative owner-only packet boundary; `tests/plinth/portable.test.mjs` — “CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive” proves retained question sources, answers and draft identity through real CLI recovery and erasure fencing; `tests/fixtures/agent-owner.mjs` and `agent-surface.json` exercise the read and draft tools under the shared MCP policy journey | Conservative default ADOPTED: a personally signed-in owner explicitly selects and reviews each immutable same-job question packet; only that current owner and their currently authorized MCP analysis may consume it. Complete manager and client Q&A, broad source coverage, complete estimate, change, daily-log and task preparation, and demonstrated answer quality remain owed. ROLE-003 exact-policy confirmation, conservative owner-only per-job external-feature default and same-job client precedence, ROLE-006 copied-preset ceiling, owner-only assignment, administrator and external scope and delivery-grant approval, and ROLE-005 recorded retention and erasure policy duties remain unchanged. No external audience, raw agent cost access, provider authority, approval or publication is granted. |
 | `AGENT-008` | Scheduled agents with human control | push-further | missing |  | No scheduled AI runner, source grants or outcome/budget controls exist. |
 | `AGENT-009` | Learn estimating accuracy from completed jobs | push-further | missing |  | No completed-job learning, replay or catalog proposal agent exists. |

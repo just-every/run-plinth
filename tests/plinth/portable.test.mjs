@@ -1,3 +1,4 @@
+import { questionFixture } from './agent-answers-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
@@ -228,6 +229,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(roomCreated.status,200);job=roomCreated.value.job
     const archivedRoom=structuredClone(job.room_boards[0])
     const archivedExport=await archiveExportWork(f,job)
+    const archivedQuestion=await questionFixture(f)
+    const retainedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/answers',{packet_digest:archivedQuestion.packet.digest,analysis:archivedQuestion.analysis})
+    const linkedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/prepare',{packet_digest:archivedQuestion.packet.digest,answer_id:retainedAnswer.record.id,input:{kind:'diary',date:'2026-10-28',note:'Retained unresolved completion review'}})
+    const savedQuestion=(await f.json(archivedQuestion.root+'/agent-answers/'+archivedQuestion.packet.id,{cookie:f.owner})).value.record
     const cookie=f.owner; await f.close();f=undefined
     const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -265,6 +270,9 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     for(const item of expected) if(item.table==='oa_auth_settings') item.row.generation++
     assert.deepEqual(rows(restored),expected)
     const recoveredJob=rows(restored).find(item=>item.table==='pl_jobs'&&item.row.id===job.id);assert.ok(recoveredJob);assert.deepEqual(JSON.parse(recoveredJob.row.data).continuity,job.continuity,'AUTO-002 interrupted draft checkpoint and source links survive recovery unchanged')
+    const recoveredQuestion=JSON.parse(rows(restored).find(r=>r.table==='pl_jobs'&&r.row.id===archivedQuestion.job.id).row.data)
+    assert.deepEqual(recoveredQuestion.agent_answers,[savedQuestion],'Reviewed question sources, citations, separated answers and the once-only draft link survive real CLI recovery')
+    assert.equal(recoveredQuestion.diary.find(d=>d.id===linkedAnswer.record.draft.id).status,'draft','Recovery cannot publish a question-derived log')
     const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
     assert.deepEqual(recoveredPortalJob.room_boards,[archivedRoom],'Room measurements, immutable revisions and pinned product snapshots survive CLI recovery')
     for(const original of roomFiles()){
@@ -318,11 +326,15 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const signedCurrent=(await f.json('/api/plinth/jobs/'+signedArchive.job.id,{cookie})).value.job;assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id,{method:'DELETE',cookie,body:{expected_version:signedCurrent.version}})).status,200);assert.equal((await f.json('/api/plinth/jobs/'+signedArchive.job.id+'/signed-changes',{cookie})).status,404)
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
     const performanceCurrent=(await f.json('/api/plinth/jobs/'+performanceSource.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+performanceSource.job.id,{method:'DELETE',cookie,body:{expected_version:performanceCurrent.version}})).status,200)
+    const questionCurrent=(await f.json(archivedQuestion.root,{cookie})).value.job
+    assert.equal((await f.request(archivedQuestion.root,{method:'DELETE',cookie,body:{expected_version:questionCurrent.version}})).status,200)
+    assert.equal((await f.request(archivedQuestion.root+'/agent-answers/'+savedQuestion.id,{cookie})).status,404)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
     assert.ok(!erasedRows.some(r=>r.table==='pl_background_work'&&archivedExport.tasks.some(t=>t.id===r.row.id)),'Erasure removes archived export captures and outputs')
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===archivedQuestion.job.id),'Erasure removes question packets, retained answers and linked drafts before backup replay is fenced')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id),'Signed change artifacts and private costs disappear before old archive recovery is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_plan_file_chunks'&&item.row.job_id===job.id),'DOC-001 erasure removes every large plan chunk')
