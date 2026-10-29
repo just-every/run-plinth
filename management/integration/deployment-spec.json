@@ -312,6 +312,12 @@
       "name": "202610291200_recovery_evidence.sql",
       "sha256": "015cddcec20da722164b2fe4225ecd10bd6f0af39ed6ad979fccf0cda123c97e",
       "sql": "-- Consent is local to the reviewing installation and never restored as standing agent authority.\nCREATE TABLE pl_recovery_evidence_grants (\n case_id TEXT PRIMARY KEY,\n packet_id TEXT NOT NULL,\n sponsor_id TEXT NOT NULL,\n sponsor_version INTEGER NOT NULL\n);\nCREATE TRIGGER pl_recovery_evidence_erased AFTER DELETE ON pl_jobs BEGIN\n DELETE FROM pl_recovery_evidence_grants WHERE case_id IN (SELECT json_extract(value,'$.id') FROM json_each(OLD.data,'$.recovery_evidence'));\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610292200_recovery_evidence_erasure.sql",
+      "sha256": "4ea999c417b1d340fba18b838bb0517ea3bd2cd71666cf81d187c98f4c8f8886",
+      "sql": "-- Recovery observations and comparisons must disappear with their source job,\n-- including replayed assessments of earlier reviewed packets.\nCREATE TRIGGER pl_recovery_evidence_payload_erased BEFORE DELETE ON pl_jobs BEGIN\n DELETE FROM agent_door_calls\n WHERE json_extract(outcome,'$.result.record.packet_id') IN (\n  SELECT json_extract(packet.value,'$.id')\n  FROM json_each(OLD.data,'$.recovery_evidence') AS recovery,\n       json_each(recovery.value,'$.packets') AS packet\n ) OR json_extract(outcome,'$.result.record.packet.id') IN (\n  SELECT json_extract(packet.value,'$.id')\n  FROM json_each(OLD.data,'$.recovery_evidence') AS recovery,\n       json_each(recovery.value,'$.packets') AS packet\n ) OR decision_id IN (\n  SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals\n  WHERE json_extract(saved,'$.tool') IN ('plinth.recovery.get','plinth.recovery.assess')\n   AND json_extract(saved,'$.args.job_id')=OLD.id\n );\n DELETE FROM agent_door_approvals\n WHERE json_extract(saved,'$.tool') IN ('plinth.recovery.get','plinth.recovery.assess')\n  AND json_extract(saved,'$.args.job_id')=OLD.id;\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

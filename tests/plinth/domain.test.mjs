@@ -1045,7 +1045,16 @@ test('Private recovery packets fence MCP evidence, replay, source decisions, rev
   const newArgs={...args,...r.observation(),idempotency_key:'synthetic-plinth-capture-53'},next=await mcp('plinth.recovery.assess',newArgs);assert.ok(next.value.result.structuredContent,JSON.stringify(next.value));await c.read()
   await c.ok(casePath+'/revoke',{});assert.equal(error(await mcp('plinth.recovery.get',args)),'recovery_revoked');assert.equal(error(await mcp('plinth.recovery.assess',newArgs)),'recovery_revoked');assert.equal((await c.act(casePath+'/review',{digest:r.recovery.packets.at(-1).digest,confirm:true})).status,403)
   stored=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${r.recovery.id}`)).value.case;assert.equal(stored.assessments.length,2);assert.deepEqual(stored.assessments[0],first.value.result.structuredContent.record)
+  const replayPayloads=async()=>(await f.db.prepare('SELECT key,outcome FROM agent_door_calls WHERE key IN (?,?) ORDER BY key').bind(capture.idempotency_key,newArgs.idempotency_key).all()).results
+  const beforeErasure=await replayPayloads();assert.equal(beforeErasure.length,2)
+  for(const {key,outcome} of beforeErasure){const record=JSON.parse(outcome).result.record;assert.equal(record.observation,capture.observation);assert.deepEqual(record,key===capture.idempotency_key?first.value.result.structuredContent.record:next.value.result.structuredContent.record)}
+  const otherCapture={job_id:other.id,input:{date:'2026-11-07',note:'synthetic-plinth-retained-other-job'},idempotency_key:'synthetic-plinth-retained-other-job'}
+  const otherDraft=await mcp('plinth.diary.prepare',otherCapture);assert.ok(otherDraft.value.result.structuredContent,JSON.stringify(otherDraft.value))
+  const unrelated=await f.db.prepare('SELECT outcome FROM agent_door_calls WHERE key=?').bind(otherCapture.idempotency_key).first()
   assert.equal((await f.json('/api/plinth/jobs/'+c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).status,200)
+  assert.deepEqual(await replayPayloads(),[],'Job erasure removes private observations and financial comparisons from every historical MCP replay')
+  assert.deepEqual(await f.db.prepare('SELECT outcome FROM agent_door_calls WHERE key=?').bind(otherCapture.idempotency_key).first(),unrelated,'Erasure preserves another job’s replay')
   assert.equal(error(await mcp('plinth.recovery.assess',newArgs)),'not_found');assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_recovery_evidence_grants WHERE case_id=?').bind(r.recovery.id).first()).n,0)
+  assert.deepEqual(await replayPayloads(),[],'A captured request cannot recreate erased private replay data')
  }finally{await f.close()}
 })

@@ -19,6 +19,7 @@ export async function providerEdge() {
   const reply = (status, value) => { response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); response.end(JSON.stringify(value)) }
   try {
    const url = new URL(request.url, 'http://127.0.0.1')
+   if (request.method === 'GET' && url.pathname === '/observations') return reply(200, { mail: messages.length, checkout: stripe.sessions.length, refunds: stripe.refunds.length })
    if (request.method === 'GET' && url.pathname === '/mail/latest') return reply(200, { message: latest(url.searchParams.get('email')) ?? null })
    assert.equal(request.method, 'POST')
    const chunks = []; for await (const chunk of request) chunks.push(chunk)
