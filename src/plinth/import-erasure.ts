@@ -4,6 +4,7 @@ import { retireImportedJob } from './import-retirement.ts'
 import { canonicalJson } from '../modules/import-kit/src/d1/index.ts'
 import { auditSql, jobRef } from './audit.ts'
 import { heldSql, requireNoHold } from './holds.ts'
+import { closeoutCacheSql } from './agent-closeout-cache'
 
 /** The job, its files, import custody and restore fence disappear together.
  * A native erasure marker prevents importing this job ID again. */
@@ -20,8 +21,7 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
     { sql: `INSERT INTO pl_guard(ok) SELECT CASE WHEN (${current.sql}) AND EXISTS(SELECT 1 FROM pl_jobs WHERE id=? AND version=? AND data=?) AND NOT ${held.sql} THEN 1 ELSE 0 END`, params: [...current.params, job.id, job.version, row.data, ...held.params] },
     audit,
     // Remove closeout content from MCP replay and person approval stores before the job disappears.
-    { sql: `DELETE FROM agent_door_calls WHERE json_extract(outcome,'$.result.record.job_id')=? OR json_extract(outcome,'$.approval.id') IN (SELECT id FROM agent_door_approvals WHERE json_extract(saved,'$.tool') IN ('plinth.closeout.read','plinth.closeout.followup') AND json_extract(saved,'$.args.job_id')=?)`, params: [job.id,job.id] },
-    { sql: `DELETE FROM agent_door_approvals WHERE json_extract(saved,'$.tool') IN ('plinth.closeout.read','plinth.closeout.followup') AND json_extract(saved,'$.args.job_id')=?`, params: [job.id] },
+    ...closeoutCacheSql(job.id),
     { sql: `DELETE FROM agent_door_reviews WHERE json_extract(saved,'$.tool') IN ('plinth.closeout.read','plinth.closeout.followup') AND json_extract(saved,'$.summary.target.id') IN (SELECT json_extract(value,'$.id') FROM json_each(?, '$.agent_closeout'))`, params: [row.data] },
     { sql: "DELETE FROM rer_mail_event_receipts WHERE event_namespace='job-mail' AND json_extract(event_json,'$.deliveryId') IN (SELECT id FROM pl_mail_messages WHERE job_id=?)", params: [job.id] },
     { sql: "DELETE FROM rer_mail_event_states WHERE event_namespace='job-mail' AND provider_message_id IN (SELECT provider_message_id FROM pl_mail_messages WHERE job_id=? AND provider_message_id IS NOT NULL)", params: [job.id] },

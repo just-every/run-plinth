@@ -17,7 +17,7 @@ export function closeoutTools(env: Bindings): ToolDefinition[] {
    outputSchema: { type: 'object', properties: { record: {}, version: { type: 'integer' } }, required: ['record', 'version'], additionalProperties: false },
    async classify(args, ctx) { const packet = await nativeCall(env, ctx.person, path(args), 'GET', undefined, ctx); return recordClasses(safe({ packet: packet.record, input: input(args) })) },
    revision(args, ctx) { return nativeVersion(env, ctx.person, String(args.job_id)) },
-   async summary(args, ctx) { const value = await nativeCall(env, ctx.person, path(args), 'GET', undefined, ctx), record = value.record as { id: string; title: string }; return { target: { id: record.id, name: record.title }, items: ['Unsent closeout follow-up only'] } },
+   async summary(args, ctx) { const value = await nativeCall(env, ctx.person, path(args), 'GET', undefined, ctx), record = value.record as { id: string; title: string }, proposed = input(args); return { target: { id: record.id, name: record.title }, items: ['Unsent closeout follow-up only', ...['kind','proposed_owner','message','proposed_window'].flatMap(key => typeof proposed[key] === 'string' ? [String(proposed[key])] : [])] } },
    async run(args, ctx) {
     const result = await nativeCall(env, ctx.person, path(args) + (write ? '/drafts' : ''), write ? 'POST' : 'GET', write ? { ...input(args), expected_version: args.expected_version ?? await nativeVersion(env, ctx.person, String(args.job_id)) } : undefined, ctx)
     return { result: { record: safe(result.record), version: result.version } }

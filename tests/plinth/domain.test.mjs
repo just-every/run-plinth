@@ -16,14 +16,15 @@ test('Closeout packets retain exact private evidence and unsent history; stale, 
   assert.equal((await f.json(c.root,{token})).value.job.agent_closeout,undefined,'The general job projection cannot bypass packet review')
   assert.equal(packet.comparisons.find(r=>r.requirement_id==='manual').state,'missing_evidence')
   assert.equal(packet.unresolved[0].id,c.issue.id);assert.equal(packet.unresolved[0].state,'open')
+  assert.equal(packet.sources.find(s=>s.key==='package:'+c.packageSource.id).revision_id,c.packageSource.digest)
   const source=packet.sources.find(s=>s.key===c.sourceKeys[0]);assert.equal(source.revision_id,c.spec.revisions[0].id);assert.equal(source.file.checksum,c.spec.revisions[0].file.checksum)
   const original=await f.request(source.original_path,{cookie:f.owner});assert.equal(original.status,200)
   const {handoverDocument}=await import('../fixtures/handover-document.mjs');assert.deepEqual(Buffer.from(await original.arrayBuffer()),handoverDocument('Window specification'))
   assert.ok([403,404].includes((await f.request(source.original_path,{cookie:client})).status))
   await c.review(packet)
   let r=await mcp('plinth.closeout.read',args);assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.result.record.digest,packet.digest)
-  const before=await c.read(),messages=f.messages.length,body=c.draft(packet)
-  r=await mcp('plinth.closeout.followup',{...args,input:body});assert.equal(r.result?.record.status,'unsent',JSON.stringify(r.value));const first=r.result.record
+  const before=await c.read(),messages=f.messages.length,body=c.draft(packet),cacheKey='synthetic-plinth-source-replay'
+  r=await mcp('plinth.closeout.followup',{...args,input:body,idempotency_key:cacheKey});assert.equal(r.result?.record.status,'unsent',JSON.stringify(r.value));const first=r.result.record
   r=await mcp('plinth.closeout.followup',{...args,input:body});assert.equal(r.result.record.id,first.id,'Identical replay returns the one retained draft')
   assert.equal((await c.act('/agent-closeout/'+packet.id+'/drafts',{...body,message:'Changed terms under the same request id'})).status,409)
   await c.ok('/agent-closeout/'+packet.id+'/drafts',{...body,request_id:'synthetic-plinth-request-2',kind:'request',message:'Alternative unsent request; preserve the first proposal'})
@@ -32,12 +33,28 @@ test('Closeout packets retain exact private evidence and unsent history; stale, 
   assert.equal(f.messages.length,messages,'Packet reads and drafts make no provider calls')
   assert.equal((await mcp('plinth.closeout.read',{...args,job_id:(await createActiveJob(f,'Other closeout job')).id})).result,undefined)
   assert.equal((await c.act('/agent-closeout',{title:'Foreign source',source_keys:['document:foreign'],requirements:c.requirements})).status,404)
+  const heldPolicy={schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'approval',approver:['sponsor'],wait:'PT1H'}],spend:{none:true}}
+  assert.equal((await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:heldPolicy}})).status,200)
+  const pending=await mcp('plinth.closeout.read',args),handle=pending.value.result._meta['com.runeditrun/approval'],requestState=pending.value.result.requestState
+  const approval=(await f.json('/agents/api/approvals/'+handle.id,{cookie:f.owner})).value.approval
+  assert.equal((await f.json('/agents/api/approvals/'+handle.id+'/approve',{method:'POST',cookie:f.owner,body:{revision:approval.revision,summary_sha256:approval.summary_sha256}})).status,200)
+  assert.equal((await mcp('plinth.closeout.read',args,{requestState})).result.record.id,packet.id,'The owner can authorize the exact held packet read')
   const revised=await c.document('selection','Window specification',c.spec)
+  assert.equal((await mcp('plinth.closeout.read',args,{requestState})).result,undefined,'A held-read replay cannot expose a packet after its sources change')
   assert.equal((await mcp('plinth.closeout.read',args)).result,undefined,'Changed originals invalidate the reviewed packet')
+  assert.equal((await mcp('plinth.closeout.followup',{...args,input:body,idempotency_key:cacheKey})).result,undefined,'A cached success cannot bypass changed sources')
   assert.equal((await mcp('plinth.closeout.followup',{...args,input:{...body,request_id:'synthetic-plinth-stale'}})).result,undefined)
   assert.deepEqual((await c.list()).value.packets[0],history,'Stale reads and writes preserve all draft history')
-  const next=await c.capture({source_keys:[...c.sourceKeys.slice(1),'document:'+revised.revisions[1].id],requirements:c.requirements.map(r=>r.id==='specification'?{...r,source_keys:['document:'+revised.revisions[1].id]}:r)})
-  await c.review(next)
+  const successor={source_keys:[...c.sourceKeys.slice(1),'document:'+revised.revisions[1].id],requirements:c.requirements.map(r=>r.id==='specification'?{...r,source_keys:['document:'+revised.revisions[1].id]}:r)}
+  let next=await c.capture(successor);await c.review(next)
+  const current=await closeoutMcp(f,token),consented={job_id:c.job.id,record_id:next.id,input:c.draft(next),idempotency_key:'synthetic-plinth-consent-replay'}
+  assert.equal((await current('plinth.closeout.read',{job_id:c.job.id,record_id:next.id})).result.record.id,next.id)
+  assert.equal((await current('plinth.closeout.followup',consented)).result.record.status,'unsent')
+  await c.ok('/agent-closeout/'+next.id+'/revoke',{digest:next.digest,confirm:true,reason:'Owner withdraws further agent use; preserve private history'})
+  assert.equal((await current('plinth.closeout.read',{job_id:c.job.id,record_id:next.id})).result,undefined)
+  assert.equal((await current('plinth.closeout.followup',consented)).result,undefined,'Consent revocation fences an exact cached draft replay')
+  assert.equal((await c.list()).value.packets.find(p=>p.id===next.id).drafts.length,1,'Revocation preserves draft history')
+  next=await c.capture(successor);await c.review(next)
   const credential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials.find(c=>!c.revoked_at)
   assert.equal((await f.request('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
   assert.equal((await mcp('plinth.closeout.read',{job_id:c.job.id,record_id:next.id})).status,401)

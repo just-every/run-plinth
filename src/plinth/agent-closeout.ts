@@ -4,6 +4,7 @@ import { requireOwner } from './auth'
 import { active, find, need, object, stamp, text, type Actor, type Attachment, type Input, type Job, type Stamp } from './model'
 import { jobOf, readClock, saveJob } from './store'
 import { warrantyGeneration } from './warranty-store'
+import { closeoutCacheSql, closeoutSources as sourceState } from './agent-closeout-cache'
 
 type Kind = 'specification' | 'manual' | 'inspection' | 'photo' | 'punch' | 'warranty' | 'promise' | 'package' | 'service'
 interface Source { key: string; kind: Kind; record_id: string; revision_id: string; reference: string; file?: Attachment; original_path?: string; evidence: unknown }
@@ -15,6 +16,7 @@ export interface CloseoutPacket {
  unresolved: { kind: 'punch' | 'service'; id: string; title: string; state: string; evidence: unknown }[]
  source_digest: string; digest: string; boundary: string
  review?: { by: Stamp; person_version: number; generation: number; statement: string }
+ revocation?: { by: Stamp; reason: string }
  drafts: Draft[]
 }
 const fingerprint = (value: unknown) => digest(new TextEncoder().encode(JSON.stringify(value)))
@@ -23,9 +25,6 @@ const json = (value: unknown) => Response.json(value, { headers: { 'cache-contro
 /** Packet state is never a professional decision or a service completion signal. */
 const boundary = 'Private evidence comparison only. Documents and trade statements do not certify inspection, interpret coverage, release work, book visits, send messages or close cases. Builder acceptance and client acknowledgment remain separate human decisions.'
 
-function sourceState(job: Job) {
- return { handover: job.handover ?? null, selections: job.selections ?? [], punch: job.punch ?? null, warranties: job.warranties ?? null, diary: job.diary }
-}
 function inventory(job: Job): Source[] {
  const root = '/api/plinth/jobs/' + encodeURIComponent(job.id), sources: Source[] = []
  for (const document of job.handover?.documents ?? []) for (const revision of document.revisions) {
@@ -48,6 +47,7 @@ async function ownerSponsor(db: D1Database, actor: Actor) {
 }
 async function reviewed(db: D1Database, job: Job, packet: CloseoutPacket) {
  need(packet.review, 'An owner must review this exact packet first', 409, 'closeout_review')
+ need(!packet.revocation, 'The owner revoked this packet consent', 409, 'closeout_revoked')
  need(packet.source_digest === await fingerprint(sourceState(job)), 'Closeout sources changed; prepare and review a new packet', 409, 'closeout_sources')
  const current = await db.prepare("SELECT id FROM oa_operators WHERE id=? AND version=? AND role='owner' AND status='active'").bind(packet.review.by.id, packet.review.person_version).first()
  need(current && packet.review.generation === await warrantyGeneration(db), 'Review authority changed; an owner must review a new packet', 409, 'closeout_authority')
@@ -93,6 +93,7 @@ export async function closeoutResponse(request: Request, env: Bindings, actor: A
  active(previous)
  const job = structuredClone(previous), packets = job.agent_closeout ??= []
  let record: CloseoutPacket | Draft
+ const writes: D1PreparedStatement[] = []
  if (parts.length === 3) {
   requireOwner(actor); need(packets.length < 100, 'This job has one hundred retained closeout packets')
   record = await prepare(job, actor, input); packets.push(record)
@@ -105,6 +106,12 @@ export async function closeoutResponse(request: Request, env: Bindings, actor: A
    need(input.confirm === true, 'Explicitly consent to agent use of this private packet')
    need(packet.source_digest === await fingerprint(sourceState(job)), 'Closeout sources changed; prepare a new packet', 409, 'closeout_sources')
    packet.review = { by: stamp(actor), person_version: actor.version, generation: await warrantyGeneration(env.DB), statement: text(input.statement, 'Review statement', 2000) }
+   record = packet
+  } else if (parts[4] === 'revoke') {
+   requireOwner(actor); need(packet.review && !packet.revocation, 'Only an active packet consent can be revoked', 409, 'closeout_review')
+   need(input.confirm === true, 'Confirm revocation of this exact private packet')
+   packet.revocation = { by: stamp(actor), reason: text(input.reason, 'Consent revocation reason', 2000) }
+   writes.push(...closeoutCacheSql(job.id).map(s => env.DB.prepare(s.sql).bind(...s.params)))
    record = packet
   } else {
    need(parts[4] === 'drafts', 'Only follow-up drafts are supported', 404, 'not_found')
@@ -125,6 +132,6 @@ export async function closeoutResponse(request: Request, env: Bindings, actor: A
    packet.drafts.push(record)
   }
  }
- await saveJob(env.DB, actor, previous, job, [], clock)
+ await saveJob(env.DB, actor, previous, job, writes, clock)
  return json({ record, version: job.version })
 }
