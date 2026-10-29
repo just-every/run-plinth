@@ -334,10 +334,12 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const costCurrent=(await f.json(`/api/plinth/jobs/${costJobId}`,{cookie})).value.job
     const performanceCurrent=(await f.json('/api/plinth/jobs/'+performanceSource.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+performanceSource.job.id,{method:'DELETE',cookie,body:{expected_version:performanceCurrent.version}})).status,200)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
+    const openingCurrent=(await f.json('/api/plinth/jobs/'+openingCase.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+openingCase.job.id,{method:'DELETE',cookie,body:{expected_version:openingCurrent.version}})).status,200);const openingWithdrawn=await f.json('/api/plinth/imports/'+openingCommit.value.job.id+'/originals',{cookie});assert.equal(openingWithdrawn.status,200);assert.equal(openingWithdrawn.value.originals.length,2);assert.ok(openingWithdrawn.value.originals.every(o=>o.original.status==='unavailable'),'Both financial source originals are withdrawn before old archive replay is fenced')
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===openingCase.job.id),'Imported historical costs and SOV are absent before the later erasure journal fences recovery')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id),'Signed change artifacts and private costs disappear before old archive recovery is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_plan_file_chunks'&&item.row.job_id===job.id),'DOC-001 erasure removes every large plan chunk')
     assert.ok(!erasedRows.some(item=>item.table==='pl_jobs'&&item.row.id===job.id),'DOC-004 erasure removes the complete register before old-archive replay is fenced')
