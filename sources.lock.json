@@ -3813,7 +3813,7 @@
       "executable": false
     },
     "src/plinth/recovery-inventory.ts": {
-      "sha256": "dfc5289d64f3bdae964bf56f130abacb84cdc7082298435e6088b27b781da725",
+      "sha256": "9d3cb925e4b9ef708c74c94b59dfdbb77ed006dca308b3dbee4c27c68ca0c2e3",
       "executable": false
     },
     "src/plinth/refund-posting.ts": {
@@ -5461,7 +5461,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "e5bf228f8f8ea255865c3d66846602461bd217471953e34c3d08b86ed61381b3",
+      "sha256": "1a42eeb3a89d2be8d2064026e8f12f5544d4c7a0ad8e3b442a3271e4d43c6475",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
