@@ -43,6 +43,12 @@ export function plinthAgentDoor(original: Bindings) {
   if(new URL(request.url).pathname==='/mcp'&&request.method==='POST'){
    let message:{id?:unknown;method?:string;params?:{name?:string;arguments?:Record<string,unknown>}}|undefined
    try{message=await request.clone().json()}catch{}
+   if(message?.method==='tools\u002fcall'&&['plinth.runs.read','plinth.runs.continue'].includes(message.params?.name??'')){
+    const runtime:Runtime={options,tools:options.tools,now:options.now??Date.now},state=await policyState(runtime)
+    if(policyRefusal(runtime,state,['standard','sensitive']))return door.handle(request)
+    const principal=await authenticate(options,request,state.business)
+    if(principal){try{await nativeCall(env,principal.person,'agent-runs/'+encodeURIComponent(String(message.params?.arguments?.run_id)),'GET',undefined,{agent:principal.agent} as ToolContext)}catch(error){if(error instanceof ToolRefusal)return Response.json({jsonrpc:'2.0',id:message.id??null,error:{code:-32000,message:'Reviewed run unavailable',data:{code:error.code}}},{headers:{'cache-control':'no-store'}});throw error}}
+   }
    if(message?.method==='tools/call'&&['plinth.learning.read','plinth.learning.prepare'].includes(message.params?.name??'')){
     const runtime:Runtime={options,tools:options.tools,now:options.now??Date.now},state=await policyState(runtime)
     // Shared policy admission precedes argument use, including unresolved source references.

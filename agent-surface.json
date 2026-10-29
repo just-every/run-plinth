@@ -221,6 +221,44 @@
       ]
     },
     {
+      "name": "plinth.runs.continue",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-008",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.runs.list",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "AGENT-008",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.runs.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-008",
+        "NATIVE-008"
+      ]
+    },
+    {
       "name": "plinth.schedule.prepare",
       "scope": "drafts:write",
       "readOnly": false,
@@ -1586,6 +1624,134 @@
             "length": 10
           }
         }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "manual-runs",
+      "tool": "plinth.runs.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-read-standard",
+      "tool": "plinth.runs.read",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/1/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-continue-standard-0",
+      "tool": "plinth.runs.continue",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/1/id"
+        },
+        "sequence": 0
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-continue-standard-1",
+      "tool": "plinth.runs.continue",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/1/id"
+        },
+        "sequence": 1
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-read-sensitive",
+      "tool": "plinth.runs.read",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-continue-sensitive-0",
+      "tool": "plinth.runs.continue",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/0/id"
+        },
+        "sequence": 0
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-continue-sensitive-1",
+      "tool": "plinth.runs.continue",
+      "args": {
+        "run_id": {
+          "$from": "manual-runs",
+          "pointer": "/runs/0/id"
+        },
+        "sequence": 1
       },
       "expect": [
         {
