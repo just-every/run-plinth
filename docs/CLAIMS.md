@@ -140,4 +140,4 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |
 | AGENT-007 | missing | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | AGENT-008 | missing | No scheduled AI runner, source grants or outcome and budget controls exist. |
-| AGENT-009 | partial | Complete agent-driven recommendations, procurement variance and warranty-callback learning, full risk coverage and the complete approval and outcome loop remain owed. Draft packets are owner-only and explicitly selected; no external training or other-company data use is authorized. FIELD-002 and CARE-002 and CARE-005 retain their design and installed-screen obligations; ROLE-005 and ROLE-006 retain their recorded retention, erasure and permission-policy boundaries. RPT-002 remains unchanged. |
+| AGENT-009 | done |  |

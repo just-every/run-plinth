@@ -13,7 +13,7 @@ export function learningTools(env:Bindings):ToolDefinition[]{
   async classify(args,ctx){const value=await nativeCall(env,ctx.person,path(args),'GET',undefined,ctx);return recordClasses([value.packet,args.input])},
   async revision(args,ctx){const value=await nativeCall(env,ctx.person,path(args),'GET',undefined,ctx);return parseInt((value.packet as {digest:string}).digest.slice(0,12),16)},
   async summary(args){return {target:{id:String(args.packet_id),name:'Owner-reviewed completed jobs'},items:[write?'Prepare a bounded counterfactual draft':'Read the exact reviewed source packet']}},
-  async run(args,ctx){const value=await nativeCall(env,ctx.person,path(args)+(write?'/drafts':''),write?'POST':'GET',write?args.input as Record<string,unknown>:undefined,ctx);return {result:{record:safe(write?value.draft:value)}}},
+  async run(args,ctx){const value=await nativeCall(env,ctx.person,path(args)+(write?'/drafts':''),write?'POST':'GET',write?args.input as Record<string,unknown>:undefined,ctx);if(write)ctx.emit('learning.draft-prepared','plinth://learning/'+String(args.packet_id),{draft_id:(value.draft as {id:string}).id});return {result:{record:safe(write?value.draft:value)}}},
  }))
  return definitions
 }

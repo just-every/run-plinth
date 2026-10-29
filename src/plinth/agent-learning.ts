@@ -1,5 +1,7 @@
 import { requireOwner } from './auth'
 import { auditStatement } from './audit'
+import { learningEvidence } from './learning-evidence'
+import { catalogValue } from './catalog-input'
 import { catalogEntry } from './estimate-catalog'
 import { catalogPreview } from './catalog-quote'
 import type { Assembly, CatalogEntry, CatalogSource, EstimateTemplate } from './catalog-model'
@@ -11,9 +13,9 @@ import { jobOf, readClock, transaction } from './store'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 const hash=async(value:unknown)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))].map(b=>b.toString(16).padStart(2,'0')).join('')
-type Source={id:string;version:number;quote_id:string;catalog:CatalogSource;retained:CatalogEntry[];performance:ReturnType<typeof performanceJob>}
+type Source={id:string;version:number;quote_id:string;catalog:CatalogSource;retained:CatalogEntry[];performance:ReturnType<typeof performanceJob>;evidence:ReturnType<typeof learningEvidence>}
 type Packet={id:string;owner_id:string;reviewed_by:ReturnType<typeof stamp>;reason:string;digest:string;currency:string;target:CatalogEntry;sources:Source[];catalog_versions:{id:string;version:number}[]}
-type Draft={id:string;packet_id:string;prepared_by:ReturnType<typeof stamp>;reason:string;changes:Input;value:Assembly|EstimateTemplate;observations:{job_id:string;rows:Source['performance']['rows']}[];replay:{job_id:string;quote_id:string;dimensions:Record<string,string>;signed_revenue_cents:number;historical_cost_cents:number|null;candidate_cost_cents:number;candidate_margin_cents:number;margin_delta_cents:number|null}[];limits:string[]}
+type Draft={citations:{job_id:string;source_version:number;quote_id:string;catalog:CatalogSource;order_ids:string[];receipt_ids:string[];callback_case_ids:string[];callback_cost_ids:string[]}[];id:string;packet_id:string;prepared_by:ReturnType<typeof stamp>;reason:string;changes:Input;value:Assembly|EstimateTemplate;observations:{job_id:string;rows:Source['performance']['rows']}[];replay:{job_id:string;quote_id:string;dimensions:Record<string,string>;signed_revenue_cents:number;historical_cost_cents:number|null;candidate_cost_cents:number;candidate_margin_cents:number;margin_delta_cents:number|null}[];limits:string[];lesson_input:{catalog_id:string;catalog_version:number;source_job_ids:string[];reason:string;value:Assembly|EstimateTemplate}}
 async function catalog(db:D1Database){return (await db.prepare('SELECT data FROM pl_estimate_catalog ORDER BY id').all<{data:string}>()).results.map(r=>JSON.parse(r.data) as CatalogEntry)}
 const current=(entry:CatalogEntry)=>entry.revisions.at(-1)!.value
 function historical(entries:CatalogEntry[],source:CatalogSource){
@@ -35,7 +37,7 @@ async function preview(db:D1Database,actor:Actor,input:Input){
   need(target.kind==='template'?source.template_id===target.id:source.assemblies.some(a=>a.id===target.id),'Select jobs using this catalog source',409,'incompatible_source')
   const retained=historical(entries,source),p=performanceJob(job,entries)
   if(target.kind==='assembly')need((retained.find(e=>e.id===target.id)?.revisions[0]?.value as Assembly)?.unit===(current(target) as Assembly).unit,'Production units must be compatible',409,'incompatible_units')
-  sources.push({id:job.id,version:job.version,quote_id:quote.id,catalog:source,retained,performance:p})
+  sources.push({id:job.id,version:job.version,quote_id:quote.id,catalog:source,retained,performance:p,evidence:learningEvidence(job)})
  }
  need(sources.every(s=>s.performance.currency===sources[0]!.performance.currency),'Compare completed jobs in the same currency',409,'currency_mismatch')
  // Every current dependency is fenced; unrelated company catalogs are neither read into the packet nor exposed.
@@ -59,13 +61,13 @@ function candidate(packet:Packet,input:Input):Assembly|EstimateTemplate{
  const value=structuredClone(current(packet.target)) as Assembly|EstimateTemplate
  if(packet.target.kind==='assembly'){
   const productivity=percent(input.productivity_percent,'Productivity change'),rate=percent(input.rate_percent,'Rate allowance change'),risk=percent(input.risk_percent,'Risk allowance',0)
-  for(const part of (value as Assembly).parts){if(part.category==='labor')part.productivity=scaled(part.productivity,productivity);part.units_per_dimension=scaled(part.units_per_dimension,rate);const waste=decimal(part.waste_percent,'Waste',false);need(waste.numerator<=25n*waste.denominator,'Existing risk allowance exceeds this bounded draft door');part.waste_percent=String(Number(part.waste_percent)+risk);need(Number(part.waste_percent)<=25,'Total risk allowance must not exceed 25 percent')}
+  for(const part of (value as Assembly).parts){if(part.category==='labor')part.productivity=scaled(part.productivity,productivity);part.rate_factor=scaled(part.rate_factor??'1',rate);const waste=decimal(part.waste_percent,'Waste',false);need(waste.numerator<=25n*waste.denominator,'Existing risk allowance exceeds this bounded draft door');const total=waste.numerator+BigInt(risk)*waste.denominator;need(total<=25n*waste.denominator,'Total risk allowance must not exceed 25 percent');const places=String(waste.denominator).length-1,raw=total.toString().padStart(places+1,'0');part.waste_percent=places?raw.slice(0,-places)+'.'+raw.slice(-places):raw}
  }else{
   const factors=object(input.dimension_percent),definition=value as EstimateTemplate
   need(Object.keys(factors).length===Object.keys(definition.dimensions).length&&Object.keys(factors).every(k=>Object.hasOwn(definition.dimensions,k)),'Supply the existing template dimensions only')
   for(const key of Object.keys(definition.dimensions))definition.dimensions[key]=scaled(definition.dimensions[key]!,percent(factors[key],'Default dimension change'))
  }
- return value
+ return catalogValue(packet.target.kind,object(value)) as Assembly|EstimateTemplate
 }
 async function prepare(db:D1Database,actor:Actor,packet:Packet,input:Input):Promise<Draft>{
  const value=candidate(packet,input),replay:Draft['replay']=[]
@@ -75,7 +77,7 @@ async function prepare(db:D1Database,actor:Actor,packet:Packet,input:Input):Prom
   need(cost!==undefined,'Candidate cost is unknown',409,'replay_source')
   replay.push({job_id:job.id,quote_id:quote.id,dimensions:source.catalog.dimensions,signed_revenue_cents:quote.total_cents,historical_cost_cents:quote.cost_total_cents??null,candidate_cost_cents:cost,candidate_margin_cents:sum([quote.total_cents,-cost]),margin_delta_cents:quote.cost_total_cents===undefined?null:sum([quote.cost_total_cents,-cost])})
  }
- return {id:crypto.randomUUID(),packet_id:packet.id,prepared_by:stamp(actor),reason:text(input.reason,'Analysis reason',2000),changes:input,value,observations:packet.sources.map(s=>({job_id:s.id,rows:s.performance.rows})),replay,limits:['Observed production uses only compatible installed units and approved labor. Unknown denominators stay null.','Rate allowance changes assembly quantities; vendor rate records are unchanged. Risk is a proposed waste allowance, not a measured probability.','Replay holds historical dimensions, dated rate revisions and signed revenue fixed. It is a counterfactual cost, not a restatement of actual margin.','Only the existing signed-person lesson approval changes a future catalog. No external training or other-company data use.']}
+ return {citations:packet.sources.map(s=>({job_id:s.id,source_version:s.version,quote_id:s.quote_id,catalog:s.catalog,order_ids:[...new Set(s.evidence.procurement.codes.flatMap(c=>c.sources.map(r=>r.order_id)))],receipt_ids:s.evidence.procurement.codes.flatMap(c=>c.sources.flatMap(r=>r.receipt_id?[r.receipt_id]:[])),callback_case_ids:s.evidence.warranty.cases.map(c=>c.id),callback_cost_ids:s.evidence.warranty.cases.flatMap(c=>c.costs.map(w=>w.id))})),id:crypto.randomUUID(),packet_id:packet.id,prepared_by:stamp(actor),reason:text(input.reason,'Analysis reason',2000),changes:input,value,observations:packet.sources.map(s=>({job_id:s.id,rows:s.performance.rows})),replay,lesson_input:{catalog_id:packet.target.id,catalog_version:packet.target.version,source_job_ids:packet.sources.map(s=>s.id),reason:text(input.reason,'Analysis reason',2000),value},limits:['Observed production uses only compatible installed units and approved labor. Unknown denominators stay null.','Rate allowance changes the assembly unit rate factor; vendor rate records are unchanged. Risk is a proposed waste allowance, not a measured probability.','Replay holds historical dimensions, dated rate revisions and signed revenue fixed. It is a counterfactual cost, not a restatement of actual margin.','Only the existing signed-person lesson approval changes a future catalog. No external training or other-company data use.']}
 }
 export async function learningResponse(request:Request,db:D1Database,actor:Actor,parts:string[],body:(r:Request)=>Promise<Input>):Promise<Response|null>{
  if(parts[0]!=='agent-learning')return null

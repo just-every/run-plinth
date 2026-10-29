@@ -1,7 +1,7 @@
 import { requireEstimating } from './auth'
 import { exact, date } from './catalog-input'
 import { catalogEntry } from './estimate-catalog'
-import { decimal } from './estimate-math'
+import { decimal, lineCents } from './estimate-math'
 import { estimateLines } from './estimate-input'
 import { need, object, recordApproval, usdOnly, stamp, text, type Actor, type Input, type Job } from './model'
 import { prepareQuote } from './quotes'
@@ -20,7 +20,7 @@ export async function catalogPreview(db:D1Database,job:Job,actor:Actor,input:Inp
  const source:CatalogSource={template_id:template.id,template_version:template.version,dimensions,as_of,rates:[],assemblies:[]},lines:Input[]=[]
  for(const item of definition.items){const entry=await entryOf(db,item.assembly_id,'assembly'),assembly=entry.revisions.at(-1)!.value as Assembly;source.assemblies.push({id:entry.id,version:entry.version})
   for(const part of assembly.parts){const rate=await entryOf(db,part.rate_id,'rate'),revision=rate.revisions.filter(r=>(r.value as VendorRate).effective_on<=as_of).sort((a,b)=>(b.value as VendorRate).effective_on.localeCompare((a.value as VendorRate).effective_on)||b.version-a.version)[0];need(revision,`No dated rate for ${rate.name} on ${as_of}`,409,'rate_missing');const value=revision.value as VendorRate;source.rates.push({id:rate.id,version:revision.version})
-   lines.push({id:`${item.id}:${part.id}`,description:part.description,quantity:dimensions[item.dimension],unit:assembly.unit,rate_unit:value.unit,cost_code:part.cost_code,phase:part.phase,category:part.category,cost_unit_cents:value.cost_cents,unit_cents:value.sell_cents,conversion:{numerator:product(part.units_per_dimension,wasteFactor(part.waste_percent)),denominator:product(part.productivity,'100')}})
+   lines.push({id:`${item.id}:${part.id}`,description:part.description,quantity:dimensions[item.dimension],unit:assembly.unit,rate_unit:value.unit,cost_code:part.cost_code,phase:part.phase,category:part.category,cost_unit_cents:lineCents('1',value.cost_cents,{numerator:part.rate_factor??'1',denominator:'1'}),unit_cents:lineCents('1',value.sell_cents,{numerator:part.rate_factor??'1',denominator:'1'}),conversion:{numerator:product(part.units_per_dimension,wasteFactor(part.waste_percent)),denominator:product(part.productivity,'100')}})
   }
  }
  const estimate=estimateLines({lines}),current=job.quotes.at(-1)

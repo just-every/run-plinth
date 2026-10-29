@@ -33,9 +33,10 @@ export default async function({request,origin,claim,displayName,returnTo}) {
    const input={template_id:template.id,dimensions:{length:'10'},as_of:'2026-10-28'},preview=await act('/estimate-template/preview',input)
    await act('/estimate-template/apply',{...input,digest:preview.preview.digest})
    await act('/quotes/'+job.quotes.at(-1).id+'/accept',{method:'signed',evidence:'Owner-reviewed signed synthetic estimate',schedule_choice:{kind:'none',reason:'Dates recorded separately'}})
-   await act('/schedules',{trade:'Framing',description:'Complete framing',start:'2026-10-20T08:00:00Z',end:'2026-10-20T10:00:00Z'})
+   const day=20+(sensitive?2:0)+index
+   await act('/schedules',{trade:'Framing',description:'Complete framing',start:`2026-10-${day}T08:00:00Z`,end:`2026-10-${day}T10:00:00Z`})
    const task=job.schedules.at(-1);if(task.status==='draft')await act('/schedules/'+task.id+'/approve',{})
-   await act('/schedule-actuals',{task_id:task.id,actual_start:'2026-10-20T08:00:00Z',actual_finish:'2026-10-20T10:00:00Z',installed:{quantity:'10',unit:'ft',cost_code:'06'},evidence:'Measured source'})
+   await act('/schedule-actuals',{task_id:task.id,actual_start:`2026-10-${day}T08:00:00Z`,actual_finish:`2026-10-${day}T10:00:00Z`,installed:{quantity:'10',unit:'ft',cost_code:'06'},evidence:'Measured source'})
    await call('reports/performance/jobs/'+job.id+'/complete',{expected_version:job.version,completed_on:'2026-10-23',confirm:true,evidence:sensitive?'Synthetic SSN 123-45-6789':'Human recorded completion'})
    job=(await call('jobs/'+job.id,undefined,'GET')).job;sourceJobs.push({id:job.id,version:job.version})
   }
