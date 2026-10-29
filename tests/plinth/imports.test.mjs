@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createFixture } from './helpers.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
+const declaration = { sourceSystem: 'Synthetic construction register', extractionScope: 'Accepted job headers only', extractedAt: '2026-10-01T12:00:00Z', verified: false }
 const invalid = await readFile(new URL('../fixtures/import-invalid-jobs.csv', import.meta.url), 'utf8')
 const prefix = '/api/plinth/imports'
 
@@ -15,16 +17,47 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
   const commit = async (value, preview) => { const r = await call('/commit', { csv: value, fingerprint: preview.fingerprint }); assert.equal(r.status, 200, JSON.stringify(r.value)); return r.value.job }
   try {
     let preview, journal, edited
+    const report = async id => { const r = await call('/' + id + '/coverage', undefined, 'GET'); assert.equal(r.status, 200, JSON.stringify(r.value)); return r.value.coverage }
     await t.test('only a person owner can review; malformed rows and changed approval leave native jobs untouched', async () => {
       assert.equal((await f.request(prefix)).status, 401)
       const client = await f.invite('unrelated@example.test')
       assert.equal((await f.request(prefix + '/preview', { method: 'POST', cookie: client, body: { csv } })).status, 403)
+      const admin=await f.invite(['synthetic-plinth-admin','example.test'].join('@'),'Synthetic administrator','admin')
+      assert.equal((await f.request(prefix + '/preview',{method:'POST',cookie:admin,body:{csv}})).status,403)
       const agent = await f.agent()
       assert.equal((await f.request(prefix + '/commit', { method: 'POST', token: agent, body: { csv, fingerprint: '0'.repeat(64) } })).status, 403)
       assert.equal((await f.request(prefix + '/preview', { method: 'POST', cookie: f.owner, headers: { origin: 'https://other.example' }, body: { csv } })).status, 403)
       assert.equal((await call('/preview', { csv: invalid })).status, 400)
       assert.equal((await call('/preview', { csv: csv.replace('2026-09-12', '2026-02-30') })).status, 400)
+      const mixed = csv.trimEnd().split('\n')
+      const duplicate = await call('/preview', { csv: mixed.concat(mixed[1]).join('\n') + '\n' })
+      assert.equal(duplicate.status, 400)
+      assert.equal(duplicate.value.coverage.counts.duplicate, 1)
+      assert.equal(duplicate.value.coverage.counts.blocked, 2)
+      assert.equal(duplicate.value.coverage.diagnostics[0].location.row, 4)
+      assert.equal(duplicate.value.coverage.diagnostics[0].location.column, 1)
+      const unsupportedCsv = csv.replace('accepted_on', 'accepted_on,attachment_reference').replaceAll('2026-09-12', '2026-09-12,missing-original').replaceAll('2026-09-18', '2026-09-18,missing-original')
+      const unsupported = await call('/commit', { csv: unsupportedCsv, fingerprint: '0'.repeat(64) })
+      assert.equal(unsupported.status, 400)
+      assert.ok(unsupported.value.coverage.diagnostics.some(d => d.code === 'UNSUPPORTED_FIELD' && d.location.column === 7))
+      const malformed = await call('/preview', { csv: csv.replace('Northside extension', 'Bad"title') })
+      assert.equal(malformed.status, 400)
+      assert.ok(malformed.value.coverage.diagnostics.some(d => d.code === 'MALFORMED_CSV' && d.location.row === 2 && d.location.column === 2))
+      const declared = await call('/preview', { csv, declaration })
+      assert.equal(declared.status, 200)
+      assert.deepEqual(declared.value.coverage.declaration, declaration)
+      assert.notEqual(declared.value.fingerprint, (await review(csv)).fingerprint)
+      assert.equal((await call('/commit', { csv, declaration: { ...declaration, extractionScope: 'Different reviewed scope' }, fingerprint: declared.value.fingerprint })).status, 409)
+      assert.equal((await call('/commit', { csv, mappingRevision: 'unsupported-mapping', fingerprint: declared.value.fingerprint })).status, 409)
+      assert.equal((await call('/preview', { csv, declaration: { ...declaration, verified: true } })).status, 400)
       preview = await review(csv)
+      assert.equal(preview.coverage.counts.proposed, 2)
+      assert.equal(preview.coverage.counts.total, 2)
+      assert.equal(preview.coverage.artifact.sha256, createHash('sha256').update(csv).digest('hex'))
+      assert.equal(preview.coverage.artifact.bytes, Buffer.byteLength(csv))
+      assert.deepEqual(preview.coverage.rows[0].columns.map(c => c.column), [1,2,3,4,5,6])
+      assert.equal(preview.coverage.rows[0].columns[1].line, 2)
+      assert.equal(preview.coverage.rows[0].columns[1].character, 10)
       assert.equal(preview.rows.length, 2)
       assert.equal((await nativeJobs()).length, 0)
       assert.equal((await call('', undefined, 'GET')).value.jobs.length, 0)
@@ -34,6 +67,13 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
     await t.test('approved upload retains exact original, imports inert quotes and replays without duplicates', async () => {
       journal = await commit(csv, preview)
       assert.equal(journal.state, 'completed')
+      assert.equal((await report(journal.id)).counts.imported, 2)
+      const repeated = await review(csv)
+      assert.equal(repeated.coverage.counts.duplicate, 2)
+      assert.equal(repeated.coverage.counts.imported, 0)
+      assert.equal((await f.request(prefix + '/' + journal.id + '/coverage')).status, 401)
+      const agent = await f.agent()
+      assert.equal((await f.request(prefix + '/' + journal.id + '/coverage', { token: agent })).status, 403)
       const jobs = await nativeJobs()
       assert.equal(jobs.length, 2)
       for (const job of jobs) {
@@ -55,12 +95,25 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       const accepted = await f.json(`/api/plinth/jobs/${edited.id}/quotes/${edited.quotes[0].id}/accept`, { method: 'POST', cookie: f.owner, body: { expected_version: edited.version, method: 'email',schedule_choice:{kind:'none',reason:'Schedule will be planned separately'}, evidence: 'Owner reviewed the original client acceptance email before adoption.' } })
       assert.equal(accepted.status, 200)
       edited = accepted.value.job
+      const preserved = await report(journal.id)
+      assert.equal(preserved.counts.conflict, 1)
+      assert.equal(preserved.counts.imported, 1)
+      const conflictUpload = csv.replace('MOVE-002', 'synthetic-plinth-fresh')
+      const conflictPreview = await review(conflictUpload)
+      const before = await nativeJobs()
+      const refused = await call('/commit', { csv: conflictUpload, fingerprint: conflictPreview.fingerprint })
+      assert.equal(refused.status, 409)
+      assert.equal(refused.value.error, 'SOURCE_CONFLICT')
+      assert.deepEqual(await nativeJobs(), before, 'Conflicted review cannot partially adopt a fresh peer')
+      assert.equal((await commit(csv, preview)).id, journal.id)
+      assert.deepEqual(await nativeJobs(), before, 'Replaying exact custody cannot overwrite native acceptance')
       const undo = await call(`/${journal.id}/undo`)
       assert.equal(undo.status, 200, JSON.stringify(undo.value))
       assert.equal(undo.value.job.state, 'undone')
       assert.equal(undo.value.report.dispositions.filter(d => d.disposition === 'retained').length, 1)
       assert.equal(undo.value.report.dispositions.filter(d => d.disposition === 'reversed').length, 1)
       assert.deepEqual(await nativeJobs(), [edited])
+      const reversed = await report(journal.id); assert.equal(reversed.counts.reversed, 1); assert.equal(reversed.counts.conflict, 1)
       assert.equal((await call(`/${journal.id}/undo`)).status, 200)
     })
     await t.test('bounded apply resumes from its durable journal without another upload', async () => {
@@ -68,6 +121,7 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       const batch = await commit(upload, await review(upload))
       assert.equal(batch.state, 'applying')
       assert.ok(batch.checkpoint > 0 && batch.checkpoint < batch.total)
+      const partial = await report(batch.id); assert.equal(partial.counts.imported, 10); assert.equal(partial.counts.proposed, 2)
       const resumed = await call(`/${batch.id}/resume`)
       assert.equal(resumed.status, 200, JSON.stringify(resumed.value))
       assert.equal(resumed.value.job.state, 'completed')
@@ -87,6 +141,13 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       const state = await call(`/${imported.id}`, undefined, 'GET')
       assert.equal(state.status, 200, JSON.stringify(state.value))
       assert.equal(state.value.job.erasedRecords, 1)
+      const erasedCoverage = await report(imported.id)
+      assert.equal(erasedCoverage.counts.erased, 1)
+      assert.equal(erasedCoverage.originalStatus, 'unavailable')
+      assert.ok(!JSON.stringify(erasedCoverage).includes(target.client_email))
+      assert.ok(!JSON.stringify(erasedCoverage).includes(target.name))
+      assert.equal(erasedCoverage.rows.find(row => row.disposition === 'erased').externalId, undefined)
+      assert.deepEqual(erasedCoverage.rows.find(row => row.disposition !== 'erased').columns.map(c => c.column), [1,2,3,4,5,6], 'Surviving peer column coordinates do not require withdrawn bytes')
       const originals = await call(`/${imported.id}/originals`, undefined, 'GET')
       assert.equal(originals.status, 200)
       assert.equal(originals.value.originals[0].original.status, 'unavailable')
