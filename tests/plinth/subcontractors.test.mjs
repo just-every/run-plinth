@@ -450,6 +450,7 @@ test('SUB-002 — owner review retains rejected originals, reconciles a linked c
   assert.equal((await c.review('/review',c.accept())).status,200)
   assert.equal(c.source.unresolved,0);assert.equal(c.source.register[0].cycles.length,3)
   const cycle=c.source.register[0].cycles.at(-1),decision=structuredClone(cycle.decision)
+  assert.deepEqual(decision.totals,{subtotal_cents:60000,tax_cents:4000,total_cents:64000,tax_percent:'10'})
   assert.deepEqual(decision.lines.map(l=>[l.cost_code,l.subtotal_cents]),[['06-100',40000],['01-100',20000]])
   const beforeLedger=(await api('/jobs/'+c.job.id+'/costs')).value
   const providerCalls=f.messages.length

@@ -58,6 +58,7 @@ try{
  await expect(record.getByText('Unsupported charge in original; corrected material and labor required',{exact:false})).toBeVisible()
  await expect(second.getByText('06-100 · Framing materials · $400.00 subtotal · taxable',{exact:true})).toBeVisible()
  await expect(second.getByText('01-100 · Framing labor · $200.00 subtotal · exempt',{exact:true})).toBeVisible()
+ await expect(second.getByText('Reviewed subtotal $600.00 · tax $40.00 at 10% · total $640.00 USD',{exact:true})).toBeVisible()
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Populated bill review fits the desktop')
  for(const font of await panel.locator('h2,h3,h4,p,label,input,button,li,a,select,summary').evaluateAll(elements=>elements.filter(e=>e.getClientRects().length).map(e=>parseFloat(getComputedStyle(e).fontSize))))assert.ok(font>=13,'Visible review text is at least 13px')
  await c.read();assert.equal(c.source.register[0].cycles.length,2);assert.equal(c.source.unresolved,0)

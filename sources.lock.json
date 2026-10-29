@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f6cd0245ed31a05daf9e2fb8b33d83cf8b978e6f9ca735269f65ca1fc619c92f",
+      "sha256": "bc9caaba29d5997bbae9bed2c8f2dabbd276dcae24521b6133fab7505511d3c5",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "11185b063dc9e6d52fbb1c66d21284ac79dff737b79711da4b2dff56796b01c9",
+      "sha256": "09bf14e6d49a93e37df0e7a7aa28c7834a87d92bd92c9f7746885418dedb08fd",
       "executable": false
     },
     "DEMO.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "32e3230ca108be763a0c7fb83026616c245b15e7ba4a76ada7b919ea7e8d041e",
+      "sha256": "9d0f0c84a739fd16921def8b4db49abf9aaafca3ac73b87a13c3e7c132c966b1",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -4013,7 +4013,7 @@
       "executable": false
     },
     "src/plinth/subcontractor-bill-review.ts": {
-      "sha256": "b0c4e2446c9655e9abebd299ce76e1b0e5278d68d0d6ec50c20729a90c4fe478",
+      "sha256": "1c12de94f2d9bcfd321bcbf322dcd8e0d637d3c4c68722f65905277f3ef29ae7",
       "executable": false
     },
     "src/plinth/subcontractor-portal.ts": {
@@ -4889,7 +4889,7 @@
       "executable": false
     },
     "src/ui/subcontractor-bill-review.tsx": {
-      "sha256": "8ee9329ecc3c156bd219a3edd2987f3c38fffc4e7dfdf154b95b85096d5903ae",
+      "sha256": "6179eaf09e4039dd5ed165cf47b39da91e3d999b6c123966263408f3886c9a14",
       "executable": false
     },
     "src/ui/subcontractor-records.tsx": {
@@ -5297,7 +5297,7 @@
       "executable": false
     },
     "tests/journeys/subcontractor-bill-review.mjs": {
-      "sha256": "4c338ed6ed5acb25851509347da3ca597628c52eb2d3db221ce1b34197fa4e67",
+      "sha256": "a86c06b097908b8d9453c5d9b93e92a61894c8df1c2e38265f5ebfdc36bfb68e",
       "executable": false
     },
     "tests/journeys/submittals.mjs": {
@@ -5469,7 +5469,7 @@
       "executable": false
     },
     "tests/plinth/subcontractors.test.mjs": {
-      "sha256": "9045a23a3a825e4a3410d9e998f97afb8643d5d631fd574eba60bf4c443e32ff",
+      "sha256": "1da945b8cd929bb782d5f9c6468503399270a943e5e22dad21aae61a926a91f5",
       "executable": false
     },
     "tests/plinth/submittal-support.mjs": {

@@ -9,7 +9,7 @@ import type {PortalSubmission} from './subcontractor-portal'
 import {jobOf,jobs,readClock,saveJob} from './store'
 
 export interface BillReviewLine {order_id:string;line_id:string;cost_code:string;description:string;subtotal_cents:number;taxable:boolean}
-export interface BillReviewCycle {id:string;reference:string;note:string;amount_cents:number;attachments:Attachment[];by:Stamp;received_submission_id?:string;replacement_reason?:string;reopened_from?:string;decision?:{id:string;outcome:'accepted'|'rejected';reason:string;by:Stamp;commitment_digest:string;commitments:unknown;lines:BillReviewLine[];draft?:Input};handoff?:{bill_id:string;by:Stamp}}
+export interface BillReviewCycle {id:string;reference:string;note:string;amount_cents:number;attachments:Attachment[];by:Stamp;received_submission_id?:string;replacement_reason?:string;reopened_from?:string;decision?:{id:string;outcome:'accepted'|'rejected';reason:string;by:Stamp;commitment_digest:string;commitments:unknown;lines:BillReviewLine[];totals?:{subtotal_cents:number;tax_cents:number;total_cents:number;tax_percent:string};draft?:Input};handoff?:{bill_id:string;by:Stamp}}
 export interface SubcontractorBillReview {id:string;subcontract_id:string;vendor_id:string;cycles:BillReviewCycle[]}
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown)=>Response.json(value,{headers})
@@ -93,6 +93,7 @@ export async function subcontractorBillReviewResponse(request:Request,env:Bindin
    const draft={vendor:terms.award.vendor_name,reference:cycle.reference,dated_on:input.dated_on,due_on:input.due_on,period:input.period,tax:input.tax,lines:decision.lines.map(l=>({...l,matches:[]})),reviewer_id:actor.id,document_id:text(input.document_id,'Reviewed original',100)}
    const checked=await billAction(structuredClone(job),actor,{...draft,document:await original(env.DB,job,cycle,draft.document_id)})
    need(checked.amount_cents===cycle.amount_cents,'Itemized subtotal and reviewed tax must equal the received bill amount',409,'review_total')
+   decision.totals={subtotal_cents:sum(checked.lines.map(l=>l.subtotal_cents)),tax_cents:checked.tax.tax_cents,total_cents:checked.amount_cents,tax_percent:checked.tax.percent}
    decision.draft=draft
   }
   cycle.decision=decision;record=decision
@@ -102,7 +103,7 @@ export async function subcontractorBillReviewResponse(request:Request,env:Bindin
   need(await digest(commitment(job,row))===cycle.decision.commitment_digest,'Awarded commitment changed; accepted terms cannot prepare a draft',409,'review_source')
   const draft=cycle.decision.draft
   need(!(await jobs(env.DB)).some(j=>costs(j).bills.some(b=>b.vendor.toLowerCase()===String(draft.vendor).toLowerCase()&&b.reference.toLowerCase()===cycle.reference.toLowerCase())),'Vendor invoice reference already exists in this installation',409,'cost_duplicate')
-  const bill:CostBill=await billAction(job,actor,{...draft,document:await original(env.DB,job,cycle,String(draft.document_id))})
+  const bill:CostBill=await billAction(job,actor,{...draft,reviewer_id:actor.id,document:await original(env.DB,job,cycle,String(draft.document_id))})
   bill.subcontractor_review={submission_id:row.id,cycle_id:cycle.id,decision_id:cycle.decision.id};cycle.handoff={bill_id:bill.id,by:stamp(actor)};record={bill_id:bill.id,status:bill.status,label:'Draft prepared; no cost posted or payment approved'}
  }
  recordApproval(job,actor,'subcontractor-bill.'+tail[1],{id:cycle.id,prepared_by:cycle.by},{submission_id:row.id,cycle_id:cycle.id,record})
