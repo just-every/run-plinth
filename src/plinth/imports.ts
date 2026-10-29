@@ -10,6 +10,7 @@ import { acceptedJobsSource, sourceDeclaration, IMPORT_VERSION, IMPORT_LIMITS } 
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
 import { coverageReport, importCoverage } from './import-coverage.ts'
+import { attachImportHistory } from './import-history.ts'
 import { auditStatement } from './audit.ts'
 
 const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
@@ -82,11 +83,12 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
         if (error instanceof DomainError && error.code === 'invalid_csv' && (error.details as any)?.inspection) return respond({ error: error.code, message: error.message, coverage: coverageReport((error.details as any).inspection) }, 400)
         throw error
       }
-      const { source, rows, inspection } = parsed
+      const { rows, inspection } = parsed
+      const source = attachImportHistory(parsed.source, input.history)
       let plan = await planD1Import(source, acceptedJobsMapping(actor), context)
       // Recognize unchanged intake approved before coordinate reporting existed.
       // Only an exact retained operation may use that older representation.
-      if (!inspection.declaration) {
+      if (!inspection.declaration && !input.history) {
         const legacy = await planD1Import(acceptedJobsSource(input.csv, undefined, true).source, acceptedJobsMapping(actor), context)
         const previous = await env.DB.prepare('SELECT id FROM ik_jobs WHERE operation_key=? AND destination=? AND namespace=? AND principal_id=?').bind('accepted-jobs:' + legacy.fingerprint, context.destination, context.namespace, context.authorization.principalId).first()
         if (previous) plan = legacy
