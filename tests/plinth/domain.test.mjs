@@ -1,3 +1,4 @@
+import { readRecoveryReport, checkRecoveryReport } from './recovery-report-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -19,8 +20,23 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   const changed=structuredClone(manifest),record=changed.records.find(row=>row.kind==='pl_jobs');record.sha256='0'.repeat(64);changed.records.splice(changed.records.findIndex(row=>row.kind==='revision-reference'),1);changed.records.push({kind:'pl_jobs',identity:'synthetic-plinth-missing',sha256:'1'.repeat(64)})
   changed.controls[0].issued_gross_cents++
   const comparison=await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest:changed}});assert.equal(comparison.status,200);assert.equal(comparison.value.matches,false);assert.ok(comparison.value.records.mismatched.includes(record.identity));assert.deepEqual(comparison.value.records.missing,['synthetic-plinth-missing']);assert.equal(comparison.value.records.extra.length,1);assert.equal(comparison.value.control_totals.match,false)
+  for(const format of ['csv','xlsx','pdf']){
+   const response=await f.request('/api/plinth/recovery/inventory.'+format,{cookie:f.owner});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store')
+   const inventoryReport=await readRecoveryReport(Buffer.from(await response.arrayBuffer()),format);checkRecoveryReport(inventoryReport,manifest,['USD',0,0,0,0,0,0,0]);assert.ok(inventoryReport.text.replace(/\s/g,'').includes('Kitchenrenovation'));assert.ok(inventoryReport.text.replace(/\s/g,'').includes('AgreedrenovationworksincludingGST'));assert.ok(inventoryReport.text.includes('/data/quotes/0/total_cents'))
+   const exported=await f.request('/api/plinth/recovery/reconcile.'+format,{method:'POST',cookie:f.owner,body:{manifest:changed}});assert.equal(exported.status,200)
+   const report=await readRecoveryReport(Buffer.from(await exported.arrayBuffer()),format);checkRecoveryReport(report,manifest,['USD',0,0,0,0,0,0,0],true);assert.ok(report.text.includes('synthetic-plinth-missing'));assert.ok(report.text.includes('Inventory differences found'))
+   const hostile=structuredClone(manifest);hostile.records.push({kind:'pl_jobs',identity:'=synthetic-plinth-operator',sha256:'1'.repeat(64)})
+   const inert=await f.request('/api/plinth/recovery/reconcile.'+format,{method:'POST',cookie:f.owner,body:{manifest:hostile}});assert.equal(inert.status,200)
+   const inertReport=await readRecoveryReport(Buffer.from(await inert.arrayBuffer()),format)
+   if(inertReport.rows)assert.equal(inertReport.rows.find(row=>row[0]==='Difference'&&row[2]==='missing')[3],(format==='csv'?"'":'')+'=synthetic-plinth-operator','Unverified source identities remain non-executable text in spreadsheet reports')
+   for(const credentials of [{cookie:client},{cookie:other},{cookie:admin},{token:agent},{}]){
+    assert.ok([401,403].includes((await f.request('/api/plinth/recovery/inventory.'+format,credentials)).status))
+    assert.ok([401,403].includes((await f.request('/api/plinth/recovery/reconcile.'+format,{...credentials,method:'POST',body:{manifest}})).status))
+   }
+  }
   for(const credentials of [{cookie:client},{cookie:other},{cookie:admin},{token:agent},{}]){assert.ok([401,403].includes((await f.request('/api/plinth/recovery/manifest.json',credentials)).status));assert.ok([401,403].includes((await f.request('/api/plinth/recovery/reconcile',{...credentials,method:'POST',body:{manifest}})).status))}
   const invalid=structuredClone(manifest);invalid.records.push(invalid.records[0]);assert.equal((await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest:invalid}})).status,400)
+  for(const format of ['csv','xlsx','pdf'])assert.equal((await f.request('/api/plinth/recovery/reconcile.'+format,{method:'POST',cookie:f.owner,body:{manifest:invalid}})).status,400)
   assert.deepEqual((await f.json(path(),{cookie:f.owner})).value.job,snapshot);assert.equal(f.messages.length,mailCount);assert.deepEqual((await f.json('/api/plinth/recovery/manifest.json',{cookie:f.owner})).value,manifest)
 
   assert.equal((await f.request('/api/plinth/jobs')).status,401)

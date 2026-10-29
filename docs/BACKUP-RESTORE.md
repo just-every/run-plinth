@@ -44,7 +44,7 @@ As the signed-in owner, open **People & access → Settings → Backup recovery 
 Choose **Download recovery manifest** before stopping the app for the CLI export.
 Keep that JSON file with the private archive. It contains record identities, revision
 references, original-file byte sizes and SHA-256 checksums, table coverage and
-financial control totals. It is confidential and does not contain the original
+financial control totals. The JSON manifest is confidential and does not contain the original
 record bodies or file bytes. It cannot restore data or grant access.
 
 After the existing CLI import into an empty installation and owner setup, open
@@ -54,6 +54,23 @@ source and current financial totals, and any changed coverage or exclusions.
 A supplied manifest is an unverified claim; a match does not establish its origin.
 Compare immediately after restoration: later edits, downloads that add audit
 events, erasures or other native activity can produce legitimate differences.
+
+The same Settings panel offers **PDF**, **CSV** and **XLSX** inventory reports.
+These include every inventoried native record identity, revision and digest;
+original-file integrity metadata; table coverage; exclusions; control totals;
+and readable native field paths and values. Original payload bytes are replaced
+by their measured size and checksum. Keep the CLI archive and the original
+native downloads when you need the actual files. Spreadsheet text remains text,
+including values beginning with formula operators; financial values stay numeric
+and currencies remain separate.
+
+After comparison, choose **Comparison report format** and **Download comparison
+report**. Each format includes the missing, extra and changed identities, source
+and current controls, and the receiving installation's current field inventory.
+The report evaluates current records when downloaded. Later edits can therefore
+change it from the comparison displayed earlier. These reports are confidential
+and require a current signed-in owner; administrator, client and bearer access
+are refused. Downloading a report changes no record or sending authority.
 
 Control totals group each currency separately. Issued gross, signed corrections,
 net receipts including reversals, deposit applications, write-offs and posted
@@ -75,9 +92,36 @@ custody records. Its exclusions explicitly retain Base account and bootstrap
 metadata, provider state, live connector grants and queues, credentials, sessions,
 private settings and standing consent outside comparison. The existing CLI remains
 the archive and restore door; its account custody and ownership rules are unchanged.
-Complete target-wide recovery, future entities, differently owned installation
-handoff, external accounting reconciliation and complete human PDF, CSV and XLSX
-reports remain owed. Restored tasks still need explicit destination-owner review.
+Complete target-wide recovery, entities not yet implemented, external accounting
+reconciliation and complete target-wide human reporting remain owed. Native D1
+field inventories and comparison reports do not establish those wider outcomes.
+Restored tasks still need explicit destination-owner review.
+
+## Explicitly hand ownership to the receiving owner
+
+Restoring an archive preserves its durable accounts and recorded approval
+identities. Changing the configured owner mailbox does not transfer these
+accounts or let an unrelated person bootstrap over them. The source's sessions
+and credentials are absent from the destination.
+
+Use the existing native account doors for an intentional handoff after restore:
+
+1. Sign in to the destination as the archived owner with a new native email link.
+2. Request and complete an **owner:transfer** confirmation through
+   `POST /auth/step-up`. Invite the receiving mailbox as an owner through
+   `POST /auth/invite`, with explicit owner authority and fresh confirmation.
+3. The receiving person accepts that invitation and signs in separately. They
+   complete their own fresh **owner:transfer** confirmation, then use
+   `POST /auth/operator/role` to remove owner authority from the source account.
+4. Compare the original manifest and download native originals as the receiving
+   owner. The old owner session is invalid immediately after the role change;
+   historical source identities, approvals and financial facts remain intact.
+
+This is a separate, explicit account-administration ceremony. Importing or
+comparing a manifest never performs it. If the archived owner cannot authorize
+the handoff, retain the archive privately and obtain that authorization; changing
+bootstrap rules or editing stored account identities is not a recovery step.
+Reconnecting providers and reviewing restored work remain separate actions.
 
 ## Reconnect native receivers
 

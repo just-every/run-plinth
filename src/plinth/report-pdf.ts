@@ -67,13 +67,21 @@ export function reportPdf(report: ReportResult, name: string): Uint8Array<ArrayB
   for (const column of report.columns) add(`${column.name} [${column.id}]: ${valueText(row.values[column.id] ?? null)}`)
   add()
  }
+ return pdfPages(lines, 'Plinth scoped saved view')
+}
+/** Render already-authorized text without dropping characters or clipping long identities. */
+export function textPdf(title: string, text: string[]): Uint8Array<ArrayBuffer> {
+ const lines = text.flatMap(line => { const value = printable(line); return value.length ? Array.from({length: Math.ceil(value.length / width)}, (_, index) => value.slice(index * width, (index + 1) * width)) : [''] })
+ return pdfPages(lines, title)
+}
+function pdfPages(lines: string[], title: string): Uint8Array<ArrayBuffer> {
  const pages = Array.from({ length: Math.max(1, Math.ceil(lines.length / pageLines)) }, (_, index) => lines.slice(index * pageLines, (index + 1) * pageLines))
  const objects: string[] = ['', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>']
  const pageIds: number[] = []
  for (const [index, page] of pages.entries()) {
   const pageId = objects.length + 1, streamId = pageId + 1
   pageIds.push(pageId)
-  const stream = `BT /F1 10 Tf 13 TL 36 756 Td <${hex('Plinth scoped saved view')}> Tj 0 -24 Td\n${page.map(line => `<${hex(line)}> Tj T*`).join('\n')}\nET\nBT /F1 10 Tf 36 36 Td <${hex(`Page ${index + 1} of ${pages.length}`)}> Tj ET\n`
+  const stream = `BT /F1 10 Tf 13 TL 36 756 Td <${hex(printable(title))}> Tj 0 -24 Td\n${page.map(line => `<${hex(line)}> Tj T*`).join('\n')}\nET\nBT /F1 10 Tf 36 36 Td <${hex(`Page ${index + 1} of ${pages.length}`)}> Tj ET\n`
   objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamId} 0 R >>`)
   // All object and stream syntax is ASCII, so character positions are exact byte offsets.
   objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`)

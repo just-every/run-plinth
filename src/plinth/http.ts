@@ -1,4 +1,5 @@
-import { recoveryInventory, reconcileRecovery } from './recovery-inventory'
+import { recoveryReport } from './recovery-report'
+import { recoveryInventory, reconcileRecovery, type RecoveryField } from './recovery-inventory'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -133,6 +134,11 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
   requireOwner(actor);need(!actor.agent_door&&!actor.credential_id,'A signed-in owner session is required',403,'forbidden')
   if(parts.length===2&&parts[1]==='manifest.json'&&method==='GET')return new Response(JSON.stringify(await recoveryInventory(env.DB,actor)),{headers:{...headers,'content-type':'application/json','content-disposition':'attachment; filename=plinth-recovery-manifest.json'}})
   if(parts.length===2&&parts[1]==='reconcile'&&method==='POST'){const input=await body(request);return json(reconcileRecovery(input.manifest,await recoveryInventory(env.DB,actor)))}
+  const report = /^(inventory|reconcile)\.(csv|xlsx|pdf)$/.exec(parts[1]??'')
+  if(parts.length===2&&report&&method===(report[1]==='inventory'?'GET':'POST')){
+   const input=report[1]==='reconcile'?await body(request):null,fields:RecoveryField[]=[],manifest=await recoveryInventory(env.DB,actor,fields)
+   return recoveryReport(manifest,report[2] as 'csv'|'xlsx'|'pdf',input?reconcileRecovery(input.manifest,manifest):undefined,fields)
+  }
   throw new DomainError('not_found','Unknown recovery route',404)
  }
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned

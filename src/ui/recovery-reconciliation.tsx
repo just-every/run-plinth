@@ -4,18 +4,25 @@ import type { reconcileRecovery } from '../plinth/recovery-inventory'
 
 type Comparison=ReturnType<typeof reconcileRecovery>
 export function RecoveryReconciliation(){
- const [result,setResult]=useState<Comparison>(),[source,setSource]=useState<File>()
+ const [compared,setCompared]=useState<unknown>(),[result,setResult]=useState<Comparison>(),[source,setSource]=useState<File>()
  return <section aria-label="Recovery reconciliation"><details><summary>Backup recovery comparison</summary>
   <p>Download a confidential inventory before making your CLI archive. After restoring, compare that file with this installation. Comparison changes no records or permissions and reconnects no provider.</p>
   <p><a className="button" href="/api/plinth/recovery/manifest.json" download>Download recovery manifest</a></p>
+  <p>Download the current inventory report: {(['pdf','csv','xlsx'] as const).map(format=><a key={format} style={{marginRight:12}} className="button" href={'/api/plinth/recovery/inventory.'+format} download>{format.toUpperCase()}</a>)}</p>
   <Form success="Comparison complete." submit="Compare recovery manifest" reset={false} action={async()=>{
-   setResult(undefined)
+   setResult(undefined);setCompared(undefined)
    if(!source)throw new Error('Choose the source recovery manifest first.')
    if(source.size>15_000_000)throw new Error('The manifest must be at most 15 MB.')
    let manifest:unknown;try{manifest=JSON.parse(await source.text())}catch{throw new Error('Choose a valid JSON recovery manifest.')}
-   setResult(await api('/recovery/reconcile',{manifest}))
-  }}><label>Source recovery manifest<input type="file" accept="application/json,.json" required onChange={event=>{setSource(event.currentTarget.files?.[0]);setResult(undefined)}}/></label></Form>
+   setResult(await api('/recovery/reconcile',{manifest}));setCompared(manifest)
+  }}><label>Source recovery manifest<input type="file" accept="application/json,.json" required onChange={event=>{setSource(event.currentTarget.files?.[0]);setResult(undefined);setCompared(undefined)}}/></label></Form>
   {result&&<div aria-live="polite" aria-label="Recovery comparison result">
+   <p>Downloaded reports compare your supplied manifest with the current records at download time.</p>
+   <Form success="Comparison report downloaded." submit="Download comparison report" reset={false} action={async form=>{
+    const format=String(form.get('format')),response=await fetch('/api/plinth/recovery/reconcile.'+format,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({manifest:compared})})
+    if(!response.ok)throw new Error('The report could not be downloaded. Confirm your current owner session and try again.')
+    const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download='plinth-recovery-comparison.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+   }}><label>Comparison report format<select name="format" aria-label="Comparison report format" defaultValue="pdf"><option value="pdf">PDF</option><option value="csv">CSV</option><option value="xlsx">XLSX</option></select></label></Form>
    <h3>{result.matches?'Inventory matches':'Inventory differences found'}</h3><p>{result.notice}</p>
    <dl><dt>Missing records</dt><dd>{result.records.missing.length}</dd><dt>Extra records</dt><dd>{result.records.extra.length}</dd><dt>Changed records</dt><dd>{result.records.mismatched.length}</dd><dt>Missing originals</dt><dd>{result.files.missing.length}</dd><dt>Extra originals</dt><dd>{result.files.extra.length}</dd><dt>Changed originals</dt><dd>{result.files.mismatched.length}</dd></dl>
    {!result.coverage_match&&<p>The inventory coverage or exclusions differ. Compare the application version and manifest scope before relying on these results.</p>}

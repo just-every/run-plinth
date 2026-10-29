@@ -2,6 +2,7 @@ import { requireOwner, actorPredicate } from './auth'
 import { digest } from './attachments'
 import { need, object, type Actor, type Input } from './model'
 
+export interface RecoveryField { identity:string; path:string; value:string|number|boolean|null; type:string }
 export interface RecoveryRecord { kind:string; identity:string; sha256:string; revision?:string|number }
 export interface RecoveryFile { identity:string; size:number; sha256:string; declared_size:number|null; declared_sha256:string|null; verified:boolean }
 export interface RecoveryControls { currency:string; issued_invoices:number; issued_gross_cents:number; corrections_cents:number; receipts_cents:number; deposit_applications_cents:number; write_offs_cents:number; posted_cost_cents:number }
@@ -38,7 +39,7 @@ function control(job:Record<string,any>):RecoveryControls {
  return result
 }
 /** One read batch observes native records and original bytes together; no reconciliation write or provider operation exists. */
-export async function recoveryInventory(db:D1Database,actor:Actor):Promise<RecoveryManifest>{
+export async function recoveryInventory(db:D1Database,actor:Actor,fields?:RecoveryField[]):Promise<RecoveryManifest>{
  requireOwner(actor);need(!actor.agent_door&&!actor.credential_id,'A signed-in owner session is required',403,'forbidden')
  const names=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB 'pl_*' OR name GLOB 'ik_*') ORDER BY name").all<{name:string}>()).results.map(r=>r.name).filter(name=>!omitted.has(name))
  const columns=await db.batch(names.map(name=>db.prepare('PRAGMA table_info('+quote(name)+')')))
@@ -91,6 +92,7 @@ export async function recoveryInventory(db:D1Database,actor:Actor):Promise<Recov
     }else normalized[key]=value
    }
    records.push({kind:name,identity,sha256:await hash(normalized),...(typeof row.version==='number'?{revision:row.version}:{})})
+   if(fields)describeFields(normalized,identity,'',fields)
   }
  }
  for(const [identity,file] of chunkFiles){
@@ -130,4 +132,14 @@ export function reconcileRecovery(value:unknown,current:RecoveryManifest){
  const source=sourceManifest(value),records=differences(source.records,current.records),files=differences(source.files,current.files)
  const controls=canonical(source.controls)!==canonical(current.controls),coverage=canonical(source.tables)!==canonical(current.tables)||canonical(source.exclusions)!==canonical(current.exclusions)
  return {matches:!current.files.some(f=>!f.verified)&&!controls&&!coverage&&[records,files].every(diff=>Object.values(diff).every(rows=>rows.length===0)),records,files,control_totals:{match:!controls,source:source.controls,current:current.controls},coverage_match:!coverage,unverified_files:current.files.filter(f=>!f.verified).map(f=>f.identity),notice:'Comparison only. Supplied source claims are unverified. No records, permissions, credentials, sending consent or provider instructions were changed.'}
+}
+
+/** Human reports retain native source facts; original payloads have already become byte counts and checksums. */
+function describeFields(value:unknown,identity:string,path:string,fields:RecoveryField[]):void {
+ if(value===null||typeof value!=='object'){
+  fields.push({identity,path,value:value as string|number|boolean|null,type:value===null?'null':typeof value});return
+ }
+ const entries=Object.entries(value)
+ if(!entries.length){fields.push({identity,path,value:Array.isArray(value)?'[]':'{}',type:'container'});return}
+ for(const [key,child] of entries)describeFields(child,identity,path+'/'+key.replaceAll('~','~0').replaceAll('/','~1'),fields)
 }

@@ -3,7 +3,7 @@ import {createFixture} from './helpers.mjs'
 import {createClient} from '../../src/plinth/api-client.mjs'
 
 /** Real CLI-restored database and native receiving-owner sign-in. */
-export async function proveConnectorRecovery(destination, oldCookie, expected, revokedId, oldCredential, oldKey) {
+export async function proveConnectorRecovery(destination, oldCookie, expected, revokedId, oldCredential, oldKey, receivingEmail = ['builder','example.com'].join('@')) {
  const received = [], f = await createFixture({persistTo: destination, ownerCookie: oldCookie, webhookReceiver: async request => { received.push(await request.text()); return new Response(null, {status: 202}) }})
  try {
   const confirmMail = async cookie => {
@@ -13,7 +13,7 @@ export async function proveConnectorRecovery(destination, oldCookie, expected, r
    return response.headers.get('set-cookie')?.split(';')[0] ?? cookie
   }
   assert.equal((await f.request('/api/plinth/connections/recovery', {cookie: oldCookie})).status, 401, 'Source sessions cannot read restored bindings')
-  assert.equal((await f.request('/auth/magic-link', {method: 'POST', body: {email: 'builder@example.com'}})).status, 202)
+  assert.equal((await f.request('/auth/magic-link', {method: 'POST', body: {email: receivingEmail}})).status, 202)
   const owner = await confirmMail()
   const post = (path, body) => f.json(path, {method: 'POST', cookie: owner, body})
   const pending = await f.json('/api/plinth/connections/recovery', {cookie: owner})
