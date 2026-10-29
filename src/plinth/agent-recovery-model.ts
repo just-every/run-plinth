@@ -10,6 +10,7 @@ export interface RecoverySources {
 export interface RecoveryAlternative {
  id:string; name:string; assumptions:string; schedule:SchedulePreview
  native_feasible:boolean
+ labor_capacity:{task_id:string;required_minutes:string;available_minutes:number;sufficient:boolean}
  forecast:CostForecast; cash:ReturnType<typeof cashReport>
  amendment:{order_id:string;original_amount_cents:number;proposed_amount_cents:number;extra_cents:number;promised_on:string;reason:string;state:'unsent'}
  client_decision:{description:string;proposed_price_delta_cents:number;state:'unapproved'}
@@ -23,6 +24,6 @@ export interface RecoveryProposal {
 }
 export interface RecoveryRequest {
  id:string; purpose:string; as_of:string; prepared_by:Stamp; owner_version:number; installation:string
- sources:RecoverySources; package_order_id:string; package_task_id:string; package_cost_code:string; labor_cost_code:string
+ sources:RecoverySources; package_order_id:string; package_task_id:string; package_cost_code:string; labor_cost_code:string; labor_task_id:string
  share_with_owner_agents:boolean; revoked_by?:Stamp; proposals:RecoveryProposal[]
 }

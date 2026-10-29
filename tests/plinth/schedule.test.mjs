@@ -234,6 +234,9 @@ test('Recovery packets retain dependency and hold refusals, reject unavailable c
   const approval=pending._meta['com.runeditrun/approval'],reviewed=(await f.json('/agents/api/approvals/'+approval.id,{cookie:f.owner})).value.approval
   r=await f.json('/agents/api/approvals/'+approval.id+'/approve',{method:'POST',cookie:f.owner,body:{revision:reviewed.revision,summary_sha256:reviewed.summary_sha256}});assert.equal(r.value.approval.state,'executed')
   response=await mcp('plinth.recovery.read',args(),token,pending.requestState);assert.equal(response.record.id,c.request.id)
+  const blockedPolicy=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'blocked'}],spend:{none:true}}}});assert.equal(blockedPolicy.status,200)
+  response=await mcp('plinth.recovery.read',args(),token,pending.requestState);assert.equal(response.error,'approval_evidence_changed','Changing policy invalidates a previously completed read approval')
+  response=await mcp('plinth.recovery.read',args());assert.equal(response.error,'policy_blocked','A fresh call still follows the shared policy decision')
   r=await post(requestPath()+'/revoke',{confirm:true});assert.equal(r.status,200)
   response=await mcp('plinth.recovery.read',args(),token,pending.requestState);assert.equal(response.error,'recovery_stale','A completed approval replay cannot disclose a revoked packet')
   const resumePolicy=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}}});assert.equal(resumePolicy.status,200)

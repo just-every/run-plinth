@@ -74,12 +74,17 @@ test('Recovery comparison reconciles two immutable date, margin and expected-cas
   assert.equal(fast.forecast.revenue_cents,300000,'An unapproved client price never becomes contract revenue')
   assert.deepEqual(wait.cash.rows.map(r=>r.closing_cents),[140000,40000,-6000]);assert.deepEqual(fast.cash.rows.map(r=>r.closing_cents),[140000,-40000,-40000])
   assert.deepEqual(proposal.difference,{finish_minutes:-5760,remaining_cents:34000,margin_cents:-34000,expected_cash_closing_cents:[0,-80000,-34000],expected_cash_trough_cents:-34000})
+  assert.deepEqual(wait.labor_capacity,{task_id:c.install,required_minutes:'960',available_minutes:960,sufficient:true});assert.deepEqual(fast.labor_capacity,wait.labor_capacity)
   assert.ok(proposal.alternatives.every(a=>a.native_feasible));assert.equal(fast.amendment.state,'unsent');assert.equal(fast.client_decision.state,'unapproved')
   let r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'expedite',decision:'retain',reason:'Owner prefers the comparison, subject to separate actual decisions'})
   assert.equal(r.record.reviews[0].decision,'retain')
   r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'wait',decision:'reject',reason:'Recorded date is too late; preserve rejected alternative'})
   assert.equal(r.record.reviews.length,2);assert.deepEqual(r.record.alternatives,proposal.alternatives)
   assert.deepEqual((await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'synthetic-plinth-1',alternatives:c.alternatives})).record,r.record,'Replay retains one proposal with its complete review history')
+  const impossible=structuredClone(c.alternatives);impossible[1].schedule.tasks[1].duration_minutes=120
+  const short=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'understated-effort',alternatives:impossible})).record
+  assert.equal(short.alternatives[1].native_feasible,false);assert.equal(short.alternatives[1].labor_capacity.required_minutes,'960');assert.equal(short.alternatives[1].labor_capacity.available_minutes,240,'A shorter elapsed promise cannot hide the forecast labor effort')
+  const denied=await f.json('/api/plinth/'+c.root+'/recovery/requests/'+c.request.id+'/review/'+short.id,{method:'POST',cookie:f.owner,body:{expected_version:c.job.version,digest:short.digest,alternative_id:'expedite',decision:'retain',reason:'Insufficient crew time'}});assert.equal(denied.value.error,'recovery_infeasible')
   const after=await c.read();for(const field of ['schedules','orders','variations','selections','invoices','approvals','budgets','schedule_baselines'])assert.deepEqual(after[field],before[field],field+' remains unchanged')
   const ledgerAfter=await call(c.root+'/costs',undefined,'GET');assert.deepEqual({...ledgerAfter,version:0},{...ledgerBefore,version:0});assert.equal(f.messages.length,messages)
   const different=structuredClone(c.alternatives);different[0].forecast.codes[1].minutes_per_unit='119'

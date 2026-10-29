@@ -55,4 +55,3 @@ export function plinthAgentDoor(original: Bindings) {
   return await recoveryBoundary(request,env,options)??await door.handle(request)
  }}
 }
-

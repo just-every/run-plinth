@@ -2,7 +2,7 @@ import { wallClock } from './time-zone'
 import { activeHolds } from './holds'
 import { costLedger } from './cost-ledger'
 import { costs, digest } from './cost-model'
-import { previewCostForecast } from './cost-forecast'
+import { forecastThousandths, previewCostForecast } from './cost-forecast'
 import { cashReport } from './cost-periods'
 import { previewSchedule } from './schedule-plan'
 import { resourceConflicts, resources } from './schedule-resources'
@@ -65,6 +65,9 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  const codes:Input[]=forecastInput.codes.map(value=>{const code=object(value);need(!Number(code.pending_change_cents??0),'Pending changes cannot become approved recovery economics');return {...code,...(code.cost_code===request.package_cost_code?{unbought_cents:sum([cents(code.unbought_cents,'Unbought cost'),extra])}:{})}})
  const labor=codes.find(c=>c.cost_code===request.labor_cost_code)
  need(labor&&Number(labor.remaining_quantity)>0&&Number(labor.minutes_per_unit)>0,'Review positive remaining labor and productivity for the overrun code')
+ const laborTask=find(schedule.tasks,request.labor_task_id),catalog=await resources(db),units=sum((laborTask.resources??[]).filter(a=>catalog.some(r=>r.id===a.resource_id&&r.kind==='crew')).map(a=>a.units))
+ const required=forecastThousandths(labor.remaining_quantity,'Remaining labor quantity')*forecastThousandths(labor.minutes_per_unit,'Labor minutes per unit'),available=(laborTask.duration_minutes??0)*units
+ const labor_capacity={task_id:laborTask.id,required_minutes:(required/1_000_000n).toString()+((required%1_000_000n)?'.'+(required%1_000_000n).toString().padStart(6,'0').replace(/0+$/,''):''),available_minutes:available,sufficient:required<=BigInt(available)*1_000_000n}
  const candidate=structuredClone(job),forecast=await previewCostForecast(candidate,actor,{...forecastInput,as_of:request.as_of,codes})
  forecast.id='recovery-'+id;forecast.source_version=request.sources.source_version
  costs(candidate).forecasts=[forecast];candidate.version=request.sources.source_version
@@ -77,7 +80,7 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  const invoiceIds=new Set<string>()
  for(const value of invoiceDates){const d=object(value),invoice=find(candidate.invoices??[],String(d.invoice_id));need(invoice.issued&&!invoiceIds.has(invoice.id),'Choose each issued invoice once');invoiceIds.add(invoice.id);(costs(candidate).cash_dates??=[]).push({id:crypto.randomUUID(),kind:'invoice',source_id:invoice.id,expected_on:localDate(d.expected_on,'Expected collection date'),reference:text(d.reference,'Expected collection assumption',2000),by:stamp(actor)})}
  const cash=cashReport(candidate,cashInput),decision=object(raw.client_decision)
- return {id,name,assumptions,schedule,native_feasible:!schedule.conflicts.length&&!schedule.blockers.length,forecast,cash,
+ return {id,name,assumptions,schedule,native_feasible:!schedule.conflicts.length&&!schedule.blockers.length&&labor_capacity.sufficient,labor_capacity,forecast,cash,
   amendment:{order_id:order.id,original_amount_cents:order.amount_cents,proposed_amount_cents:sum([order.amount_cents,extra]),extra_cents:extra,promised_on,reason:text(amendment.reason,'Proposed supplier amendment reason',2000),state:'unsent'},
   client_decision:{description:text(decision.description,'Proposed client decision',2000),proposed_price_delta_cents:cents(decision.proposed_price_delta_cents,'Proposed client price',true),state:'unapproved'},
   outstanding_decisions:['Builder commitment and baseline approval at the native human doors','Actual subcontractor attendance confirmation for these exact proposed dates','Supplier acceptance and delivery of the proposed purchase amendment','Client scope, price and promised-date decision','Actual receipt and external accounting reconciliation remain unverified'],

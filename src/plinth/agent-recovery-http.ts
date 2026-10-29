@@ -47,8 +47,11 @@ export async function recoveryResponse(request:Request,db:D1Database,previous:Jo
   need(task.status==='booked'&&task.milestone,'Choose the recorded delivery milestone used by dependent work')
   const package_cost_code=text(input.package_cost_code,'Package cost code',80),labor_cost_code=text(input.labor_cost_code,'Labor overrun cost code',80)
   need(order.lines?.some(l=>l.cost_code===package_cost_code)&&ledger.rows.some(r=>r.cost_code===labor_cost_code),'Choose exact native package and labor codes')
+  const labor_task_id=text(input.labor_task_id,'Labor overrun task',100),laborTask=find(job.schedules,labor_task_id),linked=new Set([task.id])
+  let changed=true;while(changed){changed=false;for(const t of job.schedules)if(!linked.has(t.id)&&t.predecessors?.some(p=>linked.has(p.id))){linked.add(t.id);changed=true}}
+  need(laborTask.status==='booked'&&!laborTask.milestone&&laborTask.id!==task.id&&linked.has(laborTask.id),'Review the labor task recorded downstream of the package milestone',409,'recovery_dependency')
   need(typeof input.share_with_owner_agents==='boolean','Explicitly choose whether current owner-sponsored draft agents may read this exact packet')
-  const row:RecoveryRequest={id:crypto.randomUUID(),purpose:text(input.purpose,'Recovery request and assumptions',4000),as_of:localDate(input.as_of,'Recovery as of'),prepared_by:stamp(actor),owner_version:actor.version,installation:await recoveryInstallation(db,origin),sources,package_order_id:order.id,package_task_id:task.id,package_cost_code,labor_cost_code,share_with_owner_agents:input.share_with_owner_agents,proposals:[]}
+  const row:RecoveryRequest={id:crypto.randomUUID(),purpose:text(input.purpose,'Recovery request and assumptions',4000),as_of:localDate(input.as_of,'Recovery as of'),prepared_by:stamp(actor),owner_version:actor.version,installation:await recoveryInstallation(db,origin),sources,package_order_id:order.id,package_task_id:task.id,package_cost_code,labor_cost_code,labor_task_id,share_with_owner_agents:input.share_with_owner_agents,proposals:[]}
   ;(job.recovery_requests??=[]).push(row);record=row
  }else{
   const row=find(job.recovery_requests??[],parts[4]!)

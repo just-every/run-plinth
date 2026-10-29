@@ -2,12 +2,12 @@ import { cents, need, object, recordApproval, stamp, sum, text, type Actor, type
 import { costs, costCode, digest, type CostForecast } from './cost-model'
 import { actualEntries, costLedger } from './cost-ledger'
 import { localDate } from './remittances'
-const thousandths=(value:unknown,name:string)=>{const s=String(value);need(/^\d{1,9}(\.\d{1,3})?$/.test(s),`${name} requires a nonnegative decimal with up to three places`);const [n,f='']=s.split('.');return BigInt(n!)*1000n+BigInt(f.padEnd(3,'0'))}
+export const forecastThousandths=(value:unknown,name:string)=>{const s=String(value);need(/^\d{1,9}(\.\d{1,3})?$/.test(s),`${name} requires a nonnegative decimal with up to three places`);const [n,f='']=s.split('.');return BigInt(n!)*1000n+BigInt(f.padEnd(3,'0'))}
 /** Productivity prices unbought labor only; open procurement commitments enter exactly once. */
 export async function previewCostForecast(job:Job,actor:Actor,input:Input):Promise<CostForecast>{
  const ledger=costLedger(job),rows=input.codes
  need(Array.isArray(rows)&&rows.length>0&&rows.length<=100,'Provide one to 100 code assumptions')
- const assumptions=rows.map(value=>{const a=object(value),cost_code=text(a.cost_code,'cost_code',80),source=ledger.rows.find(r=>r.cost_code===cost_code)!,remaining=thousandths(a.remaining_quantity,'remaining_quantity'),minutes=thousandths(a.minutes_per_unit,'minutes_per_unit'),rate=cents(a.labor_hour_cents,'labor_hour_cents'),numerator=remaining*minutes*BigInt(rate),denominator=60_000_000n,labor=cents(Number((numerator*2n+denominator)/(2n*denominator)))
+ const assumptions=rows.map(value=>{const a=object(value),cost_code=text(a.cost_code,'cost_code',80),source=ledger.rows.find(r=>r.cost_code===cost_code)!,remaining=forecastThousandths(a.remaining_quantity,'remaining_quantity'),minutes=forecastThousandths(a.minutes_per_unit,'minutes_per_unit'),rate=cents(a.labor_hour_cents,'labor_hour_cents'),numerator=remaining*minutes*BigInt(rate),denominator=60_000_000n,labor=cents(Number((numerator*2n+denominator)/(2n*denominator)))
   need(source,'Choose a code present in the current ledger',409,'cost_code')
   const committed=cents(a.outstanding_commitment_cents,'outstanding_commitment_cents');need(committed===source.open_commitment_cents&&committed>=0,'Review the current unconsumed commitments exactly; consumed costs cannot enter again',409,'cost_forecast_stale')
   const pending=cents(a.pending_change_cents??0,'pending_change_cents',true);need(!pending||input.scenario==='pending','Pending cost needs an explicit pending scenario')

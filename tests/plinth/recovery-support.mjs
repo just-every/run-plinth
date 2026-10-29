@@ -29,7 +29,7 @@ export async function proveRecoveredPackets(destination,oldCookie,expected){
   let job=(await api('')).value.job
   r=await api('/recovery/requests/'+expected.request.id+'/compare',{expected_version:job.version,key:'restored-old-consent',alternatives:expected.alternatives});assert.equal(r.value.error,'recovery_stale')
   const sources=(await api('/recovery/sources')).value
-  r=await api('/recovery/requests',{expected_version:job.version,source_digest:sources.digest,confirm:true,purpose:'Destination owner explicitly reviews restored native facts',as_of:'2026-10-29',package_order_id:expected.request.package_order_id,package_task_id:expected.request.package_task_id,package_cost_code:expected.request.package_cost_code,labor_cost_code:expected.request.labor_cost_code,share_with_owner_agents:false})
+  r=await api('/recovery/requests',{expected_version:job.version,source_digest:sources.digest,confirm:true,purpose:'Destination owner explicitly reviews restored native facts',as_of:'2026-10-29',package_order_id:expected.request.package_order_id,package_task_id:expected.request.package_task_id,package_cost_code:expected.request.package_cost_code,labor_cost_code:expected.request.labor_cost_code,labor_task_id:expected.request.labor_task_id,share_with_owner_agents:false})
   assert.equal(r.status,200);assert.notEqual(r.value.record.id,expected.request.id);const fresh=r.value.record
   const messages=f.messages.length
   r=await api('/recovery/requests/'+fresh.id+'/compare',{expected_version:r.value.version,key:'destination-review',alternatives:expected.alternatives});assert.equal(r.status,200);assert.equal(r.value.record.alternatives[0].forecast.final_cents,256000)
