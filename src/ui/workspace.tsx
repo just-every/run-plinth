@@ -41,8 +41,8 @@ export function Workspace() {
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
   useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
-  const go = (to: View) => { const url=new URL(window.location.href);for(const key of ['plan_job','plan_set','plan_sheet'])url.searchParams.delete(key);if(to==='plans')url.searchParams.set('view','plans');else url.searchParams.delete('view');window.history.replaceState(null,'',url);setView(to); setSelected(''); setMenu(false); if (to === 'jobs') void refresh().catch(() => {}) }
-  const open = (id: string) => { const url = new URL(window.location.href);for(const key of ['view','plan_job','plan_set','plan_sheet'])url.searchParams.delete(key); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
+  const go = (to: View) => { const url=new URL(window.location.href);for(const key of ['plan_job','plan_set','plan_sheet','source'])url.searchParams.delete(key);if(to==='plans')url.searchParams.set('view','plans');else url.searchParams.delete('view');window.history.replaceState(null,'',url);setView(to); setSelected(''); setMenu(false); if (to === 'jobs') void refresh().catch(() => {}) }
+  const open = (id: string) => { const url = new URL(window.location.href);for(const key of ['view','plan_job','plan_set','plan_sheet','source'])url.searchParams.delete(key); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
   const words = query.trim()
   useEffect(() => {
     if (!words) { setSearching(false); setSearchError(''); return }

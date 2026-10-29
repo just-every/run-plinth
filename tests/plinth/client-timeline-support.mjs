@@ -29,8 +29,9 @@ export async function timelineFixture(f) {
  await act('/invoices/'+invoice.id+'/issue')
  await act('/invoices',{kind:'deposit',description:'Private draft invoice sentinel',amount_cents:1000,recipient_email:timelineAddress(1),due_on:'2026-11-04',terms:'Office draft'})
  const agent=await f.agent()
- const hidden=await act('/diary',{date:'2026-10-17',note:'Private draft diary sentinel',attachments:[{name:'synthetic-plinth-private.png',mime:'image/png',base64:timelinePhoto.toString('base64')}]},f.owner,agent)
- await act('/schedules',{trade:'Synthetic private trade',description:'Private draft schedule sentinel',start:'2026-11-03T09:00:00Z',end:'2026-11-03T12:00:00Z'},f.owner,agent)
+ const foreman=f.fieldPerson?await f.fieldPerson(job.id):null
+ const hidden=await act('/diary',{date:'2026-10-17',note:'Private draft diary sentinel',attachments:[{name:'synthetic-plinth-private.png',mime:'image/png',base64:timelinePhoto.toString('base64')}]},foreman??f.owner,foreman?undefined:agent)
+ if(!foreman)await act('/schedules',{trade:'Synthetic private trade',description:'Private draft schedule sentinel',start:'2026-11-03T09:00:00Z',end:'2026-11-03T12:00:00Z'},f.owner,agent)
  await act('/correspondence',{kind:'message',to:timelineAddress(1),subject:'Alex oak discussion',body:'Alex private-to-recipient oak detail'})
  await act('/correspondence',{kind:'message',to:timelineAddress(2),subject:'Jordan oak discussion',body:'Jordan private-to-recipient oak detail'})
  await act('/correspondence',{kind:'note',body:'Private bid margin sentinel'})
@@ -38,7 +39,7 @@ export async function timelineFixture(f) {
  const timeline=(cookie=first,params={})=>api(root+'/client-timeline?'+new URLSearchParams(params),undefined,cookie)
  const revoke=async()=>act('/customer',{customer_id:customer.id,property_id:customer.properties[0].id,client_contact_ids:['synthetic-plinth-1']})
  const restrict=async(client)=>act('/portal-policy',{disabled:{client,subcontractor:[]},reason:'Owner reviewed current external restrictions'})
- return {first,second,outsider,agent,api,root,job:()=>job,read,act,schedule,diaries,hidden,change,selection,invoice,other,timeline,revoke,restrict}
+ return {agentDeniedStatus:f.agentDeniedStatus??403,first,second,outsider,agent,api,root,job:()=>job,read,act,schedule,diaries,hidden,change,selection,invoice,other,timeline,revoke,restrict}
 }
 export async function proveTimeline(c) {
  let r=await c.timeline();assert.equal(r.status,200,JSON.stringify(r.value));const firstPage=r.value
@@ -64,7 +65,7 @@ export async function proveTimeline(c) {
  assert.equal((await c.timeline(c.first,{cursor:'invalid'})).status,400)
  for(const cookie of [c.outsider])assert.equal((await c.timeline(cookie)).status,404)
  assert.equal((await c.api('/jobs/'+c.other.id+'/client-timeline',undefined,c.first)).status,404)
- assert.equal((await c.api(c.root+'/client-timeline',undefined,undefined,c.agent)).status,403)
+ assert.equal((await c.api(c.root+'/client-timeline',undefined,undefined,c.agent)).status,c.agentDeniedStatus)
  // Neither private records nor another recipient's new messages alter visible counts or cursors.
  await c.act('/correspondence',{kind:'note',body:'More private bid margin sentinel'})
  await c.act('/correspondence',{kind:'message',to:timelineAddress(2),subject:'Jordan additional private correspondence',body:'Recipient-only later discussion'})

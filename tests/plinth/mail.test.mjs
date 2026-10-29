@@ -109,6 +109,9 @@ test('INT-007 — replies are refused unless they reach a message address from i
   assert.equal((await s.api(`/holds/${place.value.hold.id}/release`, { method: 'POST', body: { reason: 'Dispute settled' } })).status, 200)
   assert.equal((await s.api(`/jobs/${job.id}`, { method: 'DELETE', body: { expected_version: current.version } })).status, 200)
   for (const table of ['pl_mail_messages', 'pl_mail_files', 'rer_mail_event_receipts']) assert.equal((await f.db.prepare(`SELECT count(*) AS n FROM ${table}`).first()).n, 0, `${table} is erased with the job`)
+  assert.equal((await s.api(`/jobs/${job.id}/client-timeline`, {cookie:s.client})).status,404)
+  assert.ok((await s.reply(address)).rejected,'Replaying an old addressed reply cannot restore an erased job or its timeline')
+  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_mail_messages').first()).n,0)
  } finally { await f.mf.dispose() }
 })
 

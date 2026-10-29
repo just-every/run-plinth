@@ -25,7 +25,14 @@ try{
   const mint=await owner.request.post(base+'/api/plinth/agent-credentials',{headers:{origin:base},data:{expires_in_seconds:3600}});assert.equal(mint.status(),201)
   return (await mint.json()).credential.token
  }
- const c=await timelineFixture({json,invite,agent,owner:'owner'})
+ const fieldPerson=async(jobId)=>{
+  const email=['synthetic-plinth-foreman','example.invalid'].join(String.fromCharCode(64))
+  await invite(email,'Timeline foreman','admin')
+  const people=await json('/api/plinth/team'),id=people.value.team.find(person=>person.email===email).id
+  const assigned=await json('/api/plinth/team/'+id,{method:'PUT',body:{expected_version:0,role:'superintendent',job_ids:[jobId],po_limit_cents:0}});assert.equal(assigned.status,200)
+  return email
+ }
+ const c=await timelineFixture({json,invite,agent,fieldPerson,agentDeniedStatus:401,owner:'owner'})
  const {all}=await proveTimeline(c)
  const cp=await contexts.get(c.first).newPage(),jp=await contexts.get(c.second).newPage()
  const region=cp.getByRole('region',{name:'Client timeline',exact:true})
@@ -82,7 +89,7 @@ try{
  assert.equal((await contexts.get(c.second).request.get(base+original)).status(),404)
  await c.restrict([]);await c.revoke()
  await jordan.getByRole('button',{name:'Search timeline',exact:true}).click()
- await expect(jordan.getByText('Job not found',{exact:true})).toBeVisible()
+ await expect(jordan.getByRole('alert')).toContainText('Job not found')
  await expect(jordan.getByRole('heading',{name:'Jordan oak discussion',exact:true})).toHaveCount(0)
  await jp.reload();await expect(jp.getByRole('heading',{name:c.job().name,exact:true})).toHaveCount(0)
  assert.equal((await contexts.get(c.second).request.get(base+original)).status(),404)

@@ -51,7 +51,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
     finally { if (currentId.current === id) setLoading(false) }
   }
   useEffect(() => { const tab = new URLSearchParams(window.location.search).get('tab'); setJob(undefined); setSection(sections.find(s => s === tab)); refresh().catch(e => setError(e.message)) }, [id])
-  useEffect(() => { if (!section) return; const url = new URL(window.location.href); url.searchParams.set('tab', section); window.history.replaceState(null, '', url) }, [section])
+  useEffect(() => { if (!section) return; const url = new URL(window.location.href); url.searchParams.set('tab', section); if (section !== 'Timeline') url.searchParams.delete('source'); window.history.replaceState(null, '', url) }, [section])
   useEffect(() => { heading.current?.focus() }, [job?.id])
   async function mutate(path: string, body: Record<string, unknown> = {}) {
     try {
