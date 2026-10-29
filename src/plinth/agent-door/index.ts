@@ -45,17 +45,19 @@ export function plinthAgentDoor(original: Bindings) {
   if(!response||new URL(request.url).pathname!=='/mcp'||request.method!=='POST')return response
   const rpc=await savedRequest.json().catch(()=>null) as {id?:string|number;method?:string;params?:{name?:string;arguments?:Record<string,unknown>}}|null
   if(rpc?.method!=='tools/call'||!['plinth.recovery.get','plinth.recovery.assess'].includes(rpc.params?.name??''))return response
-  const result=await response.clone().json().catch(()=>null) as {result?:{structuredContent?:{record?:{packet?:{id:string};packet_id?:string}}}}|null
+  const result=await response.clone().json().catch(()=>null) as {result?:{structuredContent?:{record?:{packet?:{id:string};packet_id?:string}};_meta?:{'com.runeditrun/decision'?:{revision?:number|null}}}}|null
   if(!result?.result?.structuredContent)return response
   try {
-   const state=await env.DB.prepare('SELECT envelope FROM agent_door_state WHERE id=1').first<{envelope:string|null}>()
+   const state=await env.DB.prepare('SELECT envelope,local_revision FROM agent_door_state WHERE id=1').first<{envelope:string|null;local_revision:number}>()
    const principal=await authenticate(options,request,state?.envelope?JSON.parse(state.envelope).business:null)
    if(!principal)throw new ToolRefusal('unauthenticated')
    const ctx:ToolContext={db:env.DB,person:principal.person,agent:principal.agent,actor:{agent:principal.agent,for:{id:principal.person.id,name:principal.person.name},label:principal.agent.name},seed:'plinth',origin:env.AUTH_ORIGIN,now:Date.now,door:'mcp',approvers:[],emit:()=>{}}
    const args=rpc.params!.arguments!
-   const live=await nativeCall(env,principal.person,`jobs/${encodeURIComponent(String(args.job_id))}/recovery-evidence/${encodeURIComponent(String(args.case_id))}`,'GET',undefined,ctx)
+   const live=await nativeCall(env,principal.person,`jobs/${encodeURIComponent(String(args.job_id))}/recovery-evidence/${encodeURIComponent(String(args.case_id??'current'))}`,'GET',undefined,ctx)
    const packetId=(live.record as {packet:{id:string}}).packet.id,returned=result.result.structuredContent.record
    if((returned?.packet?.id??returned?.packet_id)!==packetId)throw new ToolRefusal('recovery_stale')
+   const policyRevision=options.trust?(state?.envelope?JSON.parse(state.envelope).revision:null):state?.local_revision
+   if(result.result._meta?.['com.runeditrun/decision']?.revision!==policyRevision)throw new ToolRefusal('policy_changed')
    return response
   }catch(error){
    if(!(error instanceof ToolRefusal))throw error

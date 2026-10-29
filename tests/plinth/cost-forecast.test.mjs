@@ -66,6 +66,7 @@ test('Recovery evidence compares confirmation, delivery, installed progress and 
   assert.equal(first.comparison.tasks[0].confirmed,true);assert.equal(first.comparison.deliveries[0].state,'unknown');assert.equal(first.comparison.deliveries[0].received_cents,0);assert.equal(first.comparison.forecast_margin_cents,180000);assert.equal(first.comparison.posted_actual_cents,0);assert.equal(first.comparison.overall_restoration,'unverified');assert.ok(first.comparison.missing.some(s=>s.startsWith('Delivery ')))
   await c.ok(`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'2'}],reference:'synthetic-plinth-delivery-52',received_on:'2026-11-06'})
   const stale=await c.act(`/recovery-evidence/${r.recovery.id}/assess`,r.observation());assert.equal(stale.status,409);assert.equal(stale.value.error,'recovery_stale')
+  await r.refresh();const deliveryOnly=await r.assess();assert.equal(deliveryOnly.comparison.deliveries[0].state,'supported');assert.equal(deliveryOnly.comparison.tasks[0].quantity_state,'unknown');assert.equal(deliveryOnly.comparison.overall_restoration,'unverified');assert.ok(deliveryOnly.comparison.missing.some(s=>s.startsWith('Installed quantity ')))
   await c.ok('/schedule-actuals',{task_id:r.criteria.tasks[0].task_id,actual_start:'2026-11-06T08:00:00Z',actual_finish:'2026-11-06T09:00:00Z',installed:{quantity:'2',unit:'pack',cost_code:'06-100'},evidence:'Human records the exact installed units'})
   await c.ok('/costs/reconcile',{period:'2026-11',balances:[],reference:'Synthetic native balance review; not independent accounting proof'})
   await r.forecast();await r.refresh();const second=await r.assess()
@@ -73,7 +74,7 @@ test('Recovery evidence compares confirmation, delivery, installed progress and 
   const posted=await c.ok('/costs/bills',{...c.bill('synthetic-plinth-adverse-52'),tax:{percent:'0',reference:'Synthetic exempt adjustment',exemption_reference:'Synthetic source',human_reviewed:true},lines:[{cost_code:'06-100',description:'Adverse native cost adjustment',subtotal_cents:220000,taxable:false,matches:[]}]});await c.ok(`/costs/bills/${posted.record.id}/review`,{reason:'Human checks adverse original'});await c.ok(`/costs/bills/${posted.record.id}/post`)
   await r.refresh();const third=await r.assess()
   assert.equal(third.comparison.posted_actual_cents,220000);assert.equal(third.comparison.observed_margin_cents,80000);assert.equal(third.comparison.forecast_margin_cents,null);assert.equal(third.comparison.margin_state,'contradicted');assert.equal(third.comparison.native_status,'contradicted');assert.equal(third.reopened,true);assert.equal(third.comparison.overall_restoration,'unverified')
-  assert.deepEqual(r.recovery.assessments.slice(0,2),[first,second]);assert.equal(r.recovery.packets.length,3)
+  assert.deepEqual(r.recovery.assessments.slice(0,3),[first,deliveryOnly,second]);assert.equal(r.recovery.packets.length,4)
   const after=await c.read();for(const key of ['schedules','budgets','quotes','trade_invitations'])assert.deepEqual(after[key],before[key],key+' decisions remain immutable');assert.equal(after.approvals.filter(a=>a.kind==='schedule.publish').length,1)
  }finally{await f.close()}
 })

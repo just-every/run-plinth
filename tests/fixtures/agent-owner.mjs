@@ -24,5 +24,20 @@ export default async function({request,origin,claim,displayName,returnTo}) {
  await catalog('template',{kind:'remodel',dimensions:{length:'10'},items:[{id:'frame',assembly_id:assembly.id,dimension:'length'}]})
  }
  await call('pricing-rates',{kind:'sales',percent:'0',jurisdiction:'Synthetic reviewed jurisdiction',effective_on:'2026-01-01',reference:'Synthetic rate source',human_reviewed:true})
+ try {
+ // A separate native job keeps the explicitly reviewed recovery sources stable during other draft journeys.
+ let recoveryJob=(await call('jobs',{name:'E Recovery',client_email:['synthetic-plinth-recovery','example.invalid'].join('@'),address:'Synthetic recovery site'})).job
+ const recoveryCall=async(path,input)=>{const value=await call('jobs/'+recoveryJob.id+path,{expected_version:recoveryJob.version,...input});if(value.job)recoveryJob=value.job;else if(value.version)recoveryJob={...recoveryJob,version:value.version};return value}
+ await recoveryCall('/quotes',{lines:[{id:'recovery-source',description:'Synthetic recovery scope',quantity:'1',unit_cents:100000,cost_code:'06',cost_unit_cents:30000,phase:'Framing',category:'material',unit:'lot'}]})
+ await recoveryCall('/quotes/'+recoveryJob.quotes[0].id+'/accept',{method:'signed',evidence:'Native exact human acceptance',schedule_choice:{kind:'none',reason:'Separate native recovery publication'}})
+ const calendar={weekdays:[1,2,3,4,5],start_hour:0,end_hour:24,holidays:[]},tasks=[{id:'synthetic-plinth-recovery-conformance',trade:'Recovery crew',description:'Synthetic native recovery work',owner:'Builder',start:'2026-11-06T08:00:00Z',duration_minutes:60}]
+ const plan=await recoveryCall('/schedule/preview',{calendar,tasks});await recoveryCall('/schedule/publish',{calendar,tasks:plan.preview.tasks,digest:plan.preview.digest})
+ const order=await recoveryCall('/orders',{supplier:'Synthetic recovery supplier',description:'Unreceived recovery package',source:{kind:'budget',cost_code:'06'},lines:[{id:'recovery-lot',description:'Native recovery lot',cost_code:'06',quantity:'1',unit:'lot',unit_cents:20000}]})
+ await recoveryCall('/orders/'+order.record.id+'/issue',{})
+ await recoveryCall('/costs/forecasts',{as_of:'2026-11-07',source_as_of:'Native fixture only; external actuals unknown',codes:[{cost_code:'06',remaining_quantity:'0',minutes_per_unit:'0',labor_hour_cents:0,outstanding_commitment_cents:20000,unbought_cents:10000,risk_cents:0,reference:'Synthetic native remaining costs'}]})
+ recoveryJob=(await call('jobs/'+recoveryJob.id,undefined,'GET')).job
+ const criteria={schedule_approval_id:recoveryJob.approvals.findLast(a=>a.kind==='schedule.publish').id,budget_id:recoveryJob.budgets[0].id,promised_finish:'2026-11-06T09:00:00.000Z',minimum_margin_cents:70000,tasks:[{task_id:tasks[0].id,quantity:'1',unit:'lot',cost_code:'06'}],order_ids:[order.record.id]}
+ const packet=await recoveryCall('/recovery-evidence/preview',{criteria});await recoveryCall('/recovery-evidence',{title:'Synthetic private recovery evidence',criteria,digest:packet.digest,confirm:true})
+ } catch(error) { console.error('Native recovery fixture: '+error.message); throw error }
  return bootstrap
 }
