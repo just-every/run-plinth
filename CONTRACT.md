@@ -385,8 +385,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 51 | 30 | 42 | 123 |
-| All | 65 | 30 | 42 | 137 |
+| Target and push further | 51 | 31 | 41 | 123 |
+| All | 65 | 31 | 41 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -518,7 +518,7 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `BOUND-001` | Funds tax payroll and accounting responsibilities | target | missing |  | No funds tax payroll and accounting responsibilities workflow exists. |
 | `BOUND-002` | Licensed design insurance and legal decisions | target | missing |  | No licensed design insurance and legal decisions workflow exists. |
 | `BOUND-003` | Independent products and owner-controlled installation | target | partial | `README.md`; `src/base/setup.ts`; `scripts/installer/local.mjs`; `tests/plinth/portable.test.mjs` | Owner installation and backup paths exist; target external connectors and granular grants are absent. |
-| `AGENT-001` | Live grounded cost and schedule forecast | push-further | missing |  | No job-forecast agent or maintained cost/schedule forecast exists. |
+| `AGENT-001` | Live grounded cost and schedule forecast | push-further | partial | `tests/plinth/cost-forecast.test.mjs` — half-complete framing, worse productivity, posted costs and a revised remaining bid produce independently reconciled immutable forecasts; `tests/plinth/domain.test.mjs` — Plinth residential job lifecycle through authenticated HTTP; `tests/plinth/portable.test.mjs` — CLI archive round trip carries jobs, approvals, photos and import custody; `tests/fixtures/agent-owner.mjs` and `agent-surface.json` — reviewed forecast read and preparation through MCP. | Owner-reviewed, immutable native proposed packets bind exact source facts, revisions, dated assumptions and assigned uncertainties; only reviewed facts enter the draft MCP adapter. Full bid and field-time source integration, QBO and Xero actuals, live synchronization and the complete maintained job-forecast agent remain owed. Accounting completeness stays unknown; no forecast approval or schedule publication occurs. INT-001, INT-002 and INT-003 retain authorized connector-grant prerequisites; FIELD-002 and ROLE-005 and ROLE-006 retain their existing screen and policy obligations. Exact-candidate archive and agent conformance proof pending. |
 | `AGENT-002` | Recover date and margin together | push-further | missing |  | No recovery planning or cross-record decision workflow exists. |
 | `AGENT-003` | Verify promised date and margin restoration | push-further | missing |  | No outcome-tracking recovery cases or verification exist. |
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |

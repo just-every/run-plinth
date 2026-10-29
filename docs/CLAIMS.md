@@ -132,7 +132,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | BOUND-001 | missing | No funds tax payroll and accounting responsibilities workflow exists. |
 | BOUND-002 | missing | No licensed design insurance and legal decisions workflow exists. |
 | BOUND-003 | partial | Owner installation and backup paths exist; target external connectors and granular grants are absent. |
-| AGENT-001 | missing | No job-forecast agent or maintained cost and schedule forecast exists. |
+| AGENT-001 | partial | Owner-reviewed, immutable native proposed packets bind exact source facts, revisions, dated assumptions and assigned uncertainties; only reviewed facts enter the draft MCP adapter. Full bid and field-time source integration, QBO and Xero actuals, live synchronization and the complete maintained job-forecast agent remain owed. Accounting completeness stays unknown; no forecast approval or schedule publication occurs. INT-001, INT-002 and INT-003 retain authorized connector-grant prerequisites; FIELD-002 and ROLE-005 and ROLE-006 retain their existing screen and policy obligations. Exact-candidate archive and agent conformance proof pending. |
 | AGENT-002 | missing | No recovery planning or cross-record decision workflow exists. |
 | AGENT-003 | missing | No outcome-tracking recovery cases or verification exist. |
 | AGENT-004 | missing | No decision dependency graph, substitute preparation or delivery follow-through exists. |

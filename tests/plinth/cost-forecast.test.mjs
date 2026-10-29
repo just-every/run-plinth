@@ -1,3 +1,4 @@
+import {proveAgentForecast} from './agent-forecast-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
@@ -17,6 +18,7 @@ test('COST-004 — half-complete framing, worse productivity, posted costs and a
   const missing={...assumptions,codes:assumptions.codes.slice(0,1)};assert.equal((await c.act('/costs/forecasts',missing)).status,409)
   const pending=structuredClone(assumptions);pending.codes[0].pending_change_cents=1000;assert.equal((await c.act('/costs/forecasts',pending)).status,400)
   r=await c.ok('/costs/forecasts',{...pending,scenario:'pending'});assert.equal(r.record.final_cents,181000);assert.equal(r.record.revenue_cents,300000,'Pending scenario does not invent client-approved revenue')
+  await proveAgentForecast(f,c)
  }finally{await f.close()}
 })
 
