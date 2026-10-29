@@ -22,8 +22,8 @@ function Geometry({ points, kind, color, label, width }: { points: Point[]; kind
   </g>
 }
 
-export function TakeoffViewer({ jobId, revision, points, mode, calibrations, measurements, onPoint, editable, sourceUrl }: {
-  sourceUrl?: string; jobId: string; revision: DrawingRevision; points: Point[]; mode: string; calibrations: Calibration[]; measurements: TakeoffMeasurement[]; onPoint: (point: Point) => void; editable: boolean
+export function TakeoffViewer({ jobId, revision, points, mode, calibrations, measurements, onPoint, editable, sourceUrl, links=[] }: {
+  links?:{id:string;label:string;href:string;x:number;y:number;width:number;height:number}[]; sourceUrl?: string; jobId: string; revision: DrawingRevision; points: Point[]; mode: string; calibrations: Calibration[]; measurements: TakeoffMeasurement[]; onPoint: (point: Point) => void; editable: boolean
 }) {
   const host = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
   const [document, setDocument] = useState<PDFDocumentProxy>(), [width, setWidth] = useState(0), [error, setError] = useState(''), [rendered, setRendered] = useState(false), [retry, setRetry] = useState(0)
@@ -67,6 +67,7 @@ export function TakeoffViewer({ jobId, revision, points, mode, calibrations, mea
       }}>
         {calibrations.filter(item => item.revision_id === revision.id).map(item => <Geometry key={item.id} points={item.points} kind="length" color="#757575" label={`Calibration: ${item.length} ${item.unit}`} width={strokeWidth} />)}
         {measurements.filter(item => item.revision_id === revision.id).map(item => <Geometry key={item.id} points={item.points} kind={item.kind} color={item.deduct_from ? '#903f4a' : '#167c72'} label={`${item.name}${item.deduct_from ? ' (deduction)' : ''}: ${item.annotation}`} width={strokeWidth} />)}
+        {links.map(link=><a key={link.id} href={link.href} aria-label={link.label} onPointerDown={e=>e.stopPropagation()}><title>{link.label}</title><rect x={link.x} y={link.y} width={link.width} height={link.height} fill="#245eb4" fillOpacity="0.12" stroke="#245eb4" strokeWidth={strokeWidth}/><text x={link.x} y={link.y+link.height+14*revision.width/Math.max(width,1)} fontSize={14*revision.width/Math.max(width,1)} fill="#245eb4">{link.label}</text></a>)}
         <Geometry points={points} kind={mode} color="#245eb4" label="Unsaved points" width={strokeWidth} />
       </svg>}
     </div>

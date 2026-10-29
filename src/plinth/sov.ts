@@ -29,7 +29,9 @@ export function sovSources(job: Job): SovSources {
   const v = raw as Variation & { pricing?: PricingSnapshot; pricing_direction?: 'charge' | 'credit'; cost_code?: string }
   need(v.approved_by && v.approved_by.role !== 'agent', 'Change orders need their existing human approval', 409, 'sov_variation_required')
   need(v.amount_cents !== 0 && (v.amount_cents < 0) === (v.pricing_direction === 'credit'), 'Change order pricing direction must match its signed contract delta', 409, 'sov_pricing_stale')
-  return { id: v.id, revision: v.revision, description: v.description, amount_cents: cents(v.amount_cents, 'change order value', true), ...(v.cost_code ? { cost_code: v.cost_code } : {}), pricing: reviewed(v.pricing, Math.abs(v.amount_cents), 'Approved change order'), pricing_direction: v.amount_cents < 0 ? 'credit' as const : 'charge' as const, approved_by: structuredClone(v.approved_by) }
+  const signed=job.signed_changes?.find(r=>r.id===v.signed_document_id)
+  need(!v.signed_document_id||signed&&signed.signatures.length===2&&['signed','applied'].includes(signed.status),'Signed change sources require both exact signatures',409,'sov_variation_required')
+  return { ...(signed?{signed_document:structuredClone({id:signed.id,document:signed.document,digest:signed.digest,signatures:signed.signatures})}:{}), id: v.id, revision: v.revision, description: v.description, amount_cents: cents(v.amount_cents, 'change order value', true), ...(v.cost_code ? { cost_code: v.cost_code } : {}), pricing: reviewed(v.pricing, Math.abs(v.amount_cents), 'Approved change order'), pricing_direction: v.amount_cents < 0 ? 'credit' as const : 'charge' as const, approved_by: structuredClone(v.approved_by) }
  }).sort((a, b) => a.id.localeCompare(b.id))
  return { quote: { id: quote.id, revision: quote.revision, total_cents: quote.total_cents, lines: structuredClone(quote.lines), pricing, ...(quote.acceptance ? { acceptance: structuredClone(quote.acceptance) } : {}) }, variations }
 }

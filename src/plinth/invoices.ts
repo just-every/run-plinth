@@ -57,7 +57,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   need(input.source_retainage_release_id === undefined, 'Retainage releases adjust the original milestone ledger and cannot be invoiced twice')
   need(input.kind !== 'deposit' || input.source_application_id === undefined, 'Deposit invoices cannot name an earned application')
   const source_application_id = input.kind === 'milestone' ? text(input.source_application_id, 'source_application_id', 100) : undefined
-  const sources = invoiceSources(job, source_application_id)
+  const sources = invoiceSources(job, source_application_id, true)
   need(!source_application_id || !invoiceRows(job).some(i => i.source_application_id === source_application_id && i.status === 'issued'), 'This application already has an issued invoice', 409, 'invoice_duplicate')
   if(input.kind==='cost_plus'){
    sources.cost_billing=costBilling(job,input.cost_billing)

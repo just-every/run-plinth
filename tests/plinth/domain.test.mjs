@@ -1,3 +1,4 @@
+import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
@@ -943,5 +944,73 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   const erasedId=active.job.id
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId,{method:'DELETE',cookie:f.owner,body:{expected_version:active.job.version}})).status,200)
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)
+ }finally{await f.close()}
+})
+
+test('DOC-002 — office drawing review corrects source-bound proposals, reviews detail links and searches revision markup while refusing stale and revoked access',async()=>{
+ const f=await createFixture();try{
+  const job=await createActiveJob(f,'Reviewed drawing house',['synthetic-plinth-drawing-client','example.test'].join('@'))
+  const proof=await proveDrawingReview(f,job)
+  const latest=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
+  assert.equal((await f.json('/api/plinth/jobs/'+job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:latest.version}})).status,200)
+  for(const path of ['/review-search?q=Reviewed','/'+proof.set.id+'/links/'+proof.link,'/'+proof.set.id+'/files/'+proof.one.id])assert.equal((await f.request('/api/plinth/jobs/'+job.id+'/plans'+path,{cookie:f.owner})).status,404)
+  assert.equal((await f.json('/api/plinth/jobs/'+job.id+'/plans/'+proof.set.id+'/recognition-propose',{method:'POST',cookie:f.owner,body:{expected_version:latest.version}})).status,404,'Replay cannot resurrect erased recognition')
+ }finally{await f.close()}
+})
+
+test('Signed window changes freeze two exact consents, private costs and calendar terms; unsafe decisions never apply economics',async()=>{
+ const {signedChangeFixture,changeAddress}=await import('./signed-change-support.mjs'),f=await createFixture()
+ try{
+  const c=await signedChangeFixture(f),foreign=await f.invite(changeAddress('foreign-signer'),'Foreign client'),agent=await f.agent()
+  const variation=await c.priced(),row=await c.present(variation),original=structuredClone(c.job)
+  assert.equal(row.document.extra_days,5);assert.equal(row.document.completion_before,'2026-11-04');assert.equal(row.document.revised_completion,'2026-11-09')
+  assert.equal(row.private_terms.pricing.base_lines[0].cost_total_cents,45000)
+  for(const auth of [{cookie:foreign},{cookie:undefined,token:agent}])assert.ok([403,404].includes((await c.api('/jobs/'+c.job.id+'/signed-changes',undefined,auth.cookie,auth.token)).status))
+  const clientList=await c.list(c.client),wire=JSON.stringify(clientList);assert.equal(clientList.changes.length,1)
+  for(const secret of ['cost_total_cents','cost_unit_cents','source_digest','private_terms"','45000'])assert.ok(!wire.includes(secret),secret)
+  const document=await c.api('/jobs/'+c.job.id+'/signed-changes/'+row.id+'/document.json',undefined,c.client);assert.equal(document.status,200);assert.equal(document.value.digest,row.digest)
+  assert.equal((await c.act('/variations/'+variation.id+'/approve',{},c.client)).status,409,'Legacy approval cannot bypass signed execution')
+  assert.equal((await c.act('/signed-changes/'+row.id+'/sign',{digest:'changed',name:'Synthetic change client',confirm:true},c.client)).status,409)
+  assert.equal((await c.act('/signed-changes/'+row.id+'/sign',{digest:row.digest,name:'Synthetic change client'},c.client)).status,400)
+  assert.equal((await c.act('/signed-changes/'+row.id+'/apply',{digest:row.digest,confirm:true,...c.billing(row)})).status,409)
+  await c.sign(row)
+  assert.equal((await c.act('/signed-changes/'+row.id+'/sign',{digest:row.digest,name:c.job.created_by.name,confirm:true})).status,409)
+  await c.sign(row,c.client,'Synthetic change client')
+  assert.equal((await c.list()).changes[0].status,'signed');assert.deepEqual(c.job.budgets,original.budgets);assert.deepEqual(c.job.schedules,original.schedules);assert.equal(c.job.variations[0].status,'draft')
+  assert.equal((await c.act('/signed-changes/'+row.id+'/apply',{digest:row.digest,...c.billing(row)})).status,400)
+  await c.ok('/signed-changes/'+row.id+'/dispute',{digest:row.digest,reason:'Window finish needs revision'},c.client)
+  const disputed=(await c.list()).changes[0];assert.equal(disputed.signatures.length,2);assert.equal(disputed.history[0].reason,'Window finish needs revision')
+  assert.equal((await c.act('/signed-changes/'+row.id+'/apply',{digest:row.digest,confirm:true,...c.billing(row)})).status,409)
+  const revised=await c.present(variation);assert.equal(revised.revision,2)
+  await c.ok('/signed-changes/'+revised.id+'/decline',{digest:revised.digest,reason:'Do not add this window'},c.client)
+  assert.deepEqual(c.job.budgets,original.budgets);assert.deepEqual(c.job.schedules,original.schedules);assert.deepEqual(c.job.orders,original.orders);assert.deepEqual(c.job.invoices,original.invoices)
+  const fresh=await c.present(variation);await c.sign(fresh)
+  await c.ok('/schedules',{trade:'Unrelated source crew',description:'New completion source',start:'2026-11-03T08:00:00Z',end:'2026-11-03T09:00:00Z'})
+  assert.equal((await c.act('/signed-changes/'+fresh.id+'/sign',{digest:fresh.digest,confirm:true,name:'Synthetic change client'},c.client)).value.error,'change_sources')
+  const d=await signedChangeFixture(f,{tag:'revoked',clientEmail:changeAddress('revoked')});await d.priced();const revoked=await d.present();await d.sign(revoked);await d.sign(revoked,d.client,'Synthetic change client')
+  const revoke=await f.json('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:revoked.client.id,status:'inactive'}});assert.equal(revoke.status,200)
+  const before=structuredClone(d.job);assert.ok([403,409].includes((await d.act('/signed-changes/'+revoked.id+'/apply',{digest:revoked.digest,confirm:true,...d.billing(revoked)})).status));await d.read();assert.deepEqual(d.job,before)
+  const a=await signedChangeFixture(f,{tag:'allowance',clientEmail:changeAddress('signed-allowance'),allowance:50000})
+  const terms={room:'Kitchen',category:'Window',allowance_cents:50000,cost_code:'06-100',decision_on:'2026-11-04',lead_days:5,options:[{name:'Larger window',specifications:'Reviewed exact pane and frame',supplier:'Synthetic window supplier',price_cents:160000}]}
+  const selection=(await a.ok('/selections',terms)).record,revision=selection.revisions[0]
+  await a.ok('/selections/'+selection.id+'/present',{revision_id:revision.id});await a.ok('/selections/'+selection.id+'/sign',{revision_id:revision.id,option_id:revision.options[0].id,statement:'I choose this exact window',confirm:true},a.client)
+  const allowanceInput={selection_id:selection.id,revision_id:revision.id,schedule_days:5,impact_reference:'Reviewed five-calendar-day procurement impact',impacts_reviewed:true,basis:'sell',as_of:'2026-10-28',lines:[{id:'allowance-window',description:'Incremental window upgrade',cost_code:'06-100',phase:'Remodel',category:'material',quantity:'1',unit:'each',unit_cents:100000,cost_unit_cents:45000}],rules:[],tax:{rate_id:a.rate.id,taxable_line_ids:['allowance-window']}}
+  const allowancePreview=(await a.ok('/allowance-changes/preview',allowanceInput)).preview;await a.ok('/allowance-changes/apply',{...allowanceInput,digest:allowancePreview.digest})
+  const allowanceRow=await a.present();assert.deepEqual(allowanceRow.document.allowance,{selection_id:selection.id,selection_revision_id:revision.id,cost_code:'06-100',allowance_cents:50000,economic_delta_cents:110000,prior_economic_delta_cents:0,amount_cents:110000});assert.equal(allowanceRow.document.tax_cents,10000)
+  await a.sign(allowanceRow);await a.sign(allowanceRow,a.client,'Synthetic change client')
+  await a.ok('/selections/'+selection.id+'/revise',{...terms,options:[{...terms.options[0],price_cents:171000}]})
+  assert.equal((await a.act('/signed-changes/'+allowanceRow.id+'/apply',{digest:allowanceRow.digest,confirm:true,...a.billing(allowanceRow)})).value.error,'change_sources');assert.equal(a.job.budgets.length,1)
+  const g=await signedChangeFixture(f,{tag:'unpublished',clientEmail:changeAddress('unpublished-client')});await g.priced()
+  assert.equal((await g.act('/schedules',{trade:'Synthetic draft crew',description:'Unreviewed unrelated work',start:'2026-11-03T08:00:00Z',end:'2026-11-03T12:00:00Z'},undefined,agent)).status,200);await g.read();assert.equal(g.job.schedules[1].status,'draft')
+  const unpublishedBefore=structuredClone(g.job),unpublishedClients=(await g.list()).clients
+  const unpublishedDecision=await g.act('/signed-changes',{variation_id:g.job.variations[0].id,client_id:unpublishedClients[0].id,task_ids:[g.job.schedules[0].id],extra_days:5})
+  assert.equal(unpublishedDecision.status,409,'A signed change must not implicitly book unrelated draft tasks');await g.read();assert.deepEqual(g.job,unpublishedBefore)
+  const b=await signedChangeFixture(f,{tag:'builder-revoked',clientEmail:changeAddress('builder-revoked-client')}),builder=await f.invite(changeAddress('builder-revoked'),'Synthetic change builder','admin');await b.priced();const available=await b.list()
+  const builderRow=(await b.ok('/signed-changes',{variation_id:b.job.variations[0].id,client_id:available.clients[0].id,task_ids:[b.job.schedules[0].id],extra_days:5},builder)).record
+  await b.sign(builderRow,builder,'Synthetic change builder');await b.sign(builderRow,b.client,'Synthetic change client')
+  assert.equal((await f.json('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:builderRow.builder.id,status:'inactive'}})).status,200)
+  const builderBefore=structuredClone(b.job);assert.equal((await b.act('/signed-changes/'+builderRow.id+'/apply',{digest:builderRow.digest,confirm:true,...b.billing(builderRow)})).status,409);await b.read();assert.deepEqual(b.job,builderBefore)
+  assert.equal((await f.json('/api/plinth/jobs/'+d.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:d.job.version}})).status,200)
+  assert.equal((await d.act('/signed-changes/'+revoked.id+'/apply',{digest:revoked.digest,confirm:true,...d.billing(revoked)})).status,404);assert.equal((await d.api('/jobs/'+d.job.id+'/signed-changes/'+revoked.id+'/document.json')).status,404,'An erased job cannot be reconstructed by replaying a captured signature or application')
  }finally{await f.close()}
 })

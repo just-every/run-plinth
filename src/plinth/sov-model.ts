@@ -17,7 +17,7 @@ export interface SovLine {
 }
 export interface SovSources {
  quote: { id: string; revision: number; total_cents: number; lines: Line[]; pricing: PricingSnapshot; acceptance?: Quote['acceptance'] }
- variations: { id: string; revision: number; description: string; amount_cents: number; cost_code?: string; pricing: PricingSnapshot; pricing_direction: 'charge' | 'credit'; approved_by: Stamp }[]
+ variations: { signed_document?: Pick<import('./signed-change-model').SignedChange,'id'|'document'|'digest'|'signatures'>; id: string; revision: number; description: string; amount_cents: number; cost_code?: string; pricing: PricingSnapshot; pricing_direction: 'charge' | 'credit'; approved_by: Stamp }[]
 }
 export interface SovRevision {
  id: string

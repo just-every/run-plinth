@@ -3,7 +3,7 @@ import type { Actor } from './model'
 /** ROLE-005 event kinds; each audited write names one. */
 export type AuditKind = 'financial' | 'permission' | 'export' | 'send' | 'import' | 'automation' | 'record' | 'hold' | 'erasure'
 export interface AuditEvent { kind?: AuditKind; action?: string; subject_kind?: string; subject_id?: string; job_id?: string; version_before?: number; version_after?: number; before_ref?: string; after_ref?: string; detail?: Record<string, unknown> }
-const financial = new Set(['quotes', 'variations', 'orders', 'claims', 'invoices', 'remittances', 'retainage', 'sov', 'subcontracts', 'budgets', 'budget', 'pricing', 'variation-pricing', 'allowance-changes', 'estimate-template', 'takeoff-estimate', 'pricing-rates', 'estimate-catalog', 'company', 'costs'])
+const financial = new Set(['signed-changes', 'quotes', 'variations', 'orders', 'claims', 'invoices', 'remittances', 'retainage', 'sov', 'subcontracts', 'budgets', 'budget', 'pricing', 'variation-pricing', 'allowance-changes', 'estimate-template', 'takeoff-estimate', 'pricing-rates', 'estimate-catalog', 'company', 'costs'])
 const permission = new Set(['team', 'roles', 'portal-policy', 'rfi-access', 'agent-credentials', 'access'])
 const isId = (value: string) => /^[0-9a-f]{8}-[0-9a-f-]{20,}$|^[0-9a-f]{16,}$/i.test(value)
 /** The route is the event: POST /jobs/J/orders/O/issue is orders.issue on job J, a POST to a collection is a create, a DELETE of a job is its erasure. */

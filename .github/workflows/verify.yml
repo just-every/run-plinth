@@ -67,9 +67,21 @@ jobs:
       - run: pnpm run build
       - name: Exercise emitted Worker and native sign-in at 1440 and 390
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs ${{ matrix.journey }}
+      - name: Exercise installed durable report work
+        if: matrix.journey == 'portfolio'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs background-work
       - name: Exercise installed estimate comparisons and catalog review
         if: matrix.journey == 'portfolio'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs estimate-performance
+      - name: Build the existing guides for the installed office journey
+        if: matrix.journey == 'cost-billing'
+        run: pnpm exec rer build --site
+      - name: Exercise office keyboard, read and write recovery
+        if: matrix.journey == 'cost-billing'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs office
+      - name: Exercise installed signed change execution
+        if: matrix.journey == 'cost-billing'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs signed-changes
       - name: Exercise installed owner follow-up rules
         if: matrix.journey == 'bid-follow-up'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs followup-rules

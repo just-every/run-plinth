@@ -29,31 +29,37 @@ function noTransform(response: Response): Response {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
+async function response(request: Request, env: Bindings, execution: ExecutionContext): Promise<Response> {
+  const door = await plinthAgentDoor(env).handle(request)
+  if (door) return door
+  const business = await businessSettings(runtimeBindings(env)).handle(request)
+  if (business) return business
+  const asset = await staticAssetResponse(request, env)
+  if (asset) return asset
+  const auth = await authResponse(request, env)
+  if (auth) return auth
+  const agentBoundary = agentHttpBoundary(request)
+  if (agentBoundary) return agentBoundary
+  const imports = await importResponse(request, runtimeBindings(env))
+  if (imports) return imports
+  const product = await plinthResponse(request, runtimeBindings(env))
+  if (product) return product
+  // The installed variant: the Lobby at / and the public claim state it reads.
+  // Local dev serves the saved origin's data at its own port (RER_DEV_ORIGIN).
+  const state = await setupStateResponse(request, runtimeBindings(env))
+  if (state) return state
+  const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
+  if (lobby) return lobby
+  return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
+}
+
 export default withDemo({
   scheduled: plinthScheduled,
   // Cloudflare Email Routing delivers a client's reply here; the handler stores only replies to a message it sent.
   email: (message, env) => plinthEmail(message, runtimeBindings(env)),
   async fetch(request, env, execution) {
-    const door = await plinthAgentDoor(env).handle(request)
-    if (door) return door
-    const business = await businessSettings(runtimeBindings(env)).handle(request)
-    if (business) return business
-    const asset = await staticAssetResponse(request, env)
-    if (asset) return asset
-    const auth = await authResponse(request, env)
-    if (auth) return auth
-    const agentBoundary = agentHttpBoundary(request)
-    if (agentBoundary) return agentBoundary
-    const imports = await importResponse(request, runtimeBindings(env))
-    if (imports) return imports
-    const product = await plinthResponse(request, runtimeBindings(env))
-    if (product) return product
-    // The installed variant: the Lobby at / and the public claim state it reads.
-    // Local dev serves the saved origin's data at its own port (RER_DEV_ORIGIN).
-    const state = await setupStateResponse(request, runtimeBindings(env))
-    if (state) return state
-    const lobby = await lobbyResponse(request, runtimeBindings(env), identity)
-    if (lobby) return lobby
-    return rejectedResponse(request, await dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request))))
+    // All routes can refuse before reading an upload, including agent and
+    // product doors. Finish it before workerd releases the HTTP connection.
+    return rejectedResponse(request, await response(request, env, execution))
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })
