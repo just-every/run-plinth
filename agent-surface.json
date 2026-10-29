@@ -1,5 +1,12 @@
 {
   "schema": "rer-agent-surface/1",
+  "capabilities": [
+    "tools",
+    "policy",
+    "pause",
+    "audit",
+    "idempotency"
+  ],
   "seed": "plinth",
   "specialist": "Construction project coordinator",
   "tools": [
@@ -302,6 +309,12 @@
         "BOUND-003"
       ],
       "reason": "installation"
+    },
+    {
+      "clauses": [
+        "NATIVE-001"
+      ],
+      "reason": "screen"
     }
   ],
   "resources": [

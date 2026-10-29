@@ -1,12 +1,12 @@
 # Shared company agent door
 
-Use `/mcp` and discover the Construction project coordinator prompt, tool schemas, resource templates, current scopes and policy revision. The shared `/agents` person door provides policy, audit, reviews, approvals and Pause. Native owner/admin sessions remain responsible for final business decisions. Local bearer credentials keep their existing draft scope. See [the agent door guide](AGENT-DOOR.md).
+Use `/mcp` to discover the Construction project coordinator tool schemas, current scopes and policy revision. This installation declares tools, policy, pause, audit and idempotency. Prompts, public resources, events and subscriptions are undeclared and return typed refusals. The shared `/agents` person door provides policy, audit, reviews, approvals and Pause. Native owner/admin sessions remain responsible for final business decisions. Local bearer credentials keep their existing draft scope. See [the agent door guide](AGENT-DOOR.md).
 
 The HTTP examples below describe the native draft payloads and the versioned SDK connector. Agent callers use those payloads inside each discovered MCP tool's `input`, with `job_id` and a stable `idempotency_key`. The installed Worker challenges unversioned bearer API requests with the MCP resource metadata.
 
 # Draft preparation for agents
 
-The HTTP API is the agent command surface. Every call uses native authenticated authority, and every edit supplies the job's current `expected_version`. Read `GET /api/plinth/jobs/:id` before preparing a draft; a stale version returns 409 with no write. Integer amounts are cents. An agent credential can read manager-visible jobs and prepare drafts; it cannot create jobs, approve, issue, receive, export, import or erase.
+MCP is the agent command surface; the HTTP examples document the native payloads its supported tools use. Every call uses native authenticated authority, and every edit supplies the job's current `expected_version`. Read `plinth.jobs.get` before preparing a draft; a stale version returns 409 with no write. Integer amounts are cents. An agent credential can read manager-visible jobs and prepare drafts; it cannot create jobs, approve, issue, receive, export, import or erase.
 
 A signed-in owner first completes Base's credential step-up (`POST /auth/step-up`, body `{"action":"credentials:mint","returnTo":"/app"}`), follows the ordinary email confirmation, then calls `POST /api/plinth/agent-credentials` with `{"expires_in_seconds":3600}` and a same-origin session. Its `credential.token` is shown once. Store it privately; send it as `Authorization: Bearer …`, never in a URL. `GET /api/plinth/agent-credentials` lists metadata; `POST /api/plinth/agent-credentials/:id/revoke` revokes one immediately. Suspension, role changes and expired or revoked native credentials remove access.
 
