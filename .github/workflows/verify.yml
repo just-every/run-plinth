@@ -30,17 +30,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: node src/plinth/contract-docs.mjs check
-      - name: Verify with the adopted Base agent-door runner
-        # Runtime source and CLI are separate pins until this runner is released.
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          base_archive="$RUNNER_TEMP/plinth-agent-base.tar.gz"
-          base_source="$RUNNER_TEMP/plinth-agent-base"
-          mkdir -p "$base_source"
-          gh api repos/runeditrun/base/tarball/d555e789cffb744a9f83d76ebe42a2e3bdd7a055 > "$base_archive"
-          tar -xzf "$base_archive" -C "$base_source" --strip-components=1
-          node "$base_source/bin/rer.mjs" verify
+      - run: pnpm exec rer verify
 
   installed:
     name: Installed ${{ matrix.journey }}
