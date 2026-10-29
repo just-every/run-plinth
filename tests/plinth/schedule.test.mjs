@@ -194,8 +194,10 @@ test('SCH-005 — a superintendent reads today, tomorrow and the look-ahead with
 
 test('Recovery packets retain dependency and hold refusals, reject unavailable capacity and recheck exact owner consent over MCP',async()=>{
  const {recoveryFixture}=await import('./recovery-support.mjs')
+ const {proveRemainingRecovery,proveRecoveryBookingErasure}=await import('./recovery-gate-support.mjs')
  const f=await createFixture();try{
-  const {c,post,mcp,token,args}=await recoveryFixture(f)
+  const recovery=await recoveryFixture(f),{c,post,mcp,token,args}=recovery
+  await proveRemainingRecovery(recovery)
   const root='/api/plinth/'+c.root,requestPath=()=>'/recovery/requests/'+c.request.id
   let response=await mcp('plinth.recovery.read',args());assert.equal(response.status,200);assert.equal(response.record.sources.digest,c.sources.digest,JSON.stringify(response.value))
   const generic=await mcp('plinth.jobs.get',{job_id:c.job.id});assert.equal(generic.record,undefined);assert.ok(!JSON.stringify(generic.value).includes('recovery_requests'),'A general agent read cannot reveal private source packets')
@@ -249,5 +251,6 @@ test('Recovery packets retain dependency and hold refusals, reject unavailable c
   const credential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials.find(c=>!c.revoked_at)
   assert.equal((await f.json('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
   response=await mcp('plinth.recovery.read',args());assert.equal(response.status,401)
+  await proveRecoveryBookingErasure(f)
  }finally{await f.close()}
 })

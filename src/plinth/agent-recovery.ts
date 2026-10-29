@@ -1,10 +1,12 @@
-import { wallClock } from './time-zone'
+import { wallClock, zonedInstant } from './time-zone'
 import { activeHolds } from './holds'
 import { costLedger } from './cost-ledger'
 import { costs, digest } from './cost-model'
 import { forecastThousandths, previewCostForecast } from './cost-forecast'
 import { cashReport } from './cost-periods'
-import { previewSchedule } from './schedule-plan'
+import { remainingRecoverySchedule } from './agent-recovery-schedule'
+import { latestActual } from './schedule-baseline-model'
+import { workingMinutes } from './schedule-calendar'
 import { resourceConflicts, resources } from './schedule-resources'
 import { cents, find, need, object, stamp, sum, text, type Actor, type Input, type Job } from './model'
 import { localDate } from './remittances'
@@ -54,7 +56,7 @@ function preserveDependencies(job:Job,raw:Input){
 export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:Actor,request:RecoveryRequest,value:unknown):Promise<RecoveryAlternative>{
  const raw=object(value),id=text(raw.id,'Alternative identity',80),name=text(raw.name,'Alternative name',200),assumptions=text(raw.assumptions,'Dated assumptions and uncertainty',4000),plan=object(raw.schedule)
  preserveDependencies(job,plan)
- const schedule=await previewSchedule(structuredClone(job),actor,plan,all)
+ const schedule=await remainingRecoverySchedule(job,actor,plan,all,request.as_of)
  schedule.conflicts.push(...resourceConflicts(await resources(db),all,{...job,schedules:schedule.tasks}))
  const amendment=object(raw.amendment),extra=cents(amendment.extra_cents,'Amendment extra cents'),promised_on=localDate(amendment.promised_on,'Proposed delivery date'),order=find(job.orders,request.package_order_id)
  const delivery=find(schedule.tasks,request.package_task_id)
@@ -66,7 +68,8 @@ export async function recoveryAlternative(db:D1Database,job:Job,all:Job[],actor:
  const labor=codes.find(c=>c.cost_code===request.labor_cost_code)
  need(labor&&Number(labor.remaining_quantity)>0&&Number(labor.minutes_per_unit)>0,'Review positive remaining labor and productivity for the overrun code')
  const laborTask=find(schedule.tasks,request.labor_task_id),catalog=await resources(db),units=sum((laborTask.resources??[]).filter(a=>catalog.some(r=>r.id===a.resource_id&&r.kind==='crew')).map(a=>a.units))
- const required=forecastThousandths(labor.remaining_quantity,'Remaining labor quantity')*forecastThousandths(labor.minutes_per_unit,'Labor minutes per unit'),available=(laborTask.duration_minutes??0)*units
+ const remainingStart=Math.max(Date.parse(laborTask.start),Date.parse(delivery.end),zonedInstant(request.as_of,0,job.time_zone??'UTC'))
+ const required=forecastThousandths(labor.remaining_quantity,'Remaining labor quantity')*forecastThousandths(labor.minutes_per_unit,'Labor minutes per unit'),available=latestActual(job,laborTask.id)?.actual_finish?0:workingMinutes(remainingStart,Date.parse(laborTask.end),schedule.calendar)*units
  const labor_capacity={task_id:laborTask.id,required_minutes:(required/1_000_000n).toString()+((required%1_000_000n)?'.'+(required%1_000_000n).toString().padStart(6,'0').replace(/0+$/,''):''),available_minutes:available,sufficient:required<=BigInt(available)*1_000_000n}
  const candidate=structuredClone(job),forecast=await previewCostForecast(candidate,actor,{...forecastInput,as_of:request.as_of,codes})
  forecast.id='recovery-'+id;forecast.source_version=request.sources.source_version

@@ -3240,6 +3240,10 @@
       "sha256": "291dd210e2bf9bf03f06cfe26a9809742ba4f5897fe36f052a4e925c49ec3c7c",
       "executable": false
     },
+    "src/plinth/agent-recovery-erasure.ts": {
+      "sha256": "d8b09eaab2843258caf07656afae3f95b994193b1d19e6cde9650acecad096f4",
+      "executable": false
+    },
     "src/plinth/agent-recovery-http.ts": {
       "sha256": "8949b11316bcfd8e86889dffaee4f2616855bb0e75fb3b65bb92f7cb370c821a",
       "executable": false
@@ -3248,8 +3252,12 @@
       "sha256": "9ea05528fa62b97165257e230acef15d4cbd86bb12c2c7c949fc1ec7a8f9dfe9",
       "executable": false
     },
+    "src/plinth/agent-recovery-schedule.ts": {
+      "sha256": "70e02ad13559df6128806b958aa7983db04ca48b4c4d74bd0f1648f85281a599",
+      "executable": false
+    },
     "src/plinth/agent-recovery.ts": {
-      "sha256": "6809477808f2ff67b1dd80ba34669750cea291e94ea7568973504614f38c07e0",
+      "sha256": "876dbd4d6580c762395e1e8664260c3b780ff7f7f452e5e1e96f001c50ce17dc",
       "executable": false
     },
     "src/plinth/allowance-changes.ts": {
@@ -3593,7 +3601,7 @@
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
-      "sha256": "71c996aeade5738ceaacdaad6b1b1ebe8b3919a3bdf8809a5b20484c85ec7245",
+      "sha256": "b3df8473c3d8c10184a219088c93b0005ad8c976a58df554ba2ee41dbf8d7c8e",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -5480,6 +5488,10 @@
       "sha256": "e43304d2dd9a588439a3af14d39c9dd32a67305fa42fd27cecc87f26f01f913f",
       "executable": false
     },
+    "tests/plinth/recovery-gate-support.mjs": {
+      "sha256": "603aa1d27fd22916d0dcdb10bec2a68e7b3a6368e1832b23a76493c2316c79f7",
+      "executable": false
+    },
     "tests/plinth/recovery-support.mjs": {
       "sha256": "e725282a19a210db795e83f3534b1434014bce4f3651130cd8e92659c29774f7",
       "executable": false
@@ -5509,7 +5521,7 @@
       "executable": false
     },
     "tests/plinth/schedule.test.mjs": {
-      "sha256": "be622a13579cb8d43d0bf6d30619f598cd787d7ab561c94789ee1965960b94e1",
+      "sha256": "97a9589140ddfe7f9ad56b90a00161edf8381ff15803288d3d63fef079b62aab",
       "executable": false
     },
     "tests/plinth/selections.test.mjs": {
