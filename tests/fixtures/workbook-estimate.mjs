@@ -29,3 +29,10 @@ export function costInput(job,tag='synthetic-plinth-costs-1') {
  const csv=[headers,[tag+'-time','Reviewed framing time','TIME','1.25','hours','10001','time','2026-10-01','2026-10',tag+'-time-sheet','synthetic-plinth-worker'],[tag+'-expense','Reviewed supplies','EXPENSE','1','each','5000','expense','2026-10-01','2026-10',tag+'-receipt','synthetic-plinth-worker']].map(row=>row.map(v=>'"'+v+'"').join(',')).join('\r\n')+'\r\n'
  return {name:tag+'.csv',base64:Buffer.from(csv).toString('base64'),title:'Synthetic reviewed time and expenses',job_id:job.id,expected_version:job.version,mapping:{purpose:'costs',sheet:'CSV',columns:Object.fromEntries(headers.map((h,i)=>[h,String.fromCharCode(65+i)])),codes:{TIME:'06-100',EXPENSE:'09-200'},units:{hours:'hour',each:'each'},currency:'USD',duplicates:'reject',reviewed_formulas:false,excluded_rows:{}}}
 }
+
+export function billInput(job,tag='synthetic-plinth-bills-1') {
+ const headers=['id','description','code','quantity','unit','unit_cents','kind','dated_on','period','reference','vendor','due_on','tax_percent','tax_reference','taxable']
+ const bill=[tag+'-bill','Supplied framing invoice','BILL','1','each','1234','bill','2026-10-01','2026-10','synthetic-plinth-supplier-invoice-1','Synthetic Supply','2026-11-01','10','Synthetic reviewed tax source','true'],bad=[tag+'-bad','Invalid source code','INVALID','1','each','500','bill','2026-10-01','2026-10','synthetic-plinth-invalid-invoice','Synthetic Supply','2026-11-01','10','Synthetic reviewed tax source','true']
+ const csv=[headers,bill,bill,bad].map(row=>row.map(v=>'"'+v+'"').join(',')).join('\r\n')+'\r\n'
+ return {name:tag+'.csv',base64:Buffer.from(csv).toString('base64'),title:'Synthetic reviewed supplier bills',job_id:job.id,expected_version:job.version,mapping:{purpose:'costs',sheet:'CSV',columns:Object.fromEntries(headers.map((h,i)=>[h,String.fromCharCode(65+i)])),codes:{BILL:'09-200'},units:{each:'each'},currency:'USD',duplicates:'skip-identical',reviewed_tax:true,reviewed_formulas:false,excluded_rows:{'4':'Invalid supplier cost code held for correction'}}}
+}

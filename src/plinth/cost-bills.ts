@@ -43,9 +43,8 @@ function validateMatches(job:Job,bill:CostBill){
   for(const m of proposed){const same=(x:CostMatch)=>x.order_id===m.order_id&&x.receipt_id===m.receipt_id&&x.cost_code===m.cost_code;need(sum([...proposed.filter(same).map(x=>x.amount_cents),...credits.flatMap(c=>c.lines.flatMap(l=>l.matches.filter(same).map(x=>x.amount_cents)))])<=sum(original.lines.flatMap(l=>l.matches.filter(same).map(x=>x.amount_cents))),'Credit receipt must belong to the original bill',409,'cost_credit')}
  }
 }
-export async function billAction(job:Job,actor:Actor,input:Input,id?:string,action?:string):Promise<CostBill>{
+export async function prepareCostBill(job:Job,actor:Actor,input:Input,by=stamp(actor),identity:string=crypto.randomUUID()):Promise<CostBill>{
  const state=costs(job)
- if(!id){
   need(input.kind===undefined||input.kind==='bill'||input.kind==='credit','Choose bill or credit');const kind=input.kind==='credit'?'credit':'bill'
   const vendor=text(input.vendor,'vendor',200),reference=text(input.reference,'invoice reference',200)
   need(!state.bills.some(b=>b.vendor.toLowerCase()===vendor.toLowerCase()&&b.reference.toLowerCase()===reference.toLowerCase()),'Vendor invoice reference is already captured',409,'cost_duplicate')
@@ -57,9 +56,15 @@ export async function billAction(job:Job,actor:Actor,input:Input,id?:string,acti
   const pricing=calculatePricing(raw,'sell',[],percent,raw.filter(l=>l.taxable).map(l=>l.id))
   const lines:CostLine[]=raw.map((l,i)=>{need(Array.isArray(l.matches)&&l.matches.length<=50,'Send up to 50 receipt matches per line');const matches=l.matches.map(value=>{const m=object(value);return {order_id:text(m.order_id,'order_id',100),receipt_id:text(m.receipt_id,'receipt_id',100),cost_code:text(m.cost_code??l.cost_code,'Receipt cost_code',80),amount_cents:positive(m.amount_cents),...(m.draw_id?{draw_id:text(m.draw_id,'draw_id',100)}:{})}});need(sum(matches.map(m=>m.amount_cents))<=l.total_cents,'Receipt matches cannot exceed line subtotal');return {id:l.id,cost_code:l.cost_code,description:l.description,subtotal_cents:l.total_cents,amount_cents:pricing.lines[i]!.total_cents,tax_cents:pricing.lines[i]!.total_cents-l.total_cents,matches}})
   const dated=costDate(input),due_on=localDate(input.due_on,'due_on');need(due_on>=dated.dated_on,'Due date cannot precede invoice date')
-  const row:CostBill={id:crypto.randomUUID(),reviewer_id:text(input.reviewer_id??state.policy?.owner_id??actor.id,'Designated reviewer',100),kind,vendor,reference,...dated,due_on,status:'draft',lines,amount_cents:sum(lines.map(l=>l.amount_cents)),document:await document(input.document),prepared_by:stamp(actor),reviews:[],tax:{as_of:dated.dated_on,reviewed_by:stamp(actor),taxable_cents:pricing.taxable_cents,exempt_cents:pricing.exempt_cents,tax_cents:pricing.tax_cents,stages:pricing.stages,percent,reference:taxReference,exemption_reference,verification:'Human reviewed; no provider verification',taxable_line_ids:raw.filter(l=>l.taxable).map(l=>l.id)},flags:[],...(kind==='credit'?{credit_of:text(input.credit_of,'credit_of',100)}:{})}
+  const row:CostBill={id:identity,reviewer_id:text(input.reviewer_id??state.policy?.owner_id??actor.id,'Designated reviewer',100),kind,vendor,reference,...dated,due_on,status:'draft',lines,amount_cents:sum(lines.map(l=>l.amount_cents)),document:await document(input.document),prepared_by:by,reviews:[],tax:{as_of:dated.dated_on,reviewed_by:by,taxable_cents:pricing.taxable_cents,exempt_cents:pricing.exempt_cents,tax_cents:pricing.tax_cents,stages:pricing.stages,percent,reference:taxReference,exemption_reference,verification:'Human reviewed; no provider verification',taxable_line_ids:raw.filter(l=>l.taxable).map(l=>l.id)},flags:[],...(kind==='credit'?{credit_of:text(input.credit_of,'credit_of',100)}:{})}
   row.flags=lines.flatMap(l=>[...(sum(l.matches.map(m=>m.amount_cents))<l.subtotal_cents?['Missing receipt: line '+l.id]:[]),...(l.matches.some(m=>m.cost_code!==l.cost_code)?['Scope/code discrepancy: line '+l.id]:[])])
-  validateMatches(job,row);state.bills.push(row);return row
+  validateMatches(job,row);return row
+}
+export async function billAction(job:Job,actor:Actor,input:Input,id?:string,action?:string):Promise<CostBill>{
+ const state=costs(job)
+ if(!id){
+  const row=await prepareCostBill(job,actor,input)
+  state.bills.push(row);return row
  }
  const row=find(state.bills,id);need(row.status==='draft','Posted originals and coding are immutable; enter a credit or explicit transfer',409,'cost_posted')
  if(action==='route'){row.reviewer_id=text(input.reviewer_id,'Designated reviewer',100);row.reviews.push({reason:text(input.reason,'Approval routing reason',2000),by:stamp(actor)});return row}

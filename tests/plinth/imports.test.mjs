@@ -1,8 +1,9 @@
+import {proveOpeningImport} from './opening-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import {legacyWorkbook} from '../fixtures/workbook-xls.mjs'
-import { workbookInput, estimateWorkbook, catalogInput, costInput } from '../fixtures/workbook-estimate.mjs'
+import { workbookInput, estimateWorkbook, catalogInput, costInput, billInput } from '../fixtures/workbook-estimate.mjs'
 import { createFixture } from './helpers.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
@@ -177,6 +178,26 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
   actual=await f.json(costsRoot,{cookie:f.owner});assert.equal(actual.value.totals.posted_actual_cents,17501)
   assert.equal((await call('/workbook/commit',costApproval)).status,200);assert.equal((await costSources()).sources.length,2)
   const retainedCosts=await call('/'+costCommitted.value.job.id+'/undo');assert.equal(retainedCosts.status,200,JSON.stringify(retainedCosts.value));assert.ok(retainedCosts.value.report.dispositions.some(d=>d.disposition==='retained'))
+  const undoSource=costInput((await jobs())[0],'synthetic-plinth-undo-costs'),undoReview=await call('/workbook/preview',undoSource);assert.equal(undoReview.status,200,JSON.stringify(undoReview.value))
+  const undoCommit=await call('/workbook/commit',{...undoSource,reviewed_at:undoReview.value.reviewed_at,fingerprint:undoReview.value.fingerprint});assert.equal(undoCommit.status,200,JSON.stringify(undoCommit.value));assert.equal((await costSources()).sources.length,4)
+  const held=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:imported.id,kind:'legal_hold',reason:'Preserve imported original evidence',confirm:true}});assert.equal(held.status,201)
+  assert.equal((await call('/'+undoCommit.value.job.id+'/undo')).status,409);assert.equal((await costSources()).sources.length,4)
+  const released=await f.json('/api/plinth/holds/'+held.value.hold.id+'/release',{method:'POST',cookie:f.owner,body:{reason:'Owner released reviewed import hold'}});assert.equal(released.status,200)
+  const removedDrafts=await call('/'+undoCommit.value.job.id+'/undo');assert.equal(removedDrafts.status,200,JSON.stringify(removedDrafts.value));assert.ok(removedDrafts.value.report.dispositions.some(d=>d.disposition==='reversed'));assert.equal((await costSources()).sources.length,2);assert.equal((await f.json(costsRoot,{cookie:f.owner})).value.totals.posted_actual_cents,17501)
+  const billSource=billInput((await jobs())[0]),billPreview=await call('/workbook/preview',billSource);assert.equal(billPreview.status,200,JSON.stringify(billPreview.value));assert.equal(billPreview.value.canAdopt,true);assert.equal(billPreview.value.draft.source_totals.total_cents,2968);assert.equal(billPreview.value.draft.total_cents,1357)
+  const billRejected=await call('/workbook/preview',{...billSource,mapping:{...billSource.mapping,excluded_rows:{},reviewed_tax:false}});assert.equal(billRejected.status,200);assert.equal(billRejected.value.canAdopt,false)
+  const billApproval={...billSource,reviewed_at:billPreview.value.reviewed_at,fingerprint:billPreview.value.fingerprint},billCommitted=await call('/workbook/commit',billApproval);assert.equal(billCommitted.status,200,JSON.stringify(billCommitted.value))
+  let nativeBills=(await f.json(costsRoot+'/bills',{cookie:f.owner})).value;assert.equal(nativeBills.bills.length,1);let nativeBill=nativeBills.bills[0];assert.equal(nativeBill.status,'draft');assert.equal(nativeBill.amount_cents,1357);assert.equal(nativeBill.lines[0].tax_cents,123)
+  assert.equal((await call('/workbook/commit',billApproval)).status,200);assert.equal((await f.json(costsRoot+'/bills',{cookie:f.owner})).value.bills.length,1)
+  const other=await call('/workbook/preview',billInput((await jobs())[0],'synthetic-plinth-bills-duplicate'));assert.equal(other.status,200);assert.equal(other.value.canAdopt,false);assert.ok(other.value.draft.diagnostics.some(d=>d.message.includes('already exists')))
+  const billAct=async(action,body={},cookie=f.owner)=>{const current=await costSources();return f.json(costsRoot+'/bills/'+nativeBill.id+'/'+action,{method:'POST',cookie,body:{expected_version:current.version,...body}})}
+  assert.equal((await billAct('post')).status,409,'Missing receipt review cannot be skipped by import')
+  assert.equal((await billAct('review',{reason:'Owner reviewed the uploaded source and missing-receipt discrepancy'})).status,200)
+  assert.equal((await billAct('post')).status,403,'Imported bill preparation cannot self-approve')
+  const reviewerId=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.name==='Native cost reviewer').id
+  assert.equal((await billAct('route',{reviewer_id:reviewerId,reason:'Separate current office review'})).status,200)
+  const postedBill=await billAct('post',{},reviewer);assert.equal(postedBill.status,200,JSON.stringify(postedBill.value));assert.equal(postedBill.value.ledger.totals.posted_actual_cents,18858);assert.equal(postedBill.value.ledger.totals.payable_cents,1357)
+  const billOriginal=await f.request(costsRoot+'/bills/'+nativeBill.id+'/original',{cookie:f.owner});assert.equal(billOriginal.status,200);assert.equal(Buffer.from(await billOriginal.arrayBuffer()).toString('base64'),billSource.base64)
   const currentJob=(await jobs())[0];assert.deepEqual(currentJob.quotes,accepted.value.job.quotes);assert.deepEqual(currentJob.budgets,accepted.value.job.budgets)
   const erased=await f.json(`/api/plinth/jobs/${imported.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:currentJob.version}});assert.equal(erased.status,200)
   const custody=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(custody.value.originals[0].original.status,'unavailable');const costCustody=await f.json(`${prefix}/${costCommitted.value.job.id}/originals`,{cookie:f.owner});assert.equal(costCustody.status,200);assert.equal(costCustody.value.originals[0].original.status,'unavailable')
@@ -196,5 +217,6 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
   const assembly=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'assembly',name:'Native assembly uses imported rate',reason:'Owner reviewed future work',value:{unit:'ft',parts:[{id:'frame',rate_id:frame.id,description:'Framing',cost_code:'06-100',phase:'Structure',category:'labor',units_per_dimension:'1',productivity:'1',waste_percent:'0'}]}}});assert.equal(assembly.status,201,JSON.stringify(assembly.value))
   const undone=await call(`/${adoptedRates.value.job.id}/undo`);assert.equal(undone.status,200,JSON.stringify(undone.value));assert.ok(undone.value.report.dispositions.some(d=>d.disposition==='retained'));assert.equal((await catalog()).length,3,'Native dependencies preserve the complete imported catalog group')
 
+  await proveOpeningImport(f)
  }finally{await f.close()}
 })
