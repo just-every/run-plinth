@@ -294,6 +294,12 @@
       "name": "202610280102_business_people.sql",
       "sha256": "51aa39622d866b987d71b6e37c9a8300e7f24c54a55611edaab669ed051b01cd",
       "sql": "ALTER TABLE bs_settings ADD COLUMN owner_id TEXT CHECK(owner_id IS NULL OR owner_id <> '');\nALTER TABLE bs_team ADD COLUMN business_id TEXT CHECK(business_id IS NULL OR business_id <> '');\nALTER TABLE bs_team ADD COLUMN business_role TEXT CHECK(business_role IS NULL OR business_role IN('admin','member'));\nCREATE UNIQUE INDEX bs_team_business_id ON bs_team(business_id) WHERE business_id IS NOT NULL;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610290100_background_work.sql",
+      "sha256": "56a1a3732b7bb421996275ae849bbd6506292b7f00b23ea1129826762117d988",
+      "sql": "-- A private snapshot and bounded output checkpoints survive a process restart.\nCREATE TABLE pl_background_work(\n id TEXT PRIMARY KEY,\n version INTEGER NOT NULL,\n state TEXT NOT NULL CHECK(state IN ('paused','complete','failed','cancelled')),\n owner_id TEXT NOT NULL,\n format TEXT NOT NULL CHECK(format IN ('csv','xlsx')),\n created_at TEXT NOT NULL,\n data TEXT NOT NULL CHECK(json_valid(data)),\n progress INTEGER NOT NULL DEFAULT 0,\n total INTEGER NOT NULL,\n error TEXT,\n checksum TEXT\n);\nCREATE TABLE pl_background_sources(\n task_id TEXT NOT NULL REFERENCES pl_background_work(id) ON DELETE CASCADE,\n record_scope TEXT NOT NULL,\n record_id TEXT NOT NULL,\n job_id TEXT,\n PRIMARY KEY(task_id,record_id)\n);\nCREATE TABLE pl_background_chunks(\n task_id TEXT NOT NULL REFERENCES pl_background_work(id) ON DELETE CASCADE,\n sequence INTEGER NOT NULL,\n source TEXT NOT NULL CHECK(json_valid(source)),\n output TEXT,\n PRIMARY KEY(task_id,sequence)\n);\n-- Deliberately excluded from archives: restored tasks have no execution authority.\nCREATE TABLE pl_background_reviews(task_id TEXT PRIMARY KEY REFERENCES pl_background_work(id) ON DELETE CASCADE, owner_id TEXT NOT NULL, digest TEXT NOT NULL);\nCREATE TRIGGER pl_background_job_erasure BEFORE DELETE ON pl_jobs BEGIN\n DELETE FROM pl_background_work WHERE id IN (SELECT task_id FROM pl_background_sources WHERE job_id=OLD.id);\nEND;\nCREATE TRIGGER pl_background_customer_erasure BEFORE DELETE ON pl_customers BEGIN\n DELETE FROM pl_background_work WHERE id IN (SELECT task_id FROM pl_background_sources WHERE record_scope='customer' AND record_id=OLD.id);\nEND;\nCREATE TRIGGER pl_background_vendor_erasure BEFORE DELETE ON pl_vendors BEGIN\n DELETE FROM pl_background_work WHERE id IN (SELECT task_id FROM pl_background_sources WHERE record_scope='vendor' AND record_id=OLD.id);\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -309,7 +315,6 @@
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
     "MAIL_ACCOUNT_ID": "",
-    "OWNER_EMAIL": "",
     "IDENTITY_PROVIDER": ""
   },
   "secretNames": [
