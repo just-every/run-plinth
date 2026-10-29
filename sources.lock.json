@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "a86da6b4faf51af9a562da164dc335eb305dcb91a7188fc538e71d2f9348834c",
+      "sha256": "f70e2a1d67972ee81b273dc20344ec9c41072aeb76f1dda2736b44c3e91c68ff",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "699e9626bac14db9d65457d1fc5aa7b35390d65b09e389967f244f3b36d0d5b0",
+      "sha256": "d45ccbc0f22648a6dfc1741974fc6b4f2885118d6d2aa80eac52d651ed960ae4",
       "executable": false
     },
     "DEMO.md": {
@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
-      "sha256": "270a973d05be5917c553112f10782d7efa2736f622effd88ed31b0adaf4fbbc0",
+      "sha256": "f33baa3f71b739d2058ee083321a311f95201e454e875bc1b037dafed2362d99",
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
@@ -169,7 +169,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "302dfcea8001d48e7c492a73ab7f5f263dd3129d7ff0e33858740438d9a7f856",
+      "sha256": "a0f6ca8dd98d1f486904ecc37ab7b120de02e88927b41bfc0cca971d426fdb6c",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -289,7 +289,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "8a16b71c4be9d7579006b1132cb307dac32989c504a2fef5f75a21deeefcdb04",
+      "sha256": "59154f1c871e6380faebb9452f682ea3c3703998d46caddf1e6414418d30b46c",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -490,6 +490,10 @@
     },
     "migrations/core/202610291000_agent_forecast_reviews.sql": {
       "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
+      "executable": false
+    },
+    "migrations/core/202610291100_agent_forecast_custody.sql": {
+      "sha256": "7c18e28b28f8b2944e36aefd5b2ee472c2f4ade96495e06fa8408cde4e65f8fe",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3201,7 +3205,7 @@
       "executable": false
     },
     "src/plinth/agent-door/index.ts": {
-      "sha256": "dddb30e630b60f042accea40a61189bbed9165d3583f46702ff4c91b1f9a8bab",
+      "sha256": "df70455a9c51fe2a025c0223eaf3154a5b8e4c9dd6e799d7850d4eede82318ed",
       "executable": false
     },
     "src/plinth/agent-door/native.ts": {
@@ -3217,7 +3221,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "ea8dfca7e6623d9a6020e9c5a78071a63f2d7cae30fef9d66a1489d49d3945bc",
+      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
       "executable": false
     },
     "src/plinth/allowance-changes.ts": {
@@ -5325,7 +5329,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "2ed8c0d5c0051b7996f2838f63e88add1d325d2d13a8c9c173f173d876ae8e85",
+      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {
