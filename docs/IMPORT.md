@@ -266,7 +266,10 @@ history twice. Customer collections are recorded historical facts; they are not
 new executable receipts or evidence of provider settlement. No funds move.
 
 Both originals, source-cell provenance, the current cost ledger and the historical
-SOV sources remain downloadable. Replay adds no second balance or application.
+SOV sources remain downloadable. The opening comparison CSV contains each native
+line and code with exact signed cents, as-of date, posting period and both original
+checksums. Its columns let the owner independently reconcile actual, paid, retained
+and billed balances against the supplied records. Replay adds no second balance or application.
 Undo reverses an untouched opening; later native work is preserved. A job hold
 blocks destructive undo, and erasure withdraws the source and ledger custody and
 fences replay. Accounting connector grants and professional verification remain

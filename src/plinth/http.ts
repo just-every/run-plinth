@@ -1,3 +1,4 @@
+import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
 import { followupResponse } from './followup-rules'
@@ -167,6 +168,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts[2]==='room-boards'&&method==='GET'){
   requireOwner(actor)
   if(parts.length===3)return json({version:previous.version,boards:previous.room_boards??[]})
+  if(parts.length===7&&parts[4]==='revisions'&&parts[6]==='export')return roomBoardExport(env.DB,previous,actor,parts[3]!,parts[5]!)
   if((parts.length===5||parts.length===6)&&parts[3]==='files'&&(!parts[5]||parts[5]==='geometry'))return roomBoardFile(env.DB,previous,actor,parts[4]!,parts[5]==='geometry',new URL(request.url).searchParams.get('download')==='1')
   return json({error:'not_found'},404)
  }

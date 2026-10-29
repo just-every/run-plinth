@@ -1,7 +1,9 @@
+import { ifcGeometry } from './room-ifc'
 /** Bounded static geometry only. Originals remain downloadable when a feature is unsupported. */
 export interface RoomGeometry { vertices:number[][]; triangles:number[][]; unsupported:string[]; error?:string }
 const ceiling=12000
-export function roomGeometry(bytes:Uint8Array,format:'glb'|'obj'):RoomGeometry {
+export function roomGeometry(bytes:Uint8Array,format:'glb'|'obj'|'ifc'):RoomGeometry {
+ if(format==='ifc')return ifcGeometry(bytes)
  const unsupported=new Set<string>(),vertices:number[][]=[],triangles:number[][]=[]
  const fail=(message:string):never=>{throw Error(message)}
  const vertex=(v:number[])=>{if(v.length!==3||v.some(n=>!Number.isFinite(n)||Math.abs(n)>1e9))fail('Invalid or unbounded position');if(vertices.length>=ceiling)fail('Geometry exceeds 12000 vertices');vertices.push(v)}

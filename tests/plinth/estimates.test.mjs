@@ -399,26 +399,50 @@ test('Room boards retain original geometry, finish revisions and exact signed so
    for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}])assert.ok([401,403].includes((await f.request(path,credentials)).status))
   }
   for(const format of ['glb','obj']){const model=first.files.find(f=>f.format===format),r=await f.json(root+'/room-boards/files/'+model.id+'/geometry',{cookie:f.owner});assert.equal(r.status,200);assert.equal(r.value.vertices.length,4);assert.deepEqual(r.value.triangles,[[0,1,2],[0,2,3]]);assert.deepEqual(r.value.vertices[1],format==='glb'?[6,0,0]:[4,0,0]);if(format==='obj')assert.ok(r.value.unsupported.some(s=>s.includes('materials')))}
-  const revision={title:'Kitchen finish revision',measurements:{...input.measurements,length:'4.5'},base_revision_id:first.id,annotations:[{file_id:file.id,page:1,x:25,y:50,text:'Matte oak finish retained from signed specification'}]}
-  assert.equal((await post(`/room-boards/${board.id}/revise`,revision)).status,200);const second=structuredClone(job.room_boards[0].revisions[1]),before=structuredClone(job)
+  const mesh=first.files.find(f=>f.name==='synthetic-plinth-room.ifc'),extrusion=first.files.find(f=>f.name==='synthetic-plinth-extrusion.ifc')
+  const meshView=await f.json(root+'/room-boards/files/'+mesh.id+'/geometry',{cookie:f.owner});assert.equal(meshView.status,200);assert.deepEqual(meshView.value.vertices,[[2,0,-1],[6,0,-1],[6,0,-4],[2,0,-4]]);assert.deepEqual(meshView.value.triangles,[[0,1,2],[0,2,3]])
+  const solidView=await f.json(root+'/room-boards/files/'+extrusion.id+'/geometry',{cookie:f.owner});assert.equal(solidView.status,200);assert.equal(solidView.value.vertices.length,8);assert.equal(solidView.value.triangles.length,12);assert.deepEqual(solidView.value.vertices[6],[4,2.7,-2.5]);assert.ok(solidView.value.unsupported.some(v=>v.includes('materials')))
+  const exportPath=root+`/room-boards/${board.id}/revisions/${first.id}/export`
+  const exportRoom=async()=>{const response=await f.request(exportPath,{cookie:f.owner});assert.equal(response.status,200);assert.match(response.headers.get('content-disposition'),/^attachment;/);const bytes=Buffer.from(await response.arrayBuffer());return (await import('jszip')).default.loadAsync(bytes)}
+  const packageOne=await exportRoom(),manifest=JSON.parse(await packageOne.file('board.json').async('string'))
+  assert.equal(manifest.revision.id,first.id);assert.deepEqual(manifest.revision.selections[0].value.signature,signed)
+  for(const original of roomFiles()){const entry=manifest.originals.find(o=>o.name===original.name);assert.deepEqual(await packageOne.file(entry.path).async('nodebuffer'),original.bytes)}
+  for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}])assert.ok([401,403].includes((await f.request(exportPath,credentials)).status))
+  assert.equal((await f.request(`/api/plinth/jobs/synthetic-plinth-missing/room-boards/${board.id}/revisions/${first.id}/export`,{cookie:f.owner})).status,404)
+  assert.equal((await post(`/room-boards/${board.id}/revise`,{...input,files:[],base_revision_id:first.id,walkthrough:{title:'Authorized room tour',url:'javascript:alert(1)',confirm_authorized:true}})).status,400)
+  assert.equal((await post(`/room-boards/${board.id}/revise`,{...input,files:[],base_revision_id:first.id,walkthrough:{title:'Authorized room tour',url:'https://example.com/synthetic-plinth-tour',confirm_authorized:false}})).status,400)
+  assert.equal((await post(`/room-boards/${board.id}/revise`,{...input,files:[],base_revision_id:first.id,walkthrough:{title:'Authorized room tour',url:'https://example.com/synthetic-plinth-tour',confirm_authorized:true}})).status,200)
+  const linked=structuredClone(job.room_boards[0].revisions.at(-1));assert.deepEqual(linked.walkthrough,{title:'Authorized room tour',url:'https://example.com/synthetic-plinth-tour'})
+  const revision={title:'Kitchen finish revision',measurements:{...input.measurements,length:'4.5'},base_revision_id:linked.id,annotations:[{file_id:file.id,page:1,x:25,y:50,text:'Matte oak finish retained from signed specification'}]}
+  assert.equal((await post(`/room-boards/${board.id}/revise`,revision)).status,200);const second=structuredClone(job.room_boards[0].revisions.at(-1)),before=structuredClone(job)
   for(const body of [{...revision,expected_version:job.version-1},{...revision,base_revision_id:first.id},{...revision,base_revision_id:second.id,products:[{product_id:'synthetic-plinth-unknown',revision_id:pr}]}])assert.ok([404,409].includes((await post(`/room-boards/${board.id}/revise`,body)).status))
   assert.deepEqual((await f.json(root,{cookie:f.owner})).value.job,before)
   const other=await createActiveJob(f,'Separate room job',email)
   assert.equal((await f.request(`/api/plinth/jobs/${other.id}/room-boards/files/${file.id}`,{cookie:f.owner})).status,404)
   const foreign=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),expected_version:other.version,products:input.products}});assert.equal(foreign.status,404)
   assert.equal((await post(`/products/${pid}/revise`,{...product,cost_quote_cents:18000})).status,200)
-  assert.deepEqual(job.room_boards[0].revisions[0],first);assert.deepEqual(job.room_boards[0].revisions[1],second);assert.equal(second.products[0].cost_quote_cents,12000)
+  assert.deepEqual(job.room_boards[0].revisions[0],first);assert.deepEqual(job.room_boards[0].revisions[1],linked);assert.deepEqual(job.room_boards[0].revisions[2],second);assert.deepEqual(second.walkthrough,linked.walkthrough);assert.equal(second.products[0].cost_quote_cents,12000)
   assert.deepEqual(job.selections[0].revisions[0].signature,signed);assert.deepEqual(job.quotes,accepted)
+  const packageLater=await exportRoom();assert.deepEqual(JSON.parse(await packageLater.file('board.json').async('string')).revision,first,'A later design and price revision cannot change an exported earlier selection')
+  const neutralFiles=[]
+  for(const model of manifest.models){for(const path of model.exports){neutralFiles.push({name:'synthetic-plinth-neutral-'+neutralFiles.length+'.'+path.split('.').at(-1),base64:await packageOne.file(path).async('base64'),original_id:model.original_id,format:path.split('.').at(-1)})}}
+  // Reopen emitted neutral artifacts through the public import and viewing doors, not the serializer.
+  const exportedMesh=neutralFiles.filter(f=>f.original_id===mesh.id)
+  const restored=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),expected_version:other.version,files:exportedMesh}});assert.equal(restored.status,200)
+  for(const entry of restored.value.record.revisions[0].files){const geometry=await f.json(`/api/plinth/jobs/${other.id}/room-boards/files/${entry.id}/geometry`,{cookie:f.owner});assert.equal(geometry.status,200);assert.deepEqual(geometry.value.vertices,meshView.value.vertices);assert.deepEqual(geometry.value.triangles,meshView.value.triangles)}
+  const unsupportedBytes=(await import('../fixtures/room-board.mjs')).roomIfc('unsupported'),unsupported=await post('/room-boards',{...roomInput(),files:[{name:'synthetic-plinth-unsupported.ifc',base64:unsupportedBytes.toString('base64')}]});assert.equal(unsupported.status,200)
+  const unsupportedFile=unsupported.value.record.revisions[0].files[0],unsupportedView=await f.json(root+'/room-boards/files/'+unsupportedFile.id+'/geometry',{cookie:f.owner});assert.match(unsupportedView.value.error,/Unsupported IFC body: IFCBOOLEANRESULT/);assert.deepEqual(unsupportedView.value.vertices,[]);assert.deepEqual(Buffer.from(await (await f.request(root+'/room-boards/files/'+unsupportedFile.id,{cookie:f.owner})).arrayBuffer()),unsupportedBytes)
   for(const cookie of [client,admin]){assert.equal((await f.json(root,{cookie})).value.job.room_boards,undefined);assert.equal((await f.request(root+'/room-boards',{cookie})).status,403)}
   const download=await f.request(root+'/room-boards/files/'+file.id,{cookie:f.owner});assert.deepEqual(Buffer.from(await download.arrayBuffer()),roomFiles()[0].bytes)
   const erase=await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(erase.status,200)
   assert.equal((await f.request(root+'/room-boards/files/'+file.id,{cookie:f.owner})).status,404)
+  assert.equal((await f.request(exportPath,{cookie:f.owner})).status,404)
   assert.equal((await f.json(root+'/room-boards',{method:'POST',cookie:f.owner,body:{...input,expected_version:job.version}})).status,404)
   assert.equal((await f.db.prepare('SELECT count(*) n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
   const modelBytes=roomFiles().find(f=>f.name.endsWith('.obj')).bytes
   const large=Buffer.concat([modelBytes,Buffer.from('#'),Buffer.alloc(2_000_000-modelBytes.length-1,32)])
   const manyFiles=Array.from({length:8},(_,i)=>({name:`synthetic-plinth-${i}.obj`,base64:(i===0?large:modelBytes).toString('base64')}))
-  const otherBoard=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),files:manyFiles,expected_version:other.version}});assert.equal(otherBoard.status,200)
+  const otherBoard=await f.json(`/api/plinth/jobs/${other.id}/room-boards`,{method:'POST',cookie:f.owner,body:{...roomInput(),files:manyFiles,expected_version:restored.value.job.version}});assert.equal(otherBoard.status,200)
   const expanded=await f.json(`/api/plinth/jobs/${other.id}/room-boards/${otherBoard.value.record.id}/revise`,{method:'POST',cookie:f.owner,body:{...roomInput(),files:manyFiles.slice(1),expected_version:otherBoard.value.job.version,base_revision_id:otherBoard.value.record.revisions[0].id}});assert.equal(expanded.status,200)
   assert.equal(expanded.value.record.revisions.at(-1).files.length,15)
   const erasedMany=await f.json(`/api/plinth/jobs/${other.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:expanded.value.job.version}});assert.equal(erasedMany.status,200,'Exact byte guards permit erasure with many originals and a large model')

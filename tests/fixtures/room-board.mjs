@@ -10,5 +10,32 @@ export function roomGlb(){
  const header=Buffer.alloc(12),jh=Buffer.alloc(8),bh=Buffer.alloc(8);header.writeUInt32LE(0x46546c67);header.writeUInt32LE(2,4);header.writeUInt32LE(28+json.length+binary.length,8);jh.writeUInt32LE(json.length);jh.writeUInt32LE(0x4e4f534a,4);bh.writeUInt32LE(binary.length);bh.writeUInt32LE(0x004e4942,4)
  return Buffer.concat([header,jh,json,bh,binary])
 }
-export const roomFiles=()=>[{name:'synthetic-plinth-plan.pdf',bytes:takeoffPlan()},{name:'synthetic-plinth-finish.png',bytes:roomPng},{name:'synthetic-plinth-finish.jpg',bytes:roomJpeg},{name:'synthetic-plinth-room.glb',bytes:roomGlb()},{name:'synthetic-plinth-room.obj',bytes:roomObj}]
+export function roomIfc(kind='mesh'){
+ const body=kind==='mesh'?"#20=IFCCARTESIANPOINTLIST3D(((0.,0.,0.),(4000.,0.,0.),(4000.,3000.,0.),(0.,3000.,0.)));\n#21=IFCTRIANGULATEDFACESET(#20,$,.F.,((1,2,3),(1,3,4)),$);":kind==='extrusion'?"#20=IFCRECTANGLEPROFILEDEF(.AREA.,$,$,4000.,3000.);\n#22=IFCDIRECTION((0.,0.,1.));\n#21=IFCEXTRUDEDAREASOLID(#20,#2,#22,2700.);":"#21=IFCBOOLEANRESULT(.DIFFERENCE.,#2,#2);"
+ return Buffer.from(`ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Synthetic measured room'),'2;1');
+FILE_NAME('synthetic-plinth.ifc','2026-10-27T15:00:00',(),(),'Synthetic','Synthetic','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCAXIS2PLACEMENT3D(#1,$,$);
+#3=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,0.00001,#2,$);
+#4=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);
+#5=IFCUNITASSIGNMENT((#4));
+#6=IFCPROJECT('0000000000000000000001',$,'Synthetic room',$,$,$,$,(#3),#5);
+#7=IFCCARTESIANPOINT((2000.,1000.,0.));
+#8=IFCAXIS2PLACEMENT3D(#7,$,$);
+#9=IFCLOCALPLACEMENT($,#8);
+#10=IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,#3,$,.MODEL_VIEW.,$);
+${body}
+#23=IFCSHAPEREPRESENTATION(#10,'Body','Tessellation',(#21));
+#24=IFCPRODUCTDEFINITIONSHAPE($,$,(#23));
+#25=IFCBUILDINGELEMENTPROXY('0000000000000000000002',$,'Synthetic room',$,$,#9,#24,$,.NOTDEFINED.);
+ENDSEC;
+END-ISO-10303-21;
+`)
+}
+export const roomFiles=()=>[{name:'synthetic-plinth-plan.pdf',bytes:takeoffPlan()},{name:'synthetic-plinth-finish.png',bytes:roomPng},{name:'synthetic-plinth-finish.jpg',bytes:roomJpeg},{name:'synthetic-plinth-room.glb',bytes:roomGlb()},{name:'synthetic-plinth-room.obj',bytes:roomObj},{name:'synthetic-plinth-room.ifc',bytes:roomIfc()},{name:'synthetic-plinth-extrusion.ifc',bytes:roomIfc('extrusion')}]
 export const roomInput=()=>({title:'Kitchen finish board',measurements:{length:'4',width:'3',height:'2.7',unit:'m'},files:roomFiles().map(({name,bytes})=>({name,base64:bytes.toString('base64')}))})
