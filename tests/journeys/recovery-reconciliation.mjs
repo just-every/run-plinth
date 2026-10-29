@@ -1,3 +1,4 @@
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import assert from 'node:assert/strict'
 import { mkdtemp, cp, symlink, rm, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -21,7 +22,7 @@ let f,worker,browser
 try{
  await mkdir(shots,{recursive:true});await checkout(source);await checkout(destination)
  execFileSync(process.execPath,[join(root,'node_modules/wrangler/bin/wrangler.js'),'d1','migrations','apply','DB','--local','--persist-to',join(source,'.wrangler/state'),'--config',join(source,'wrangler.jsonc')],{env:commandEnv,stdio:'pipe'})
- f=await createFixture({persistTo:source});const c=await costFixture(f)
+ f=await createFixture({persistTo:source});await reusedAssemblyEstimate(f);const c=await costFixture(f)
  let r=await c.ok('/costs/bills',c.bill());await c.ok(`/costs/bills/${r.record.id}/review`,{reason:'Reviewed source and receipt discrepancy'});await c.ok(`/costs/bills/${r.record.id}/post`)
  const invoice=await c.ok('/invoices',{kind:'deposit',description:'Synthetic recovery deposit',recipient_email:['synthetic-plinth-client','example.com'].join('@'),amount_cents:10000,due_on:'2026-11-01',terms:'Reviewed recovery terms'})
  await c.ok(`/invoices/${invoice.record.id}/issue`)

@@ -1,4 +1,5 @@
 import { questionFixture } from './agent-answers-support.mjs'
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import { submittalFixture } from './submittal-support.mjs'
 import {proveConnectorRecovery} from './connector-recovery-support.mjs'
@@ -234,6 +235,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archivedRoom=structuredClone(job.room_boards[0])
     const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),recoveryArchive=await recoveryEvidenceFixture(f)
     await recoveryArchive.assess();const archivedRecovery=structuredClone(recoveryArchive.recovery)
+    await reusedAssemblyEstimate(f)
     const archivedExport=await archiveExportWork(f,job)
     const archivedQuestion=await questionFixture(f)
     const retainedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/answers',{packet_digest:archivedQuestion.packet.digest,analysis:archivedQuestion.analysis})

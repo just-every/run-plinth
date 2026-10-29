@@ -3841,7 +3841,7 @@
       "executable": false
     },
     "src/plinth/recovery-inventory.ts": {
-      "sha256": "b655256946a5b2d156dc03410512dc7ec3d194ef419ca9b0bb6d4e552a6ed14c",
+      "sha256": "dfc5289d64f3bdae964bf56f130abacb84cdc7082298435e6088b27b781da725",
       "executable": false
     },
     "src/plinth/refund-posting.ts": {
@@ -5136,6 +5136,10 @@
       "sha256": "0f182ff06c772afb8588894695abdbc82d2ca3174b29243aff627b2eb00461a6",
       "executable": false
     },
+    "tests/fixtures/recovery-catalog.mjs": {
+      "sha256": "8656a97dc8bd8186adf049f71f32d869cbfb1558540e28ca7b6148ed931dec36",
+      "executable": false
+    },
     "tests/fixtures/room-board.mjs": {
       "sha256": "4678943f3329fc6a1f085c868f136f9de040f6b99002b2c45d2c6edd641e3e3d",
       "executable": false
@@ -5305,7 +5309,7 @@
       "executable": false
     },
     "tests/journeys/recovery-reconciliation.mjs": {
-      "sha256": "b1368e4e5d9eccb3b14c36185d8ca9c8bc34a6a5d4d5130d61e4899e141e9803",
+      "sha256": "438a3fdae142038048ff247e49a04097139c772620630e25cb0379e3a1acc02b",
       "executable": false
     },
     "tests/journeys/report-packets.mjs": {
@@ -5445,7 +5449,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "e33539336ee59e3d52a9a0330f266319dd48b36004239f222f3a3d45365f0ce8",
+      "sha256": "e59c655a988f1fb5f83f1a0e104c638229c314f0e7abec23e6eb4e5016d63a86",
       "executable": false
     },
     "tests/plinth/drawing-review-support.mjs": {
@@ -5489,7 +5493,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "13ed87b42bfa21d13c8455f35ddaa3e7f21471b054d1c1ef2281303c637f1547",
+      "sha256": "ec7b88a78f85a068ec760436aa2b471301078160e9a32741e32f336e5b1f40da",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
