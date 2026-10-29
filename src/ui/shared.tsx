@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import type { Job } from '../plinth/model'
 
 export async function api(path: string, body?: unknown, method = 'POST') {
@@ -73,7 +74,8 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
     let saved = false
     try { await action(data); if (reset) form.reset(); setMessage('Saved.'); setCompleted(((performance.now() - start) / 1000).toFixed(1)); saved = true }
     catch (e) { setInvalid(e instanceof FieldError && e.field ? [e.field] : []); setError(e instanceof Error ? e.message : 'Could not save.'); }
-    finally { setBusy(false); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
+    // A frame can run before React commits: enable the controls before restoring focus.
+    finally { flushSync(() => setBusy(false)); if (saved) requestAnimationFrame(() => { const target = focused?.isConnected ? focused : fallback; if (target?.isConnected) { if (!target.matches('input,select,textarea,button,summary')) target.tabIndex = -1; target.focus() } }) }
   }
   return <form ref={formRef} onSubmit={send} noValidate aria-label={submit} aria-describedby={error ? id : undefined}><fieldset disabled={busy} aria-busy={busy}>{children}<button type="submit">{busy ? 'Saving…' : submit}</button></fieldset>{(busy || message) && <p role="status" aria-live="polite">{busy ? <>Saving… <span aria-hidden="true">{elapsed.toFixed(1)} seconds elapsed. </span>Keep this page open.</> : message}</p>}{message && <p role="timer" aria-label="Request duration">Completed in {completed} seconds.</p>}{error && <p id={id} ref={errorRef} tabIndex={-1} role="alert" className="error">{error}</p>}{error && <p className="hint">Your entries are still here. Review them and try again.</p>}</form>
 }

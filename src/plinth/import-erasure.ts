@@ -10,6 +10,9 @@ import { heldSql, requireNoHold } from './holds.ts'
 export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
   requireOwner(actor)
   await requireNoHold(db, actor, 'job', job.id)
+  // A shared analysis is also evidence of its other selected jobs.
+  const linked = (await db.prepare('SELECT DISTINCT job_id FROM pl_learning_sources WHERE packet_id IN (SELECT packet_id FROM pl_learning_sources WHERE job_id=?)').bind(job.id).all<{job_id:string}>()).results
+  for (const source of linked) if (source.job_id !== job.id) await requireNoHold(db, actor, 'job', source.job_id)
   const row = await db.prepare('SELECT data,version FROM pl_jobs WHERE id=?').bind(job.id).first<{ data: string; version: number }>()
   need(row && row.version === job.version && canonicalJson(JSON.parse(row.data)) === canonicalJson(job), 'Job changed. Reload before erasing.', 409, 'conflict')
   const current = actorPredicate(actor), held = heldSql('job', job.id), audit = auditSql(actor, { kind: 'erasure', action: 'jobs.erase', subject_kind: 'job', subject_id: job.id, job_id: job.id, version_before: job.version, before_ref: await jobRef(row.data), detail: { erased: ['job record', 'photos and documents', 'correspondence and its files', 'import custody'] } })
