@@ -112,7 +112,7 @@ function display(job:Job,actor:Actor):any {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
- if(actor.role!=='owner'){job={...job,room_boards:undefined};delete job.followup}
+ if(actor.role!=='owner'){job={...job,room_boards:undefined};delete job.followup;delete job.import_evidence}
  job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('plans.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)

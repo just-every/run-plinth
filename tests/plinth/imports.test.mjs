@@ -1,6 +1,9 @@
+import {proveOpeningImport} from './opening-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import {legacyWorkbook} from '../fixtures/workbook-xls.mjs'
+import { workbookInput, estimateWorkbook, catalogInput, costInput, billInput } from '../fixtures/workbook-estimate.mjs'
 import { createFixture } from './helpers.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
@@ -101,4 +104,123 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       assert.ok(!(await nativeJobs()).some(job => job.id === target.id))
     })
   } finally { await f.close() }
+})
+
+
+test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fence unsafe adoption through HTTP', async () => {
+ const f=await createFixture(),input=await workbookInput()
+ const call=(suffix,body,credentials={cookie:f.owner})=>f.json(prefix+suffix,{method:'POST',...credentials,body})
+ const jobs=async()=>(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs
+ try {
+  const inspect=await call('/workbook/inspect',input);assert.equal(inspect.status,200,JSON.stringify(inspect.value));assert.deepEqual(inspect.value.sheets.map(s=>s.name),['Estimate','Notes'])
+  const client=await f.invite(input.client_email),agent=await f.agent(),admin=await f.invite(['workbook-office','dev.localhost'].join('@'),'Workbook office','admin')
+  for(const credentials of [{cookie:client},{cookie:admin},{token:agent},{}])assert.ok([401,403].includes((await call('/workbook/preview',input,credentials)).status))
+  let rejected=await call('/workbook/preview',{...input,mapping:{...input.mapping,reviewed_formulas:false,excluded_rows:{}}})
+  assert.equal(rejected.status,200,JSON.stringify(rejected.value));assert.equal(rejected.value.canAdopt,false)
+  assert.ok(rejected.value.draft.diagnostics.some(d=>d.code==='formula_review'&&d.cell==='F3'))
+  assert.ok(rejected.value.draft.diagnostics.some(d=>d.row===5&&d.message.includes('invalid cost code')))
+  assert.equal((await call('/workbook/commit',{...input,mapping:{...input.mapping,reviewed_formulas:false,excluded_rows:{}},fingerprint:rejected.value.fingerprint})).status,409)
+  for(const options of [{missingCache:true},{unsupported:true},{macro:true}]){
+   const broken={...input,...await estimateWorkbook(options)},review=await call('/workbook/preview',broken)
+   assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,false)
+   assert.equal((await call('/workbook/commit',{...broken,fingerprint:review.value.fingerprint})).status,409)
+  }
+  for(const options of [{missingCache:true},{unsupported:true},{macro:true}]){
+   const broken={...input,...legacyWorkbook(options)},review=await call('/workbook/preview',broken)
+   assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,false)
+   assert.equal((await call('/workbook/commit',{...broken,fingerprint:review.value.fingerprint})).status,409)
+  }
+  for(const options of [{},{continued:true}]){
+   const legacy={...input,...legacyWorkbook(options)},review=await call('/workbook/preview',legacy)
+   assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
+   assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
+   assert.equal(review.value.draft.provenance[1].cells.quantity.formula,'(5/4)')
+   assert.equal(review.value.draft.provenance[1].cells.quantity.address,'F3')
+   const approved={...legacy,fingerprint:review.value.fingerprint},adopted=await call('/workbook/commit',approved);assert.equal(adopted.status,200,JSON.stringify(adopted.value));const imported=(await jobs())[0];assert.equal(imported.quotes[0].status,'draft');assert.equal(imported.quotes[0].total_cents,669);assert.equal(imported.quotes[0].cost_total_cents,449)
+   assert.equal((await call('/workbook/commit',approved)).value.job.id,adopted.value.job.id);assert.equal((await jobs()).length,1)
+   const original=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(original.status,200);assert.equal(original.value.originals[0].original.base64,legacy.base64)
+   assert.equal((await call(`/${adopted.value.job.id}/undo`)).status,200);assert.deepEqual(await jobs(),[])
+  }
+  assert.deepEqual(await jobs(),[])
+  const review=await call('/workbook/preview',input);assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
+  assert.equal(review.value.draft.source_totals.total_cents,1422);assert.equal(review.value.draft.source_totals.cost_total_cents,947);assert.deepEqual(review.value.draft.source_totals.rows.map(r=>r.disposition),['included','included','duplicate','excluded']);assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
+  assert.equal(review.value.draft.provenance[1].cells.quantity.address,'F3');assert.equal(review.value.draft.provenance[1].cells.quantity.formula,'5/4')
+  assert.equal((await call('/workbook/commit',{...input,mapping:{...input.mapping,currency:'AUD'},fingerprint:review.value.fingerprint})).status,409)
+  const adopted=await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint});assert.equal(adopted.status,200,JSON.stringify(adopted.value));assert.equal(adopted.value.job.state,'completed')
+  const imported=(await jobs())[0],quote=imported.quotes[0]
+  for(const cookie of [client,admin]){assert.equal((await f.request('/api/plinth/jobs/'+imported.id,{cookie})).status,404);assert.deepEqual((await f.json('/api/plinth/jobs',{cookie})).value.jobs,[])}
+  for(const scope of ['job','financial']){
+   const visible=await f.json('/api/plinth/reports/records?record_scope='+scope,{cookie:f.owner});assert.equal(visible.status,200);assert.ok(visible.value.records.some(r=>r.job_id===imported.id))
+   const hidden=await f.json('/api/plinth/reports/records?record_scope='+scope,{cookie:admin});assert.equal(hidden.status,200);assert.deepEqual(hidden.value.records,[])
+  }
+  const hiddenPerformance=await f.json('/api/plinth/reports/performance',{cookie:admin});assert.equal(hiddenPerformance.status,200);assert.deepEqual(hiddenPerformance.value.jobs,[])
+  const hiddenBids=await f.json('/api/plinth/bids',{cookie:admin});assert.equal(hiddenBids.status,200);assert.deepEqual(hiddenBids.value.sources,[])
+  assert.equal((await f.request('/api/plinth/bid-comparisons/'+imported.id,{cookie:admin})).status,404)
+  assert.equal(imported.status,'quoting');assert.equal(quote.status,'draft');assert.equal(quote.lines.length,2);assert.equal(quote.lines[1].quantity,'1.25');assert.deepEqual(imported.approvals,[])
+  assert.equal((await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint})).value.job.id,adopted.value.job.id);assert.equal((await jobs()).length,1)
+  const changed={...input,title:'Different title'},changedPreview=await call('/workbook/preview',changed)
+  assert.equal((await call('/workbook/commit',{...changed,fingerprint:changedPreview.value.fingerprint})).status,409)
+  const originals=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(originals.status,200);assert.equal(originals.value.originals[0].original.base64,input.base64)
+  const report=await f.json(`/api/plinth/jobs/${imported.id}/quotes/${quote.id}/cost-codes.json`,{cookie:f.owner});assert.equal(report.status,200);assert.equal(report.value.total_cents,669);assert.equal(report.value.cost_total_cents,449)
+  assert.equal((await f.request(`/api/plinth/jobs/${imported.id}/quotes/${quote.id}/cost-codes.csv`,{cookie:f.owner})).status,200)
+  const accepted=await f.json(`/api/plinth/jobs/${imported.id}/quotes/${quote.id}/accept`,{method:'POST',cookie:f.owner,body:{expected_version:imported.version,method:'email',evidence:'Reviewed synthetic source agreement',schedule_choice:{kind:'none',reason:'Separate planning'}}});assert.equal(accepted.status,200)
+  const clientView=await f.json(`/api/plinth/jobs/${imported.id}`,{cookie:client});assert.equal(clientView.status,200);assert.equal(clientView.value.job.import_evidence,undefined);assert.equal(clientView.value.job.quotes[0].lines[0].cost_unit_cents,undefined)
+  assert.equal((await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint})).status,200)
+  const unchanged=(await jobs())[0];assert.deepEqual(unchanged.quotes,accepted.value.job.quotes);assert.deepEqual(unchanged.budgets,accepted.value.job.budgets)
+  const costSource=costInput(unchanged),costPreview=await call('/workbook/preview',costSource);assert.equal(costPreview.status,200,JSON.stringify(costPreview.value));assert.equal(costPreview.value.canAdopt,true);assert.equal(costPreview.value.draft.total_cents,17501)
+  const costsRoot=`/api/plinth/jobs/${imported.id}/costs`,costSources=async()=>(await f.json(costsRoot+'/sources',{cookie:f.owner})).value
+  assert.deepEqual((await costSources()).sources,[])
+  const costApproval={...costSource,reviewed_at:costPreview.value.reviewed_at,fingerprint:costPreview.value.fingerprint}
+  assert.equal((await call('/workbook/commit',{...costApproval,expected_version:costSource.expected_version+1})).status,409);assert.deepEqual((await costSources()).sources,[])
+  const costCommitted=await call('/workbook/commit',costApproval);assert.equal(costCommitted.status,200,JSON.stringify(costCommitted.value))
+  let importedSources=await costSources();assert.equal(importedSources.sources.length,2);assert.ok(importedSources.sources.every(s=>!s.approved_by));assert.deepEqual(importedSources.sources.map(s=>s.amount_cents),[12501,5000])
+  let actual=await f.json(costsRoot,{cookie:f.owner});assert.equal(actual.value.totals.posted_actual_cents,0)
+  const originalCost=await f.request(costsRoot+'/sources/'+importedSources.sources[1].id+'/original',{cookie:f.owner});assert.equal(originalCost.status,200);assert.equal(Buffer.from(await originalCost.arrayBuffer()).toString('base64'),costSource.base64)
+  assert.equal((await f.json(costsRoot+'/sources/'+importedSources.sources[0].id+'/approve',{method:'POST',cookie:f.owner,body:{expected_version:importedSources.version}})).status,403)
+  const reviewer=await f.invite(['cost-reviewer','dev.localhost'].join('@'),'Native cost reviewer','admin')
+  for(const row of importedSources.sources){const current=await costSources();const approved=await f.json(costsRoot+'/sources/'+row.id+'/approve',{method:'POST',cookie:reviewer,body:{expected_version:current.version}});assert.equal(approved.status,200,JSON.stringify(approved.value))}
+  actual=await f.json(costsRoot,{cookie:f.owner});assert.equal(actual.value.totals.posted_actual_cents,17501)
+  assert.equal((await call('/workbook/commit',costApproval)).status,200);assert.equal((await costSources()).sources.length,2)
+  const retainedCosts=await call('/'+costCommitted.value.job.id+'/undo');assert.equal(retainedCosts.status,200,JSON.stringify(retainedCosts.value));assert.ok(retainedCosts.value.report.dispositions.some(d=>d.disposition==='retained'))
+  const undoSource=costInput((await jobs())[0],'synthetic-plinth-undo-costs'),undoReview=await call('/workbook/preview',undoSource);assert.equal(undoReview.status,200,JSON.stringify(undoReview.value))
+  const undoCommit=await call('/workbook/commit',{...undoSource,reviewed_at:undoReview.value.reviewed_at,fingerprint:undoReview.value.fingerprint});assert.equal(undoCommit.status,200,JSON.stringify(undoCommit.value));assert.equal((await costSources()).sources.length,4)
+  const held=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:imported.id,kind:'legal_hold',reason:'Preserve imported original evidence',confirm:true}});assert.equal(held.status,201)
+  assert.equal((await call('/'+undoCommit.value.job.id+'/undo')).status,409);assert.equal((await costSources()).sources.length,4)
+  const released=await f.json('/api/plinth/holds/'+held.value.hold.id+'/release',{method:'POST',cookie:f.owner,body:{reason:'Owner released reviewed import hold'}});assert.equal(released.status,200)
+  const removedDrafts=await call('/'+undoCommit.value.job.id+'/undo');assert.equal(removedDrafts.status,200,JSON.stringify(removedDrafts.value));assert.ok(removedDrafts.value.report.dispositions.some(d=>d.disposition==='reversed'));assert.equal((await costSources()).sources.length,2);assert.equal((await f.json(costsRoot,{cookie:f.owner})).value.totals.posted_actual_cents,17501)
+  const billSource=billInput((await jobs())[0]),billPreview=await call('/workbook/preview',billSource);assert.equal(billPreview.status,200,JSON.stringify(billPreview.value));assert.equal(billPreview.value.canAdopt,true);assert.equal(billPreview.value.draft.source_totals.total_cents,2968);assert.equal(billPreview.value.draft.total_cents,1357)
+  const billRejected=await call('/workbook/preview',{...billSource,mapping:{...billSource.mapping,excluded_rows:{},reviewed_tax:false}});assert.equal(billRejected.status,200);assert.equal(billRejected.value.canAdopt,false)
+  const billApproval={...billSource,reviewed_at:billPreview.value.reviewed_at,fingerprint:billPreview.value.fingerprint},billCommitted=await call('/workbook/commit',billApproval);assert.equal(billCommitted.status,200,JSON.stringify(billCommitted.value))
+  let nativeBills=(await f.json(costsRoot+'/bills',{cookie:f.owner})).value;assert.equal(nativeBills.bills.length,1);let nativeBill=nativeBills.bills[0];assert.equal(nativeBill.status,'draft');assert.equal(nativeBill.amount_cents,1357);assert.equal(nativeBill.lines[0].tax_cents,123)
+  assert.equal((await call('/workbook/commit',billApproval)).status,200);assert.equal((await f.json(costsRoot+'/bills',{cookie:f.owner})).value.bills.length,1)
+  const other=await call('/workbook/preview',billInput((await jobs())[0],'synthetic-plinth-bills-duplicate'));assert.equal(other.status,200);assert.equal(other.value.canAdopt,false);assert.ok(other.value.draft.diagnostics.some(d=>d.message.includes('already exists')))
+  const billAct=async(action,body={},cookie=f.owner)=>{const current=await costSources();return f.json(costsRoot+'/bills/'+nativeBill.id+'/'+action,{method:'POST',cookie,body:{expected_version:current.version,...body}})}
+  assert.equal((await billAct('post')).status,409,'Missing receipt review cannot be skipped by import')
+  assert.equal((await billAct('review',{reason:'Owner reviewed the uploaded source and missing-receipt discrepancy'})).status,200)
+  assert.equal((await billAct('post')).status,403,'Imported bill preparation cannot self-approve')
+  const reviewerId=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.name==='Native cost reviewer').id
+  assert.equal((await billAct('route',{reviewer_id:reviewerId,reason:'Separate current office review'})).status,200)
+  const postedBill=await billAct('post',{},reviewer);assert.equal(postedBill.status,200,JSON.stringify(postedBill.value));assert.equal(postedBill.value.ledger.totals.posted_actual_cents,18858);assert.equal(postedBill.value.ledger.totals.payable_cents,1357)
+  const billOriginal=await f.request(costsRoot+'/bills/'+nativeBill.id+'/original',{cookie:f.owner});assert.equal(billOriginal.status,200);assert.equal(Buffer.from(await billOriginal.arrayBuffer()).toString('base64'),billSource.base64)
+  const currentJob=(await jobs())[0];assert.deepEqual(currentJob.quotes,accepted.value.job.quotes);assert.deepEqual(currentJob.budgets,accepted.value.job.budgets)
+  const erased=await f.json(`/api/plinth/jobs/${imported.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:currentJob.version}});assert.equal(erased.status,200)
+  const custody=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(custody.value.originals[0].original.status,'unavailable');const costCustody=await f.json(`${prefix}/${costCommitted.value.job.id}/originals`,{cookie:f.owner});assert.equal(costCustody.status,200);assert.equal(costCustody.value.originals[0].original.status,'unavailable')
+  await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint});assert.equal((await jobs()).length,0)
+  // Catalog adoption uses the same owner-reviewed custody and never creates a job or changes an accepted rate.
+  const catalog=async()=>{const r=await f.json('/api/plinth/estimate-catalog',{cookie:f.owner});assert.equal(r.status,200);return r.value.entries}
+  const importCatalog=async tag=>{const source=catalogInput(tag),preview=await call('/workbook/preview',source);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.canAdopt,true);const approved={...source,reviewed_at:preview.value.reviewed_at,fingerprint:preview.value.fingerprint};return {source,preview:preview.value,approved}}
+  const first=await importCatalog('synthetic-plinth-catalog-1');assert.deepEqual(await catalog(),[])
+  assert.equal((await call('/workbook/commit',{...first.approved,mapping:{...first.source.mapping,currency:'AUD'}})).status,400);assert.deepEqual(await catalog(),[])
+  const committed=await call('/workbook/commit',first.approved);assert.equal(committed.status,200,JSON.stringify(committed.value))
+  let rates=await catalog();assert.equal(rates.length,2);assert.deepEqual(rates.map(r=>r.revisions[0].value.sell_cents).sort((a,b)=>a-b),[101,333]);assert.ok(rates.every(r=>r.revisions[0].approved_by.role==='owner'&&r.revisions[0].import_evidence.artifact_sha256===first.preview.draft.artifact_sha256))
+  assert.equal((await call('/workbook/commit',first.approved)).value.job.id,committed.value.job.id);assert.equal((await catalog()).length,2);assert.equal((await jobs()).length,0)
+  const retained=await f.json(`${prefix}/${committed.value.job.id}/originals`,{cookie:f.owner});assert.equal(retained.value.originals[0].original.base64,first.source.base64)
+  assert.equal((await call(`/${committed.value.job.id}/undo`)).status,200);assert.deepEqual(await catalog(),[])
+  const second=await importCatalog('synthetic-plinth-catalog-2'),adoptedRates=await call('/workbook/commit',second.approved);assert.equal(adoptedRates.status,200,JSON.stringify(adoptedRates.value));rates=await catalog()
+  const frame=rates.find(r=>r.name==='Framing rate')
+  const assembly=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'assembly',name:'Native assembly uses imported rate',reason:'Owner reviewed future work',value:{unit:'ft',parts:[{id:'frame',rate_id:frame.id,description:'Framing',cost_code:'06-100',phase:'Structure',category:'labor',units_per_dimension:'1',productivity:'1',waste_percent:'0'}]}}});assert.equal(assembly.status,201,JSON.stringify(assembly.value))
+  const undone=await call(`/${adoptedRates.value.job.id}/undo`);assert.equal(undone.status,200,JSON.stringify(undone.value));assert.ok(undone.value.report.dispositions.some(d=>d.disposition==='retained'));assert.equal((await catalog()).length,3,'Native dependencies preserve the complete imported catalog group')
+
+  await proveOpeningImport(f)
+ }finally{await f.close()}
 })

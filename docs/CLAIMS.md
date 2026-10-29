@@ -123,7 +123,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | MOVE-005 | missing | No jobtread live-job migration workflow exists. |
 | MOVE-006 | missing | No ressio budget schedule and approvals migration workflow exists. |
 | MOVE-007 | missing | No autodesk archive and document-history migration workflow exists. |
-| MOVE-008 | partial | Only accepted-job CSV total imports exist; workbooks, coded lines and costs and financial opening balances do not. |
+| MOVE-008 | done |  |
 | MOVE-009 | partial | Journaled deduplication and undo and native-edit preservation ship; live delta cutover, shadow reconciliation and connector ownership do not. |
 | MOVE-010 | partial | Native archives carry ledger, original photos, import custody, costs, invoice corrections and write-offs, payment instructions and durable refund reservations, meetings, reviewed extracts, consent, correspondence and original files. Complete target-wide export and restoration, including future plan and external accounting entities and receiving-owner reconciliation, remain unproved; restored authority and pending sends remain inert. |
 | OPS-001 | partial | Remaining: complete office, field, client and subcontractor estimate-to-draw and field and selection journeys at both widths using a screen reader, populated schedule and SOV table and photo cases under slow connections, and full accessibility conformance. Existing office browser and accessibility-tree proof does not establish those outcomes. FIELD-002 retains its named br and owner design authorization hold and installed-screen obligations; CLIENT-006, CARE-002 and CARE-005 retain their design authorization holds and complete named journeys; FIELD-003 retains real native-device and offline qualification. |

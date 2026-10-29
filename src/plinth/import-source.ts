@@ -13,7 +13,7 @@ const invalid = (message: string): never => { throw new DomainError('invalid_csv
 
 /** RFC 4180 quoting, including embedded newlines and doubled quotes. No trimming
  * or reserialization of the retained original bytes. */
-function cells(csv: string): string[][] {
+export function csvCells(csv: string): string[][] {
   const rows: string[][] = [], row: string[] = []
   let field = '', quoted = false, closed = false
   const cell = () => { row.push(field); field = ''; closed = false }
@@ -39,7 +39,7 @@ export function acceptedJobsSource(csv: string): { source: SourceBundle; rows: A
   const bytes = Buffer.from(csv, 'utf8')
   if (bytes.length > IMPORT_LIMITS.bytes) invalid('CSV exceeds 256 KiB')
   if (csv.includes('\0') || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(csv)) invalid('CSV contains invalid text')
-  const table = cells(csv), header = table.shift()
+  const table = csvCells(csv), header = table.shift()
   const columns = header?.join(',') === CURRENCY_HEADER.join(',') ? CURRENCY_HEADER : IMPORT_HEADER
   if (!header || header.join(',') !== columns.join(',')) invalid(`Expected header: ${IMPORT_HEADER.join(',')} (optionally followed by ,currency)`)
   if (!table.length) invalid('CSV must contain at least one job')
