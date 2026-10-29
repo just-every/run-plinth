@@ -318,6 +318,12 @@
       "name": "202610292200_recovery_evidence_erasure.sql",
       "sha256": "4ea999c417b1d340fba18b838bb0517ea3bd2cd71666cf81d187c98f4c8f8886",
       "sql": "-- Recovery observations and comparisons must disappear with their source job,\n-- including replayed assessments of earlier reviewed packets.\nCREATE TRIGGER pl_recovery_evidence_payload_erased BEFORE DELETE ON pl_jobs BEGIN\n DELETE FROM agent_door_calls\n WHERE json_extract(outcome,'$.result.record.packet_id') IN (\n  SELECT json_extract(packet.value,'$.id')\n  FROM json_each(OLD.data,'$.recovery_evidence') AS recovery,\n       json_each(recovery.value,'$.packets') AS packet\n ) OR json_extract(outcome,'$.result.record.packet.id') IN (\n  SELECT json_extract(packet.value,'$.id')\n  FROM json_each(OLD.data,'$.recovery_evidence') AS recovery,\n       json_each(recovery.value,'$.packets') AS packet\n ) OR decision_id IN (\n  SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals\n  WHERE json_extract(saved,'$.tool') IN ('plinth.recovery.get','plinth.recovery.assess')\n   AND json_extract(saved,'$.args.job_id')=OLD.id\n );\n DELETE FROM agent_door_approvals\n WHERE json_extract(saved,'$.tool') IN ('plinth.recovery.get','plinth.recovery.assess')\n  AND json_extract(saved,'$.args.job_id')=OLD.id;\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610292201_agent_forecast_reviews.sql",
+      "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
+      "sql": "-- Reviewed forecast contents are portable history; execution authority is installation-local.\nCREATE TABLE pl_agent_forecast_reviews(\n request_id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n owner_id TEXT NOT NULL,\n digest TEXT NOT NULL\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
