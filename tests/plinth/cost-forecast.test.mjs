@@ -17,6 +17,21 @@ test('COST-004 — half-complete framing, worse productivity, posted costs and a
   const missing={...assumptions,codes:assumptions.codes.slice(0,1)};assert.equal((await c.act('/costs/forecasts',missing)).status,409)
   const pending=structuredClone(assumptions);pending.codes[0].pending_change_cents=1000;assert.equal((await c.act('/costs/forecasts',pending)).status,400)
   r=await c.ok('/costs/forecasts',{...pending,scenario:'pending'});assert.equal(r.record.final_cents,181000);assert.equal(r.record.revenue_cents,300000,'Pending scenario does not invent client-approved revenue')
+  const {reconciliationRequest,reviewReconciliation}=await import('./reconciliation-support.mjs')
+  const unposted=(await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-forecast-crew',employee_reference:'synthetic-plinth-private-crew',cost_code:'01-100',dated_on:'2026-10-23',period:'2026-10',minutes:120,hour_cents:3000,burden_bps:0})).record
+  const diagnostic=await reconciliationRequest(c);assert.equal(diagnostic.findings.find(f=>f.kind==='unposted_labor').amount_cents,6000)
+  await reviewReconciliation(c,diagnostic)
+  const proposal=(await c.ok(`/cost-reconciliation/${diagnostic.id}/propose`,{digest:diagnostic.digest})).record
+  const labor=proposal.findings.find(f=>f.kind==='unposted_labor')
+  await c.ok(`/cost-reconciliation/${diagnostic.id}/decide`,{digest:diagnostic.digest,proposal_id:proposal.id,finding_id:labor.id,decision:'accepted',reason:'Reviewer accepts candidate; native source approval remains separate'})
+  assert.equal((await c.ledger()).totals.posted_actual_cents,43000)
+  await c.ok(`/costs/sources/${unposted.id}/approve`)
+  assert.equal((await c.act(`/cost-reconciliation/${diagnostic.id}/propose`,{digest:diagnostic.digest})).status,409)
+  const afterCorrection=await c.ok('/costs/forecasts',assumptions);assert.equal(afterCorrection.record.final_cents,186000);assert.equal(afterCorrection.record.codes.find(r=>r.cost_code==='01-100').actual_cents,16000)
+  await c.ok('/sov',{});await c.read()
+  const draw=await c.ok('/claims',{description:'Native corrected crew draw',lines:c.job.sov.at(-1).lines.map(l=>({line_id:l.id,completed_cents:1000,stored_cents:0,evidence:'synthetic-plinth-corrected-work'}))})
+  assert.equal(draw.record.reconciliation.cost_ledger.totals.posted_actual_cents,49000,'Only approved native sources enter the next draw snapshot')
+  assert.equal((await c.api(`/jobs/${c.job.id}/costs/sources`)).value.sources.filter(s=>s.kind==='payroll').length,0,'Suggestion approval never executes payroll')
  }finally{await f.close()}
 })
 

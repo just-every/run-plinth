@@ -16,3 +16,18 @@ export async function nativeAgentPolicy(f){
  const result=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'native-drafts',class:'*',do:'autonomous'}],spend:{none:true}}}})
  assert.equal(result.status,200,JSON.stringify(result.value))
 }
+export async function archiveCostPacket(c){
+ await c.read()
+ const packet=await reconciliationRequest(c);await reviewReconciliation(c,packet)
+ const proposal=(await c.ok(`/cost-reconciliation/${packet.id}/propose`,{digest:packet.digest})).record
+ await c.ok(`/cost-reconciliation/${packet.id}/decide`,{digest:packet.digest,proposal_id:proposal.id,finding_id:proposal.findings[0].id,decision:'rejected',reason:'Owner retains the suggestion without taking its proposed action'})
+ return (await c.api(`/jobs/${c.job.id}/cost-reconciliation`)).value.packets.find(p=>p.id===packet.id)
+}
+export async function proveRestoredCostPacket(f,cookie,jobId,packet){
+ const root=`/api/plinth/jobs/${jobId}`,read=await f.json(root+'/cost-reconciliation',{cookie});assert.equal(read.status,200)
+ const restored=read.value.packets.find(p=>p.id===packet.id);assert.equal(restored.review_required,true,'Restored history supplies no standing agent consent');assert.deepEqual(restored.decisions,packet.decisions);assert.deepEqual(restored.proposals,packet.proposals)
+ const before=await f.json(root+'/costs',{cookie})
+ const attempt=await f.json(root+'/cost-reconciliation/'+packet.id+'/propose',{method:'POST',cookie,body:{expected_version:read.value.version,digest:packet.digest}});assert.equal(attempt.status,409)
+ assert.equal((await f.json(root+'/cost-reconciliation/'+packet.id+'/reviewed',{cookie})).status,409)
+ assert.deepEqual((await f.json(root+'/costs',{cookie})).value,before.value,'Restored packet cannot change native costs')
+}

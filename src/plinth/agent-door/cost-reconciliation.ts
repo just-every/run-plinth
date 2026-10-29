@@ -20,6 +20,6 @@ export function reconciliationTools(env:Bindings){
   async classify(args,ctx){return recordClasses(safe(await reviewed(args,ctx)))},
   revision(args,ctx){return nativeVersion(env,ctx.person,String(args.job_id))},
   async summary(args,ctx){const packet=await reviewed(args,ctx);return {target:{id:packet.id,name:'Owner-reviewed pre-draw diagnostic'},items:['Prepare suggestions from '+packet.findings.length+' selected findings','Packet digest '+packet.digest]}},
-  async run(args,ctx){await reviewed(args,ctx);const version=await nativeVersion(env,ctx.person,String(args.job_id)),value=await nativeCall(env,ctx.person,base(args)+'/'+encodeURIComponent(String(args.packet_id))+'/propose','POST',{digest:args.digest,expected_version:args.expected_version??version},ctx);return {result:{record:safe(value.record),version:value.version}}},
+  async run(args,ctx){await reviewed(args,ctx);const version=await nativeVersion(env,ctx.person,String(args.job_id)),value=await nativeCall(env,ctx.person,base(args)+'/'+encodeURIComponent(String(args.packet_id))+'/propose','POST',{digest:args.digest,expected_version:args.expected_version??version},ctx);const record=value.record as {id:string;digest:string;label:string;findings:unknown[]};return {result:{record:{id:record.id,packet_id:String(args.packet_id),digest:record.digest,label:record.label,finding_count:record.findings.length},version:value.version}}},
  })]
 }

@@ -94,19 +94,25 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   const c=await costFixture(f),ids=[]
   for(const reference of ['synthetic-plinth-reconcile-1','synthetic-plinth-reconcile-2'])ids.push((await c.ok('/costs/bills',c.bill(reference))).record.id)
   const source=(await c.ok('/costs/sources',{kind:'time',reference:'synthetic-plinth-unposted-crew-day',employee_reference:'synthetic-plinth-private-worker',cost_code:'01-100',dated_on:'2026-10-23',period:'2026-10',minutes:480,hour_cents:3000,burden_bps:2000})).record
+  await c.ok('/costs/bills',{...c.bill('synthetic-plinth-unmatched-3'),document:{...original,base64:Buffer.from('%PDF-1.4 synthetic-plinth-unmatched-3').toString('base64')},tax:{percent:'0',reference:'Reviewed zero rate',human_reviewed:true},lines:[{cost_code:'06-100',description:'Unmatched native original',subtotal_cents:7000,taxable:true,matches:[]}]})
+  const economics=structuredClone({orders:c.job.orders,budgets:c.job.budgets,quotes:c.job.quotes,claims:c.job.claims})
   const before=await c.ledger(),exceptions=(await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value,packet=await reconciliationRequest(c)
   const duplicate=packet.findings.find(f=>f.kind==='suspected_duplicate'),labor=packet.findings.find(f=>f.kind==='unposted_labor'),coding=packet.findings.filter(f=>f.kind==='coding'),receipts=packet.findings.filter(f=>f.kind==='unmatched_receipt')
   assert.equal(duplicate.amount_cents,43000);assert.deepEqual(duplicate.evidence.map(e=>e.id),ids);assert.equal(new Set(duplicate.evidence.map(e=>e.checksum)).size,1)
   assert.equal(labor.amount_cents,28800,'Eight hours at 3000 cents plus 20 percent burden is a candidate, never actual');assert.equal(labor.evidence[0].id,source.id)
   assert.equal(receipts.reduce((n,r)=>n+r.amount_cents,0),50000,'Draft duplicate matches never consume receipts');assert.deepEqual(receipts.flatMap(r=>r.evidence.filter(e=>e.kind==='receipt_quantity').map(e=>e.quantity)),['3','2'])
+  assert.equal(packet.findings.find(f=>f.kind==='unmatched_bill').amount_cents,7000);assert.ok(packet.findings.find(f=>f.kind==='unmatched_bill').uncertainty.includes('not attested'))
   assert.equal(coding.length,2);assert.ok(packet.uncertainties.some(s=>s.includes('overlap')))
   assert.ok(!JSON.stringify(packet).includes('synthetic-plinth-private-worker'));assert.ok(!JSON.stringify(packet).includes('hour_cents'))
   const token=await f.agent();await nativeAgentPolicy(f)
   const args={job_id:c.job.id,packet_id:packet.id,digest:packet.digest,idempotency_key:'synthetic-plinth-reconcile-request'}
   let response=await mcp(f,token,'plinth.costs.reconcile',args);assert.equal(response.value.result.isError,true,'Unreviewed native facts cannot be consumed')
   await reviewReconciliation(c,packet,[duplicate,labor])
-  response=await mcp(f,token,'plinth.costs.reconcile',args);assert.equal(response.value.result.isError,false,JSON.stringify(response.value));const proposed=response.value.result.structuredContent.record;await c.read()
+  response=await mcp(f,token,'plinth.costs.reconcile',args);assert.equal(response.value.result.isError,false,JSON.stringify(response.value));const receipt=response.value.result.structuredContent.record;await c.read()
+  assert.equal(receipt.finding_count,2);assert.equal(receipt.findings,undefined,'MCP caches a content-free receipt; private evidence remains at the signed-in owner door')
+  const proposed=(await c.api(`/jobs/${c.job.id}/cost-reconciliation`)).value.packets[0].proposals.find(p=>p.id===receipt.id)
   assert.deepEqual(proposed.findings.map(f=>f.kind),['suspected_duplicate','unposted_labor'],'Withheld coding and receipt findings never enter the adapter')
+  const noNoticeCount=f.messages.length
   const version=c.job.version,replay=await mcp(f,token,'plinth.costs.reconcile',args);assert.deepEqual(replay.value.result.structuredContent,response.value.result.structuredContent);await c.read();assert.equal(c.job.version,version,'Replay cannot append or post again')
   await c.ok(`/cost-reconciliation/${packet.id}/decide`,{digest:packet.digest,proposal_id:proposed.id,finding_id:duplicate.id,decision:'rejected',reason:'Identical scan was an intentional split; staff must retain both originals'})
   await c.ok(`/cost-reconciliation/${packet.id}/decide`,{digest:packet.digest,proposal_id:proposed.id,finding_id:labor.id,decision:'accepted',reason:'Valid time source needs independent human approval'})
@@ -115,6 +121,8 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   for(const [name,input] of [['plinth.costs.post',{bill_id:ids[0]}],['plinth.payments.send',{amount_cents:43000}]])assert.equal((await mcp(f,token,name,{job_id:c.job.id,...input,idempotency_key:name})).value.result?.isError??true,true)
   assert.equal((await c.act(`/costs/bills/${ids[0]}/post`,{},undefined,token)).status,403)
   assert.equal((await c.act(`/costs/sources/${source.id}/approve`,{},undefined,token)).status,403)
+  assert.equal(f.messages.length,noNoticeCount,'Diagnostic preparation and MCP replay send nothing')
+  assert.deepEqual({orders:c.job.orders,budgets:c.job.budgets,quotes:c.job.quotes,claims:c.job.claims},economics)
   const client=await f.invite(['synthetic-plinth-client','example.com'].join('@')),admin=await f.invite(['synthetic-plinth-reconcile-admin','example.com'].join('@'),'Office','admin')
   for(const credentials of [{cookie:client},{cookie:admin},{token},{}])assert.ok([401,403].includes((await f.request(`/api/plinth/jobs/${c.job.id}/cost-reconciliation`,credentials)).status))
   const other=(await c.api('/jobs',{name:'Other private job',client_email:['synthetic-plinth-other','example.com'].join('@'),address:'Other site'})).value.job
@@ -129,8 +137,14 @@ test('Owner pre-draw reconciliation cites duplicate originals and unposted labor
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',{...args,packet_id:fresh.id,digest:fresh.digest,idempotency_key:'synthetic-plinth-stale-source'})).value.result.isError,true)
   const regenerated=await reconciliationRequest(c);assert.equal(regenerated.findings.filter(f=>f.kind==='unposted_labor').length,0);assert.equal(regenerated.ledger.posted_actual_cents,28800)
   const credential=(await c.api('/agent-credentials')).value.credentials[0]
+  const billsBeforeErase=(await c.api(`/jobs/${c.job.id}/costs/bills`)).value.bills;assert.ok(billsBeforeErase.every(b=>b.status==='draft'))
+  for(const id of ids){const r=await f.request(`/api/plinth/jobs/${c.job.id}/costs/bills/${id}/original`,{cookie:f.owner});assert.deepEqual(Buffer.from(await r.arrayBuffer()),costOriginal)}
+  await reviewReconciliation(c,regenerated)
+  const eraseArgs={job_id:c.job.id,packet_id:regenerated.id,digest:regenerated.digest,idempotency_key:'synthetic-plinth-erased-packet'}
+  assert.equal((await mcp(f,token,'plinth.costs.reconcile',eraseArgs)).value.result.isError,false);await c.read()
+  assert.equal((await f.request(`/api/plinth/jobs/${c.job.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).status,200)
+  const erasedReplay=await mcp(f,token,'plinth.costs.reconcile',eraseArgs);assert.equal(erasedReplay.value.result.isError,true);assert.equal(erasedReplay.value.result.structuredContent,undefined,'Erasure fences cached evidence as well as another write')
   assert.equal((await c.api('/agent-credentials/'+credential.id+'/revoke',{})).status,200)
   assert.equal((await mcp(f,token,'plinth.costs.reconcile',args)).status,401,'Revoked credentials cannot replay a prior result')
-  const bills=(await c.api(`/jobs/${c.job.id}/costs/bills`)).value.bills;assert.ok(bills.every(b=>b.status==='draft'));for(const id of ids){const r=await f.request(`/api/plinth/jobs/${c.job.id}/costs/bills/${id}/original`,{cookie:f.owner});assert.deepEqual(Buffer.from(await r.arrayBuffer()),costOriginal)}
  }finally{await f.close()}
 })
