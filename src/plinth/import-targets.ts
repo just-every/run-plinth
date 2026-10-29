@@ -1,3 +1,5 @@
+import { costImportTargets } from './workbook-cost-target'
+import { catalogImportTargets } from './workbook-catalog'
 import { heldSql } from './holds.ts'
 import type { D1Database, D1Sql, D1TargetAdapter, Json, TargetRow } from '../modules/import-kit/src/d1/index.ts'
 
@@ -8,6 +10,8 @@ const value = (row: TargetRow) => row.value as unknown as NativeValue
 const attachmentColumns = ['id', 'job_id', 'entry_id', 'name', 'mime', 'checksum', 'size', 'bytes_hex'] as const
 function scope(destination: string, kind: string) { if (destination !== 'plinth-jobs' || kind !== 'construction-project') throw new Error('IMPORT_TARGET_SCOPE') }
 async function read(db: D1Database, destination: string, kind: string, id: string): Promise<TargetRow | undefined> {
+  if(kind==='cost-workbook')return costImportTargets.read(db,destination,kind,id)
+  if(kind==='catalog-group')return catalogImportTargets.read(db,destination,kind,id)
   scope(destination, kind)
   const row = await db.prepare('SELECT data,version,import_revision FROM pl_jobs WHERE id=?').bind(id).first<{ data: string; version: number; import_revision: string | null }>()
   if (!row) return undefined
@@ -15,6 +19,8 @@ async function read(db: D1Database, destination: string, kind: string, id: strin
   return { destination, targetKind: kind, targetId: id, revision: row.import_revision ?? '', value: { data: row.data, version: row.version, attachments: attachments as unknown as Json[] } }
 }
 function matches(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql {
+  if(kind==='cost-workbook')return costImportTargets.matches(row,destination,kind,id)
+  if(kind==='catalog-group')return catalogImportTargets.matches(row,destination,kind,id)
   scope(destination, kind)
   if (!row) return sql('NOT EXISTS(SELECT 1 FROM pl_jobs WHERE id=?) AND NOT EXISTS(SELECT 1 FROM pl_attachments WHERE job_id=?)', id, id)
   const current = value(row)
@@ -30,6 +36,8 @@ function matches(row: TargetRow | null, destination: string, kind: string, id: s
 /** Keep every exact byte and metadata predicate while fitting D1 statement limits.
  * The kit conjuncts all parts in the same transaction, including cardinality. */
 function matchesParts(row: TargetRow | null, destination: string, kind: string, id: string): D1Sql[] {
+  if(kind==='cost-workbook')return [costImportTargets.matches(row,destination,kind,id)]
+  if(kind==='catalog-group')return catalogImportTargets.matchesParts!(row,destination,kind,id)
   scope(destination, kind)
   if (!row) return [matches(row, destination, kind, id)]
   const current = value(row)
@@ -51,20 +59,22 @@ function matchesParts(row: TargetRow | null, destination: string, kind: string, 
 export const importTargets: D1TargetAdapter = {
   read, matches, matchesParts,
   write(row) {
+    if(row.targetKind==='cost-workbook')return costImportTargets.write(row)
+    if(row.targetKind==='catalog-group')return catalogImportTargets.write(row)
     scope(row.destination, row.targetKind)
     const next = value(row)
     if (next.attachments.length) throw new Error('IMPORT_CANNOT_WRITE_ATTACHMENTS')
     return [sql('INSERT INTO pl_jobs(id,version,data,import_revision) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,data=excluded.data,import_revision=excluded.import_revision', row.targetId, next.version, next.data, row.revision), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')]
   },
   /** A job under an owner hold is never retired by an import undo or rollback; the guard fails the whole batch. */
-  remove(destination, kind, id) { scope(destination, kind); const held = heldSql('job', id); return [sql(`INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT ${held.sql} THEN 1 ELSE 0 END`, ...held.params), sql('DELETE FROM pl_jobs WHERE id=?', id), sql('DELETE FROM pl_guard'), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')] },
+  remove(destination, kind, id) { if(kind==='cost-workbook')return costImportTargets.remove(destination,kind,id); if(kind==='catalog-group')return catalogImportTargets.remove(destination,kind,id); scope(destination, kind); const held = heldSql('job', id); return [sql(`INSERT INTO pl_guard(ok) SELECT CASE WHEN NOT ${held.sql} THEN 1 ELSE 0 END`, ...held.params), sql('DELETE FROM pl_jobs WHERE id=?', id), sql('DELETE FROM pl_guard'), sql('UPDATE pl_clock SET version=version+1 WHERE id=1')] },
   async list(db, destination) {
     const { results } = await db.prepare('SELECT id FROM pl_jobs WHERE import_revision IS NOT NULL ORDER BY id').all<{ id: string }>()
     const rows: TargetRow[] = []
     for (const { id } of results) rows.push((await read(db, destination, 'construction-project', id))!)
-    return rows
+    return [...rows,...await catalogImportTargets.list!(db,destination),...await costImportTargets.list!(db,destination)]
   },
-  matchesCount(count) { return sql('(SELECT count(*) FROM pl_jobs WHERE import_revision IS NOT NULL)=?', count) },
+  matchesCount(count) { return sql("(SELECT count(*) FROM pl_jobs WHERE import_revision IS NOT NULL)+(SELECT count(DISTINCT import_group) FROM pl_estimate_catalog WHERE import_group IS NOT NULL)+(SELECT count(*) FROM pl_jobs,json_each(pl_jobs.data,'$.cost_records.workbook_imports'))=?", count) },
   async preparePreservedUndo(db, destination, effects) {
     const observations = []
     const guards: D1Sql[] = []
@@ -72,7 +82,7 @@ export const importTargets: D1TargetAdapter = {
       const { targetKind: kind, targetId: id } = effect.provenance
       const current = await read(db, destination, kind, id) ?? null
       guards.push(...matchesParts(current, destination, kind, id))
-      observations.push({ effectId: effect.provenance.id, current, entity: { table: 'pl_jobs', recordId: id } })
+      observations.push({ effectId: effect.provenance.id, current, entity:{table:kind==='catalog-group'?'pl_estimate_catalog':'pl_jobs',recordId:kind==='cost-workbook'?id.split(':')[0]!:id} })
     }
     if (!guards.length) {
       const count = await db.prepare('SELECT count(*) AS n FROM pl_jobs WHERE import_revision IS NOT NULL').first<{ n: number }>()

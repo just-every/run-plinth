@@ -1,4 +1,4 @@
-import { requireRateAccess } from './auth'
+import { requireRateAccess, assignedJob } from './auth'
 import { wallClock } from './time-zone'
 import { auditStatement } from './audit'
 import { catalogValue, date } from './catalog-input'
@@ -22,7 +22,7 @@ function catalogAccess(actor:Actor){
  need(actor.role==='owner'||actor.role==='admin','Only catalog managers approve lesson revisions',403,'forbidden')
  if(actor.permissions)need(actor.permissions.matrix.estimates.edit&&actor.permissions.matrix.reports.approve,'Catalog editing and report approval are required',403,'forbidden')
 }
-const allowed=(actor:Actor,job:Job)=>!actor.team||(!actor.permissions&&actor.role!=='project_manager')||actor.team.job_ids.includes(job.id)
+const allowed=(actor:Actor,job:Job)=>assignedJob(actor,job)&&(!actor.team||(!actor.permissions&&actor.role!=='project_manager')||actor.team.job_ids.includes(job.id))
 async function entries(db:D1Database){return (await db.prepare('SELECT data FROM pl_estimate_catalog ORDER BY rowid').all<{data:string}>()).results.map(r=>JSON.parse(r.data) as CatalogEntry)}
 export function performanceJob(job:Job,catalog:CatalogEntry[]){
  const quote=job.quotes.find(q=>q.status==='accepted')??job.quotes.at(-1),source=quote?.cost_catalog

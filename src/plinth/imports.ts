@@ -1,3 +1,7 @@
+import {openingWorkbook} from './workbook-opening'
+import {costWorkbook,costWorkbookDigest} from './workbook-costs'
+import {jobOf,jobs} from './store'
+import {costs} from './cost-model'
 import type { Bindings } from '../auth.server'
 import {
   applyD1ImportBatches, createD1ImportJob, planD1Import, readD1ImportJob,
@@ -5,10 +9,11 @@ import {
   type D1ImportContext,
 } from '../modules/import-kit/src/d1/index.ts'
 import { authorize, requireOwner } from './auth.ts'
-import { DomainError, need } from './model.ts'
+import { DomainError, need, text } from './model.ts'
 import { acceptedJobsSource, IMPORT_LIMITS } from './import-source.ts'
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
+import { readWorkbook, workbookInspection, workbookSource } from './workbook-import.ts'
 import { auditStatement } from './audit.ts'
 
 const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
@@ -69,6 +74,32 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
     requireOwner(actor)
     const context = importContext(env.DB, actor)
     const route = path.slice('/api/plinth/imports'.length)
+    if (request.method === 'POST' && ['/workbook/inspect','/workbook/preview','/workbook/commit'].includes(route)) {
+      const input = await body(request), book = await readWorkbook(input)
+      if (route === '/workbook/inspect') return respond(workbookInspection(book))
+      const purpose=(input.mapping as {purpose?:string})?.purpose??'estimate'
+      if(['catalog','costs','opening'].includes(purpose)&&route==='/workbook/preview'&&input.reviewed_at===undefined)input.reviewed_at=new Date(Date.now()).toISOString()
+      const previous=['costs','opening'].includes(purpose)?await jobOf(env.DB,actor,text(input.job_id,'Destination job',100)):undefined
+      const receipt=previous?costs(previous).workbook_imports?.find(r=>r.id===previous.id+':'+book.hash):undefined
+      if(route==='/workbook/commit'&&receipt){
+        need(receipt.input_digest===costWorkbookDigest(input),'The cost file, ledger or mapping changed. Use its original journal.',409,'REVIEW_FINGERPRINT_MISMATCH')
+        const prior=await env.DB.prepare('SELECT id,fingerprint FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(context.destination,context.authorization.principalId,'workbook:'+book.hash).first<{id:string;fingerprint:string}>()
+        need(prior&&prior.fingerprint===input.fingerprint,'Approve the original preview before replay',409,'REVIEW_FINGERPRINT_MISMATCH')
+        return respond({job:await readD1ImportJob(prior.id,context)})
+      }
+      let prepared=purpose==='opening'?await openingWorkbook(book,input,previous!,actor):workbookSource(book,input)
+      if(prepared.draft.kind==='costs')prepared=await costWorkbook(prepared.source,prepared.draft,previous!,actor,input,await jobs(env.DB))
+      const {source,draft,canAdopt}=prepared
+      const plan = await planD1Import(source,acceptedJobsMapping(actor),context)
+      if (route === '/workbook/preview') return respond({draft,canAdopt,...(draft.reviewed_at?{reviewed_at:draft.reviewed_at}:{}),fingerprint:plan.fingerprint,source:workbookInspection(book)})
+      need(input.fingerprint === plan.fingerprint, 'The workbook or mapping changed. Preview and approve again.',409,'REVIEW_FINGERPRINT_MISMATCH')
+      need(canAdopt,'Resolve every rejected row or explicitly exclude it with a reason before adoption',409,'workbook_diagnostics')
+      const approved = {...context,reviewedFingerprint:plan.fingerprint,operationKey:`workbook:${book.hash}`}
+      const created = await createD1ImportJob(plan,approved)
+      const job = created.state === 'queued' || created.state === 'applying' ? await applyD1ImportBatches(created.id,approved) : created
+      await env.DB.batch([auditStatement(env.DB,actor,{detail:{job_id:job.id,fingerprint:plan.fingerprint}})])
+      return respond({job})
+    }
     if (request.method === 'GET' && (route === '' || route === '/')) return respond({ jobs: await journal(context) })
     if (request.method === 'GET' && route === '/erasure-journal') return respond({ entries: await readD1ErasureJournal(context) })
     if (request.method === 'POST' && (route === '/preview' || route === '/commit')) {
