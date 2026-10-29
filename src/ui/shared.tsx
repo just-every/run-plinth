@@ -55,11 +55,13 @@ export function Form({ children, action, submit = 'Save', reset = true }: {child
       else control.removeAttribute('aria-invalid')
       if (descriptions.length) control.setAttribute('aria-describedby', descriptions.join(' ')); else control.removeAttribute('aria-describedby')
     })
-    if (error) {
+    // Error effects can flush while the submitting fieldset is still disabled.
+    // Retry focus after completion commits and the controls become focusable.
+    if (error && !busy) {
       const first = [...(controls ?? [])].find(control => invalid.includes(control.name))
       ;(first ?? errorRef.current)?.focus()
     }
-  }, [error, invalid, id])
+  }, [error, invalid, id, busy])
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget
     if (busy) return
