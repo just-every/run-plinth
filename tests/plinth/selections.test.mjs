@@ -1,3 +1,4 @@
+import { decisionGraphFixture } from './decision-graph-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture } from './helpers.mjs'
@@ -449,4 +450,77 @@ test('A client and delegated signer racing the exact revision commit one signatu
   current=(await x.api('/jobs/'+job.id)).value.job
   assert.equal((await x.api(`/jobs/${job.id}/selections/${selection.id}/delegations`,{expected_version:current.version,...x.consent,revision_id:revision.id},x.client)).value.error,'customer_required')
  }finally{await f.close()}
+})
+
+
+test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bounded MCP drafts never authorize or establish delivery', async () => {
+ const f = await createFixture({now: Date.parse('2026-10-29T12:00:00Z')})
+ try {
+  const address = ['synthetic-plinth-client', 'example.test'].join('@')
+  const client = await f.invite(address), outsider = await f.invite(['synthetic-plinth-other', 'example.test'].join('@'))
+  const token = await f.agent()
+  const d = await decisionGraphFixture(f, await createActiveJob(f, 'Decision cutoff job', address))
+  const packetPath = id => d.root + '/decision-graphs/' + id
+  const get = (id, cookie = f.owner) => f.json(packetPath(id), {cookie})
+  const first = d.packet.facts[0]
+  // Independently counted: 30 Nov minus 14 lead, 5 review and 2 safety days = 9 Nov.
+  assert.equal(first.timing.latest_safe_decision_at, '2026-11-09T08:00:00.000Z')
+  assert.match(first.timing.warning, /cutoff reached/); assert.equal(first.tasks[0].id, d.task.id)
+  assert.equal(first.comparisons[0].supplier_quote_difference_cents, -2500)
+  assert.deepEqual(first.comparisons[0].specification_comparison, {original: '8 inch reach', proposed: '9 inch reach'})
+  assert.equal(first.comparisons[0].client_price_difference_cents, null)
+  assert.equal(first.submittal_evidence.status, 'unavailable'); assert.equal(first.case_closed, false)
+  assert.equal((await get(d.packet.id, client)).status, 403)
+  assert.equal((await get(d.packet.id, outsider)).status, 404)
+  assert.equal((await f.json(packetPath(d.packet.id), {token})).status, 403, 'A raw bearer cannot read private owner packets')
+  assert.equal((await f.json(d.root, {cookie: client})).value.job.decision_graphs, undefined)
+  const policy = await f.json('/agents/api/policy', {method: 'PUT', cookie: f.owner, body: {document: {schema: 'rer-agent-policy/1', catalogue: 'rer-agent-classes/1', rules: [{id: 'owner-reviewed-drafts', class: '*', do: 'autonomous'}], spend: {none: true}}}})
+  assert.equal(policy.status, 200, JSON.stringify(policy.value))
+  let sequence = 0
+  const mcp = async (name, args) => {
+   const r = await f.json('/mcp', {method: 'POST', token, headers: {accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25', 'mcp-method': 'tools/call', 'mcp-name': name}, body: {jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: {name, arguments: args}}})
+   return r
+  }
+  const args = {job_id: d.job.id, packet_id: d.packet.id}
+  let r = await mcp('plinth.decisions.read', args); assert.equal(r.status, 200); assert.equal(r.value.result.isError, false, JSON.stringify(r.value))
+  assert.equal(r.value.result.structuredContent.record.facts[0].timing.latest_safe_decision_at, '2026-11-09T08:00:00.000Z')
+  const effects = {orders: structuredClone(d.job.orders), selections: structuredClone(d.job.selections), schedules: structuredClone(d.job.schedules), messages: f.messages.length}
+  const draftArgs = {...args, request_id: 'synthetic-plinth-1', idempotency_key: crypto.randomUUID()}
+  r = await mcp('plinth.decisions.draft', draftArgs); assert.equal(r.value.result.isError, false, JSON.stringify(r.value)); const draft = r.value.result.structuredContent.record
+  assert.equal(draft.delivery, 'unsent'); assert.equal(draft.consent, 'unverified'); assert.equal(draft.status, 'proposed')
+  assert.match(draft.text, /2026-11-09T08:00:00/)
+  r = await mcp('plinth.decisions.draft', draftArgs); assert.equal(r.value.result.isError, false)
+  await d.read(); assert.equal((await get(d.packet.id)).value.record.drafts.length, 1)
+  assert.deepEqual(d.job.orders, effects.orders); assert.deepEqual(d.job.selections, effects.selections); assert.deepEqual(d.job.schedules, effects.schedules); assert.equal(f.messages.length, effects.messages)
+  const refuse = async (path, body, credentials = {cookie: f.owner}) => f.json(d.root + path, {method: 'POST', ...credentials, body: {expected_version: d.job.version, ...body}})
+  assert.equal((await refuse('/selections/' + d.selection.id + '/order', {revision_id: d.link.revision_id})).value.error, 'selection_unsigned')
+  const changed = await d.act('/products/' + d.alternate.id + '/revise', {...d.productTerms, name: 'Changed alternate', cost_quote_cents: 9000})
+  await d.act('/products/' + d.alternate.id + '/review', {revision_id: changed.revisions.at(-1).id, confirm: true})
+  assert.equal((await get(d.packet.id)).value.current, false)
+  assert.equal((await get(d.packet.id)).value.record.facts[0].comparisons[0].supplier_quote_cents, 7500, 'Historical comparison remains immutable')
+  r = await mcp('plinth.decisions.read', args); assert.equal(r.value.result._meta['com.runeditrun/error'].code, 'decision_source_stale')
+  r = await mcp('plinth.decisions.draft', {...draftArgs, request_id: 'synthetic-plinth-stale', idempotency_key: crypto.randomUUID()}); assert.equal(r.value.result.isError, true)
+  assert.equal((await d.review()).facts[0].comparisons[0].supplier_quote_difference_cents, -1000)
+  await d.act('/selections/' + d.selection.id + '/present', {revision_id: d.link.revision_id})
+  await d.act('/selections/' + d.selection.id + '/sign', {revision_id: d.link.revision_id, option_id: d.selection.revisions[0].options[0].id, statement: 'I choose the exact original fixture', confirm: true}, {cookie: client})
+  const order = await d.act('/selections/' + d.selection.id + '/order', {revision_id: d.link.revision_id})
+  await d.act('/orders/' + order.id + '/issue')
+  await d.act('/orders/' + order.id + '/acknowledge', {acknowledged_on: '2026-11-10', by_name: 'Synthetic supplier', reference: 'synthetic-plinth-ack-1', promised_on: '2026-11-29'})
+  const withOrder = {...d.link, order_ids: [order.id]}
+  const acknowledged = await d.review([withOrder]); assert.equal(acknowledged.facts[0].status, 'approved'); assert.equal(acknowledged.facts[0].orders[0].delivery_status, 'acknowledged'); assert.equal(acknowledged.facts[0].case_closed, false)
+  const sourceEconomics = structuredClone(d.job.quotes)
+  assert.equal((await refuse('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '1'}], reference: 'forbidden agent receipt'}, {token})).status, 403)
+  await d.act('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '0.5'}], reference: 'synthetic-plinth-ticket-1'})
+  assert.equal((await d.review([withOrder])).facts[0].case_closed, false)
+  await d.act('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '0.5'}], reference: 'synthetic-plinth-ticket-2'})
+  const delivered = await d.review([withOrder]); assert.equal(delivered.facts[0].case_closed, true); assert.equal(delivered.facts[0].orders[0].human_receipts.length, 2)
+  assert.deepEqual(d.job.quotes, sourceEconomics); assert.equal(f.messages.length, effects.messages)
+  const foreign = await createActiveJob(f, 'Other decision job', address)
+  assert.equal((await f.json('/api/plinth/jobs/' + foreign.id + '/decision-graphs/' + delivered.id, {cookie: f.owner})).status, 404)
+  const creds = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials
+  for (const credential of creds) assert.equal((await f.json('/api/plinth/agent-credentials/' + credential.id + '/revoke', {method: 'POST', cookie: f.owner, body: {}})).status, 200)
+  assert.equal((await mcp('plinth.decisions.read', {job_id: d.job.id, packet_id: delivered.id})).status, 401)
+  assert.equal((await f.json(d.root, {method: 'DELETE', cookie: f.owner, body: {expected_version: d.job.version}})).status, 200)
+  assert.equal((await get(delivered.id)).status, 404)
+ } finally { await f.close() }
 })

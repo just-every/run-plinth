@@ -135,7 +135,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | AGENT-001 | missing | No job-forecast agent or maintained cost and schedule forecast exists. |
 | AGENT-002 | missing | No recovery planning or cross-record decision workflow exists. |
 | AGENT-003 | missing | No outcome-tracking recovery cases or verification exist. |
-| AGENT-004 | missing | No decision dependency graph, substitute preparation or delivery follow-through exists. |
+| AGENT-004 | partial | Private owner-reviewed packets and draft tools only; full submittal integration, consent-aware actual request delivery, client and vendor participation, and complete maintained decision follow-through remain owed. Native client decision, builder substitution, PO issue and vendor-send gates remain unchanged. Submittal evidence stays unavailable in packets. The owner-only draft floor follows the standing scope policy; ROLE-003 exact external boundary and ROLE-006 scoped permission duties including RL-104 remain with those clauses. INT-007 policy and owner catch-all and provider webhook proof, plus NOTIFY-001 configured mail, Twilio and native push prerequisites remain held. Exact-candidate Verify and fleet publication and landing receipts remain required. |
 | AGENT-005 | missing | No cost-match agent or actual-cost correction packets exist. |
 | AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |
 | AGENT-007 | missing | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |

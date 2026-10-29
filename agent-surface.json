@@ -42,6 +42,44 @@
       ]
     },
     {
+      "name": "plinth.decisions.draft",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-004",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.decisions.list",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "AGENT-004",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.decisions.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-004",
+        "NATIVE-008"
+      ]
+    },
+    {
       "name": "plinth.diary.prepare",
       "scope": "drafts:write",
       "readOnly": false,
@@ -1447,6 +1485,134 @@
             }
           ]
         }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-list-standard",
+      "tool": "plinth.decisions.list",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-read-standard",
+      "tool": "plinth.decisions.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "packet_id": {
+          "$from": "decision-list-standard",
+          "pointer": "/packets/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-draft-standard",
+      "tool": "plinth.decisions.draft",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "packet_id": {
+          "$from": "decision-list-standard",
+          "pointer": "/packets/0/id"
+        },
+        "request_id": "synthetic-plinth-standard"
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-list-sensitive",
+      "tool": "plinth.decisions.list",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-read-sensitive",
+      "tool": "plinth.decisions.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "packet_id": {
+          "$from": "decision-list-sensitive",
+          "pointer": "/packets/0/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision-draft-sensitive",
+      "tool": "plinth.decisions.draft",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "packet_id": {
+          "$from": "decision-list-sensitive",
+          "pointer": "/packets/0/id"
+        },
+        "request_id": "synthetic-plinth-sensitive"
       },
       "expect": [
         {

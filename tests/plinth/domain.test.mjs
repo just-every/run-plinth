@@ -205,10 +205,18 @@ test('DOC-003 — sheet-linked field RFI, assigned revised detail, explicit trad
   assert.equal((await act('/rfi-access',{email:'rfi-other@example.com',role:'trade',sheet_ids:[],subcontract_id:secondScope.scope.id})).status,200)
   const sourceResponse=await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:designer});assert.equal(sourceResponse.status,200);assert.deepEqual(Buffer.from(await sourceResponse.arrayBuffer()),drawing)
   assert.equal((await f.request(`/api/plinth/rfi-inbox/${job.id}/files/${sheet.revisions[0].document.id}`,{cookie:other})).status,404)
+  const graphSelection=await act('/selections',{room:'Kitchen',category:'Beam fixture',allowance_cents:1000,cost_code:'06-100',decision_on:'2026-11-01',lead_days:1,options:[{name:'Beam fixture',supplier:'Synthetic supplier',specifications:'Reviewed beam detail',price_cents:1000}]})
+  assert.equal(graphSelection.status,200)
+  const graphRequest={as_of:'2026-11-05',confirm:true,review:'Owner explicitly selects this open RFI and its task',links:[{selection_id:graphSelection.value.record.id,revision_id:graphSelection.value.record.revisions[0].id,task_ids:[task.id],rfi_ids:[id],product_ids:[],order_ids:[],lead_days:1,review_days:1,buffer_days:1}]}
+  const graph=await act('/decision-graphs',graphRequest);assert.equal(graph.status,200)
+  assert.equal(graph.value.record.facts[0].rfis[0].id,id);assert.equal(graph.value.record.facts[0].rfis[0].resolved,null);assert.equal(graph.value.record.facts[0].case_closed,false)
+  assert.equal((await api(`/jobs/${job.id}/decision-graphs/${graph.value.record.id}`,undefined,designer)).status,404,'The graph grants a designer no private office record access')
   const detail=Buffer.from('%PDF-1.4\nsynthetic-plinth-2 revised structural detail\n%%EOF'),response={text:'Move the duct opening; install the engineer-reviewed revised detail',cost_impact_cents:15000,date_impact_days:2,attachments:[{name:'revised-detail.pdf',mime:'application/pdf',base64:detail.toString('base64')}]}
   assert.equal((await inboxAct(`/${id}/respond`,response,trade)).status,403)
   r=await inboxAct(`/${id}/respond`,response,designer);assert.equal(r.status,200);let answer=job.rfis[0].responses[0]
   assert.equal((await api('/rfi-inbox',undefined,trade)).value.jobs[0].rfis[0].responses.length,0,'Unreviewed design responses are not distributed')
+  assert.equal((await api(`/jobs/${job.id}/decision-graphs/${graph.value.record.id}`)).value.current,false,'A changed RFI response invalidates its graph links')
+  assert.equal((await act(`/decision-graphs/${graph.value.record.id}/draft`,{request_id:'synthetic-plinth-stale-rfi'})).value.error,'decision_source_stale')
   const count=job.variations.length,before=structuredClone(job.schedules),messages=f.messages.length
   assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:1,date_impact_days:2})).value.error,'rfi_review')
   assert.equal((await act(`/rfis/${id}/publish`,{response_id:answer.id,confirm:true,cost_impact_cents:15000,date_impact_days:2})).status,200)

@@ -16,6 +16,13 @@ export default async function({request,origin,claim,displayName,returnTo}) {
    job=(await call(`jobs/${job.id}/products/${product.id}/review`,{expected_version:job.version,revision_id:product.revisions[0].id,confirm:true})).job
   }
   if(name.includes('Active'))job=(await call(`jobs/${job.id}/quotes/${job.quotes[0].id}/accept`,{expected_version:job.version,method:'email',evidence:'Synthetic client acceptance of exact scope',schedule_choice:{kind:'none',reason:'Field dates pending'}})).job
+  if(name.includes('Active')) {
+   let response = await call(`jobs/${job.id}/selections`, {expected_version:job.version,room:'Kitchen',category:'Fixture',allowance_cents:1000,cost_code:'22',decision_on:'2026-11-09',lead_days:14,options:[{name:'Synthetic choice',supplier:'Synthetic supplier',specifications:name.includes('sensitive')?'Synthetic SSN 123-45-6789':'Reviewed fixture dimensions',price_cents:1000}]})
+   job=response.job;const selection=response.record
+   response=await call(`jobs/${job.id}/schedules`,{expected_version:job.version,trade:'Fixture '+name,description:'Fixture installation',start:'2026-11-30T08:00:00Z',end:'2026-11-30T10:00:00Z'})
+   job=response.job;const task=response.record
+   await call(`jobs/${job.id}/decision-graphs`,{expected_version:job.version,as_of:'2026-11-10',confirm:true,review:'Owner explicitly reviews these fixture sources for a private draft',links:[{selection_id:selection.id,revision_id:selection.revisions[0].id,task_ids:[task.id],product_ids:[],rfi_ids:[],order_ids:[],lead_days:14,review_days:5,buffer_days:2}]})
+  }
  }
  const catalog=async(kind,value)=>(await call('estimate-catalog',{kind,name:'Synthetic '+kind,reason:'Reviewed synthetic conformance source',value})).entry
  for(const sensitive of [false,true]) {

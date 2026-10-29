@@ -1,3 +1,4 @@
+import { decisionGraphResponse } from './agent-decision-graph'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -107,12 +108,12 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
+ job={...job,decision_graphs:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
- if(actor.role!=='owner'){job={...job,room_boards:undefined};delete job.followup}
+ if(actor.role!=='owner'){job={...job,decision_graphs:undefined,room_boards:undefined};delete job.followup}
  job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('plans.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job
  if(!['owner','admin','project_manager'].includes(actor.role)||actor.permissions)job={...job,meetings:undefined}
  job=withoutCosts(job,actor)
@@ -133,6 +134,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='GET'){requireOwner(actor);const credentials=await env.DB.prepare('SELECT id,operator_id,expires_at,revoked_at FROM oa_credentials ORDER BY expires_at DESC').all();return json({credentials:credentials.results})}
  if(parts[0]==='agent-credentials'&&parts.length===3&&parts[2]==='revoke'&&method==='POST'){requireOwner(actor);await body(request);await transaction(env.DB,actor,null,[env.DB.prepare("UPDATE oa_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?").bind(Date.now(),parts[1]),env.DB.prepare("INSERT INTO oa_auth_audit(id,actor_id,action,value,created_at) VALUES(?,?,'credential.revoke',?,?)").bind(crypto.randomUUID(),actor.id,parts[1],Date.now())]);return json({revoked:true})}
+ const graph=await decisionGraphResponse(request,env,actor,parts,body);if(graph)return graph
  const plans=await planResponse(request,env,actor,parts,body);if(plans)return plans
  const subPortal=await subcontractorPortalResponse(request,env,actor,parts);if(subPortal)return subPortal
  const scheduledReports=await reportScheduleResponse(request,env,actor,parts,body);if(scheduledReports)return scheduledReports
