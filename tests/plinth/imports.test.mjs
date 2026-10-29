@@ -136,6 +136,10 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
    assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
    assert.equal(review.value.draft.provenance[1].cells.quantity.formula,'(5/4)')
    assert.equal(review.value.draft.provenance[1].cells.quantity.address,'F3')
+   const approved={...legacy,fingerprint:review.value.fingerprint},adopted=await call('/workbook/commit',approved);assert.equal(adopted.status,200,JSON.stringify(adopted.value));const imported=(await jobs())[0];assert.equal(imported.quotes[0].status,'draft');assert.equal(imported.quotes[0].total_cents,669);assert.equal(imported.quotes[0].cost_total_cents,449)
+   assert.equal((await call('/workbook/commit',approved)).value.job.id,adopted.value.job.id);assert.equal((await jobs()).length,1)
+   const original=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(original.status,200);assert.equal(original.value.originals[0].original.base64,legacy.base64)
+   assert.equal((await call(`/${adopted.value.job.id}/undo`)).status,200);assert.deepEqual(await jobs(),[])
   }
   assert.deepEqual(await jobs(),[])
   const review=await call('/workbook/preview',input);assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
