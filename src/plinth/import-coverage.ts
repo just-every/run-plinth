@@ -90,7 +90,13 @@ export async function importCoverage(context: D1ImportContext, input: { plan: Im
     const retainedColumns = coordinates?.columns
     rows.push({
       row: coordinates?.row ?? entry.source.location.row ?? index + 2, externalId: entry.source.sourceId, targetId: id, disposition, reason, imported,
-      history: (entry.source.payload as { source_history?: HistoryEvidence }).source_history,
+      history: (() => {
+        const history = (entry.source.payload as { source_history?: HistoryEvidence }).source_history
+        return history && { ...history, files: history.files.map(file => ({ ...file,
+          outcome: file.disposition === 'missing' ? 'missing' : disposition,
+          custody: file.disposition === 'missing' ? 'not supplied' : !job ? 'supplied for preview' : plan.source.artifacts.some(artifact => artifact.name === file.artifact && artifact.original?.status === 'available') ? 'retained original' : 'unavailable after erasure',
+        })) }
+      })(),
       columns: retainedColumns?.map(cell => ({ ...cell, treatment: treatments[cell.field] ?? 'Unsupported' })) ?? fields?.map((cell, i) => ({ field: inspection!.header[i]?.value ?? '', column: i + 1, line: cell.location.line, character: cell.location.character, treatment: treatments[inspection!.header[i]?.value] ?? 'Unsupported' })),
     })
   }
@@ -101,7 +107,8 @@ export async function importCoverage(context: D1ImportContext, input: { plan: Im
   const declarations = plan.entries.filter(entry => !entry.erased).map(entry => (entry.source.payload as Record<string, unknown>).source_declaration)
   return {
     ...report,
-    historyCounts: Object.fromEntries(['historical','duplicate','unsupported','retained','missing'].map(key => [key, rows.reduce((n, row) => n + [...row.history?.records ?? [], ...row.history?.files ?? []].filter(item => item.disposition === key).length, 0)])),
+    historyCounts: Object.fromEntries(['historical','duplicate','unsupported','supplied','missing'].map(key => [key, rows.reduce((n, row) => n + [...row.history?.records ?? [], ...row.history?.files ?? []].filter(item => item.disposition === key).length, 0)])),
+    fileCounts: Object.fromEntries(['proposed','imported','duplicate','conflict','reversed','missing'].map(key => [key, rows.reduce((n,row) => n + (row.history?.files.filter(file => file.outcome === key).length ?? 0),0)])),
     declaration: job?.erasedRecords ? null : declarations[0] ?? report.declaration,
     originalStatus: artifact.original?.status ?? 'unavailable', job: job ? { id: job.id, state: job.state, checkpoint: job.checkpoint, total: job.total } : null,
   }

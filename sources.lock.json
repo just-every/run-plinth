@@ -201,7 +201,7 @@
       "executable": false
     },
     "docs/IMPORT.md": {
-      "sha256": "b31d71c9be3caef09c05badde679470bf4e1ace2c7d554585ffa8fece6b63992",
+      "sha256": "47a63562361c61dc7e3c776e573389bc3eb4344bf185a24ddfb6f8386c3f88e7",
       "executable": false
     },
     "docs/MAIN-FLOWS.md": {
@@ -3553,7 +3553,7 @@
       "executable": false
     },
     "src/plinth/import-coverage.ts": {
-      "sha256": "ff708722fb85bf5394a14858bbac4dbe7769e5b30f52472319b9fbf6476a415b",
+      "sha256": "b4221b940a4fb4018c119d1783905ddfeae86587262a0ece06ea9cf2bfb7afcd",
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
@@ -3561,7 +3561,7 @@
       "executable": false
     },
     "src/plinth/import-history.ts": {
-      "sha256": "62665c7993020c7d0ad4a84fcb241cea2a529b28960311b547aa4deaa50561ff",
+      "sha256": "c7546e9a17eabeb1eddfd41be113b946547d53f26ed31b348e87b8f0932977c8",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -4697,7 +4697,7 @@
       "executable": false
     },
     "src/ui/imports.tsx": {
-      "sha256": "a56abfed4942517a91b56716b90def754df63222b6c3279efd4b3fc7e10ae8cc",
+      "sha256": "74cf299a52c926a3f546f5bd084866589c8e2c59b5508d1c72de06d48779de4b",
       "executable": false
     },
     "src/ui/invoice-corrections.tsx": {
@@ -5181,7 +5181,7 @@
       "executable": false
     },
     "tests/journeys/import-coverage.mjs": {
-      "sha256": "12886e8ec9011ca9d6f1c4366bef555f07c6e0d1fb23e54b2cc95b8c4ebb9550",
+      "sha256": "b5a8e75e49286d64289a1521b56fa4a73b1cf25e1902364a6386c7a2aabe46d0",
       "executable": false
     },
     "tests/journeys/installed-signin.mjs": {
@@ -5409,7 +5409,7 @@
       "executable": false
     },
     "tests/plinth/import-history-support.mjs": {
-      "sha256": "d5735e05c915a8489bf438fd35a679264c1a271899cb1b2b60a681b45cc4d897",
+      "sha256": "e8470d58b6c1c865ff44f6a57c1248319f78b549954f9e420fdf3f7b6e939df6",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {

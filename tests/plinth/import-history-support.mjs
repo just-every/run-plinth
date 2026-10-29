@@ -6,7 +6,8 @@ export async function proveHistoricalCustody(f,csv){
  const before=(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs,mail=f.messages.length
  const preview=await call('/preview',{csv:upload,history})
  assert.equal(preview.status,200,JSON.stringify(preview.value))
- assert.deepEqual(preview.value.coverage.historyCounts,{historical:6,duplicate:1,unsupported:1,retained:1,missing:1})
+ assert.deepEqual(preview.value.coverage.historyCounts,{historical:6,duplicate:1,unsupported:1,supplied:1,missing:1})
+ assert.equal(preview.value.coverage.fileCounts.proposed,1)
  const records=preview.value.coverage.rows[0].history.records
  assert.equal(records[0].kind,'signed-change');assert.equal(records[0].verified,false)
  assert.equal(records[0].pointer,'/jobs/0/records/0')
@@ -19,6 +20,7 @@ export async function proveHistoricalCustody(f,csv){
  assert.equal(result.status,200,JSON.stringify(result.value));const journal=result.value.job
  result=await call('/'+journal.id+'/coverage');assert.equal(result.status,200)
  assert.deepEqual(result.value.coverage.historyCounts,preview.value.coverage.historyCounts)
+ assert.equal(result.value.coverage.fileCounts.imported,1)
  const originals=(await call('/'+journal.id+'/originals')).value.originals
  assert.deepEqual(Buffer.from(originals.find(file=>file.name==='source-history.json').original.base64,'base64'),Buffer.from(history))
  assert.deepEqual(Buffer.from(originals.find(file=>file.name==='history-file-0-0').original.base64,'base64'),historicalBytes)
@@ -28,6 +30,16 @@ export async function proveHistoricalCustody(f,csv){
  assert.equal(job.claims.length,0);assert.equal(job.invoices?.length??0,0);assert.equal(job.schedules.length,0)
  assert.equal((await call('/commit',{csv:upload,history,fingerprint:preview.value.fingerprint})).value.job.id,journal.id)
  assert.equal((await call('/preview',{csv:upload,history})).value.coverage.counts.duplicate,2)
+ const edited=await f.json('/api/plinth/jobs/'+job.id+'/quotes',{method:'POST',cookie:f.owner,body:{expected_version:job.version,lines:[{description:'Explicit native review of continuing scope',quantity:1,unit_cents:125000}]}})
+ assert.equal(edited.status,200);job=edited.value.job
+ assert.equal((await call('/'+journal.id+'/coverage')).value.coverage.fileCounts.conflict,1)
+ assert.equal((await call('/commit',{csv:upload,history,fingerprint:preview.value.fingerprint})).status,200)
+ assert.deepEqual((await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job,job,'Source replay preserves native review')
+ const held=await f.json('/api/plinth/holds',{method:'POST',cookie:f.owner,body:{subject_kind:'job',subject_id:job.id,kind:'legal_hold',reason:'Preserve reviewed source originals',confirm:true}})
+ assert.equal(held.status,201)
+ assert.equal((await f.json('/api/plinth/jobs/'+job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}})).status,409)
+ assert.ok((await call('/'+journal.id+'/originals')).value.originals.every(file=>file.original.status!=='unavailable'))
+ assert.equal((await f.json('/api/plinth/holds/'+held.value.hold.id+'/release',{method:'POST',cookie:f.owner,body:{reason:'Owner reviewed source retention and release'}})).status,200)
  const erase=await f.json('/api/plinth/jobs/'+job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}})
  assert.equal(erase.status,200,JSON.stringify(erase.value))
  result=await call('/'+journal.id+'/coverage')

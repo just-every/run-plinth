@@ -58,8 +58,8 @@ header as native mutations. JSON responses are private and `no-store`.
 | Method and suffix | Input | Result |
 | --- | --- | --- |
 | GET `/` | — | `{jobs}`; most recent 100 import journal summaries |
-| POST `/preview` | `{csv,declaration?}` | `{fingerprint,counts,diagnostics,rows,coverage,adoption:"draft",limits}` |
-| POST `/commit` | `{csv,fingerprint,declaration?,mappingRevision?}` | `{job}`; conflicts refuse new intake before any native row is adopted |
+| POST `/preview` | `{csv,declaration?,history?}` | `{fingerprint,counts,diagnostics,rows,coverage,adoption:"draft",limits}` |
+| POST `/commit` | `{csv,fingerprint,declaration?,mappingRevision?,history?}` | `{job}`; conflicts refuse new intake before any native row is adopted |
 | GET `/:id` | — | `{job}` after retained-plan integrity checks |
 | POST `/:id/resume` | — | `{job}` from the immutable retained plan |
 | POST `/:id/undo` | — | `{job,report}`; completed import only |

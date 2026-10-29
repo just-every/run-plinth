@@ -7,7 +7,7 @@ type HistoricalFile = { id: string; name: string; mediaType: string; base64: str
 type HistoryJob = { externalId: string; records: HistoricalRecord[]; files: HistoricalFile[] }
 export type HistoryEvidence = {
   records: (HistoricalRecord & { pointer: string; disposition: 'historical' | 'duplicate' | 'unsupported'; verified: false })[]
-  files: { id: string; name?: string; mediaType?: string; sha256?: string; bytes?: number; artifact?: string; pointer: string; disposition: 'retained' | 'missing' }[]
+  files: { id: string; name?: string; mediaType?: string; sha256?: string; bytes?: number; artifact?: string; pointer: string; disposition: 'supplied' | 'missing'; outcome?: string; custody?: string }[]
 }
 const supported = new Set(['note', 'schedule', 'signed-change', 'invoice', 'payment', 'approval'])
 const object = (value: unknown, keys: string[]): Record<string, unknown> => {
@@ -53,7 +53,7 @@ export function attachImportHistory(source: SourceBundle, input: unknown): Sourc
       need(bytes.length > 0 && totalFiles <= 65536, 'Historical originals must total at most 64 KiB')
       const artifact = 'history-file-' + jobIndex + '-' + index
       artifacts.push({ name: artifact, size: bytes.length, sha256: sha256(bytes), original: { status: 'available', base64: file.base64 } })
-      files.push({ id: fileId, name, mediaType, bytes: bytes.length, sha256: sha256(bytes), artifact, pointer: pointer + '/files/' + index, disposition: 'retained' })
+      files.push({ id: fileId, name, mediaType, bytes: bytes.length, sha256: sha256(bytes), artifact, pointer: pointer + '/files/' + index, disposition: 'supplied' })
     }
     const recordIds = new Map<string, string>(), records: HistoryEvidence['records'] = []
     for (const [index, rawRecord] of array(job.records, 100).entries()) {
