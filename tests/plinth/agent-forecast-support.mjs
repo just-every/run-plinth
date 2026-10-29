@@ -63,13 +63,57 @@ export async function proveAgentForecast(f,c){
  const after=await c.read();assert.deepEqual(after.budgets,economics.budgets);assert.deepEqual(after.schedules,economics.schedules);assert.equal(after.orders[0].amount_cents,economics.orders[0].amount_cents);assert.deepEqual(after.approvals.filter(a=>!a.kind.startsWith('purchase_order.promise')),economics.approvals.filter(a=>!a.kind.startsWith('purchase_order.promise')))
  assert.equal(f.messages.length,outbound,'Forecast review, preparation and replay cause no outbound delivery')
  assert.equal(after.agent_forecasts,undefined,'Generic projections never expose reviewed private packets')
- const erased=await f.request('/api/plinth/jobs/'+current.id,{method:'DELETE',cookie:f.owner,body:{expected_version:after.version}});assert.equal(erased.status,200)
+ await proveReviewedSchedule(f,c,mcp)
+ await c.read()
+ const erased=await f.request('/api/plinth/jobs/'+current.id,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}});assert.equal(erased.status,200)
  assert.ok((await mcp('plinth.forecast.prepare',{...args,packet_digest:first.digest,idempotency_key:prepareKey})).result.isError,'An erased forecast cannot be reconstructed by replaying its cached preparation')
  assert.equal((await c.api('/jobs/'+current.id+'/agent-forecasts')).status,404)
  const credentials=(await c.api('/agent-credentials')).value.credentials
  for(const credential of credentials)assert.equal((await c.api(`/agent-credentials/${credential.id}/revoke`,{})).status,200)
  assert.equal((await f.request('/mcp',{method:'POST',token,headers:{Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2026-07-28','Mcp-Method':'tools/list'},body:{jsonrpc:'2.0',id:++sequence,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}}})).status,401)
  return first
+}
+
+async function proveReviewedSchedule(f,c,mcp){
+ const privateTitle='synthetic-plinth-private-bid-package',privateEstimator='synthetic-plinth-private-estimator'
+ const email=['synthetic-plinth-forecast-estimator','example.com'].join('@')
+ await f.invite(email,privateEstimator,'admin')
+ const person=(await c.api('/team')).value.team.find(p=>p.email===email)
+ assert.equal((await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'estimator',job_ids:[c.job.id],po_limit_cents:0}})).status,200)
+ let source=(await c.api('/bids/'+c.job.id)).value.source
+ const bid=async(path,input,status=200)=>{const r=await c.api('/bids/'+c.job.id+path,{expected_version:source.version,...input});assert.equal(r.status,status,JSON.stringify(r.value));source=r.value.source;return r.value}
+ const created=await bid('',{title:privateTitle,trade:'Synthetic procurement',scope:'synthetic-plinth-private-bid-scope',mode:'unpriced',lines:[{cost_code:'06-100',description:'Synthetic package'}],note:'synthetic-plinth-private-bid-note',due_on:'2026-10-30',plans:[{name:'synthetic-plinth-1.pdf',base64:Buffer.from('%PDF-1.7\nsynthetic-plinth-1\n%%EOF').toString('base64')}]},201)
+ const id=created.record_id,revision=source.bids.find(b=>b.id===id).revisions.at(-1).id
+ await bid('/'+id+'/publish',{revision_id:revision,confirm:true})
+ await bid('/'+id+'/follow-up',{revision_id:revision,required_on_site:'2026-12-01',lead_days:30,remind_on:'2026-10-28',estimator_id:person.id,draft_task:{description:'Synthetic scheduled installation',start:'2026-12-01T08:00:00Z',end:'2026-12-01T09:00:00Z'},confirm:true})
+ const followUp=source.bids.find(b=>b.id===id).follow_up,task=source.tasks.find(t=>t.id===followUp.task_id)
+ await c.read()
+ const held=(await c.ok('/schedule-constraints',{kind:'site',title:'synthetic-plinth-reviewed-site-hold',jurisdiction:'Synthetic site',accountable:'Reviewed site owner',task_ids:[task.id],reason:'Synthetic access review pending'})).record
+ const plan={tasks:c.job.schedules,calendar:c.job.schedule_calendar},native=await c.ok('/schedule/preview',plan)
+ assert.ok(native.preview.blockers.some(b=>b.constraint_id===followUp.id&&b.title.includes(privateTitle)&&b.accountable===privateEstimator),'The ordinary planner still evaluates private bid follow-up')
+ const before=await c.read(),sources=(await c.api('/jobs/'+c.job.id+'/agent-forecasts/sources')).value.sources
+ const packet=(await reviewForecast(c,{observed_at:'2026-10-21T12:00:00Z',sources:sources.filter(s=>s.key==='schedule').map(s=>({key:s.key,revision:s.revision,as_of:'2026-10-21',valid_until:'2026-10-31'}))})).record
+ const checkPrivate=value=>{const text=JSON.stringify(value);for(const secret of [privateTitle,privateEstimator,followUp.id,id])assert.ok(!text.includes(secret),'Schedule-only forecast must omit unreviewed bid details: '+secret)}
+ checkPrivate(packet)
+ assert.ok(packet.forecast.schedule.blockers.some(b=>b.constraint_id===held.id),'Explicitly reviewed site constraints still reach the forecast')
+ assert.ok(packet.uncertainties.some(u=>u.source==='bids'&&u.state==='unavailable'))
+ assert.equal(packet.forecast.native_cost,null)
+ const args={job_id:c.job.id,request_id:packet.id},key=crypto.randomUUID()
+ const read=await mcp('plinth.forecast.read',args);assert.ok(!read.result.isError,JSON.stringify(read));checkPrivate(read)
+ const prepared=await mcp('plinth.forecast.prepare',{...args,packet_digest:packet.digest,idempotency_key:key});assert.ok(!prepared.result.isError,JSON.stringify(prepared));checkPrivate(prepared)
+ source=(await c.api('/bids/'+c.job.id)).value.source
+ await bid('/'+id+'/pause-follow-up',{})
+ const unchanged=await c.api('/jobs/'+c.job.id+'/agent-forecasts/'+packet.id)
+ assert.equal(unchanged.status,200,'An unreviewed bid change cannot affect a schedule-only packet');assert.deepEqual(unchanged.value.packet.forecast,packet.forecast);checkPrivate(unchanged.value)
+ const replay=await mcp('plinth.forecast.prepare',{...args,packet_digest:packet.digest,idempotency_key:key});assert.ok(!replay.result.isError,JSON.stringify(replay));checkPrivate(replay)
+ const requests=(await c.api('/jobs/'+c.job.id+'/agent-forecasts')).value.requests
+ assert.deepEqual(requests.find(r=>r.id===packet.id).stale_sources,[])
+ await c.read()
+ await c.ok('/schedule-constraints/'+held.id,{action:'held',reason:'Synthetic site requirement changed'})
+ const stale=await c.api('/jobs/'+c.job.id+'/agent-forecasts/'+packet.id)
+ assert.equal(stale.status,409);assert.equal(stale.value.error,'forecast_source_changed');assert.deepEqual(stale.value.details.sources,['schedule'])
+ const refused=await mcp('plinth.forecast.prepare',{...args,packet_digest:packet.digest,idempotency_key:key});assert.ok(refused.result.isError);checkPrivate(refused)
+ const after=await c.read();assert.deepEqual(after.schedules,before.schedules);assert.deepEqual(after.budgets,before.budgets);assert.deepEqual(after.orders,before.orders,'Forecast preparation never changes issued economics')
 }
 
 export async function proveForecastAuthority(f,job,client,other,token){

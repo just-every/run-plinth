@@ -3221,7 +3221,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
+      "sha256": "f018cdc61aebe336f2af749c0a8905fc09a3c5f3de0b6c9afff4473140e02659",
       "executable": false
     },
     "src/plinth/allowance-changes.ts": {
@@ -5329,7 +5329,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
+      "sha256": "72bcc6d98b933791484a5ca8abcaedf3b7b118f8459768ae112f7cbbdd40a637",
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {

@@ -11,6 +11,7 @@ import { jobOf, readClock, saveJob } from './store'
 
 type Kind = 'estimate'|'budget'|'ledger'|'schedule'|'quantities'|'procurement'|'confirmations'
 interface Source { key:Kind; id:string; revision:string; facts:unknown }
+interface ScheduleFacts { tasks:Job['schedules']; calendar:ReturnType<typeof workingCalendar>; constraints:NonNullable<Job['schedule_constraints']> }
 interface ReviewedSource extends Source { as_of:string; valid_until:string }
 interface Uncertainty { source:string; state:'withheld'|'unavailable'|'stale'|'unverified'; owner_id:string; due_on:string; reason:string }
 interface RequestPacket { format:'plinth-agent-forecast-v1'; job_id:string; id:string; reviewed_by:Stamp; as_of:string; sources:ReviewedSource[]; assumptions:Input; uncertainties:Uncertainty[]; forecast:unknown; digest:string; revoked_by?:Stamp; proposal_id?:string }
@@ -59,9 +60,12 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
   native_cost={currency:ledger.currency,codes:rows,remaining_cents:sum(rows.map(r=>r.remaining_cents)),final_cents:sum(rows.map(r=>r.final_cents)),revenue_cents:sum(rows.map(r=>r.revenue_cents)),margin_cents:sum(rows.map(r=>r.margin_cents)),label:'Proposed native recorded costs only; external accounting completeness is unknown'}
  }
  let schedule:unknown=null
- if(has('schedule')){
-  const candidate=structuredClone(job),calendar=workingCalendar(job.schedule_calendar,job.time_zone),observed=text(input.observed_at,'Observation instant',40)
-  need(Number.isFinite(Date.parse(observed))&&wallClock(Date.parse(observed),job.time_zone??'UTC').date===input.as_of,'Observation instant must fall on the assumption date')
+ const scheduleFacts=selected.find(s=>s.key==='schedule')?.facts as ScheduleFacts|undefined
+ if(scheduleFacts){
+  const calendar=structuredClone(scheduleFacts.calendar),observed=text(input.observed_at,'Observation instant',40)
+  // The planner also inspects bids and RFI decisions on ordinary jobs. Give it only reviewed facts.
+  const candidate:Job={id:job.id,version:job.version,status:job.status,name:'',client_email:'',address:'',created_by:stamp(actor),quotes:[],schedules:structuredClone(scheduleFacts.tasks),diary:[],variations:[],orders:[],claims:[],approvals:[],schedule_constraints:structuredClone(scheduleFacts.constraints),time_zone:calendar.time_zone}
+  need(Number.isFinite(Date.parse(observed))&&wallClock(Date.parse(observed),calendar.time_zone??'UTC').date===input.as_of,'Observation instant must fall on the assumption date')
   const production=input.production??[],deliveries=input.deliveries??[]
   need(Array.isArray(production)&&production.length<=100&&Array.isArray(deliveries)&&deliveries.length<=100,'Provide bounded task assumptions')
   const measured:{task_id:string;actual_id:string;installed_quantity:string;remaining_quantity:string;elapsed_minutes:number;minutes_per_unit:string;remaining_minutes:number}[]=[],seen=new Set<string>()
@@ -88,10 +92,10 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
    const available=new Date(zonedInstant(order.promised_on,0,job.time_zone??'UTC')).toISOString();if(Date.parse(available)>Date.parse(task.start))task.start=available
   }
   // Project remaining work forward; retained physical actuals are not rewritten by the planner.
-  candidate.schedule_actuals=[]
   const preview=await previewSchedule(candidate,actor,{calendar,tasks:candidate.schedules},[])
   for(const blocker of preview.blockers)unknown.push({source:'schedule-constraint',state:'unverified',owner_id:actor.id,due_on:String(input.due_on),reason:'Proposed dates retain an unresolved native work prerequisite: '+JSON.stringify(blocker)})
   schedule={completion_before:preview.completion_before,completion_after:preview.completion_after,tasks:preview.tasks,critical_path:preview.critical_path,blockers:preview.blockers,production:measured,label:'Proposed remaining-work dates; delivery promises and elapsed productivity are assumptions, not confirmations or labor time'}
+  unknown.push({source:'unreviewed-work-prerequisites',state:'unverified',owner_id:actor.id,due_on:String(input.due_on),reason:'Only reviewed schedule constraints were evaluated; bid and RFI decision holds remain unverified and no work release is authorized'})
  }
  if(!native_cost)unknown.push({source:'native-cost',state:'unavailable',owner_id:actor.id,due_on:String(input.due_on),reason:'Review ledger and budget plus complete code assumptions before calculating native economics'})
  return {native_cost,schedule,accounting_actual_cents:null,complete_cost_to_complete_cents:null,complete_margin_cents:null,label:'Proposed only; no approval, publication, physical receipt or provider synchronization'}
