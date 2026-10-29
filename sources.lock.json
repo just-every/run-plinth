@@ -5361,7 +5361,7 @@
       "executable": false
     },
     "tests/journeys/workbook-import.mjs": {
-      "sha256": "6096e18ab333f073928a97f1471a2670c5963c938385e8d5f4deb39ea8a6910f",
+      "sha256": "e9610f6f1abdbf552bda5cbaa47464c127970fef894fe93ced7b279844d4d6bf",
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {
@@ -5433,7 +5433,7 @@
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
-      "sha256": "d29ba55c76e2616370b9b694a223572350c2aff792b7ea97a5ececdba262661c",
+      "sha256": "6f69d25f58bb8894bb1832c5fd1b8abfc59c7035ce3a42edfbcddff96c1e6a57",
       "executable": false
     },
     "tests/plinth/invoices.test.mjs": {
