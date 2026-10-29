@@ -64,6 +64,8 @@ test('Recovery evidence compares confirmation, delivery, installed progress and 
   const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),r=await recoveryEvidenceFixture(f),c=r.c
   const before=await c.read(),first=await r.assess()
   assert.equal(first.comparison.tasks[0].confirmed,true);assert.equal(first.comparison.deliveries[0].state,'unknown');assert.equal(first.comparison.deliveries[0].received_cents,0);assert.equal(first.comparison.forecast_margin_cents,180000);assert.equal(first.comparison.posted_actual_cents,0);assert.equal(first.comparison.overall_restoration,'unverified');assert.ok(first.comparison.missing.some(s=>s.startsWith('Delivery ')))
+  const outcomePath=`/recovery-evidence/${r.recovery.id}/review-outcome`,riskPath=`/recovery-evidence/${r.recovery.id}/risk-decision`
+  const unverifiedBefore=structuredClone(await c.read());assert.equal((await c.act(outcomePath,r.reviewInput())).value.error,'recovery_unverified');assert.deepEqual(await c.read(),unverifiedBefore,'Confirmation alone cannot become a native outcome review')
   await c.ok(`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'2'}],reference:'synthetic-plinth-delivery-52',received_on:'2026-11-06'})
   const stale=await c.act(`/recovery-evidence/${r.recovery.id}/assess`,r.observation());assert.equal(stale.status,409);assert.equal(stale.value.error,'recovery_stale')
   await r.refresh();const deliveryOnly=await r.assess();assert.equal(deliveryOnly.comparison.deliveries[0].state,'supported');assert.equal(deliveryOnly.comparison.tasks[0].quantity_state,'unknown');assert.equal(deliveryOnly.comparison.overall_restoration,'unverified');assert.ok(deliveryOnly.comparison.missing.some(s=>s.startsWith('Installed quantity ')))
@@ -71,10 +73,51 @@ test('Recovery evidence compares confirmation, delivery, installed progress and 
   await c.ok('/costs/reconcile',{period:'2026-11',balances:[],reference:'Synthetic native balance review; not independent accounting proof'})
   await r.forecast();await r.refresh();const second=await r.assess()
   assert.equal(second.comparison.deliveries[0].state,'supported');assert.equal(second.comparison.tasks[0].date_state,'supported');assert.equal(second.comparison.tasks[0].quantity_state,'supported');assert.equal(second.comparison.native_status,'supported');assert.equal(second.comparison.overall_restoration,'unverified');assert.equal(second.comparison.forecast_margin_cents,180000);assert.equal(second.comparison.observed_margin_cents,300000);assert.equal(second.risks[0].owner_id,c.job.created_by.id)
+  const nativeReview=(await c.ok(outcomePath,r.reviewInput())).record
+  const supportedState=await r.state();assert.equal(supportedState.status,'native_supported');assert.equal(supportedState.open_risk_count,1);assert.equal(supportedState.overall_restoration,'unverified')
   const posted=await c.ok('/costs/bills',{...c.bill('synthetic-plinth-adverse-52'),tax:{percent:'0',reference:'Synthetic exempt adjustment',exemption_reference:'Synthetic source',human_reviewed:true},lines:[{cost_code:'06-100',description:'Adverse native cost adjustment',subtotal_cents:220000,taxable:false,matches:[]}]});await c.ok(`/costs/bills/${posted.record.id}/review`,{reason:'Human checks adverse original'});await c.ok(`/costs/bills/${posted.record.id}/post`)
+  const live=await r.state();assert.equal(live.status,'reopened','Reading a changed native cost immediately exposes the reopened case, before another agent assessment');assert.equal(live.comparison.observed_margin_cents,80000);assert.equal(live.open_risk_count,1)
+  const changedBefore=structuredClone(await c.read());assert.equal((await c.act(outcomePath,r.reviewInput())).value.error,'recovery_stale');assert.deepEqual(await c.read(),changedBefore)
   await r.refresh();const third=await r.assess()
   assert.equal(third.comparison.posted_actual_cents,220000);assert.equal(third.comparison.observed_margin_cents,80000);assert.equal(third.comparison.forecast_margin_cents,null);assert.equal(third.comparison.margin_state,'contradicted');assert.equal(third.comparison.native_status,'contradicted');assert.equal(third.reopened,true);assert.equal(third.comparison.overall_restoration,'unverified')
   assert.deepEqual(r.recovery.assessments.slice(0,3),[first,deliveryOnly,second]);assert.equal(r.recovery.packets.length,4)
   const after=await c.read();for(const key of ['schedules','budgets','quotes','trade_invitations'])assert.deepEqual(after[key],before[key],key+' decisions remain immutable');assert.equal(after.approvals.filter(a=>a.kind==='schedule.publish').length,1)
+  assert.deepEqual(r.recovery.outcome_reviews,[nativeReview],'The earlier human native review remains history after contradiction')
+  // Human source corrections and two accounting periods exercise the complete native review loop.
+  const credit=(await c.ok('/costs/bills',{...c.bill('synthetic-plinth-recovery-credit'),kind:'credit',credit_of:posted.record.id,tax:{percent:'0',reference:'Synthetic exempt correction',exemption_reference:'Synthetic source',human_reviewed:true},lines:[{cost_code:'06-100',description:'Approved correction of adverse source',subtotal_cents:220000,taxable:false,matches:[]}]})).record
+  await c.ok(`/costs/bills/${credit.id}/review`,{reason:'Human checks the original-linked correction'});await c.ok(`/costs/bills/${credit.id}/post`)
+  for(const period of ['2026-10','2026-11']){
+   const bill=(await c.ok('/costs/bills',{...c.bill('synthetic-plinth-recovery-'+period),period,dated_on:period+'-06',tax:{percent:'0',reference:'Synthetic reviewed exempt cost',exemption_reference:'Synthetic source',human_reviewed:true},lines:[{cost_code:'06-100',description:'Recorded recovery cost',subtotal_cents:10000,taxable:false,matches:[]}]})).record
+   await c.ok(`/costs/bills/${bill.id}/review`,{reason:'Human checks period and original'});await c.ok(`/costs/bills/${bill.id}/post`)
+  }
+  await c.ok('/costs/reconcile',{period:'2026-11',balances:[{cost_code:'06-100',amount_cents:10000}],reference:'Synthetic reviewed November native actuals'})
+  await r.forecast();await r.refresh();const incomplete=await r.assess(),periods=r.recovery.packets.at(-1).evidence.accounting.periods
+  assert.equal(incomplete.comparison.posted_actual_cents,20000);assert.equal(incomplete.comparison.observed_margin_cents,280000);assert.equal(incomplete.comparison.native_status,'unverified');assert.ok(incomplete.comparison.missing.includes('Complete current native accounting evidence'))
+  assert.deepEqual(periods.map(period=>[period.period,period.balances[0].actual_cents,period.current]),[['2026-10',10000,false],['2026-11',10000,true]])
+  assert.equal((await c.act(outcomePath,r.reviewInput())).value.error,'recovery_unverified','A later agreeing period cannot hide missing reconciliation of earlier actuals')
+  await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:9000}],reference:'Synthetic deliberately mismatched October source'})
+  await r.refresh();const mismatch=await r.assess();assert.equal(mismatch.comparison.native_status,'unverified');assert.equal(r.recovery.packets.at(-1).evidence.accounting.periods[0].balances[0].difference_cents,1000)
+  await c.ok('/costs/reconcile',{period:'2026-09',balances:[{cost_code:'06-100',amount_cents:5000}],reference:'Synthetic earlier accounting source with no matching native entry'})
+  await c.ok('/costs/reconcile',{period:'2026-10',balances:[{cost_code:'06-100',amount_cents:10000}],reference:'Synthetic corrected October source'})
+  await r.refresh();const externalOnly=await r.assess();assert.equal(externalOnly.comparison.native_status,'unverified');assert.equal(r.recovery.packets.at(-1).evidence.accounting.periods[0].balances[0].difference_cents,-5000,'An earlier reviewed source with no native entry must not disappear behind a later agreeing period')
+  await c.ok('/costs/reconcile',{period:'2026-09',balances:[],reference:'Synthetic human correction of the earlier unmatched accounting declaration'})
+  await r.refresh()
+  const riskObservation={...r.observation(),risks:[...r.observation().risks,{description:'Review the installed lot against the recorded task quantity',owner_id:c.job.created_by.id,due_on:'2026-11-30'}]}
+  await c.ok(`/recovery-evidence/${r.recovery.id}/assess`,riskObservation);await r.state()
+  const restored=await r.state();assert.equal(restored.comparison.native_status,'supported');assert.equal(restored.comparison.forecast_margin_cents,160000);assert.equal(restored.open_risk_count,2)
+  const nativeSources=structuredClone(await c.read()),risk=restored.risks.find(risk=>risk.description===riskObservation.risks[1].description)
+  const decision=(await c.ok(riskPath,{...r.reviewInput(),risk_id:risk.id,status:'resolved',reason:'Human checked the exact recorded installed quantity; external accounting is still outstanding'})).record
+  await r.state();const finalReview=(await c.ok(outcomePath,r.reviewInput())).record
+  const reviewed=await r.state();assert.equal(reviewed.status,'native_supported');assert.equal(reviewed.open_risk_count,1);assert.equal(reviewed.risks.find(row=>row.id===risk.id).status,'resolved');assert.equal(reviewed.overall_restoration,'unverified');assert.deepEqual(reviewed.risks.find(row=>row.id===risk.id).decisions,[decision])
+  const decisionSnapshot=structuredClone(await c.read());assert.equal((await c.act(riskPath,{...r.reviewInput(),risk_id:risk.id,status:'resolved'})).status,409);assert.equal((await c.act(`/recovery-evidence/${r.recovery.id}/close`,{confirm:true})).status,404);assert.deepEqual(await c.read(),decisionSnapshot,'Replay and a narrative final-close attempt change nothing')
+  for(const key of ['orders','schedules','schedule_actuals','approvals','budgets','cost_records'])assert.deepEqual((await c.read())[key],nativeSources[key],'Native outcome and risk review cannot mutate '+key)
+  await c.ok(`/orders/${r.order.id}/return`,{lines:[{line_id:'recovery-lot',quantity:'1'}],reference:'synthetic-plinth-recovery-return',reason:'Human records returned package'})
+  await c.ok(`/orders/${r.order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'1'}],reference:'synthetic-plinth-recovery-late-receipt',received_on:'2026-11-08'})
+  const late=await r.state();assert.equal(late.status,'reopened');assert.equal(late.comparison.deliveries[0].state,'supported');assert.equal(late.comparison.deliveries[0].date_state,'contradicted');assert.equal(late.comparison.deliveries[0].observed_on,'2026-11-08');assert.equal(late.risks.find(row=>row.id===risk.id).status,'open','Resolution of earlier evidence cannot clear a changed packet');assert.equal(late.open_risk_count,2)
+  assert.deepEqual(r.recovery.outcome_reviews,[nativeReview,finalReview]);assert.deepEqual(r.recovery.assessments.slice(0,3),[first,deliveryOnly,second]);assert.deepEqual(r.recovery.risk_decisions,[decision])
+  await r.refresh();await r.assess();await r.state()
+  const reopenedRisk=(await c.ok(riskPath,{...r.reviewInput(),risk_id:risk.id,status:'resolved',reason:'Human reviewed this changed source without certifying final recovery'})).record
+  await c.ok(riskPath,{...r.reviewInput(),risk_id:risk.id,status:'open',reason:'Human reopens the follow-up while the actual delivery remains late'})
+  const open=await r.state();assert.equal(open.risks.find(row=>row.id===risk.id).decisions.length,3);assert.equal(open.risks.find(row=>row.id===risk.id).decisions[1].id,reopenedRisk.id);assert.equal(open.open_risk_count,2)
  }finally{await f.close()}
 })

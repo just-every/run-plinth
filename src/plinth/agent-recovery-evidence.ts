@@ -22,8 +22,11 @@ interface Assessment {
  id:string; packet_id:string; observation_id:string; observed_on:string; by:Stamp; observation:string; risks:Risk[]; supplied_risks:Risk[]
  comparison:ReturnType<typeof compare>; reopened:boolean
 }
+interface RiskDecision { id:string; risk_id:string; packet_id:string; assessment_id:string; status:'open'|'resolved'; reason:string; by:Stamp }
+interface OutcomeReview { id:string; packet_id:string; assessment_id:string; reason:string; by:Stamp }
 export interface RecoveryEvidenceCase {
  id:string; title:string; criteria:Criteria; requested_by:Stamp; packets:Packet[]; assessments:Assessment[]; revoked_by?:Stamp
+ risk_decisions?:RiskDecision[]; outcome_reviews?:OutcomeReview[]
 }
 const date=(value:unknown,name:string)=>{const s=text(value,name,10);need(/^\d{4}-\d{2}-\d{2}$/.test(s)&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s,'Use a calendar date');return s}
 const instant=(value:unknown)=>{const s=text(value,'Promised finish',40);need(/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(s)&&Number.isFinite(Date.parse(s)),'Promised finish needs an explicit UTC offset');return new Date(s).toISOString()}
@@ -59,8 +62,16 @@ async function evidence(db:D1Database,job:Job,c:Criteria){
  }))
  const orders=c.order_ids.map(id=>{const order=find(job.orders,id);need(order.issued_by&&order.status!=='draft','Select issued native commitments',409,'recovery_order');return {order,fulfillment:fulfillment(order)}})
  const forecast=state.forecasts.at(-1),forecastCurrent=!!forecast&&forecast.source_digest===await forecastSourceDigest(job)
+ const entries=actualEntries(job),issues=discrepancies(job),latestReconciliation=state.reconciliations.at(-1)
+ // Reconcile every recorded period. Agreement in a later empty period cannot cover an earlier cost.
+ const periods=[...new Set([...entries.map(entry=>entry.period),...state.reconciliations.map(row=>row.period)])].sort().map(period=>{
+  const reconciliation=state.reconciliations.findLast(row=>row.period===period)??null
+  const codes=[...new Set([...entries.filter(entry=>entry.period===period).map(entry=>entry.cost_code),...(reconciliation?.balances.map(row=>row.cost_code)??[])])]
+  const balances=codes.map(cost_code=>{const actual_cents=sum(entries.filter(entry=>entry.period===period&&entry.cost_code===cost_code).map(entry=>entry.amount_cents)),reviewed_cents=reconciliation?.balances.find(row=>row.cost_code===cost_code)?.amount_cents??0;return {cost_code,actual_cents,reviewed_cents,difference_cents:sum([actual_cents,-reviewed_cents])}})
+  return {period,reconciliation,balances,current:!!reconciliation&&reconciliation.source_key===latestReconciliation?.source_key&&!issues.some(issue=>issue.kind==='stale')}
+ })
  return structuredClone({job_id:job.id,currency:ledger.currency,approval,budget,approved_margin_cents:approvedMargin,current_budget:job.budgets!.at(-1)!,tasks,orders,
-  accounting:{entries:actualEntries(job).map(({matches,...entry})=>entry),reconciliation:state.reconciliations.at(-1)??null,issues:discrepancies(job),posted_actual_cents:ledger.totals.posted_actual_cents!,open_commitment_cents:ledger.totals.open_commitment_cents!,forecast:forecast?{id:forecast.id,source_digest:forecast.source_digest,current:forecastCurrent,as_of:forecast.as_of,final_cents:forecast.final_cents,remaining_cents:forecast.remaining_cents,margin_cents:forecast.margin_cents,assumptions:forecast.assumptions,codes:forecast.codes}:null},
+  accounting:{entries:entries.map(({matches,...entry})=>entry),reconciliation:latestReconciliation??null,periods,issues,posted_actual_cents:ledger.totals.posted_actual_cents!,open_commitment_cents:ledger.totals.open_commitment_cents!,forecast:forecast?{id:forecast.id,source_digest:forecast.source_digest,current:forecastCurrent,as_of:forecast.as_of,final_cents:forecast.final_cents,remaining_cents:forecast.remaining_cents,margin_cents:forecast.margin_cents,assumptions:forecast.assumptions,codes:forecast.codes}:null},
   boundary:'Native human-recorded evidence only. Accounting source declarations are not independently reconciled external actuals. Assessment never certifies physical completion or final recovery.'})
 }
 function compare(e:Evidence,c:Criteria){
@@ -71,12 +82,28 @@ function compare(e:Evidence,c:Criteria){
   const quantity_state=!compatible?'unknown':Number(installed!.quantity)>=Number(required.quantity)?'supported':'contradicted'
   return {task_id:task.id,confirmed:confirmations.some(i=>i.current&&i.responses.at(-1)?.kind==='confirm'),forecast_finish:task.end,observed_finish:actual?.actual_finish??null,installed:installed??null,date_state,forecast_date_state,quantity_state}
  })
- const deliveries=e.orders.map(({order,fulfillment:f})=>({order_id:order.id,acknowledged:!!order.acknowledgment,received_cents:f.received_cents,outstanding_cents:f.outstanding_cents,state:order.status==='cancelled'||!!order.returns?.length&&f.outstanding_cents>0?'contradicted':!order.lines?.length||!f.lines.length?'unknown':f.lines.every(l=>Number(l.outstanding)===0)?'supported':'unknown'}))
+ const deliveries=e.orders.map(({order,fulfillment:f})=>{
+  const observed_on=order.receipts.every(receipt=>receipt.received_on)&&order.receipts.length?order.receipts.map(receipt=>receipt.received_on!).sort().at(-1)!:null
+  const date_state=observed_on===null?'unknown':observed_on>c.promised_finish.slice(0,10)?'contradicted':'supported'
+  return {order_id:order.id,acknowledged:!!order.acknowledgment,received_cents:f.received_cents,outstanding_cents:f.outstanding_cents,observed_on,date_state,state:order.status==='cancelled'||!!order.returns?.length&&f.outstanding_cents>0?'contradicted':!order.lines?.length||!f.lines.length?'unknown':f.lines.every(l=>Number(l.outstanding)===0)?'supported':'unknown'}
+ })
  const a=e.accounting,observed_margin_cents=sum([e.current_budget.contract_cents,-a.posted_actual_cents]),forecast_margin_cents=a.forecast?.current?a.forecast.margin_cents:null
  const margin_state=e.approved_margin_cents===null?'unknown':observed_margin_cents<c.minimum_margin_cents||forecast_margin_cents!==null&&forecast_margin_cents<c.minimum_margin_cents?'contradicted':forecast_margin_cents!==null?'supported':'unknown'
- const missing=[...tasks.flatMap(t=>[...(t.date_state==='unknown'?['Task finish '+t.task_id]:[]),...(t.quantity_state==='unknown'?['Installed quantity '+t.task_id]:[]),...(!t.confirmed?['Trade confirmation '+t.task_id]:[])]),...deliveries.filter(d=>d.state==='unknown').map(d=>'Delivery '+d.order_id),...(e.approved_margin_cents===null?['Approved native margin basis']:[]),...(!a.reconciliation||a.issues.some(i=>['stale','ledger','unapproved','unmatched'].includes(i.kind))?['Complete current native accounting evidence']:[]),...(forecast_margin_cents===null?['Current native cost forecast']:[]),'Independently reconciled external accounting actuals and final human recovery decision']
- const contradicted=tasks.some(t=>t.date_state==='contradicted'||t.forecast_date_state==='contradicted'||t.quantity_state==='contradicted')||deliveries.some(d=>d.state==='contradicted')||margin_state==='contradicted'
+ const missing=[...tasks.flatMap(t=>[...(t.date_state==='unknown'?['Task finish '+t.task_id]:[]),...(t.quantity_state==='unknown'?['Installed quantity '+t.task_id]:[]),...(!t.confirmed?['Trade confirmation '+t.task_id]:[])]),...deliveries.flatMap(d=>[...(d.state==='unknown'?['Delivery '+d.order_id]:[]),...(d.date_state==='unknown'?['Delivery date '+d.order_id]:[])]),...(e.approved_margin_cents===null?['Approved native margin basis']:[]),...(!a.reconciliation||a.issues.some(issue=>!['budget','commitment'].includes(issue.kind))||!a.periods?.length||a.periods.some(period=>!period.current||period.balances.some(balance=>balance.difference_cents!==0))?['Complete current native accounting evidence']:[]),...(forecast_margin_cents===null?['Current native cost forecast']:[]),'Independently reconciled external accounting actuals and final human recovery decision']
+ const contradicted=tasks.some(t=>t.date_state==='contradicted'||t.forecast_date_state==='contradicted'||t.quantity_state==='contradicted')||deliveries.some(d=>d.state==='contradicted'||d.date_state==='contradicted')||margin_state==='contradicted'
  return {tasks,deliveries,posted_actual_cents:a.posted_actual_cents,observed_margin_cents,forecast_margin_cents,margin_state,native_status:contradicted?'contradicted':missing.length===1?'supported':'unverified',missing,overall_restoration:'unverified' as const}
+}
+/** Stable first-observation identities retain assignments when later observations carry them forward. */
+function residualRisks(row:RecoveryEvidenceCase,fresh=true){
+ const risks=new Map<string,{id:string;risk:Risk}>()
+ for(const assessment of row.assessments)assessment.risks.forEach((risk,index)=>{const key=JSON.stringify(risk);if(!risks.has(key))risks.set(key,{id:assessment.id+':'+index,risk})})
+ return [...risks.values()].map(({id,risk})=>{const decisions=(row.risk_decisions??[]).filter(decision=>decision.risk_id===id),latest=decisions.at(-1),needs_review=latest?.status==='resolved'&&(!fresh||latest.packet_id!==row.packets.at(-1)!.id);return {id,...risk,status:needs_review?'open':latest?.status??'open',needs_review,decisions}})
+}
+function caseState(row:RecoveryEvidenceCase,source:Evidence,fresh:boolean){
+ const comparison=compare(source,row.criteria),review=row.outcome_reviews?.at(-1),risks=residualRisks(row,fresh)
+ const priorSupport=!!review||row.assessments.some(assessment=>assessment.comparison.native_status==='supported')
+ const status=row.revoked_by?'revoked':comparison.native_status==='contradicted'&&priorSupport?'reopened':!fresh?'review_required':review?.packet_id===row.packets.at(-1)!.id?'native_supported':'open'
+ return {status,comparison,risks,open_risk_count:risks.filter(risk=>risk.status==='open').length,overall_restoration:'unverified' as const}
 }
 const owner=(actor:Actor)=>{requireOwner(actor);need(!actor.agent_door,'A signed-in owner reviews evidence',403,'human_required')}
 async function packet(db:D1Database,job:Job,c:Criteria,actor:Actor,input:Input){
@@ -86,6 +113,7 @@ async function packet(db:D1Database,job:Job,c:Criteria,actor:Actor,input:Input){
  return {id:crypto.randomUUID(),digest:hash,evidence:source,reviewed_by:stamp(actor)}
 }
 async function grant(db:D1Database,row:RecoveryEvidenceCase,p:Packet,actor:Actor){return db.prepare('INSERT OR REPLACE INTO pl_recovery_evidence_grants(case_id,packet_id,sponsor_id,sponsor_version) VALUES(?,?,?,?)').bind(row.id,p.id,actor.id,actor.version)}
+async function granted(db:D1Database,row:RecoveryEvidenceCase,actor:Actor){return !!await db.prepare('SELECT 1 FROM pl_recovery_evidence_grants WHERE case_id=? AND packet_id=? AND sponsor_id=? AND sponsor_version=?').bind(row.id,row.packets.at(-1)!.id,actor.id,actor.version).first()}
 async function current(db:D1Database,job:Job,row:RecoveryEvidenceCase,actor:Actor){
  need(!row.revoked_by,'Owner revoked this recovery case',403,'recovery_revoked')
  const p=row.packets.at(-1)!,g=await db.prepare('SELECT packet_id,sponsor_id,sponsor_version FROM pl_recovery_evidence_grants WHERE case_id=?').bind(row.id).first<{packet_id:string;sponsor_id:string;sponsor_version:number}>()
@@ -101,8 +129,9 @@ export async function recoveryEvidenceResponse(db:D1Database,job:Job,actor:Actor
  if(method==='GET'){
   if(!id){owner(actor);return {version:job.version,cases:rows}}
   const row=find(rows,id)
-  if(draftAgent){await current(db,job,row,actor);return {record:{id:row.id,title:row.title,criteria:row.criteria,packet:row.packets.at(-1),assessments:row.assessments},version:job.version}}
-  return {case:row,version:job.version,stale:await digest(await evidence(db,job,row.criteria))!==row.packets.at(-1)!.digest}
+  if(draftAgent){const p=await current(db,job,row,actor);return {record:{id:row.id,title:row.title,criteria:row.criteria,packet:p,assessments:row.assessments,state:caseState(row,p.evidence,true)},version:job.version}}
+  const source=await evidence(db,job,row.criteria),fresh=await digest(source)===row.packets.at(-1)!.digest
+  return {case:row,version:job.version,stale:!fresh,state:caseState(row,source,fresh&&await granted(db,row,actor))}
  }
  need(method==='POST'&&input,'Unknown recovery evidence door',404,'not_found');active(job)
  need(input.expected_version===job.version,'Job changed; reload before preparing evidence',409,'stale_version')
@@ -113,6 +142,24 @@ export async function recoveryEvidenceResponse(db:D1Database,job:Job,actor:Actor
   const row=find(next.recovery_evidence??[],id)
   if(action==='review'){owner(actor);need(!row.revoked_by,'Revoked cases remain revoked',403,'recovery_revoked');const p=await packet(db,job,row.criteria,actor,input);need(p.digest!==row.packets.at(-1)!.digest||!(await db.prepare('SELECT 1 FROM pl_recovery_evidence_grants WHERE case_id=? AND sponsor_id=? AND sponsor_version=?').bind(row.id,actor.id,actor.version).first()),'This exact evidence is already reviewed',409,'immutable');row.packets.push(p);writes=[await grant(db,row,p,actor)];record=p}
   else if(action==='revoke'){owner(actor);need(!row.revoked_by,'Case already revoked',409,'immutable');row.revoked_by=stamp(actor);writes=[db.prepare('DELETE FROM pl_recovery_evidence_grants WHERE case_id=?').bind(row.id)];record={revoked:true,id:row.id}}
+  else if(action==='risk-decision'||action==='review-outcome'){
+   owner(actor);const p=await current(db,job,row,actor),assessment=row.assessments.at(-1)
+   need(input.confirm===true,'Explicitly confirm this native review')
+   need(input.packet_id===p.id&&assessment?.packet_id===p.id&&input.assessment_id===assessment.id,'Review the latest assessment of the current evidence',409,'recovery_stale')
+   const reason=text(input.reason,'Review reason',2000)
+   if(action==='risk-decision'){
+    const risk=find(residualRisks(row),text(input.risk_id,'Residual risk',200))
+    need(input.status==='open'||input.status==='resolved','Choose open or resolved')
+    need(input.status!==risk.status,'This risk already has that status',409,'immutable')
+    const decision:RiskDecision={id:crypto.randomUUID(),risk_id:risk.id,packet_id:p.id,assessment_id:assessment.id,status:input.status,reason,by:stamp(actor)}
+    ;(row.risk_decisions??=[]).push(decision);record=decision
+   }else{
+    need(compare(p.evidence,row.criteria).native_status==='supported','Native delivery, progress, date, margin and accounting evidence must all support this review',409,'recovery_unverified')
+    need(row.outcome_reviews?.at(-1)?.packet_id!==p.id,'This native outcome already has a human review',409,'immutable')
+    const review:OutcomeReview={id:crypto.randomUUID(),packet_id:p.id,assessment_id:assessment.id,reason,by:stamp(actor)}
+    ;(row.outcome_reviews??=[]).push(review);record=review
+   }
+  }
   else if(action==='assess'){
    const p=await current(db,job,row,actor);need(input.packet_id===p.id,'Assess only the current reviewed packet',409,'recovery_stale')
    const observation_id=text(input.observation_id,'Observation identity',100),existing=row.assessments.find(a=>a.observation_id===observation_id)

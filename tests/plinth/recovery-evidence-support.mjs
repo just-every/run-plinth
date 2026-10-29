@@ -16,6 +16,14 @@ export async function recoveryEvidenceFixture(f){
  r=await c.ok('/recovery-evidence',{title:'Private recovery comparison',criteria,digest:review.digest,confirm:true});let recovery=r.record
  const refresh=async()=>{const p=await c.ok('/recovery-evidence/preview',{case_id:recovery.id});await c.ok(`/recovery-evidence/${recovery.id}/review`,{digest:p.digest,confirm:true});recovery=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${recovery.id}`)).value.case;return recovery}
  const observation=()=>({observation_id:'synthetic-plinth-observation-'+recovery.packets.at(-1).id,packet_id:recovery.packets.at(-1).id,observed_on:'2026-11-07',observation:'Native evidence compared; no final recovery decision',risks:[{description:'Obtain independently reconciled actuals and final human review',owner_id:c.job.created_by.id,due_on:'2026-11-30'}]})
- const assess=async()=>{const result=await c.ok(`/recovery-evidence/${recovery.id}/assess`,observation());recovery=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${recovery.id}`)).value.case;return result.record}
- return {c,order,criteria,forecast,refresh,assess,observation,trade,invitation,vendor:released.vendor,get recovery(){return recovery}}
+ const assess=async(input=observation())=>{const result=await c.ok(`/recovery-evidence/${recovery.id}/assess`,input);recovery=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${recovery.id}`)).value.case;return result.record}
+ const state=async()=>{const result=(await c.api(`/jobs/${c.job.id}/recovery-evidence/${recovery.id}`)).value;recovery=result.case;return result.state}
+ const reviewInput=()=>({packet_id:recovery.packets.at(-1).id,assessment_id:recovery.assessments.at(-1)?.id,confirm:true,reason:'Human reviews only the exact native outcome; independent accounting remains required'})
+ const completeNative=async()=>{
+  await c.ok(`/orders/${order.id}/receive`,{lines:[{line_id:'recovery-lot',quantity:'2'}],reference:'synthetic-plinth-native-delivery',received_on:'2026-11-06'})
+  await c.ok('/schedule-actuals',{task_id:criteria.tasks[0].task_id,actual_start:'2026-11-06T08:00:00Z',actual_finish:'2026-11-06T09:00:00Z',installed:{quantity:'2',unit:'pack',cost_code:'06-100'},evidence:'Human records the installed native lot'})
+  await c.ok('/costs/reconcile',{period:'2026-11',balances:[],reference:'Synthetic native review only; external accounting remains unproved'})
+  await forecast();await refresh();return assess()
+ }
+ return {c,order,criteria,forecast,refresh,assess,observation,state,reviewInput,completeNative,trade,invitation,vendor:released.vendor,get recovery(){return recovery}}
 }
