@@ -416,7 +416,7 @@ test('SUB-002 — owner review retains rejected originals, reconciles a linked c
   const {billReviewFixture,billBytes,correctedBytes,billFile}=await import('./subcontractor-bill-support.mjs')
   const email=n=>['synthetic-plinth-'+n,'example.invalid'].join('@'),sub={email:email(1),cookie:await f.invite(email(1))},admin={cookie:await f.invite(email(2),'Synthetic administrator','admin')},client={cookie:await f.invite(email(3))},agent=await f.agent()
   const api=(path,body,who)=>f.json('/api/plinth'+path,{cookie:who?.cookie??f.owner,...(who?.token?{token:who.token,cookie:undefined}:{}),...(body===undefined?{}:{method:'POST',body})})
-  const c=await billReviewFixture(api,{sub,clientEmail:email(3)}),external=await api('/subcontractor-portal/'+c.job.id,undefined,sub),clientBefore=(await api('/jobs/'+c.job.id,undefined,client)).value.job
+  const c=await billReviewFixture(api,{sub,clientEmail:email(3)});let external=await api('/subcontractor-portal/'+c.job.id,undefined,sub);const clientBefore=(await api('/jobs/'+c.job.id,undefined,client)).value.job
   const version=c.source.version
   for(const who of [sub,admin,client,{token:agent}]){
    assert.equal((await api(c.root,undefined,who)).status,403)
@@ -429,7 +429,14 @@ test('SUB-002 — owner review retains rejected originals, reconciles a linked c
   const rejection=structuredClone(c.source.register[0].cycles[0])
   assert.equal((await c.review('/review',rejected)).value.error,'review_immutable')
   assert.equal((await c.review('/prepare-draft',{cycle_id:c.submission,confirm:true})).status,409)
-  assert.equal((await c.review('/replace',{cycle_id:c.submission,reason:'Owner received corrected source from the same company',reference:'synthetic-plinth-corrected-2',note:'Corrected invoice received by the signed-in owner; no external delivery',amount_cents:64000,attachments:[billFile(correctedBytes)]})).status,200)
+  assert.equal((await c.review('/replace',{cycle_id:c.submission,reason:'Reject self-link',received_submission_id:c.submission})).value.error,'review_duplicate')
+  const receivedCorrection=await api('/subcontractor-portal/'+c.job.id+'/bills',{expected_version:c.source.version,subcontract_id:c.scope.id,reference:'synthetic-plinth-received-correction',note:'Corrected company original received through the existing external intake',amount_cents:64000,attachments:[billFile(correctedBytes)]},sub)
+  assert.equal(receivedCorrection.status,200);external=await api('/subcontractor-portal/'+c.job.id,undefined,sub);await c.read()
+  assert.equal((await c.review('/replace',{cycle_id:c.submission,reason:'Owner linked the actual corrected external submission',received_submission_id:receivedCorrection.value.record_id})).status,200)
+  assert.equal(c.source.register.length,1);assert.equal(c.source.register[0].cycles[1].received_submission_id,receivedCorrection.value.record_id)
+  const linkedCycle=c.source.register[0].cycles[1]
+  assert.equal((await c.review('/review',{cycle_id:linkedCycle.id,commitment_digest:c.source.register[0].commitment_digest,outcome:'rejected',reason:'Corrected original still requires a source clarification',confirm:true})).status,200)
+  assert.equal((await c.review('/replace',{cycle_id:linkedCycle.id,reason:'Owner received corrected source from the same company',reference:'synthetic-plinth-corrected-2',note:'Corrected invoice received by the signed-in owner; no external delivery',amount_cents:64000,attachments:[billFile(correctedBytes)]})).status,200)
   assert.equal(c.source.unresolved,1);assert.deepEqual(c.source.register[0].cycles[0],rejection)
   assert.equal((await c.review('/review',{...c.accept(),cycle_id:c.submission})).value.error,'review_revision')
   assert.equal((await c.review('/review',{...c.accept(),expected_version:version})).value.error,'stale_version')
@@ -441,7 +448,7 @@ test('SUB-002 — owner review retains rejected originals, reconciles a linked c
   const mismatch=c.accept();mismatch.lines[1].subtotal_cents=19999
   assert.equal((await c.review('/review',mismatch)).value.error,'review_total')
   assert.equal((await c.review('/review',c.accept())).status,200)
-  assert.equal(c.source.unresolved,0);assert.equal(c.source.register[0].cycles.length,2)
+  assert.equal(c.source.unresolved,0);assert.equal(c.source.register[0].cycles.length,3)
   const cycle=c.source.register[0].cycles.at(-1),decision=structuredClone(cycle.decision)
   assert.deepEqual(decision.lines.map(l=>[l.cost_code,l.subtotal_cents]),[['06-100',40000],['01-100',20000]])
   const beforeLedger=(await api('/jobs/'+c.job.id+'/costs')).value
@@ -461,7 +468,7 @@ test('SUB-002 — owner review retains rejected originals, reconciles a linked c
   assert.equal((await api('/jobs/'+c.job.id+'/costs')).value.totals.payable_cents,beforeLedger.totals.payable_cents)
   assert.equal(f.messages.length,providerCalls,'No review or handoff calls a delivery or financial provider')
   const original=(await api(c.root)).value.register[0].cycles
-  for(const [cycle,bytes] of [[original[0],billBytes],[original[1],correctedBytes]]){
+  for(const [cycle,bytes] of [[original[0],billBytes],[original[1],correctedBytes],[original[2],correctedBytes]]){
    const path=c.root+'/files/'+cycle.attachments[0].id
    const download=await f.request('/api/plinth'+path,{cookie:f.owner});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),bytes)
    for(const who of [admin,sub,client,{token:agent}])assert.equal((await api(path,undefined,who)).status,403)
