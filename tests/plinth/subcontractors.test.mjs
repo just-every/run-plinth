@@ -409,3 +409,71 @@ test('BID-001 — three qualified contacts receive pre-award and released scoped
   for(const path of [`/api/plinth/jobs/${job.id}`,'/api/plinth/jobs']){const visible=await f.json(path,{token:agent});assert.equal(visible.status,200);assert.equal((visible.value.job??visible.value.jobs.find(j=>j.id===job.id)).bids,undefined,'Generic agent job doors do not expose private bids')}
  }finally{await f.close()}
 })
+
+test('SUB-002 — owner review retains rejected originals, reconciles a linked correction, and refuses stale, nonowner and replayed draft preparation without changing external grants',async()=>{
+ const f=await createFixture()
+ try{
+  const {billReviewFixture,billBytes,correctedBytes,billFile}=await import('./subcontractor-bill-support.mjs')
+  const email=n=>['synthetic-plinth-'+n,'example.invalid'].join('@'),sub={email:email(1),cookie:await f.invite(email(1))},admin={cookie:await f.invite(email(2),'Synthetic administrator','admin')},client={cookie:await f.invite(email(3))},agent=await f.agent()
+  const api=(path,body,who)=>f.json('/api/plinth'+path,{cookie:who?.cookie??f.owner,...(who?.token?{token:who.token,cookie:undefined}:{}),...(body===undefined?{}:{method:'POST',body})})
+  const c=await billReviewFixture(api,{sub,clientEmail:email(3)}),external=await api('/subcontractor-portal/'+c.job.id,undefined,sub),clientBefore=(await api('/jobs/'+c.job.id,undefined,client)).value.job
+  const version=c.source.version
+  for(const who of [sub,admin,client,{token:agent}]){
+   assert.equal((await api(c.root,undefined,who)).status,403)
+   assert.equal((await c.review('/review',{...c.accept(),outcome:'rejected'},who)).status,403)
+  }
+  const rejected={cycle_id:c.submission,commitment_digest:c.source.register[0].commitment_digest,outcome:'rejected',reason:'Original includes an unsupported charge; retain it and request correction',confirm:true}
+  assert.equal((await c.review('/review',{...rejected,reason:''})).status,400)
+  assert.equal((await c.review('/review',rejected)).status,200)
+  assert.equal(c.source.unresolved,1);assert.equal(c.source.register[0].status,'Revision required')
+  const rejection=structuredClone(c.source.register[0].cycles[0])
+  assert.equal((await c.review('/review',rejected)).value.error,'review_immutable')
+  assert.equal((await c.review('/prepare-draft',{cycle_id:c.submission,confirm:true})).status,409)
+  assert.equal((await c.review('/replace',{cycle_id:c.submission,reason:'Owner received corrected source from the same company',reference:'synthetic-plinth-corrected-2',note:'Corrected invoice received by the signed-in owner; no external delivery',amount_cents:64000,attachments:[billFile(correctedBytes)]})).status,200)
+  assert.equal(c.source.unresolved,1);assert.deepEqual(c.source.register[0].cycles[0],rejection)
+  assert.equal((await c.review('/review',{...c.accept(),cycle_id:c.submission})).value.error,'review_revision')
+  assert.equal((await c.review('/review',{...c.accept(),expected_version:version})).value.error,'stale_version')
+  assert.equal((await c.review('/review',{...c.accept(),commitment_digest:'synthetic-plinth-wrong-source'})).value.error,'review_source')
+  const over=c.accept();over.lines[0].subtotal_cents=100001
+  assert.equal((await c.review('/review',over)).value.error,'review_overbill')
+  const wrong=c.accept();wrong.lines[0].order_id='synthetic-plinth-other-order';assert.equal((await c.review('/review',wrong)).status,404)
+  const missingTax=c.accept();missingTax.tax.human_reviewed=false;assert.equal((await c.review('/review',missingTax)).status,400)
+  const mismatch=c.accept();mismatch.lines[1].subtotal_cents=19999
+  assert.equal((await c.review('/review',mismatch)).value.error,'review_total')
+  assert.equal((await c.review('/review',c.accept())).status,200)
+  assert.equal(c.source.unresolved,0);assert.equal(c.source.register[0].cycles.length,2)
+  const cycle=c.source.register[0].cycles.at(-1),decision=structuredClone(cycle.decision)
+  assert.deepEqual(decision.lines.map(l=>[l.cost_code,l.subtotal_cents]),[['06-100',40000],['01-100',20000]])
+  const beforeLedger=(await api('/jobs/'+c.job.id+'/costs')).value
+  const providerCalls=f.messages.length
+  const handoff={cycle_id:cycle.id,decision_id:decision.id,confirm:true}
+  assert.equal((await c.review('/prepare-draft',{...handoff,confirm:false})).status,400)
+  for(const who of [admin,sub,client,{token:agent}])assert.equal((await c.review('/prepare-draft',handoff,who)).status,403)
+  assert.equal((await c.review('/prepare-draft',handoff)).status,200)
+  const billId=c.source.record.bill_id
+  assert.equal((await c.review('/prepare-draft',handoff)).value.error,'review_handoff')
+  assert.equal((await c.review('/review',c.accept())).value.error,'review_immutable')
+  const bills=(await api('/jobs/'+c.job.id+'/costs/bills')).value.bills
+  assert.equal(bills.length,1);assert.equal(bills[0].id,billId);assert.equal(bills[0].status,'draft')
+  assert.equal(bills[0].amount_cents,64000);assert.equal(bills[0].tax.tax_cents,4000)
+  assert.equal(bills[0].subcontractor_review.decision_id,decision.id)
+  assert.equal((await api('/jobs/'+c.job.id+'/costs')).value.totals.posted_actual_cents,0)
+  assert.equal((await api('/jobs/'+c.job.id+'/costs')).value.totals.payable_cents,beforeLedger.totals.payable_cents)
+  assert.equal(f.messages.length,providerCalls,'No review or handoff calls a delivery or financial provider')
+  const original=(await api(c.root)).value.register[0].cycles
+  for(const [cycle,bytes] of [[original[0],billBytes],[original[1],correctedBytes]]){
+   const path=c.root+'/files/'+cycle.attachments[0].id
+   const download=await f.request('/api/plinth'+path,{cookie:f.owner});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),bytes)
+   for(const who of [admin,sub,client,{token:agent}])assert.equal((await api(path,undefined,who)).status,403)
+  }
+  const native=await f.request('/api/plinth/jobs/'+c.job.id+'/costs/bills/'+billId+'/original',{cookie:f.owner});assert.deepEqual(Buffer.from(await native.arrayBuffer()),correctedBytes)
+  const afterExternal=(await api('/subcontractor-portal/'+c.job.id,undefined,sub)).value.source
+  assert.deepEqual({...afterExternal,version:external.value.source.version},external.value.source,'Only optimistic version changes; external records, statuses, search and grants stay unchanged')
+  const afterClient=(await api('/jobs/'+c.job.id,undefined,client)).value.job
+  assert.deepEqual({...afterClient,version:clientBefore.version},clientBefore)
+  for(const who of [admin,client,{token:agent}])assert.equal((await api('/jobs/'+c.job.id,undefined,who)).value.job.subcontractor_bill_reviews,undefined)
+  await f.request('/auth/signout',{method:'POST',cookie:f.owner,body:{}})
+  assert.equal((await api(c.root)).status,401)
+  assert.equal((await c.review('/prepare-draft',handoff)).status,401,'A revoked owner session cannot replay a capture')
+ }finally{await f.close()}
+})

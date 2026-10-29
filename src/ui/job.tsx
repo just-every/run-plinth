@@ -1,3 +1,4 @@
+import {SubcontractorBillReview} from './subcontractor-bill-review'
 import { RoomBoards } from './room-boards'
 import { FollowupPreferences } from './followup-rules'
 import { PlanWorkspace } from './plans'
@@ -88,7 +89,7 @@ export function JobWorkspace({ id, role, onBack, onChange }: {id: string; role: 
       {open === 'Daily logs' && <DailyLogs {...props} />}
       {open === 'Changes' && <Changes {...props} />}
       {open === 'Selections' && <Selections {...props} />}
-      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} />{manager&&<Submittals job={job} refresh={refresh}/>}<Subcontracts {...props} />{manager&&<SubcontractorRecords jobId={job.id}/>}</>}
+      {open === 'Purchasing' && <>{manager&&<Products job={job} mutate={mutate}/>}<Orders {...props} />{manager&&<Submittals job={job} refresh={refresh}/>}<Subcontracts {...props} />{manager&&<SubcontractorRecords jobId={job.id}/>}{role==='owner'&&<SubcontractorBillReview jobId={job.id} changed={refresh}/>}</>}
       {open === 'Billing' && <Billing {...props} />}
       {open === 'Customer' && manager && <JobCustomer {...props} />}
       {open === 'RFIs' && manager && <RfiWorkspace {...props}/>}
