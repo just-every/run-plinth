@@ -1,10 +1,56 @@
 import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
+import {closeoutFixture,closeoutAddress,closeoutMcp} from './closeout-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createActiveJob, createFixture, createReleasedScope } from './helpers.mjs'
+test('Closeout packets retain exact private evidence and unsent history; stale, cross-job, revoked and erased MCP requests cannot act',async()=>{
+ const f=await createFixture();try{
+  const client=await f.invite(closeoutAddress('client')),admin=await f.invite(closeoutAddress('admin'),'Closeout administrator','admin')
+  const c=await closeoutFixture(f),token=await f.agent(),mcp=await closeoutMcp(f,token),packet=await c.capture()
+  const args={job_id:c.job.id,record_id:packet.id}
+  assert.equal((await mcp('plinth.closeout.read',args)).result,undefined,'Unreviewed private evidence is unavailable to agents')
+  for(const cookie of [client,admin])assert.equal((await f.json(c.root+'/agent-closeout',{cookie})).status,403)
+  assert.equal((await f.json(c.root,{cookie:client})).value.job.agent_closeout,undefined)
+  assert.equal((await f.json(c.root,{token})).value.job.agent_closeout,undefined,'The general job projection cannot bypass packet review')
+  assert.equal(packet.comparisons.find(r=>r.requirement_id==='manual').state,'missing_evidence')
+  assert.equal(packet.unresolved[0].id,c.issue.id);assert.equal(packet.unresolved[0].state,'open')
+  const source=packet.sources.find(s=>s.key===c.sourceKeys[0]);assert.equal(source.revision_id,c.spec.revisions[0].id);assert.equal(source.file.checksum,c.spec.revisions[0].file.checksum)
+  const original=await f.request(source.original_path,{cookie:f.owner});assert.equal(original.status,200)
+  const {handoverDocument}=await import('../fixtures/handover-document.mjs');assert.deepEqual(Buffer.from(await original.arrayBuffer()),handoverDocument('Window specification'))
+  assert.ok([403,404].includes((await f.request(source.original_path,{cookie:client})).status))
+  await c.review(packet)
+  let r=await mcp('plinth.closeout.read',args);assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.result.record.digest,packet.digest)
+  const before=await c.read(),messages=f.messages.length,body=c.draft(packet)
+  r=await mcp('plinth.closeout.followup',{...args,input:body});assert.equal(r.result?.record.status,'unsent',JSON.stringify(r.value));const first=r.result.record
+  r=await mcp('plinth.closeout.followup',{...args,input:body});assert.equal(r.result.record.id,first.id,'Identical replay returns the one retained draft')
+  assert.equal((await c.act('/agent-closeout/'+packet.id+'/drafts',{...body,message:'Changed terms under the same request id'})).status,409)
+  await c.ok('/agent-closeout/'+packet.id+'/drafts',{...body,request_id:'synthetic-plinth-request-2',kind:'request',message:'Alternative unsent request; preserve the first proposal'})
+  const history=(await c.list()).value.packets[0];assert.equal(history.drafts.length,2);assert.deepEqual(history.drafts[0],first)
+  const after=await c.read();for(const key of ['punch','warranties','schedules','orders','claims','handover'])assert.deepEqual(after[key],before[key],key)
+  assert.equal(f.messages.length,messages,'Packet reads and drafts make no provider calls')
+  assert.equal((await mcp('plinth.closeout.read',{...args,job_id:(await createActiveJob(f,'Other closeout job')).id})).result,undefined)
+  assert.equal((await c.act('/agent-closeout',{title:'Foreign source',source_keys:['document:foreign'],requirements:c.requirements})).status,404)
+  const revised=await c.document('selection','Window specification',c.spec)
+  assert.equal((await mcp('plinth.closeout.read',args)).result,undefined,'Changed originals invalidate the reviewed packet')
+  assert.equal((await mcp('plinth.closeout.followup',{...args,input:{...body,request_id:'synthetic-plinth-stale'}})).result,undefined)
+  assert.deepEqual((await c.list()).value.packets[0],history,'Stale reads and writes preserve all draft history')
+  const next=await c.capture({source_keys:[...c.sourceKeys.slice(1),'document:'+revised.revisions[1].id],requirements:c.requirements.map(r=>r.id==='specification'?{...r,source_keys:['document:'+revised.revisions[1].id]}:r)})
+  await c.review(next)
+  const credential=(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials.find(c=>!c.revoked_at)
+  assert.equal((await f.request('/api/plinth/agent-credentials/'+credential.id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
+  assert.equal((await mcp('plinth.closeout.read',{job_id:c.job.id,record_id:next.id})).status,401)
+  assert.equal((await mcp('plinth.closeout.followup',{job_id:c.job.id,record_id:next.id,input:c.draft(next)})).status,401)
+  const fresh=await closeoutMcp(f,await f.agent()),replayArgs={job_id:c.job.id,record_id:next.id,input:c.draft(next),idempotency_key:'synthetic-plinth-erasure-replay'}
+  assert.equal((await fresh('plinth.closeout.followup',replayArgs)).result.record.status,'unsent');await c.read()
+  assert.equal((await f.json(c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:c.job.version}})).status,200)
+  assert.equal((await fresh('plinth.closeout.followup',replayArgs)).result,undefined,'An exact MCP idempotency replay cannot return erased draft content')
+  assert.equal((await fresh('plinth.closeout.read',{job_id:c.job.id,record_id:next.id})).result,undefined)
+  assert.equal((await fresh('plinth.closeout.followup',{job_id:c.job.id,record_id:next.id,input:c.draft(next)})).result,undefined,'Captured packets cannot resurrect erased jobs')
+ }finally{await f.close()}
+})
 // Six public business flows share one real Worker to keep local resource use small.
 test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const f=await createFixture();try{
