@@ -6,9 +6,10 @@ import {
 } from '../modules/import-kit/src/d1/index.ts'
 import { authorize, requireOwner } from './auth.ts'
 import { DomainError, need } from './model.ts'
-import { acceptedJobsSource, IMPORT_LIMITS } from './import-source.ts'
+import { acceptedJobsSource, sourceDeclaration, IMPORT_VERSION, IMPORT_LIMITS } from './import-source.ts'
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
+import { coverageReport, importCoverage } from './import-coverage.ts'
 import { auditStatement } from './audit.ts'
 
 const respond = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
@@ -74,21 +75,41 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
     if (request.method === 'POST' && (route === '/preview' || route === '/commit')) {
       const input = await body(request)
       need(typeof input.csv === 'string', 'csv must be a string')
-      const { source, rows } = acceptedJobsSource(input.csv)
-      const plan = await planD1Import(source, acceptedJobsMapping(actor), context)
-      if (route === '/preview') return respond({ fingerprint: plan.fingerprint, counts: plan.counts, diagnostics: plan.diagnostics, rows, adoption: 'draft', limits: IMPORT_LIMITS })
+      need(input.mappingRevision === undefined || input.mappingRevision === IMPORT_VERSION, 'Mapping revision changed. Preview the current mapping again.', 409, 'REVIEW_FINGERPRINT_MISMATCH')
+      let parsed
+      try { parsed = acceptedJobsSource(input.csv, sourceDeclaration(input.declaration)) }
+      catch (error) {
+        if (error instanceof DomainError && error.code === 'invalid_csv' && (error.details as any)?.inspection) return respond({ error: error.code, message: error.message, coverage: coverageReport((error.details as any).inspection) }, 400)
+        throw error
+      }
+      const { source, rows, inspection } = parsed
+      let plan = await planD1Import(source, acceptedJobsMapping(actor), context)
+      // Recognize unchanged intake approved before coordinate reporting existed.
+      // Only an exact retained operation may use that older representation.
+      if (!inspection.declaration) {
+        const legacy = await planD1Import(acceptedJobsSource(input.csv, undefined, true).source, acceptedJobsMapping(actor), context)
+        const previous = await env.DB.prepare('SELECT id FROM ik_jobs WHERE operation_key=? AND destination=? AND namespace=? AND principal_id=?').bind('accepted-jobs:' + legacy.fingerprint, context.destination, context.namespace, context.authorization.principalId).first()
+        if (previous) plan = legacy
+      }
+      if (route === '/preview') return respond({ fingerprint: plan.fingerprint, counts: plan.counts, diagnostics: plan.diagnostics, rows, coverage: await importCoverage(context, { plan, inspection }), adoption: 'draft', limits: IMPORT_LIMITS })
       need(typeof input.fingerprint === 'string' && /^[a-f0-9]{64}$/.test(input.fingerprint), 'Approve the preview fingerprint before importing')
       need(input.fingerprint === plan.fingerprint, 'The CSV changed after preview. Preview and approve it again.', 409, 'REVIEW_FINGERPRINT_MISMATCH')
+      const prior = await env.DB.prepare('SELECT id FROM ik_jobs WHERE operation_key=? AND destination=? AND namespace=? AND principal_id=?').bind('accepted-jobs:' + plan.fingerprint, context.destination, context.namespace, context.authorization.principalId).first()
+      if (!prior) {
+        const coverage = await importCoverage(context, { plan, inspection })
+        if (coverage.rows.some(row => row.disposition === 'conflict' || row.disposition === 'erased')) return respond({ error: 'SOURCE_CONFLICT', message: 'Existing source or native work conflicts. No rows were imported; inspect coverage.', coverage }, 409)
+      }
       const approved = { ...context, reviewedFingerprint: input.fingerprint, operationKey: `accepted-jobs:${input.fingerprint}` }
       const created = await createD1ImportJob(plan, approved)
       const job = created.state === 'queued' || created.state === 'applying' ? await applyD1ImportBatches(created.id, approved) : created
       await env.DB.batch([auditStatement(env.DB, actor, { detail: { job_id: job.id, fingerprint: input.fingerprint } })])
       return respond({ job })
     }
-    const match = /^\/([^/]+)(?:\/(resume|undo|rollback|originals|report))?$/.exec(route)
+    const match = /^\/([^/]+)(?:\/(resume|undo|rollback|originals|report|coverage))?$/.exec(route)
     if (match) {
       const id = decodeURIComponent(match[1]), action = match[2]
       if (request.method === 'GET' && !action) return respond({ job: await readD1ImportJob(id, context) })
+      if (request.method === 'GET' && action === 'coverage') return respond({ coverage: await importCoverage(context, { id }) })
       if (request.method === 'GET' && action === 'originals') return respond({ originals: await readD1ImportOriginals(id, context) })
       if (request.method === 'GET' && action === 'report') return respond({ report: await readD1ImportUndoReport(id, context) })
       if (request.method === 'POST' && action === 'resume') { const job = await resumeD1Import(id, context); await env.DB.batch([auditStatement(env.DB, actor, { subject_id: id })]); return respond({ job }) }
