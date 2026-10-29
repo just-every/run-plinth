@@ -1,4 +1,5 @@
-import { createAgentDoor, ToolRefusal, type AgentDoorOptions, type Runtime, type ToolContext, type ResourceDefinition, type Trust } from '../../modules/agent-door/index.ts'
+import { forecastResponseGuard, forecastResultRefusal } from '../agent-forecast'
+import { createAgentDoor, ToolRefusal, type AgentDoor, type AgentDoorOptions, type Runtime, type ToolContext, type ResourceDefinition, type Trust } from '../../modules/agent-door/index.ts'
 import { authConfig, businessSettings, operatorAuth, runtimeBindings, type Bindings } from '../../auth.server'
 import { nativeCall, safe } from './native'
 import { recordClasses } from './classes'
@@ -18,7 +19,7 @@ export const notTools=[
  {clauses:['INT-006','INT-009','INT-011'],reason:'connector' as const},
  {clauses:['NATIVE-014','BOUND-003'],reason:'installation' as const},
 ]
-export function plinthAgentDoor(original: Bindings) {
+export function plinthAgentDoor(original: Bindings):AgentDoor {
  const env=runtimeBindings(original),auth=operatorAuth(env)
  const resources:ResourceDefinition[]=[{uriTemplate:'plinth://jobs/{id}',name:'Native job',description:'Current native projection; imported and external text is untrusted.',scope:'jobs:read',mimeType:'application/json',classes:['standard','sensitive'],classify:record=>recordClasses(record.json),async read(uri,ctx){
   const match=/^plinth:\/\/jobs\/([^/?#]+)$/.exec(uri);if(!match)return null
@@ -51,7 +52,7 @@ export function plinthAgentDoor(original: Bindings) {
     if(principal){try{await nativeCall(env,principal.person,'agent-learning/packets/'+encodeURIComponent(String(message.params?.arguments?.packet_id)),'GET',undefined,{agent:principal.agent} as ToolContext)}catch(error){if(error instanceof ToolRefusal)return Response.json({jsonrpc:'2.0',id:message.id??null,error:{code:-32000,message:'Reviewed learning source unavailable',data:{code:error.code}}},{headers:{'cache-control':'no-store'}});throw error}}
    }
   }
-  return door.handle(request)
- }}
+  const response=await door.handle(request);return response?forecastResponseGuard(env,response):response
+ },async invoke(name,args,who){const result=await door.invoke(name,args,who),code=await forecastResultRefusal(env,result.result,result.decision?.revision);return code?{outcome:'refused' as const,code,decision:result.decision}:result}}
 }
 

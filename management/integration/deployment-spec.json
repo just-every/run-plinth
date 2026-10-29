@@ -312,6 +312,12 @@
       "name": "202610291201_agent_forecast_reviews.sql",
       "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
       "sql": "-- Reviewed forecast contents are portable history; execution authority is installation-local.\nCREATE TABLE pl_agent_forecast_reviews(\n request_id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n owner_id TEXT NOT NULL,\n digest TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610291202_agent_forecast_custody.sql",
+      "sha256": "7c18e28b28f8b2944e36aefd5b2ee472c2f4ade96495e06fa8408cde4e65f8fe",
+      "sql": "-- Erasure removes private forecast copies retained by transport replay and review receipts.\nCREATE TRIGGER pl_agent_forecast_erasure BEFORE DELETE ON pl_jobs BEGIN\n DELETE FROM agent_door_calls\n WHERE json_extract(outcome,'$.result.record.packet.format')='plinth-agent-forecast-v1'\n   AND json_extract(outcome,'$.result.record.packet.job_id')=OLD.id;\n DELETE FROM agent_door_approvals\n WHERE json_extract(saved,'$.tool') IN ('plinth.forecast.read','plinth.forecast.prepare')\n   AND json_extract(saved,'$.args.job_id')=OLD.id;\n DELETE FROM agent_door_reviews\n WHERE json_extract(saved,'$.tool') IN ('plinth.forecast.read','plinth.forecast.prepare')\n   AND json_extract(saved,'$.args.job_id')=OLD.id;\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
