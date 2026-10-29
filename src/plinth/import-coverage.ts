@@ -85,9 +85,11 @@ export async function importCoverage(context: D1ImportContext, input: { plan: Im
       } else { disposition = 'conflict'; reason = sameSource ? 'Native work changed; retained without overwrite' : 'Source identity or target already exists with different reviewed content' }
     } else if (imported) { disposition = 'reversed'; reason = 'Imported record was reversed; no native record remains' }
     const fields = inspection?.table[index]
+    const coordinates = (entry.source.payload as { source_coordinates?: { row: number; columns: { field: string; column: number; line: number; character: number }[] } }).source_coordinates
+    const retainedColumns = coordinates?.columns
     rows.push({
-      row: entry.source.location.row ?? index + 2, externalId: entry.source.sourceId, targetId: id, disposition, reason, imported,
-      columns: fields?.map((cell, i) => ({ field: inspection!.header[i]?.value ?? '', column: i + 1, line: cell.location.line, character: cell.location.character, treatment: treatments[inspection!.header[i]?.value] ?? 'Unsupported' })),
+      row: coordinates?.row ?? entry.source.location.row ?? index + 2, externalId: entry.source.sourceId, targetId: id, disposition, reason, imported,
+      columns: retainedColumns?.map(cell => ({ ...cell, treatment: treatments[cell.field] ?? 'Unsupported' })) ?? fields?.map((cell, i) => ({ field: inspection!.header[i]?.value ?? '', column: i + 1, line: cell.location.line, character: cell.location.character, treatment: treatments[inspection!.header[i]?.value] ?? 'Unsupported' })),
     })
   }
   await readAtomic(context, guards)

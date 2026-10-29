@@ -79,6 +79,9 @@ jobs:
       - name: Exercise installed signed change execution
         if: matrix.journey == 'cost-billing'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs signed-changes
+      - name: Exercise reviewed CSV coverage and custody
+        if: matrix.journey == 'plans'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs import-coverage
       - name: Exercise installed owner follow-up rules
         if: matrix.journey == 'bid-follow-up'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs followup-rules

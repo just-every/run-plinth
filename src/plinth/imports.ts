@@ -83,7 +83,14 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
         throw error
       }
       const { source, rows, inspection } = parsed
-      const plan = await planD1Import(source, acceptedJobsMapping(actor), context)
+      let plan = await planD1Import(source, acceptedJobsMapping(actor), context)
+      // Recognize unchanged intake approved before coordinate reporting existed.
+      // Only an exact retained operation may use that older representation.
+      if (!inspection.declaration) {
+        const legacy = await planD1Import(acceptedJobsSource(input.csv, undefined, true).source, acceptedJobsMapping(actor), context)
+        const previous = await env.DB.prepare('SELECT id FROM ik_jobs WHERE operation_key=? AND destination=? AND namespace=? AND principal_id=?').bind('accepted-jobs:' + legacy.fingerprint, context.destination, context.namespace, context.authorization.principalId).first()
+        if (previous) plan = legacy
+      }
       if (route === '/preview') return respond({ fingerprint: plan.fingerprint, counts: plan.counts, diagnostics: plan.diagnostics, rows, coverage: await importCoverage(context, { plan, inspection }), adoption: 'draft', limits: IMPORT_LIMITS })
       need(typeof input.fingerprint === 'string' && /^[a-f0-9]{64}$/.test(input.fingerprint), 'Approve the preview fingerprint before importing')
       need(input.fingerprint === plan.fingerprint, 'The CSV changed after preview. Preview and approve it again.', 409, 'REVIEW_FINGERPRINT_MISMATCH')

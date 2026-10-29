@@ -27,7 +27,7 @@ export function sourceDeclaration(input: unknown): SourceDeclaration | undefined
   const sourceSystem = text('sourceSystem', 120), extractionScope = text('extractionScope', 500), extractedAt = text('extractedAt', 40)
   need(!extractedAt || (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(extractedAt) && Number.isFinite(Date.parse(extractedAt)) && new Date(extractedAt).toISOString().replace('.000Z', 'Z') === extractedAt.replace('.000Z', 'Z')), 'Extraction time must be a valid UTC timestamp')
   need(value.verified === undefined || value.verified === false, 'Source declarations are always unverified')
-  return { sourceSystem, extractionScope, extractedAt, verified: false }
+  return sourceSystem || extractionScope || extractedAt ? { sourceSystem, extractionScope, extractedAt, verified: false } : undefined
 }
 
 /** Record and column are one-based CSV coordinates; line and character identify
@@ -95,13 +95,17 @@ export function inspectAcceptedJobs(csv: string, declaration?: SourceDeclaration
   return { sha256: sha256(bytes), bytes: bytes.length, header, table, rows, diagnostics, ...(declaration ? { declaration } : {}) }
 }
 
-export function acceptedJobsSource(csv: string, declaration?: SourceDeclaration): { source: SourceBundle; rows: AcceptedJobRow[]; inspection: CsvInspection } {
+export function acceptedJobsSource(csv: string, declaration?: SourceDeclaration, legacy = false): { source: SourceBundle; rows: AcceptedJobRow[]; inspection: CsvInspection } {
   const inspection = inspectAcceptedJobs(csv, declaration)
   if (inspection.diagnostics.length) throw new DomainError('invalid_csv', inspection.diagnostics[0].message, 400, { inspection })
   const { rows, sha256: hash, bytes: size } = inspection
   return { rows, inspection, source: {
     diagnostics: [],
     artifacts: [{ name: 'accepted-jobs.csv', sha256: hash, size, original: { status: 'available', base64: Buffer.from(csv, 'utf8').toString('base64') } }],
-    records: rows.map((row, index) => ({ namespace: IMPORT_NAMESPACE, kind: 'accepted-job', sourceId: row.external_id, payload: { ...row }, payloadHash: sha256(canonicalJson(row)), artifactHash: hash, location: { artifact: 'accepted-jobs.csv', row: index + 2 } })),
+    records: rows.map((row, index) => {
+      const coordinates = { row: index + 2, columns: inspection.table[index].map((cell, i) => ({ field: inspection.header[i].value, column: i + 1, line: cell.location.line, character: cell.location.character })) }
+      const payload = { ...row, ...(!legacy ? { source_coordinates: coordinates } : {}) }
+      return { namespace: IMPORT_NAMESPACE, kind: 'accepted-job', sourceId: row.external_id, payload, payloadHash: sha256(canonicalJson(payload)), artifactHash: hash, location: { artifact: 'accepted-jobs.csv', row: index + 2 } }
+    }),
   } }
 }
