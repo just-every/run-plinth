@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -520,7 +520,7 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `AGENT-002` | Recover date and margin together | push-further | missing |  | No recovery planning or cross-record decision workflow exists. |
 | `AGENT-003` | Verify promised date and margin restoration | push-further | missing |  | No outcome-tracking recovery cases or verification exist. |
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |
-| `AGENT-005` | Find missing or duplicate job costs | push-further | missing |  | No cost-match agent or actual-cost correction packets exist. |
+| `AGENT-005` | Find missing or duplicate job costs | push-further | partial | `tests/plinth/cost-ledger.test.mjs` — Owner pre-draw reconciliation cites duplicate originals and unposted labor; reviewed MCP suggestions preserve every human financial gate. Native diagnostic and reviewed draft packet doors are documented in `docs/COST-RECONCILIATION.md`. | Owner-requested native diagnostics and proposed coding, matching and correction packets are implemented. Complete maintained cost-match agent execution, field quantity attestation, accounts-staff correction follow-through and live accounting and payroll reconciliation remain owed. Native bill lines lack attested billed quantities; monetary matches never attest physical quantities. INT-001, INT-002, INT-003 and INT-010 require authorized accounting and Gusto grants not provided to this run. FIELD-002 retains its design and installed-screen obligations; ROLE-005 and ROLE-006 retain their recorded policy boundaries. Existing human review, posting, payroll, payment, exception clearance and private pay restrictions remain unchanged. |
 | `AGENT-006` | Keep handover and warranty promises | push-further | missing |  | No handover/warranty agent or closure workflow exists. |
 | `AGENT-007` | Cited project answers and draft actions | push-further | missing |  | Draft bearer commands exist, but no grounded AI question answering, risk summaries or AI action preparation exists. |
 | `AGENT-008` | Scheduled agents with human control | push-further | missing |  | No scheduled AI runner, source grants or outcome/budget controls exist. |

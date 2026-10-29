@@ -1,3 +1,4 @@
+import { costReconciliationResponse } from './agent-cost-reconciliation'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -128,6 +129,7 @@ async function body(request:Request):Promise<Input>{need((request.headers.get('c
 async function handle(request:Request,original:Bindings):Promise<Response>{return nativePlinth(request,original,await authorize(request,original))}
 /** Native dispatcher shared by HTTP and explicitly declared door tools. Authentication stays at each caller. */
 export async function nativePlinth(request:Request,original:Bindings,actor:Actor):Promise<Response>{const env=runtimeBindings(original),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
+ const costPacket=await costReconciliationResponse(request,env,actor,parts,body);if(costPacket)return costPacket
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned
  const connections=await connectorsResponse(request,env,actor,parts,body);if(connections)return connections
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}

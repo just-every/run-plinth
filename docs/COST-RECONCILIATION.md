@@ -1,0 +1,15 @@
+# Pre-draw cost reconciliation
+
+The signed-in owner can request a private native diagnostic before preparing a draw. It preserves suspected duplicate originals, unposted native labor, draft bill coding and receipt discrepancies as evidence. It does not change a bill, cost entry, forecast, pay application, payroll, payment or exception decision.
+
+Use the job's `./api/plinth/jobs/:id/cost-reconciliation` HTTP collection. A POST requires the current `expected_version`, an `as_of` date and a reason. A GET returns the immutable packet history with current source freshness and whether owner review is required.
+
+Each finding retains exact native identities and original checksums where an original exists. Duplicate candidates compare original bytes across distinct bill references, including posted originals, and remain suspicions. Receipt quantities are recorded observations. Native bill lines contain monetary amounts rather than attested billed quantities, so the diagnostic reports that physical comparison as unknown. Labor candidates omit individual pay rates and employee details. Findings overlap; adding them together would double count exposure.
+
+To authorize a draft agent request, POST to the packet's `review` action with its digest, current job version, `confirm: true`, explicit `finding_ids` and a review reason. The `plinth.costs.packets` tool lists only current reviewed packet identities. The `plinth.costs.reconcile` tool takes a job identity, packet identity and exact digest through the existing MCP policy door. It consumes only selected findings and appends a proposed coding, matching or correction packet. Source changes, withdrawal, a revoked credential or erasure prevent another execution and prevent replay from returning the former packet contents.
+
+The owner can record an `accepted` or `rejected` suggestion using the packet's `decide` action, supplying the proposal and finding identities, digest, current version and reason. Both decisions remain in history. Acceptance records a decision about the suggestion; it does not approve a cost. Use the original human bill review, source approval, coding, credit, payroll and exception doors for any actual correction. Existing separation and accounting-period rules still apply. Request a new diagnostic after source changes.
+
+A packet's `revoke` action withdraws its consent permanently. Recovery preserves its evidence and rejected suggestions, while the receiving installation requires fresh owner review because authentication generation changes on restore. No provider credentials or standing consent travel with this history.
+
+Live accounting and payroll reconciliation, field quantity attestation, the complete maintained agent and staff follow-through remain unfinished AGENT-005 obligations. No live synchronization, professional certification, delivery, funds movement or payroll execution is claimed.
