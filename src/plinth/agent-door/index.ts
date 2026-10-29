@@ -13,6 +13,7 @@ function trust(env: Bindings):Trust|null {
 export const notTools=[
  {clauses:['NATIVE-010','NATIVE-011','MOVE-010'],reason:'import-door' as const},
  {clauses:['FIELD-003'],reason:'device' as const},
+ {clauses:['NATIVE-001'],reason:'screen' as const},
  {clauses:['INT-006','INT-009','INT-011'],reason:'connector' as const},
  {clauses:['NATIVE-014','BOUND-003'],reason:'installation' as const},
 ]

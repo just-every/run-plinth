@@ -309,6 +309,12 @@
         "BOUND-003"
       ],
       "reason": "installation"
+    },
+    {
+      "clauses": [
+        "NATIVE-001"
+      ],
+      "reason": "screen"
     }
   ],
   "resources": [

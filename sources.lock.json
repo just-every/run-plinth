@@ -125,7 +125,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "3d5903b28985845affdc61f4a9301851ec94b9f09d00ff9c94a74863fb9a958d",
+      "sha256": "a67d736a116011d35e530356bf415e523c6d3f0efc278c437ca47abd378e6804",
       "executable": false
     },
     "AGENTS.md": {
@@ -3901,7 +3901,7 @@
       "executable": false
     },
     "src/plinth/agent-door/index.ts": {
-      "sha256": "1cde7794f3f3a7a6fb49dba28a515d5e8a92f3fc9acc6ba0a693de722bf36dcb",
+      "sha256": "b4b33c30afc15150b02d915adbbd3aa311c2cebd8e7f0215d51f534d1e7d797b",
       "executable": false
     },
     "src/plinth/agent-door/native.ts": {
