@@ -1,9 +1,10 @@
 import { getCustomer } from './customers'
-import { requireManager } from './auth'
+import { requireManager, privateWorkbookDraft } from './auth'
 import { need, stamp, text, type Actor, type Input, type Job } from './model'
 
 /** The original client remains authorized alongside explicitly granted contact identities. */
 export async function clientAccess(db: D1Database, job: Job, email: string): Promise<boolean> {
+  if (privateWorkbookDraft(job)) return false
   if (job.client_email === email.toLowerCase()) return true
   if (!job.customer_id || !job.client_contact_ids?.length) return false
   const customer = await getCustomer(db, job.customer_id)
