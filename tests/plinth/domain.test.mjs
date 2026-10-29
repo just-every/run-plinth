@@ -1,3 +1,4 @@
+import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -1014,3 +1015,5 @@ test('Signed window changes freeze two exact consents, private costs and calenda
   assert.equal((await d.act('/signed-changes/'+revoked.id+'/apply',{digest:revoked.digest,confirm:true,...d.billing(revoked)})).status,404);assert.equal((await d.api('/jobs/'+d.job.id+'/signed-changes/'+revoked.id+'/document.json')).status,404,'An erased job cannot be reconstructed by replaying a captured signature or application')
  }finally{await f.close()}
 })
+
+test('AGENT-007 — reviewed question packets retain cited analysis and one inert draft while source, sponsor, replay and erasure fences hold',async()=>{const f=await createFixture();try{await proveQuestionAnswers(f)}finally{await f.close()}})
