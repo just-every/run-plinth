@@ -63,6 +63,16 @@ test('INT-007 — a selection request leaves through the provider, signed events
   assert.equal((await s.send({ kind: 'note', body: 'Client leaning to the oak; check lead time with the supplier.' })).status, 201)
   const own = await s.thread({ cookie: s.client }); assert.deepEqual(own.map(m => m.visibility), ['client', 'client']); assert.equal((await s.thread()).filter(m => m.visibility === 'private').length, 1)
   assert.equal((await f.request(`/api/plinth/jobs/${s.job().id}/correspondence/files/${inbound.files[0].id}`, { cookie: s.client })).status, 200)
+  const timelinePath = `/api/plinth/jobs/${s.job().id}/client-timeline`
+  const timelineBefore = f.messages.length
+  const timeline = (await s.api(timelinePath.replace('/api/plinth','')+'?q=Natural+oak', { cookie: s.client })).value
+  const replyItem = timeline.items.find(item => item.source === 'correspondence:'+inbound.id)
+  assert.ok(replyItem, 'The addressed inbound reply is searchable through the client timeline')
+  assert.equal(replyItem.date, inbound.created_at); assert.equal(replyItem.date_label, 'Received')
+  assert.deepEqual(replyItem.files.map(file => file.name), ['drawing.pdf'])
+  for (const original of replyItem.files) assert.equal((await f.request(original.href, {cookie:s.client})).status,200)
+  assert.equal((await s.api(timelinePath.replace('/api/plinth','')+'?q=check+lead+time', {cookie:s.client})).value.count,0)
+  assert.equal(f.messages.length,timelineBefore,'Timeline search and original downloads never deliver mail')
   assert.equal((await s.send({ kind: 'message', subject: 'Hi', body: 'x' }, { cookie: s.client })).status, 403)
   // Unsubscribe: optional notices stop, required transactional mail continues; a bounce is recorded as its own state.
   r = await s.send({ kind: 'selection_reminder', selection_id: s.selection }); assert.equal(r.status, 201)

@@ -1014,3 +1014,23 @@ test('Signed window changes freeze two exact consents, private costs and calenda
   assert.equal((await d.act('/signed-changes/'+revoked.id+'/apply',{digest:revoked.digest,confirm:true,...d.billing(revoked)})).status,404);assert.equal((await d.api('/jobs/'+d.job.id+'/signed-changes/'+revoked.id+'/document.json')).status,404,'An erased job cannot be reconstructed by replaying a captured signature or application')
  }finally{await f.close()}
 })
+
+test('Client timeline searches published records and recipient mail with current household authority, bounded pages and stable source dates',async()=>{
+ const {timelineFixture,proveTimeline,timelinePhoto}=await import('./client-timeline-support.mjs')
+ const f=await createFixture({stripeEdge:()=>{assert.fail('Timeline must never call the payment provider')}})
+ try{
+  const c=await timelineFixture(f),{all,firstPage}=await proveTimeline(c)
+  const original=all.find(i=>i.source==='diary:'+c.diaries[0].id).files[0].href
+  let r=await f.request(original,{cookie:c.second});assert.equal(r.status,200);assert.deepEqual(Buffer.from(await r.arrayBuffer()),timelinePhoto)
+  const calls=f.messages.length,before=await c.read()
+  await c.timeline();await c.timeline(c.second,{q:'oak'});assert.equal(f.messages.length,calls);assert.deepEqual(await c.read(),before,'Timeline reading has no job or financial effect')
+  await c.restrict(['schedule','photos','selections','changes','billing'])
+  r=await c.timeline();assert.equal(r.value.count,1);assert.ok(r.value.items.every(i=>i.kind==='correspondence'))
+  assert.equal((await c.timeline(c.first,{cursor:firstPage.next_cursor})).status,409)
+  assert.equal((await f.request(original,{cookie:c.second})).status,404)
+  for(const category of ['schedules','diary','selections','variations','invoices'])assert.equal((await c.api(c.root+'/'+category,undefined,c.first)).status,404)
+  await c.restrict([]);await c.revoke();assert.equal((await c.timeline(c.second)).status,404);assert.equal((await f.request(original,{cookie:c.second})).status,404)
+  const current=await c.read();assert.equal((await f.json('/api/plinth'+c.root,{method:'DELETE',cookie:f.owner,body:{expected_version:current.version}})).status,200)
+  assert.equal((await c.timeline()).status,404);assert.equal((await f.request(original,{cookie:c.first})).status,404)
+ }finally{await f.close()}
+})

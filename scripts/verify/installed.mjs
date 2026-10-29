@@ -11,7 +11,7 @@ import { nativeSignIn } from './native-signin.mjs'
 import { requireStatus } from './diagnostics.mjs'
 
 const name = process.argv[2]
-assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards', 'office'].includes(name), 'Choose an installed product journey')
+assert.ok(['invoice-corrections', 'cost-billing', 'settlements', 'meetings', 'portfolio', 'report-packets', 'bid-follow-up', 'satisfaction', 'estimate-performance', 'plans', 'drawing-review', 'followup-rules', 'signed-changes', 'room-boards', 'office', 'client-timeline'].includes(name), 'Choose an installed product journey')
 assert.equal(process.env.HOME, userInfo().homedir, 'Browser-driving Node uses the real account HOME')
 const shots = resolve(process.env.PLINTH_SCREENSHOTS_ROOT ?? 'artifacts/installed', name)
 await mkdir(shots, { recursive: true })

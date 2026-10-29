@@ -1,3 +1,4 @@
+import { clientTimeline } from './client-timeline'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -189,6 +190,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
   return json(parts[3]==='transcription-preview'?await transcriptionPreview(env.DB,previous,actor,input,sources.results):{transcription:await saveTranscription(env.DB,previous,actor,input,sources.results,clock)})
  }
  if(parts.length===4&&parts[2]==='decision-search'&&parts[3]==='metadata'&&method==='POST'){const input=await body(request);const sources=await decisionSearch(env.DB,previous,display(previous,actor),actor,new URLSearchParams());return json({metadata:await annotateDecision(env.DB,previous,actor,input,sources.results.map(r=>r.source))})}
+ if(parts.length===3&&parts[2]==='client-timeline'&&method==='GET')return json(await clientTimeline(env.DB,display(previous,actor),actor,new URL(request.url).searchParams))
  if(parts.length===3&&parts[2]==='decision-search'&&method==='GET')return json(await decisionSearch(env.DB,previous,display(previous,actor),actor,new URL(request.url).searchParams))
  if(parts.length===7&&parts[2]==='meetings'&&parts[4]==='links'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.completion?.links.find((_,index)=>String(index)===parts[6]);need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===3&&parts[2]==='meetings'&&method==='GET'){meetingAccess(actor);return json({meetings:previous.meetings??[]})}
