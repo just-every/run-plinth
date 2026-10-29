@@ -62,7 +62,9 @@ and readable native field paths and values. Original payload bytes are replaced
 by their measured size and checksum. Keep the CLI archive and the original
 native downloads when you need the actual files. Spreadsheet text remains text,
 including values beginning with formula operators; financial values stay numeric
-and currencies remain separate.
+and currencies remain separate. Long text values use numbered workbook rows
+with the same record identity and field path so that no Excel cell exceeds its
+text limit; read the value parts in order.
 
 After comparison, choose **Comparison report format** and **Download comparison
 report**. Each format includes the missing, extra and changed identities, source

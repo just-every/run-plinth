@@ -12,6 +12,11 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const path=(suffix='')=>`/api/plinth/jobs/${job.id}${suffix}`
  const mutate=async(suffix,body={},credentials={cookie:f.owner})=>f.json(path(suffix),{method:'POST',...credentials,body:{expected_version:job.version,...body}})
  await t.test('private transport, matching client scope and credential authority',async()=>{
+  const longBody='synthetic-plinth-source-text '.repeat(2500)+'synthetic-plinth-source-end'
+  const mailAddress=label=>[label,'example.com'].join('@')
+  const raw=Buffer.from(['From: '+mailAddress('synthetic-plinth-source'),'To: '+mailAddress('builder'),'Subject: Synthetic long recovery source','Message-ID: <'+mailAddress('synthetic-plinth-long-source')+'>','Content-Type: text/plain; charset=utf-8','',''+longBody].join('\r\n'))
+  const captured=await f.json(path('/correspondence'),{method:'POST',cookie:f.owner,body:{kind:'capture',original_base64:raw.toString('base64'),confirm:true}});assert.equal(captured.status,201)
+  assert.equal(captured.value.messages.find(message=>message.id===captured.value.id).body,longBody)
   const inventory=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(inventory.status,200);assert.match(inventory.headers.get('content-disposition'),/attachment/)
   const manifest=await inventory.json();assert.ok(manifest.records.some(row=>row.kind==='pl_jobs'));assert.ok(manifest.records.some(row=>row.kind==='revision-reference'));assert.ok(manifest.exclusions.length)
   const admin=await f.invite(['synthetic-plinth-admin','example.com'].join('@'),'Synthetic administrator','admin')
@@ -23,6 +28,11 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   for(const format of ['csv','xlsx','pdf']){
    const response=await f.request('/api/plinth/recovery/inventory.'+format,{cookie:f.owner});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store')
    const inventoryReport=await readRecoveryReport(Buffer.from(await response.arrayBuffer()),format);checkRecoveryReport(inventoryReport,manifest,['USD',0,0,0,0,0,0,0]);assert.ok(inventoryReport.text.replace(/\s/g,'').includes('Kitchenrenovation'));assert.ok(inventoryReport.text.replace(/\s/g,'').includes('AgreedrenovationworksincludingGST'));assert.ok(inventoryReport.text.includes('/data/quotes/0/total_cents'))
+   if(inventoryReport.rows){
+    const bodyRows=inventoryReport.rows.filter(row=>row[0]==='Field'&&row[1]==='pl_mail_messages:'+JSON.stringify([captured.value.id])&&row[2]==='/body')
+    assert.equal(bodyRows.map(row=>row[4]).join(''),longBody,'Recovery report retains every character of a supported long correspondence source')
+    if(format==='xlsx'){assert.ok(bodyRows.length>1);assert.ok(bodyRows.every(row=>row[4].length<=32767));assert.deepEqual(bodyRows.map(row=>row[5]),bodyRows.map((_,index)=>`${index+1} of ${bodyRows.length}`))}
+   }else assert.ok(inventoryReport.text.replace(/\s/g,'').includes(longBody.replace(/\s/g,'')),'PDF retains the full long correspondence source across pages')
    const exported=await f.request('/api/plinth/recovery/reconcile.'+format,{method:'POST',cookie:f.owner,body:{manifest:changed}});assert.equal(exported.status,200)
    const report=await readRecoveryReport(Buffer.from(await exported.arrayBuffer()),format);checkRecoveryReport(report,manifest,['USD',0,0,0,0,0,0,0],true);assert.ok(report.text.includes('synthetic-plinth-missing'));assert.ok(report.text.includes('Inventory differences found'))
    const hostile=structuredClone(manifest);hostile.records.push({kind:'pl_jobs',identity:'=synthetic-plinth-operator',sha256:'1'.repeat(64)})

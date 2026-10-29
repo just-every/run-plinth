@@ -33,11 +33,25 @@ export function recoveryReport(manifest: RecoveryManifest, format: 'csv' | 'xlsx
  for (const record of manifest.records) rows.push(['Record', record.kind, record.identity, record.revision ?? null, record.sha256])
  rows.push(['Originals', 'Identity', 'Actual bytes', 'Actual SHA-256', 'Declared bytes', 'Declared SHA-256', 'Integrity verified'])
  for (const file of manifest.files) rows.push(['Original', file.identity, file.size, file.sha256, file.declared_size, file.declared_sha256, file.verified])
- rows.push(['Native source fields', 'Record identity', 'Field path', 'Type', 'Value'])
- for(const field of fields)rows.push(['Field',field.identity,field.path,field.type,field.value])
+ rows.push(['Native source fields', 'Record identity', 'Field path', 'Type', 'Value', 'Value part'])
+ for(const field of fields){
+  const parts=format==='xlsx'&&typeof field.value==='string'?spreadsheetParts(field.value):[field.value]
+  parts.forEach((value,index)=>rows.push(['Field',field.identity,field.path,field.type,value,`${index+1} of ${parts.length}`]))
+ }
  rows.push(['Original representation','Original payload bytes are represented by measured sizes and SHA-256 checksums. Download the originals through their native doors or use the CLI archive.'])
  for (const exclusion of manifest.exclusions) rows.push(['Exclusion', exclusion])
  const body = format === 'pdf' ? textPdf(title, rows.map(row => row.map(value => value === null || value === undefined ? 'Not recorded' : String(value)).join(' | '))) : format === 'xlsx' ? tableXlsx(rows, 'Recovery report') : rows.map(row => row.map(value=>typeof value==='number'?String(value):reportCsvCell(value)).join(',')).join('\r\n') + '\r\n'
  const type = format === 'pdf' ? 'application/pdf' : format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv; charset=utf-8'
  return new Response(body, {headers: {'cache-control':'private, no-store','x-content-type-options':'nosniff','content-type':type,'content-disposition':`attachment; filename=plinth-recovery-${comparison ? 'comparison' : 'inventory'}.${format}`}})
+}
+
+/** Excel limits a cell to 32,767 UTF-16 units. Numbered rows preserve long native text in order. */
+function spreadsheetParts(value:string):string[]{
+ const parts:string[]=[]
+ for(let offset=0;offset<value.length;){
+  let end=Math.min(offset+30000,value.length)
+  if(end<value.length&&value.charCodeAt(end-1)>=0xd800&&value.charCodeAt(end-1)<=0xdbff)end--
+  parts.push(value.slice(offset,end));offset=end
+ }
+ return parts.length?parts:['']
 }

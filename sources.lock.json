@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "eca820a23bab9d8fdb48ecde676fd821e026e3eaeec28d92fdbf92afb4999fa1",
+      "sha256": "bc3e0dc86be9ab20c0c26dba278ec469de6b50b641e65ba2c8d0c26b55d9ec32",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "5b0f70cf288970bc3a5ebbdeaab68d484e9db6f9a5a731130fcabfbf990f8b62",
+      "sha256": "3f58535fadb6fe724546ff9d1b792c832b54dcffeef325757608e1dc54c2a4e1",
       "executable": false
     },
     "DEMO.md": {
@@ -165,7 +165,7 @@
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
-      "sha256": "1e1700111036e0d97d1ad8e41a1e4caf45d16a7eb32368d8970778c46f3ed0a0",
+      "sha256": "9f13c3fe0e2bc8e6ed1ee65fe1397109ce3c2400bac10ea15d45aafd707b04d0",
       "executable": false
     },
     "docs/CLAIMS.md": {
@@ -3785,7 +3785,7 @@
       "executable": false
     },
     "src/plinth/recovery-report.ts": {
-      "sha256": "82fdcd6794b50c8182b99e20e5455b3481de3d1a36b89b01fe16115d2dd53fa6",
+      "sha256": "eabb1e1021d47ccf7139c751793999df5a0a54f70632b417f6cc5fb57bf24cb6",
       "executable": false
     },
     "src/plinth/refund-posting.ts": {
@@ -5365,7 +5365,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "673237aaf0ccf99d27c8fcd8d06634e172db20ea4a6f92729381ab0a43597926",
+      "sha256": "844f772f48384ddc63385485669d2e63f749cd1254e7ea0a3f946df86cebd53a",
       "executable": false
     },
     "tests/plinth/drawing-review-support.mjs": {
