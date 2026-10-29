@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
-      "sha256": "2f4455449a8814e3c2f4f13a5263d72ce2d30e7d9c250b14b1229718dd041652",
+      "sha256": "5717054b519426773b51c49307c76ad7072c18862330b206d69364a39da0b2b2",
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
@@ -486,6 +486,10 @@
     },
     "migrations/core/202610290100_background_work.sql": {
       "sha256": "56a1a3732b7bb421996275ae849bbd6506292b7f00b23ea1129826762117d988",
+      "executable": false
+    },
+    "migrations/core/202610290200_closeout_cache.sql": {
+      "sha256": "d6eb007bb16928b698f800dbd9d6506ab7b60bda87cc735ae068112c67bba25e",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3188,8 +3192,12 @@
       "sha256": "0372645b58702508d6749315f91e80331ef875fe92e4de7e01d17294736ab0bd",
       "executable": false
     },
+    "src/plinth/agent-closeout-cache.ts": {
+      "sha256": "80fff6dfe0d1a1e07c6b00c0636d05a4131ab065b778d895dfd46fccce59e901",
+      "executable": false
+    },
     "src/plinth/agent-closeout.ts": {
-      "sha256": "b8eb2f6de04c4263658391d565d5b85dc835cba026fa54ce2a9731b932805214",
+      "sha256": "5b8ba6bbad32e9a7bc9f093731ea63a3456805a52d8b78950352075c9ebbab60",
       "executable": false
     },
     "src/plinth/agent-door/classes.ts": {
@@ -3197,7 +3205,7 @@
       "executable": false
     },
     "src/plinth/agent-door/closeout.ts": {
-      "sha256": "d51319bcbbfcd8e1889f2176e2ac5a7542c2d8a398eb96cb6c778d2c4a22fc9b",
+      "sha256": "94e3ecd5d3939510754dda22585682f18981b0b132615f868b973c11bafb096a",
       "executable": false
     },
     "src/plinth/agent-door/http.ts": {
@@ -3561,7 +3569,7 @@
       "executable": false
     },
     "src/plinth/import-erasure.ts": {
-      "sha256": "7a760e20bcd0e06050ab7667bc83774659299de37f2bb8b5d08e530b00e5f5f5",
+      "sha256": "7a0e61b977720c926fcb10a151a03555927a0c47317301132116bc9c13c6a9dd",
       "executable": false
     },
     "src/plinth/import-mapping.ts": {
@@ -5345,7 +5353,7 @@
       "executable": false
     },
     "tests/plinth/closeout-support.mjs": {
-      "sha256": "68de57e4983f2e3fc7317b8ab8f142e3e0269b637004603b67253424e080add3",
+      "sha256": "f3c77e53cfa91817bc2ae42f837462ec89eff65b1930e061c678c6f6d5c33f5f",
       "executable": false
     },
     "tests/plinth/connector-recovery-support.mjs": {
@@ -5385,7 +5393,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "c6a344bf357f1ddcca945dc951498b5aa3608c7850f4f82f6604b23be46161de",
+      "sha256": "380fb14612135161629092693e04bd2258dfb3b8c2e9bc4cffbec62285fb8707",
       "executable": false
     },
     "tests/plinth/drawing-review-support.mjs": {
@@ -5501,7 +5509,7 @@
       "executable": false
     },
     "tests/plinth/warranties.test.mjs": {
-      "sha256": "2eead789e68995b49571cf9403f87de6782513aedfcceffc3f992802c5381e89",
+      "sha256": "4f2c26a21f769403b5e89c6ba94f89921802f5c4389c2fbbd74235faef0c2496",
       "executable": false
     },
     "tests/site.test.mjs": {
