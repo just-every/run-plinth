@@ -1,3 +1,4 @@
+import { recoveryInventory, reconcileRecovery } from './recovery-inventory'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -128,6 +129,12 @@ async function body(request:Request):Promise<Input>{need((request.headers.get('c
 async function handle(request:Request,original:Bindings):Promise<Response>{return nativePlinth(request,original,await authorize(request,original))}
 /** Native dispatcher shared by HTTP and explicitly declared door tools. Authentication stays at each caller. */
 export async function nativePlinth(request:Request,original:Bindings,actor:Actor):Promise<Response>{const env=runtimeBindings(original),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
+ if(parts[0]==='recovery'){
+  requireOwner(actor);need(!actor.agent_door&&!actor.credential_id,'A signed-in owner session is required',403,'forbidden')
+  if(parts.length===2&&parts[1]==='manifest.json'&&method==='GET')return new Response(JSON.stringify(await recoveryInventory(env.DB,actor)),{headers:{...headers,'content-type':'application/json','content-disposition':'attachment; filename=plinth-recovery-manifest.json'}})
+  if(parts.length===2&&parts[1]==='reconcile'&&method==='POST'){const input=await body(request);return json(reconcileRecovery(input.manifest,await recoveryInventory(env.DB,actor)))}
+  throw new DomainError('not_found','Unknown recovery route',404)
+ }
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned
  const connections=await connectorsResponse(request,env,actor,parts,body);if(connections)return connections
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}

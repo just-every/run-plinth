@@ -88,6 +88,9 @@ jobs:
       - name: Exercise settlement script against the processor boundary
         if: matrix.journey == 'settlements'
         run: perl -e 'alarm 1200; exec @ARGV' -- node scripts/live-proof/settlement-sandbox.mjs "$RUNNER_TEMP/plinth-settlement" --provider-edge
+      - name: Exercise native archive recovery comparison
+        if: matrix.journey == 'plans'
+        run: perl -e 'alarm 1200; exec @ARGV' -- node tests/journeys/recovery-reconciliation.mjs
       - name: Preserve installed journey screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
