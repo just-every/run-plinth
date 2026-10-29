@@ -109,7 +109,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "bd3660ea9ed365b79bc928a0b8e69b75b9a714e4f803420090b4f7fc67a1bac7",
+      "sha256": "170b9c20db1548070100d29bf24ecf5c96e59e1750a05949da7387ec73879f30",
       "executable": false
     },
     ".gitignore": {
@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "af69ae129405045c8bf1f1296cde9ccc6cd802b7849ed020e089d8ded2d388fc",
+      "sha256": "5e7a56a3ec7f5fbf919e6e0eea6a61cf0ac5f4ff4337f3e1c8dc144d4245638c",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "3a6b36e86b6f0aa98abd2fc989c6eb240424679489a5f66c6d8b0f69a2b5684d",
+      "sha256": "ee3a428c470939a750574ff7f9b64ad14f751d834263fa61814804d5622529ea",
       "executable": false
     },
     "DEMO.md": {
@@ -169,11 +169,11 @@
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
-      "sha256": "4724ee119bd73e1b892cf3d0fb75d1efb9c27497f5bd454ef7cdaf6692d50fab",
+      "sha256": "a0e6e10168b38e3813de7ab96541897f423921c6f46e465fe88f2d7065668ffd",
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "fa39f3c077467607d591cebb72c36b7773ab68dcf1761260da4f6be23b9ef6c4",
+      "sha256": "63207ebdeaed071634e7ead9e7f906827f71a1efbea6be59ee1e69848058f558",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -1009,7 +1009,7 @@
       "executable": false
     },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "c2beb0f71e4c4aa4c8953374405203f692c85b407a20c7079c31853edf91b16b",
+      "sha256": "a95bca2ce12cda56723b54f3cba40dddc526be47fd728d6bded9f16aa52e7726",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
@@ -3561,7 +3561,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "157182b425b7a3771d80dbde448fbc2c5ba49ed36c3dd1da3887f935e16bb24d",
+      "sha256": "4858f77b463d3d744a4187928d5d17f0143c76520469b7a443ec765bdc259072",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3810,6 +3810,10 @@
     },
     "src/plinth/quotes.ts": {
       "sha256": "19cf24141f5f02f69dc23612f66090ff56cb350db1d19fc1d43742ae5173f54d",
+      "executable": false
+    },
+    "src/plinth/recovery-inventory.ts": {
+      "sha256": "b655256946a5b2d156dc03410512dc7ec3d194ef419ca9b0bb6d4e552a6ed14c",
       "executable": false
     },
     "src/plinth/refund-posting.ts": {
@@ -4812,6 +4816,10 @@
       "sha256": "dd3bc90ebe9f7961612f6a00af05237b6454166bc17754f51d32fc1f7f981d2c",
       "executable": false
     },
+    "src/ui/recovery-reconciliation.tsx": {
+      "sha256": "f4a5184eb5b482fcc9e7ce83124d69a43ea6df88787f15c33d5929679d29bcc7",
+      "executable": false
+    },
     "src/ui/report-schedules.tsx": {
       "sha256": "2250ad78e91d64e3fbf06d03090d9ced8e6ac71b50bfa797664a952218a92f86",
       "executable": false
@@ -5005,7 +5013,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "ba091b5e5af70f06a7e9ed2bf3df97802a18c72a3b833c555384314ed5b063cd",
+      "sha256": "28d8e62cf9448c5310c0cf7a03c1fedd22d7afab961386475449efe87983a366",
       "executable": false
     },
     "test-budget.json": {
@@ -5268,6 +5276,10 @@
       "sha256": "ec8b54cb56512f211dd13fb411d17f9b8f37965fe757a46f4dffc0780eed3921",
       "executable": false
     },
+    "tests/journeys/recovery-reconciliation.mjs": {
+      "sha256": "bd3453d487fd02e86c5f67fb9610ffcdef932ec1172d548a681d5c692469d2be",
+      "executable": false
+    },
     "tests/journeys/report-packets.mjs": {
       "sha256": "b249845a00bfa888549ecfee6fdefcab85490d6cf2c0f0b8d67336e2a025c42c",
       "executable": false
@@ -5401,7 +5413,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "b8ea662f7013907c680fcfd22a9a4fc622a5089dcc369800cda986b63f4bf6f1",
+      "sha256": "6dacf422aac9beba3dffffbf6cf34679ec69c860671e6976d58c110add83cd0b",
       "executable": false
     },
     "tests/plinth/drawing-review-support.mjs": {
@@ -5445,7 +5457,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "9a0e78f5e54a0986a3665fd4a49430d8cd8cd52c52bb3f97540067d390b722ed",
+      "sha256": "9ed8ca42e77ed164f104247e2ca4c1fbcf024fadaaf1de275d562dcbf9f82bd7",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
