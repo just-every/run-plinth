@@ -165,7 +165,7 @@
       "executable": false
     },
     "docs/BACKUP-RESTORE.md": {
-      "sha256": "a0e6e10168b38e3813de7ab96541897f423921c6f46e465fe88f2d7065668ffd",
+      "sha256": "b04a6ba32ee4006e052cf96a698d869b19a363fdf5b5a422147e847158aed193",
       "executable": false
     },
     "docs/CLAIMS.md": {
@@ -3789,7 +3789,7 @@
       "executable": false
     },
     "src/plinth/recovery-inventory.ts": {
-      "sha256": "b655256946a5b2d156dc03410512dc7ec3d194ef419ca9b0bb6d4e552a6ed14c",
+      "sha256": "ca919a81febbd8196c637959515e0137fb60552d42ebbad620ebbec1e3caed44",
       "executable": false
     },
     "src/plinth/refund-posting.ts": {
@@ -5429,7 +5429,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "ed2be19c1e83bed1cacc47970779b1c49ce53cb717a117eabeafbe13c4da3553",
+      "sha256": "6e762e94113a47129b0da9c379477873f72413ec86e4d9dcf3014266b13c34e5",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

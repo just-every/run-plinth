@@ -73,7 +73,9 @@ restore erased content or bypass the CLI's later-journal refusal described below
 The semantic inventory covers currently implemented native product and import
 custody records. Its exclusions explicitly retain Base account and bootstrap
 metadata, provider state, live connector grants and queues, credentials, sessions,
-private settings and standing consent outside comparison. The existing CLI remains
+private settings and standing consent outside comparison. Report export continuation
+reviews are excluded too: restored work requires fresh destination-owner review,
+while its retained checkpoints and output remain part of the inventory. The existing CLI remains
 the archive and restore door; its account custody and ownership rules are unchanged.
 Complete target-wide recovery, future entities, differently owned installation
 handoff, external accounting reconciliation and complete human PDF, CSV and XLSX

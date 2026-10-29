@@ -6,10 +6,11 @@ export interface RecoveryRecord { kind:string; identity:string; sha256:string; r
 export interface RecoveryFile { identity:string; size:number; sha256:string; declared_size:number|null; declared_sha256:string|null; verified:boolean }
 export interface RecoveryControls { currency:string; issued_invoices:number; issued_gross_cents:number; corrections_cents:number; receipts_cents:number; deposit_applications_cents:number; write_offs_cents:number; posted_cost_cents:number }
 export interface RecoveryManifest { format:'plinth-recovery-inventory-v1'; records:RecoveryRecord[]; files:RecoveryFile[]; controls:RecoveryControls[]; exclusions:string[]; tables:{name:string;count:number}[] }
-const omitted = new Set(['pl_clock','pl_guard','pl_calendar_tokens','pl_warranty_scheduler','pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits'])
+const omitted = new Set(['pl_clock','pl_guard','pl_calendar_tokens','pl_warranty_scheduler','pl_connector_subscriptions','pl_connector_deliveries','pl_connector_event_order','pl_api_limits','pl_background_reviews'])
 const exclusions = [
  'Sessions, credentials, private settings, signing keys and standing consent are excluded. This manifest grants no authority.',
  'Live connector subscriptions, delivery queues, calendar tokens and runtime counters are excluded; retained connector bindings are inert references.',
+ 'Report export continuation reviews are excluded; restored work requires fresh destination-owner review.',
  'Native product and import custody records are inventoried. Base account and bootstrap metadata, provider state and external accounting are outside this semantic comparison.',
  'A manifest is a confidential comparison document, not an archive, proof of source authenticity or permission to restore. Use the existing CLI archive and later erasure journal.',
  'Complete target-wide recovery, future entities, differently owned installation handoff and complete PDF, CSV and XLSX reports remain unproved.',
