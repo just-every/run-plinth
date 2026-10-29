@@ -19,7 +19,7 @@ export function answerAccess(door:AgentDoor,options:AgentDoorOptions,env:Binding
    if(new URL(request.url).pathname==='/mcp'&&request.method==='POST'){
     // Keep malformed and oversized input on the shared transport's bounded parser.
     const reader=request.clone().body?.getReader(),decoder=new TextDecoder();let raw='',size=0
-    if(reader)for(;;){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>1048576){await reader.cancel();return door.handle(request)}raw+=decoder.decode(next.value,{stream:true})}
+    if(reader)for(;;){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>1048576){void reader.cancel();return door.handle(request)}raw+=decoder.decode(next.value,{stream:true})}
     let rpc:{id?:unknown;method?:string;params?:{name?:string;arguments?:Record<string,unknown>;requestState?:unknown}}
     try{rpc=JSON.parse(raw)}catch{return door.handle(request)}
     if(rpc?.method==='tools/call'&&typeof rpc.params?.name==='string'&&rpc.params.name.startsWith('plinth.answers.')&&rpc.params.arguments){

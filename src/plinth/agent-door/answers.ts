@@ -16,7 +16,7 @@ export function answerTools(env:Bindings):ToolDefinition[]{
    outputSchema:{type:'object',properties:{record:{type:'object'},version:{type:'integer'}},required:['record','version'],additionalProperties:false},classes:['standard','sensitive'],clauses:['AGENT-007','NATIVE-008','ROLE-006'],untrusted:true,
    async classify(args,ctx){const value=await nativeCall(env,ctx.person,'jobs/'+encodeURIComponent(String(args.job_id))+'/agent-answers'+(args.packet_id?'/'+encodeURIComponent(String(args.packet_id)):''),'GET',undefined,ctx);return recordClasses(safe({packet:value.record,...payload(args)}))},
    revision(args,ctx){return nativeVersion(env,ctx.person,String(args.job_id))},
-   async summary(args,ctx){const value=await nativeCall(env,ctx.person,'jobs/'+encodeURIComponent(String(args.job_id))+'/agent-answers/'+encodeURIComponent(String(args.packet_id)),'GET',undefined,ctx);return {target:{id:String(args.packet_id),name:String((value.record as {question:string}).question)},items:[action.title]}},
+   summary(args){return {target:args.packet_id?{id:String(args.packet_id)}:undefined,items:[action.title]}},
    async run(args,ctx){const version=await nativeVersion(env,ctx.person,String(args.job_id));const value=await nativeCall(env,ctx.person,path(args),action.readOnly?'GET':'POST',action.readOnly?undefined:{...payload(args),expected_version:args.expected_version??version},ctx);return {result:{record:safe(value.record),version:value.version}}},
   })
  })

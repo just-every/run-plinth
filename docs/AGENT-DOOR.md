@@ -13,3 +13,20 @@ The current NATIVE-008 contract remains draft-only. Policy never permits an agen
 The native setup-token owner claim remains the installation and verification bootstrap. The fixture drives `/auth/bootstrap` and ordinary native HTTP actions with its returned owner session; it creates no people or job rows through SQL. The adopted tools do not call Stripe, webhooks, OAuth connectors, LLMs or storage providers. Product URLs are retained evidence, not fetched. No extra verification network edge is declared; native invitation mail uses the shared built-in mail adapters.
 
 Runtime source is copied from Base `d555e789cffb744a9f83d76ebe42a2e3bdd7a055`; npm CLI `0.2.85` is a separate released pin. Until the matching runner is released, Verify acquires that exact Base source archive and runs its ordinary `bin/rer.mjs verify` dispatcher against the seed. The archive's global launcher delegates to the checkout's released package pin, so it is not the verification entry while the runner is unreleased. The Base source, module source digests and additive migrations travel with the application; no generated CLI copy is edited into this seed. Existing migrations retain their applied bytes.
+
+## Owner-reviewed project questions
+
+A signed-in owner can create a question packet with `POST /api/plinth/jobs/{job_id}/agent-answers`, supplying the current `expected_version`, a `question`, `confirm: true` and explicitly selected `sources`. The supported references are:
+
+- `kind: plan` with `set_id` and `sheet_id`, retaining that exact sheet, original reference, reviewed text and annotations.
+- `kind: bid` with `package_id`, `invitation_id` and `response_id`, retaining the selected private response and its revision context.
+- `kind: decision` with `decision_id`, referring to a native change decision, including its unresolved draft state.
+- `kind: cost` with `entry_id`, retaining only the selected posted entry's amount, currency, coding, dates and source identities. Individual pay details and the full ledger are excluded.
+
+The owner reviews these facts for this question; an agent cannot create packets or grant itself source access. `plinth.answers.read` lists currently usable packet identities for one job, or reads an exact `packet_id`. Every read rechecks the current owner sponsor, packet consent and source fingerprints. Changed sources require a newly reviewed packet. The owner revokes a packet with `POST /api/plinth/jobs/{job_id}/agent-answers/{packet_id}/revoke` and the current job version.
+
+An MCP client supplies analysis to `plinth.answers.retain`, with `job_id`, `packet_id`, `packet_digest` and `analysis`. Analysis has separate `facts`, `conflicts`, `assumptions` and `unresolved` arrays. Each statement supplies `text` and `citations`; each citation contains an exact packet `source_id` and its `digest`. Recorded facts need a citation, conflicts need two distinct cited sources, and assumptions may be explicitly uncited. Fabricated or inaccessible citations are refused. Analysis remains an attributed draft; citation membership does not establish that its interpretation is correct. Earlier answers remain retained.
+
+`plinth.answers.prepare` accepts the exact packet digest and retained `answer_id`, then an `input` naming `kind: diary` with `date` and `note`, or `kind: schedule` with `trade`, `start`, `end` and `description`. It uses native draft preparation and records one linked draft per answer, including across retries with different transport keys. It neither publishes nor approves. Both write tools also require the shared door's `idempotency_key`. Shared approval summaries contain references only. Source checks precede cached answer replay, and job erasure removes both native packets and copied answer payloads from the shared door.
+
+This owner-only workflow grants no manager or client question access, raw agent cost access, external audience or provider authority. Broader question answering, source coverage, estimate and change preparation, and demonstrated answer quality remain AGENT-007 work in the contract.

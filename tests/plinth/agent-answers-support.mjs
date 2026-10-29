@@ -56,6 +56,7 @@ export async function proveQuestionAnswers(f){
  q.packet=await q.make([...q.refs,{kind:'cost',entry_id:entry.id},{kind:'bid',package_id:bid.id,invitation_id:invitation.id,response_id:responded.id}])
  const mcp=await localMcp(f),args={job_id:q.job.id,packet_id:q.packet.id,packet_digest:q.packet.digest}
  const before=structuredClone(await q.refresh()),messages=f.messages.length
+ const listed=await mcp.ok('plinth.answers.read',{job_id:q.job.id});assert.ok(listed.record.packets.some(p=>p.id===q.packet.id))
  const read=await mcp.ok('plinth.answers.read',args)
  assert.equal(read.record.sources.length,5);assert.equal(read.record.sources[3].recorded.amount_cents,3300);assert.equal(read.record.sources[4].recorded.response.total_cents,123456);assert.ok(!JSON.stringify(read.record).includes('hour_cents'));assert.equal(read.record.sources[0].recorded.sheet.revision,'A');assert.equal(read.record.sources[1].recorded.sheet.revision,'B')
  assert.match(read.record.sources[1].recorded.annotations[0].text,/November 17/)
@@ -81,10 +82,20 @@ export async function proveQuestionAnswers(f){
  const differentKey=await mcp.ok('plinth.answers.prepare',{...input,idempotency_key:crypto.randomUUID()});assert.equal(differentKey.record.draft.id,prepared.record.draft.id)
  const current=await q.refresh();assert.equal(current.diary.length,before.diary.length+1);assert.equal(current.diary.at(-1).status,'draft');assert.equal(current.diary.at(-1).prepared_by.role,'agent');assert.deepEqual(current.approvals,before.approvals);assert.deepEqual(current.schedules,before.schedules);assert.deepEqual(current.variations,before.variations);assert.equal(current.agent_answers,undefined,'Generic job responses cannot bypass packet review')
  assert.equal((await f.request(q.root+'/costs',{token:mcp.token})).status,403,'Raw cost doors remain refused')
+ const heldPolicy=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'approval',approver:['sponsor'],wait:'PT1H'}],spend:{none:true}}}});assert.equal(heldPolicy.status,200)
+ const heldArgs={...args,analysis:q.analysis,idempotency_key:crypto.randomUUID()},pending=await mcp.call('plinth.answers.retain',heldArgs)
+ assert.equal(pending.error,'approval_required')
+ const approvalId=pending.wire.result._meta['com.runeditrun/error'].approval.id
+ const approvalPath='/agents/api/approvals/'+approvalId,approval=(await f.json(approvalPath,{cookie:f.owner})).value.approval
+ assert.equal(approval.summary.target.id,q.packet.id);assert.ok(!JSON.stringify(approval.summary).includes(q.packet.question),'Shared approval summaries reveal no question or source content')
+ const approved=await f.json(approvalPath+'/approve',{method:'POST',cookie:f.owner,body:{revision:approval.revision,summary_sha256:approval.summary_sha256}});assert.equal(approved.status,200)
+ assert.ok((await mcp.ok('plinth.answers.retain',heldArgs)).record.id)
+ const reset=await f.json('/agents/api/policy',{method:'PUT',cookie:f.owner,body:{document:{schema:'rer-agent-policy/1',catalogue:'rer-agent-classes/1',rules:[{id:'all',class:'*',do:'autonomous'}],spend:{none:true}}}});assert.equal(reset.status,200)
  const changed=await q.ok('/plans/'+q.refs[1].set_id+'/annotate',{sheet_id:q.refs[1].sheet_id,x:30,y:30,text:'Owner found a changed source explanation'})
  assert.ok(changed.record.id)
  assert.equal((await mcp.call('plinth.answers.read',args)).error,'packet_stale')
  assert.equal((await mcp.call('plinth.answers.prepare',input)).error,'packet_stale','Cached transport replay rechecks native source authority')
+ assert.equal((await mcp.call('plinth.answers.retain',heldArgs)).error,'packet_stale','Completed approval replay cannot return stale packet content')
  const fresh=await q.make(),freshArgs={job_id:q.job.id,packet_id:fresh.id,packet_digest:fresh.digest}
  assert.equal((await q.post('/agent-answers/'+fresh.id+'/revoke',{})).status,200)
  assert.equal((await mcp.call('plinth.answers.read',freshArgs)).error,'packet_revoked')
@@ -93,5 +104,7 @@ export async function proveQuestionAnswers(f){
  assert.equal((await mcp.call('plinth.answers.read',args)).status,401)
  const erased=await q.refresh();assert.equal((await f.request(q.root,{method:'DELETE',cookie:f.owner,body:{expected_version:erased.version}})).status,200)
  assert.equal((await f.request(q.root+'/agent-answers/'+q.packet.id,{cookie:f.owner})).status,404)
+ const gone=await f.json(approvalPath,{cookie:f.owner});assert.equal(gone.status,404,'Job erasure removes retained approval payloads')
+ const cached=await f.db.prepare("SELECT count(*) AS n FROM agent_door_calls WHERE json_extract(outcome,'$.result.record.id') IN (?,?)").bind(retained.record.id,prepared.record.id).first();assert.equal(cached.n,0,'Erasure removes copied native answer payloads, including completed replay outcomes')
  assert.equal(f.messages.length,messages,'Analysis and draft preparation send no notices or provider requests')
 }

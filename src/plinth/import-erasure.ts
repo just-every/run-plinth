@@ -26,6 +26,10 @@ export async function eraseJob(db: D1Database, actor: Actor, job: Job) {
     { sql: 'DELETE FROM pl_mail_messages WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_attachments WHERE job_id=?', params: [job.id] },
     { sql: 'DELETE FROM pl_lien_waiver_files WHERE job_id=?', params: [job.id] },
+    // Remove this job's copied MCP answer payloads; the shared decision audit keeps references only.
+    { sql: "DELETE FROM agent_door_calls WHERE json_extract(outcome,'$.result.record.id') IN (SELECT value FROM json_each(?)) OR decision_id IN (SELECT json_extract(saved,'$.decision_id') FROM agent_door_approvals WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.args.job_id')=?)", params: [JSON.stringify((job.agent_answers??[]).flatMap(p=>[p.id,...p.answers.map(a=>a.id)])),job.id] },
+    { sql: "DELETE FROM agent_door_reviews WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.summary.target.id') IN (SELECT value FROM json_each(?))", params: [JSON.stringify((job.agent_answers??[]).map(p=>p.id))] },
+    { sql: "DELETE FROM agent_door_approvals WHERE json_extract(saved,'$.tool') LIKE 'plinth.answers.%' AND json_extract(saved,'$.args.job_id')=?", params: [job.id] },
     { sql: 'DELETE FROM pl_jobs WHERE id=?', params: [job.id] },
     { sql: "INSERT INTO pl_erased_jobs(job_id,erased_at) VALUES(?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", params: [job.id] },
     { sql: 'UPDATE pl_clock SET version=version+1 WHERE id=1' },
