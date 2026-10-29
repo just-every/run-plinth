@@ -160,6 +160,10 @@
       "sha256": "89945f1cfad580238187275c608b80f041e7b55c556cec10daa24d103fd1c8c2",
       "executable": false
     },
+    "docs/AGENT-DECISIONS.md": {
+      "sha256": "acae684f8e6e2fef07e946d9b631812af23061d2d7d2946b6e38701297059fd8",
+      "executable": false
+    },
     "docs/AGENT-DOOR.md": {
       "sha256": "270a973d05be5917c553112f10782d7efa2736f622effd88ed31b0adaf4fbbc0",
       "executable": false
@@ -3189,7 +3193,7 @@
       "executable": false
     },
     "src/plinth/agent-decision-graph.ts": {
-      "sha256": "b6656073ddac00217100184e219737c2a9318360411c9913c75b1c60a42c04ce",
+      "sha256": "4a511f71e48aa3e0267f9fa1e9b7c952f4a9f0e8bfa42014ab7cee9cd8d388c2",
       "executable": false
     },
     "src/plinth/agent-door/classes.ts": {
@@ -5473,7 +5477,7 @@
       "executable": false
     },
     "tests/plinth/selections.test.mjs": {
-      "sha256": "016211a03ff8a6b3223b5246d6095b06043a146aa87a2dd25092a838db90d338",
+      "sha256": "4f3e89542f48b4be9066387d7e2651b8ec0228ac8af9b355d8eae731d55b043c",
       "executable": false
     },
     "tests/plinth/signed-change-support.mjs": {

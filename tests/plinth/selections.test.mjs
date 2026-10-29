@@ -458,6 +458,7 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
  try {
   const address = ['synthetic-plinth-client', 'example.test'].join('@')
   const client = await f.invite(address), outsider = await f.invite(['synthetic-plinth-other', 'example.test'].join('@'))
+  const administrator = await f.invite(['synthetic-plinth-admin', 'example.test'].join('@'), 'Office administrator', 'admin')
   const token = await f.agent()
   const d = await decisionGraphFixture(f, await createActiveJob(f, 'Decision cutoff job', address))
   const packetPath = id => d.root + '/decision-graphs/' + id
@@ -481,6 +482,13 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
    const r = await f.json('/mcp', {method: 'POST', token, headers: {accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25', 'mcp-method': 'tools/call', 'mcp-name': name}, body: {jsonrpc: '2.0', id: ++sequence, method: 'tools/call', params: {name, arguments: args}}})
    return r
   }
+  await d.act('/selections', {...d.terms, category: 'Unselected private choice', options: [{name: 'Unselected confidential option', supplier: 'Private supplier', specifications: 'Unselected office notes', price_cents: 50000}]})
+  const isolated = await get(d.packet.id)
+  assert.equal(isolated.value.current, true, 'An unselected record cannot invalidate the reviewed sources')
+  assert.ok(!JSON.stringify(isolated.value.record).includes('Unselected confidential option'))
+  const reviewBody = {expected_version: d.job.version, as_of: '2026-11-10', links: [d.link], confirm: true, review: 'Explicit source review'}
+  for (const cookie of [client, administrator]) assert.equal((await f.json(d.root + '/decision-graphs', {method: 'POST', cookie, body: reviewBody})).status, 403)
+  assert.equal((await f.json(d.root + '/decision-graphs', {method: 'POST', cookie: f.owner, body: {...reviewBody, links: [{...d.link, lead_days: 13}]}})).status, 400, 'A stated buffer cannot shorten its supplier or selection lead source')
   const args = {job_id: d.job.id, packet_id: d.packet.id}
   let r = await mcp('plinth.decisions.read', args); assert.equal(r.status, 200); assert.equal(r.value.result.isError, false, JSON.stringify(r.value))
   assert.equal(r.value.result.structuredContent.record.facts[0].timing.latest_safe_decision_at, '2026-11-09T08:00:00.000Z')
@@ -507,14 +515,28 @@ test('AGENT-004 — owner-reviewed decision cutoffs, retained comparisons and bo
   await d.act('/orders/' + order.id + '/issue')
   await d.act('/orders/' + order.id + '/acknowledge', {acknowledged_on: '2026-11-10', by_name: 'Synthetic supplier', reference: 'synthetic-plinth-ack-1', promised_on: '2026-11-29'})
   const withOrder = {...d.link, order_ids: [order.id]}
-  const acknowledged = await d.review([withOrder]); assert.equal(acknowledged.facts[0].status, 'approved'); assert.equal(acknowledged.facts[0].orders[0].delivery_status, 'acknowledged'); assert.equal(acknowledged.facts[0].case_closed, false)
+  const acknowledged = await d.review([withOrder]); assert.equal(acknowledged.facts[0].status, 'approved'); assert.equal(acknowledged.facts[0].orders[0].delivery_status, 'acknowledged'); assert.equal(acknowledged.facts[0].case_closed, false); assert.equal(acknowledged.facts[0].stage, 'acknowledged')
   const sourceEconomics = structuredClone(d.job.quotes)
   assert.equal((await refuse('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '1'}], reference: 'forbidden agent receipt'}, {token})).status, 403)
   await d.act('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '0.5'}], reference: 'synthetic-plinth-ticket-1'})
   assert.equal((await d.review([withOrder])).facts[0].case_closed, false)
   await d.act('/orders/' + order.id + '/receive', {lines: [{line_id: order.lines[0].id, quantity: '0.5'}], reference: 'synthetic-plinth-ticket-2'})
-  const delivered = await d.review([withOrder]); assert.equal(delivered.facts[0].case_closed, true); assert.equal(delivered.facts[0].orders[0].human_receipts.length, 2)
+  const delivered = await d.review([withOrder]); assert.equal(delivered.facts[0].case_closed, true); assert.equal(delivered.facts[0].stage, 'human_recorded_received'); assert.equal(delivered.facts[0].orders[0].human_receipts.length, 2)
+  await d.act('/orders/' + order.id + '/return', {lines: [{line_id: order.lines[0].id, quantity: '0.5'}], reason: 'Damaged fixture returned', reference: 'synthetic-plinth-return-1'})
+  const returned = await d.review([withOrder]); assert.equal(returned.facts[0].case_closed, false); assert.equal(returned.facts[0].orders[0].received, false)
+  assert.equal((await get(delivered.id)).value.current, false, 'A return invalidates the earlier complete-delivery view')
+  await d.act('/schedules/' + d.task.id + '/move', {start: '2026-12-01T08:00:00Z', end: '2026-12-01T10:00:00Z'})
+  assert.equal((await get(returned.id)).value.current, false, 'A changed dependent task invalidates its decision cutoff')
   assert.deepEqual(d.job.quotes, sourceEconomics); assert.equal(f.messages.length, effects.messages)
+  const freeSelection = await d.act('/selections', {...d.terms, category: 'Nominal-cost replacement', options: [{name: 'Nominal-cost fixture', supplier: 'Synthetic fixtures', specifications: '8 inch replacement', price_cents: 1}]})
+  const freeRevision = freeSelection.revisions[0]
+  await d.act('/selections/' + freeSelection.id + '/present', {revision_id: freeRevision.id})
+  await d.act('/selections/' + freeSelection.id + '/sign', {revision_id: freeRevision.id, option_id: freeRevision.options[0].id, statement: 'I approve this exact one-cent replacement', confirm: true}, {cookie: client})
+  const freeOrder = await d.act('/selections/' + freeSelection.id + '/order', {revision_id: freeRevision.id})
+  await d.act('/orders/' + freeOrder.id + '/issue')
+  await d.act('/orders/' + freeOrder.id + '/receive', {lines: [{line_id: freeOrder.lines[0].id, quantity: '0.5'}], reference: 'synthetic-plinth-free-half'})
+  const freeLink = {...d.link, selection_id: freeSelection.id, revision_id: freeRevision.id, order_ids: [freeOrder.id]}
+  assert.equal((await d.review([freeLink])).facts[0].case_closed, false, 'A rounded one-cent receipt still requires every physical quantity')
   const foreign = await createActiveJob(f, 'Other decision job', address)
   assert.equal((await f.json('/api/plinth/jobs/' + foreign.id + '/decision-graphs/' + delivered.id, {cookie: f.owner})).status, 404)
   const creds = (await f.json('/api/plinth/agent-credentials', {cookie: f.owner})).value.credentials

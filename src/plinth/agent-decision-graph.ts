@@ -34,7 +34,11 @@ async function collect(job: Job, links: Link[]) {
   for (const [kind, values] of [['task', link.task_ids], ['product', link.product_ids], ['rfi', link.rfi_ids], ['order', link.order_ids]] as const) for (const id of values) refs.push({ kind, id })
  }
  const unique = [...new Map(refs.map(r => [r.kind + ':' + r.id, r])).values()]
- return Promise.all(unique.map(async ref => ({ ...ref, fingerprint: await fingerprint(source(job, ref)) })))
+ return Promise.all(unique.map(async ref => {
+  const record = source(job, ref)
+  const revision_id = ref.kind === 'product' ? find(job.products ?? [], ref.id).revisions.at(-1)!.id : ref.revision_id
+  return { ...ref, ...(revision_id ? { revision_id } : {}), fingerprint: await fingerprint(record) }
+ }))
 }
 /** No unselected job record is included in a reviewed packet or a draft request. */
 function facts(job: Job, link: Link, asOf: string) {
@@ -67,7 +71,7 @@ function facts(job: Job, link: Link, asOf: string) {
   return { order_id: order.id, status: order.status, approved_by: order.issued_by ?? null,
    vendor_send: order.delivery?.status ?? 'unsent', acknowledgment: order.acknowledgment ?? null,
    human_receipts: order.receipts, returned: order.returns ?? [], delivery_status: state.delivery_status,
-   received: order.status === 'issued' && state.delivery_status === 'received' && order.receipts.length > 0 }
+   received: order.status === 'issued' && order.receipts.length > 0 && (state.lines.length > 0 ? state.lines.every(line => line.outstanding === '0') : state.outstanding_cents === 0) }
  })
  const rfis = link.rfi_ids.map(id => {
   const rfi = find(job.rfis ?? [], id)
@@ -78,8 +82,8 @@ function facts(job: Job, link: Link, asOf: string) {
   choice: chosen ?? null, options: revision.options, tasks: tasks.map(t => ({ id: t.id, revision: t.revision ?? 1, description: t.description, start: t.start, predecessors: t.predecessors ?? [] })),
   timing: { basis: 'Elapsed UTC calendar days before earliest dependent task start', lead_days: link.lead_days, review_days: link.review_days, buffer_days: link.buffer_days, latest_safe_decision_at: cutoff,
    warning: !signed && Date.parse(asOf + 'T00:00:00Z') >= Date.parse(cutoff) ? 'Decision cutoff reached; dependent work at risk' : !signed ? 'Decision pending before cutoff' : 'Client choice recorded; procurement still requires human review' },
-  comparisons, rfis, submittal_evidence: { status: 'unavailable', reason: 'Submittal evidence is not authorized by this packet; use the existing reviewed submittal door' },
-  orders, case_closed: signed && orders.length > 0 && orders.every(o => o.received) && rfis.every(r => !!r.resolved) }
+  comparisons, rfis, submittal_evidence: { status: 'unavailable', reason: 'Submittal integration is unavailable in this packet; use the existing human-reviewed submittal door' },
+  orders, stage: !signed ? 'proposed' : orders.length > 0 && orders.every(o => o.received) ? 'human_recorded_received' : orders.some(o => o.acknowledgment) ? 'acknowledged' : 'approved', case_closed: signed && orders.length > 0 && orders.every(o => o.received) && rfis.every(r => !!r.resolved) }
 }
 function access(actor: Actor, origin: string, packet?: DecisionGraph) {
  if (actor.role === 'owner' && !actor.agent_door) return
