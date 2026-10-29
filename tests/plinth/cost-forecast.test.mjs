@@ -1,3 +1,4 @@
+import {recoveryNative} from '../fixtures/recovery-native.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFixture} from './helpers.mjs'
@@ -56,5 +57,32 @@ test('COST-006 — owner limits and separated approval assign budget and missing
   for(const e of exceptions.items.filter(e=>!e.resolutions.length&&!e.current))await c.ok(`/costs/exceptions/${e.id}`,{reason:'Approved source is now posted and the current external ledger agrees'})
   assert.equal((await c.api(`/jobs/${c.job.id}/costs/exceptions`)).value.healthy,true)
   assert.equal((await c.act('/costs/policy',{budget_limit_cents:0},admin)).status,403)
+ }finally{await f.close()}
+})
+
+
+test('Recovery comparison reconciles two immutable date, margin and expected-cash alternatives without executing decisions',async()=>{
+ const f=await createFixture();try{
+  const call=async(path,body,method='POST')=>{const r=await f.json('/api/plinth/'+path,{method,cookie:f.owner,...(method==='GET'?{}:{body})});assert.equal(r.status, ['jobs','resources','pricing-rates'].includes(path)?201:200,JSON.stringify(r.value));return r.value}
+  const c=await recoveryNative(call,{name:'Recovery arithmetic',client:['synthetic-plinth-client','example.invalid'].join('@')})
+  const before=await c.read(),ledgerBefore=(await call(c.root+'/costs',undefined,'GET')),messages=f.messages.length
+  const proposal=(await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'synthetic-plinth-1',alternatives:c.alternatives})).record
+  const [wait,fast]=proposal.alternatives
+  assert.equal(wait.schedule.completion_after,'2026-11-10T16:00:00.000Z');assert.equal(fast.schedule.completion_after,'2026-11-06T16:00:00.000Z')
+  assert.equal(wait.forecast.remaining_cents,196000);assert.equal(wait.forecast.final_cents,256000);assert.equal(wait.forecast.margin_cents,44000)
+  assert.equal(fast.forecast.remaining_cents,230000);assert.equal(fast.forecast.final_cents,290000);assert.equal(fast.forecast.margin_cents,10000)
+  assert.equal(fast.forecast.revenue_cents,300000,'An unapproved client price never becomes contract revenue')
+  assert.deepEqual(wait.cash.rows.map(r=>r.closing_cents),[140000,40000,-6000]);assert.deepEqual(fast.cash.rows.map(r=>r.closing_cents),[140000,-40000,-40000])
+  assert.deepEqual(proposal.difference,{finish_minutes:-5760,remaining_cents:34000,margin_cents:-34000,expected_cash_closing_cents:[0,-80000,-34000],expected_cash_trough_cents:-34000})
+  assert.ok(proposal.alternatives.every(a=>a.native_feasible&&a.outstanding_decisions.length===5));assert.equal(fast.amendment.state,'unsent');assert.equal(fast.client_decision.state,'unapproved')
+  let r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'expedite',decision:'retain',reason:'Owner prefers the comparison, subject to separate actual decisions'})
+  assert.equal(r.record.reviews[0].decision,'retain')
+  r=await c.act('/recovery/requests/'+c.request.id+'/review/'+proposal.id,{digest:proposal.digest,alternative_id:'wait',decision:'reject',reason:'Recorded date is too late; preserve rejected alternative'})
+  assert.equal(r.record.reviews.length,2);assert.deepEqual(r.record.alternatives,proposal.alternatives)
+  assert.deepEqual((await c.act('/recovery/requests/'+c.request.id+'/compare',{key:'synthetic-plinth-1',alternatives:c.alternatives})).record,r.record,'Replay retains one proposal with its complete review history')
+  const after=await c.read();for(const field of ['schedules','orders','variations','selections','invoices','approvals','budgets','schedule_baselines'])assert.deepEqual(after[field],before[field],field+' remains unchanged')
+  const ledgerAfter=await call(c.root+'/costs',undefined,'GET');assert.deepEqual({...ledgerAfter,version:0},{...ledgerBefore,version:0});assert.equal(f.messages.length,messages)
+  const different=structuredClone(c.alternatives);different[0].forecast.codes[1].minutes_per_unit='119'
+  assert.equal((await f.json('/api/plinth/'+c.root+'/recovery/requests/'+c.request.id+'/compare',{method:'POST',cookie:f.owner,body:{expected_version:after.version,key:'synthetic-plinth-1',alternatives:different}})).value.error,'recovery_replay')
  }finally{await f.close()}
 })

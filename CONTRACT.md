@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -517,7 +517,7 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `BOUND-002` | Licensed design insurance and legal decisions | target | missing |  | No licensed design insurance and legal decisions workflow exists. |
 | `BOUND-003` | Independent products and owner-controlled installation | target | partial | `README.md`; `src/base/setup.ts`; `scripts/installer/local.mjs`; `tests/plinth/portable.test.mjs` | Owner installation and backup paths exist; target external connectors and granular grants are absent. |
 | `AGENT-001` | Live grounded cost and schedule forecast | push-further | missing |  | No job-forecast agent or maintained cost/schedule forecast exists. |
-| `AGENT-002` | Recover date and margin together | push-further | missing |  | No recovery planning or cross-record decision workflow exists. |
+| `AGENT-002` | Recover date and margin together | push-further | partial | `src/plinth/agent-recovery.ts`; `src/plinth/agent-recovery-http.ts`; `tests/plinth/cost-forecast.test.mjs` — “Recovery comparison reconciles two immutable date, margin and expected-cash alternatives without executing decisions” proves independent native finish, remaining cost, margin and expected cash, immutable alternatives and retained rejection, once-only replay and unchanged native commitments, decisions, receipts and published dates. | Private owner-requested recovery comparison is implemented; authority, capacity, hold, stale-source, MCP and archive proofs are still being completed. Complete coordinated recovery execution, builder commitment and baseline approval, actual subcontractor confirmation, purchase-amendment delivery, client scope, price and date execution and reconciled external accounting and cash outcomes remain owed. INT-001, INT-002 and INT-003 retain authorized connector-grant prerequisites; FIELD-002 retains its named design ASK and installed screens. ROLE-003, ROLE-005 and ROLE-006 retain their existing external-access, hold, retention, erasure and permission-policy boundaries, including RL-103 and RL-104. Proposal review supplies no decision or grant. |
 | `AGENT-003` | Verify promised date and margin restoration | push-further | missing |  | No outcome-tracking recovery cases or verification exist. |
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | `AGENT-005` | Find missing or duplicate job costs | push-further | missing |  | No cost-match agent or actual-cost correction packets exist. |
