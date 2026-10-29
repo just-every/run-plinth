@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { proveHistoricalCustody } from './import-history-support.mjs'
 import { createFixture } from './helpers.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
@@ -160,6 +161,7 @@ test('Reviewed CSV move-in, native adoption, reversible custody and erasure thro
       const repeat = await call('/commit', { csv: upload, fingerprint: (await review(upload)).fingerprint })
       assert.equal(repeat.status, 200, JSON.stringify(repeat.value))
       assert.ok(!(await nativeJobs()).some(job => job.id === target.id))
+      await proveHistoricalCustody(f,csv)
     })
   } finally { await f.close() }
 })
