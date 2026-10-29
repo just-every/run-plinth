@@ -134,7 +134,7 @@ Generated from CONTRACT.md. These are implementation statuses for the contract c
 | BOUND-003 | partial | Owner installation and backup paths exist; target external connectors and granular grants are absent. |
 | AGENT-001 | missing | No job-forecast agent or maintained cost and schedule forecast exists. |
 | AGENT-002 | missing | No recovery planning or cross-record decision workflow exists. |
-| AGENT-003 | missing | No outcome-tracking recovery cases or verification exist. |
+| AGENT-003 | partial | Private native diagnostic comparisons are implemented; overall restoration remains unverified. Complete outcome-tracking agent operation, fully reconciled accounting actuals, comprehensive subcontractor and client participation, and end-to-end restored-date and margin closure and reopening remain owed. INT-001, INT-002 and INT-003 require authorized accounting grants; FIELD-002 retains its named design ASK and installed screens, and ROLE-003, ROLE-005 and ROLE-006 policy holds remain unchanged. Neither native evidence nor an assessment establishes physical completion, external reconciliation or final recovery. |
 | AGENT-004 | missing | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | AGENT-005 | missing | No cost-match agent or actual-cost correction packets exist. |
 | AGENT-006 | missing | No handover and warranty agent or closure workflow exists. |

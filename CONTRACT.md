@@ -383,8 +383,8 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 50 | 30 | 43 | 123 |
-| All | 64 | 30 | 43 | 137 |
+| Target and push further | 50 | 31 | 42 | 123 |
+| All | 64 | 31 | 42 | 137 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -518,7 +518,7 @@ RPT-003 is proposed DONE on the approved ct boundary, with current manager finan
 | `BOUND-003` | Independent products and owner-controlled installation | target | partial | `README.md`; `src/base/setup.ts`; `scripts/installer/local.mjs`; `tests/plinth/portable.test.mjs` | Owner installation and backup paths exist; target external connectors and granular grants are absent. |
 | `AGENT-001` | Live grounded cost and schedule forecast | push-further | missing |  | No job-forecast agent or maintained cost/schedule forecast exists. |
 | `AGENT-002` | Recover date and margin together | push-further | missing |  | No recovery planning or cross-record decision workflow exists. |
-| `AGENT-003` | Verify promised date and margin restoration | push-further | missing |  | No outcome-tracking recovery cases or verification exist. |
+| `AGENT-003` | Verify promised date and margin restoration | push-further | partial | `tests/plinth/cost-forecast.test.mjs` — “Recovery evidence compares confirmation, delivery, installed progress and adverse costs without certifying restoration” proves real native human approvals, exact reviewed revisions, missing delivery despite confirmation, later human receipt and installed progress, independent native margin comparisons, assigned residual risk and preserved assessments reopened by an adverse cost. `tests/plinth/domain.test.mjs` — “Private recovery packets fence MCP evidence, replay, source decisions, revocation and erasure” proves owner consent, draft-only MCP access, stale and cross-job refusal, revoked capture and erasure fences, and unchanged human source decisions. | Private native diagnostic comparisons are implemented; overall restoration remains unverified. Complete outcome-tracking agent operation, fully reconciled accounting actuals, comprehensive subcontractor and client participation, and end-to-end restored-date and margin closure and reopening remain owed. INT-001, INT-002 and INT-003 require authorized accounting grants; FIELD-002 retains its named design ASK and installed screens, and ROLE-003, ROLE-005 and ROLE-006 policy holds remain unchanged. Neither native evidence nor an assessment establishes physical completion, external reconciliation or final recovery. |
 | `AGENT-004` | Chase decisions before they block site work | push-further | missing |  | No decision dependency graph, substitute preparation or delivery follow-through exists. |
 | `AGENT-005` | Find missing or duplicate job costs | push-further | missing |  | No cost-match agent or actual-cost correction packets exist. |
 | `AGENT-006` | Keep handover and warranty promises | push-further | missing |  | No handover/warranty agent or closure workflow exists. |
