@@ -1,4 +1,5 @@
 import { proveQuestionAnswers } from './agent-answers-support.mjs'
+import {proveForecastAuthority} from './agent-forecast-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -9,6 +10,7 @@ import { createActiveJob, createFixture, createReleasedScope } from './helpers.m
 test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const f=await createFixture();try{
  const client=await f.invite('client@example.com'),other=await f.invite('other@example.com','Other client'),agent=await f.agent();let job=await createActiveJob(f)
+ let forecastRequest
  const path=(suffix='')=>`/api/plinth/jobs/${job.id}${suffix}`
  const mutate=async(suffix,body={},credentials={cookie:f.owner})=>f.json(path(suffix),{method:'POST',...credentials,body:{expected_version:job.version,...body}})
  await t.test('private transport, matching client scope and credential authority',async()=>{
@@ -20,6 +22,7 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   assert.equal((await f.request('/api/plinth/jobs',{method:'POST',token:agent,body:{name:'Agent cannot create job',client_email:'client@example.com'}})).status,403)
  })
  await t.test('agent preparation, client decision and immutable variation evidence',async()=>{
+  const forecast=await proveForecastAuthority(f,job,client,other,agent);job=forecast.job;forecastRequest=forecast.request
   let r=await mutate('/variations',{description:'Client requested stone benchtop',amount_cents:100_000},{token:agent});assert.equal(r.status,200);job=r.value.job;const id=r.value.record.id
   assert.equal((await mutate(`/variations/${id}/approve`,{},{token:agent})).status,403)
   assert.equal((await mutate(`/variations/${id}/approve`)).status,403)
@@ -69,6 +72,7 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   assert.equal((await f.request(path(),{method:'DELETE',cookie:client,body:{expected_version:job.version}})).status,403)
   const photo=job.diary[0];const response=await f.request(path(),{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(response.status,200)
   assert.equal((await f.request(path(),{cookie:f.owner})).status,404)
+  assert.equal((await f.request(path('/agent-forecasts/'+forecastRequest.id),{cookie:f.owner})).status,404,'Erased forecast packets cannot be recovered through a captured request')
   assert.equal((await f.request(path(`/diary/${photo.id}/attachments/${photo.attachments[0].id}`),{cookie:f.owner})).status,404)
   const credentials=await f.json('/api/plinth/agent-credentials',{cookie:f.owner});for(const credential of credentials.value.credentials){assert.equal((await f.request(`/api/plinth/agent-credentials/${credential.id}/revoke`,{method:'POST',cookie:f.owner,body:{}})).status,200)}assert.equal((await f.request('/api/plinth/jobs',{token:agent})).status,401)
   const signout=await f.request('/auth/signout',{method:'POST',cookie:f.owner,body:{}});assert.equal(signout.status,204);assert.equal((await f.request('/api/plinth/jobs',{cookie:f.owner})).status,401)

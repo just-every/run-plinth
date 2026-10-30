@@ -1,4 +1,5 @@
 import { questionFixture } from './agent-answers-support.mjs'
+import {reviewForecast} from './agent-forecast-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import {openingJob} from './opening-support.mjs'
 import {openingInput} from '../fixtures/workbook-opening.mjs'
@@ -240,6 +241,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await signedArchive.priced();const signedArchiveRow=await signedArchive.present();await signedArchive.sign(signedArchiveRow);await signedArchive.sign(signedArchiveRow,signedArchive.client,'Synthetic change client')
     await signedArchive.ok('/signed-changes/'+signedArchiveRow.id+'/apply',{digest:signedArchiveRow.digest,confirm:true,...signedArchive.billing(signedArchiveRow)})
     const archivedChanges=(await signedArchive.list()).changes
+    const archivedForecast=(await reviewForecast(c)).record
+    const archivedForecastProposal=(await c.ok('/agent-forecasts/'+archivedForecast.id+'/prepare',{packet_digest:archivedForecast.digest})).record
     const costJobId=c.job.id
     const {roomInput,roomFiles}=await import('../fixtures/room-board.mjs')
     job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
@@ -296,6 +299,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     for(const records of [rows(original),rows(restored)]){const recovered=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id).row.data);assert.deepEqual(recovered.signed_changes,archivedChanges,'Signed documents, two exact signatures and once-only application links survive CLI recovery');assert.deepEqual(recovered.budgets,signedArchive.job.budgets);assert.deepEqual(recovered.sov,signedArchive.job.sov);assert.deepEqual(recovered.invoices,signedArchive.job.invoices.map(({balance,...invoice})=>invoice))}
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
+    for(const records of [originalRows,restoredRows]){const captured=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).agent_forecasts;assert.deepEqual(captured.proposals,[archivedForecastProposal]);assert.equal(captured.requests[0].digest,archivedForecast.digest);assert.ok(!records.some(r=>r.table==='pl_agent_forecast_reviews'),'Forecast packets restore as history without execution authority')}
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
     assert.deepEqual(authority(restoredRows),authority(originalRows));assert.equal(authority(restoredRows).accountant_id,accountantId);assert.equal(getCost(restoredRows).periods[0].native_review.by.id,accountantId);assert.deepEqual(getCost(restoredRows).periods[0].snapshot,nativePreview.snapshot)
     // The complete part stream, including binary cells, is unchanged by a restore.
@@ -326,6 +330,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const evidenceReview=await recoveredSearch.json(recoveryRoot+'/preview',{method:'POST',cookie:receivingCookie,body:{case_id:archivedRecovery.id,expected_version:recoveredVersion}});assert.equal(evidenceReview.status,200)
       const consent=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/review',{method:'POST',cookie:receivingCookie,body:{expected_version:recoveredVersion,digest:evidenceReview.value.digest,confirm:true}});assert.equal(consent.status,200)
       const fresh=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:{...recoveredObservation,expected_version:consent.value.version,packet_id:consent.value.record.id,observation_id:'synthetic-plinth-restored-observation'}});assert.equal(fresh.status,200);assert.equal(fresh.value.record.comparison.overall_restoration,'unverified');
+const inactiveForecast=await recoveredSearch.json('/api/plinth/jobs/'+costJobId+'/agent-forecasts/'+archivedForecast.id,{cookie:receivingCookie});assert.equal(inactiveForecast.status,403);assert.equal(inactiveForecast.value.error,'forecast_review_required');
       const recoveredCoverage=await recoveredSearch.json('/api/plinth/imports/'+importId+'/coverage',{cookie:receivingCookie});
       assert.equal(recoveredCoverage.status,200,JSON.stringify(recoveredCoverage.value));
       assert.deepEqual(recoveredCoverage.value.coverage,sourceCoverage.value.coverage,'Source declarations, row locations, mapping revision, digest and actual dispositions survive a real CLI round trip');
