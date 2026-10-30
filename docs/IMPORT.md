@@ -168,8 +168,7 @@ This creates a separate quoting job with an inert coded estimate. It remains
 visible only to the owner until the owner records native quote acceptance. It does not
 replace a native job, accept a quote, post actual costs or adopt financial
 opening balances. Dated catalog rates and native time and expense drafts use the
-explicit import types described below. Supplier bill matching, SOV and financial
-opening balances remain outside this import door.
+explicit import types described below. Supplier bills and reconciled SOV opening positions use the explicit flows below.
 
 Inspect the file, choose one worksheet, and map column letters to source row id,
 description, code, phase, category, quantity, measurement unit and selling rate
@@ -248,7 +247,7 @@ once a native record depends on one of its rates, or a rate has been edited.
 Choose **Time and expense drafts**, load accepted jobs and select the destination.
 Map `id`, `description`, `code`, `quantity`, `unit`, `unit_cents`, `kind`,
 `dated_on`, `period`, `reference` and `employee_reference`. `rate_unit` is optional.
-Kinds are `time` and `expense`. Map time units to `hour` or `minute`; the quantity
+Kinds are `time`, `expense` and `bill`. Map time units to `hour` or `minute`; the quantity
 must resolve exactly to whole native minutes. Expenses use the exact extended
 amount from the mapped decimal quantity and integer cent rate. Codes must already
 exist in the destination's accepted budget. Source references cannot duplicate
@@ -269,6 +268,68 @@ For costs also provide `job_id` and `expected_version`. Carry `reviewed_at` from
 the preview response into commit, together with its fingerprint. A changed
 mapping, source or destination requires another preview.
 
-Supplier-bill matching, imported SOV and financial opening balances are not
-implemented. Supplied-ledger reconciliation remains required before financial
-opening adoption; importing draft cost sources does not adopt opening balances.
+Importing draft cost sources does not adopt financial opening balances. The separate opening flow below requires a supplied ledger before adoption.
+
+
+### Supplier bill drafts
+
+A bill row also maps `vendor`, `due_on`, `tax_percent`, `tax_reference` and
+`taxable` (the explicit text `true` or `false`). An exempt row also maps
+`tax_exemption`. Review the source tax rate, taxable amount and exemption evidence
+before previewing. `unit_cents` is the net rate: the source comparison remains net
+before tax and the proposed native amount includes the exact reviewed tax.
+
+Identical source rows may be omitted explicitly. Conflicting rows or an invoice
+reference already captured for that supplier require resolution, including an
+existing bill on another job. Imported bills remain drafts. Their ordinary
+missing-receipt review, current designated reviewer, separate approval, limits
+and accounting-period checks still govern posting. Import never creates a
+supplier payment or provider instruction.
+
+### Reconciled historical SOV and opening balances
+
+Use **Opening balances and SOV** with an accepted USD job, its current priced SOV
+and its reviewed retainage terms. Opening adoption requires no existing actual
+costs, cost sources, bills, invoices, receipts or pay applications. Prepare those
+native foundations before importing historical progress; the import does not
+replace the accepted quote, budget, SOV definition or retainage terms.
+
+Upload the source workbook and a separately supplied ledger snapshot. Map each
+file independently to `id`, `description`, `code`, `native_line_id`,
+`scheduled_cents`, `completed_cents`, `stored_cents`, `actual_cents`, `paid_cents`,
+`retainage_cents`, `collected_cents`, `client_retainage_cents` and
+`billed_tax_cents`. Amounts are exact whole USD cents. The two files may use
+different columns, code names and source line identifiers. Native SOV line
+mappings translate those source identifiers explicitly; the destination's
+current line identifiers are shown beside the mapping controls. Optional
+`order_ids` contains semicolon-separated native issued PO identifiers supporting
+stored materials. Native receipt capacity and source scope checks still apply.
+
+Review saved formula caches and resolve duplicate or rejected rows independently
+for both files. Every included native line, cost code and financial amount must
+match the supplied ledger. The source preview retains totals before exclusions,
+so omitted values remain visible. Scheduled values must match the accepted
+native SOV; billed tax and client retainage must match its reviewed tax and
+retainage snapshots. Choose a source as-of date and an open posting period.
+
+Approve the exact file pair, mappings, row resolutions, destination version and
+reconciliation once. Actual costs and recorded supplier paid and retained values
+become source-linked opening balances. Historical progress becomes an explicitly
+labelled SOV opening position. It cannot be invoiced again. The next native draw
+and invoice deduct prior gross billing, tax and withholding rather than charging
+history twice. Customer collections are recorded historical facts; they are not
+new executable receipts or evidence of provider settlement. No funds move.
+
+Both originals, source-cell provenance, the current cost ledger and the historical
+SOV sources remain downloadable. Replay adds no second balance or application.
+Undo reverses an untouched opening; later native work is preserved. A job hold
+blocks destructive undo, and erasure withdraws the source and ledger custody and
+fences replay. Accounting connector grants and professional verification remain
+outside this native import.
+
+For the HTTP sequence use `mapping.purpose: "opening"`, `job_id`,
+`expected_version`, `as_of`, `posting_period`, `ledger_reviewed: true`, and a
+`ledger` object with its own `name`, `base64` and mapping. Carry the preview's
+`reviewed_at` and fingerprint into commit. Opening mappings use `columns`, `codes`,
+optional `line_ids`, `currency: "USD"`, duplicate handling, formula-cache review
+and excluded-row reasons for each file.

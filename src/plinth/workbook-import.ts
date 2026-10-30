@@ -13,13 +13,13 @@ import { estimateLines } from './estimate-input.ts'
 
 export interface Cell { value: string; address: string; formula?: string; problem?: string }
 export interface Sheet { name: string; rows: { number: number; cells: Cell[] }[] }
-interface Workbook { name: string; hash: string; base64: string; size: number; sheets: Sheet[]; problems: string[] }
-export const workbookFields = ['id', 'description', 'code', 'phase', 'category', 'quantity', 'unit', 'rate_unit', 'unit_cents', 'cost_unit_cents', 'vendor', 'effective_on', 'reference', 'kind', 'dated_on', 'period', 'employee_reference'] as const
+export interface Workbook { name: string; hash: string; base64: string; size: number; sheets: Sheet[]; problems: string[] }
+export const workbookFields = ['id', 'description', 'code', 'phase', 'category', 'quantity', 'unit', 'rate_unit', 'unit_cents', 'cost_unit_cents', 'vendor', 'effective_on', 'reference', 'kind', 'dated_on', 'period', 'employee_reference', 'due_on', 'tax_percent', 'tax_reference', 'taxable', 'tax_exemption'] as const
 export type WorkbookField = typeof workbookFields[number]
-interface Mapping { purpose: 'estimate' | 'catalog' | 'costs'; sheet: string; columns: Partial<Record<WorkbookField, string>>; codes: Record<string,string>; units: Record<string,string>; currency: 'USD' | 'AUD'; duplicates: 'reject' | 'skip-identical'; reviewed_formulas: boolean; excluded_rows: Record<string,string> }
+interface Mapping { purpose: 'estimate' | 'catalog' | 'costs'; sheet: string; columns: Partial<Record<WorkbookField, string>>; codes: Record<string,string>; units: Record<string,string>; currency: 'USD' | 'AUD'; duplicates: 'reject' | 'skip-identical'; reviewed_formulas: boolean; reviewed_tax: boolean; excluded_rows: Record<string,string> }
 interface Diagnostic { row?: number; cell?: string; code: string; message: string; resolved: boolean }
 interface RowTotal { row: number; total_cents: number | null; cost_total_cents: number | null; disposition: 'included' | 'excluded' | 'duplicate' | 'rejected' }
-export interface WorkbookDraft { kind: 'estimate' | 'catalog' | 'costs'; reviewed_at?: string; catalog_rates?: VendorRate[]; name: string; client_email: string; address: string; currency: 'USD' | 'AUD'; lines: Line[]; total_cents: number; cost_total_cents?: number; mapping: Mapping; provenance: { row: number; cells: Record<string, Cell> }[]; diagnostics: Diagnostic[]; artifact_sha256: string; source_name: string; source_totals: { total_cents: number | null; cost_total_cents: number | null; rows: RowTotal[] } }
+export interface WorkbookDraft { kind: 'estimate' | 'catalog' | 'costs'; reviewed_at?: string; catalog_rates?: VendorRate[]; name: string; client_email: string; address: string; currency: 'USD' | 'AUD'; lines: (Line & {import_tax_cents?:number})[]; total_cents: number; cost_total_cents?: number; mapping: Mapping; provenance: { row: number; cells: Record<string, Cell> }[]; diagnostics: Diagnostic[]; artifact_sha256: string; source_name: string; source_totals: { total_cents: number | null; cost_total_cents: number | null; rows: RowTotal[] } }
 const fail = (message: string): never => { throw new DomainError('invalid_workbook', message) }
 const nodes = (node: Document | Element, tag: string) => Array.from(node.getElementsByTagName(tag))
 const content = (node: Element, tag: string) => nodes(node, tag)[0]?.textContent ?? ''
@@ -99,12 +99,12 @@ export function workbookSource(book: Workbook, input: Record<string,unknown>): {
  const purpose=raw.purpose??'estimate';need(purpose==='estimate'||purpose==='catalog'||purpose==='costs','Choose estimate, catalog or cost draft import')
  const rawColumns=object(raw.columns),columns: Mapping['columns']={}
  for(const key of workbookFields){if(rawColumns[key]!==undefined&&rawColumns[key]!==''){const col=text(rawColumns[key],key,2);need(/^[A-Z]{1,2}$/.test(col),'Map fields to column letters');columns[key]=col}}
- const required:WorkbookField[]=purpose==='costs'?['id','description','code','quantity','unit','unit_cents','kind','dated_on','period','reference','employee_reference']:purpose==='catalog'?['id','description','code','unit','unit_cents','cost_unit_cents','vendor','effective_on','reference']:['id','description','code','phase','category','quantity','unit','unit_cents']
+ const required:WorkbookField[]=purpose==='costs'?['id','description','code','quantity','unit','unit_cents','kind','dated_on','period','reference']:purpose==='catalog'?['id','description','code','unit','unit_cents','cost_unit_cents','vendor','effective_on','reference']:['id','description','code','phase','category','quantity','unit','unit_cents']
  for(const key of required)need(columns[key],`Map the ${key} column`)
  need(raw.currency==='USD'||raw.currency==='AUD','Choose USD or historical AUD currency')
  need(raw.duplicates==='reject'||raw.duplicates==='skip-identical','Choose duplicate handling')
  need(purpose==='estimate'||raw.currency==='USD','Native rate catalogs are USD; historical AUD estimates stay separate')
- const mapping:Mapping={purpose,sheet:sheet.name,columns,codes:stringMap(raw.codes,'Code mapping'),units:stringMap(raw.units,'Unit mapping'),currency:raw.currency,duplicates:raw.duplicates,reviewed_formulas:raw.reviewed_formulas===true,excluded_rows:stringMap(raw.excluded_rows,'Exclusion reason')}
+ const mapping:Mapping={purpose,sheet:sheet.name,columns,codes:stringMap(raw.codes,'Code mapping'),units:stringMap(raw.units,'Unit mapping'),currency:raw.currency,duplicates:raw.duplicates,reviewed_formulas:raw.reviewed_formulas===true,reviewed_tax:raw.reviewed_tax===true,excluded_rows:stringMap(raw.excluded_rows,'Exclusion reason')}
  for(const code of Object.values(mapping.codes))need(/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(code),'Target cost codes must use letters, digits, dots, underscores or hyphens')
  const email=purpose!=='estimate'?'':text(input.client_email,'Client email',254).toLowerCase();need(purpose!=='estimate'||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),'Provide a client email')
  const catalog_rates:VendorRate[]=[]

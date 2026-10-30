@@ -10,6 +10,7 @@ import { IMPORT_NAMESPACE, IMPORT_VERSION, type AcceptedJobRow } from './import-
 export function acceptedJobsMapping(actor: Actor): ImportMapping { return {
   version: IMPORT_VERSION,
   map(record) {
+    if(record.kind==='opening-ledger')return {effects:[],unmapped:[{reason:'Supplied ledger retained for exact financial reconciliation; not a second financial posting'}]}
     if(record.kind==='cost-workbook'){
       const payload=record.payload as unknown as {target_job:Job;draft:WorkbookDraft;expected_version:number}
       return {effects:[{targetKind:'cost-workbook',targetId:payload.target_job.id+':'+record.artifactHash,value:{data:canonicalJson(payload.target_job as unknown as import('../modules/import-kit/src/d1/index').Json),version:payload.target_job.version,expected_version:payload.expected_version}}]}
