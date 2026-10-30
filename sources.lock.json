@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
-      "sha256": "786c4813b27e01de3d50de634189b94790788c2578b853944e92ea5d7be7498d",
+      "sha256": "cd353c63d98f58ae1217618eb2f7a517441f7fcde60d154a2ed80c9103a0eccd",
       "executable": false
     },
     "docs/AGENT-LEARNING.md": {
@@ -293,7 +293,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "b84694ac4cf022295a0efd449d7cffa1af85fe7599e4c332522c6ee7f3db600c",
+      "sha256": "0bb968dc3490c9cf09577ab80441219500dd92cb40dc092d684d867c062e08d6",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -510,6 +510,10 @@
     },
     "migrations/core/202610292202_agent_forecast_reviews.sql": {
       "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
+      "executable": false
+    },
+    "migrations/core/202610292203_agent_forecast_custody.sql": {
+      "sha256": "7c18e28b28f8b2944e36aefd5b2ee472c2f4ade96495e06fa8408cde4e65f8fe",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -3233,7 +3237,7 @@
       "executable": false
     },
     "src/plinth/agent-door/index.ts": {
-      "sha256": "13285d00c4104a592a7bda581e737a637da4e45759ba9f11a7a94dd2c75ae82d",
+      "sha256": "d668d3ab41fe5b852693f3bd13d6b3aacf4c3f84e50c5f9340b4c3bfc5fc64f6",
       "executable": false
     },
     "src/plinth/agent-door/learning.ts": {
@@ -3257,7 +3261,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "ea8dfca7e6623d9a6020e9c5a78071a63f2d7cae30fef9d66a1489d49d3945bc",
+      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
       "executable": false
     },
     "src/plinth/agent-learning.ts": {
@@ -5449,7 +5453,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "2ed8c0d5c0051b7996f2838f63e88add1d325d2d13a8c9c173f173d876ae8e85",
+      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {
