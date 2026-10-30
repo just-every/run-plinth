@@ -65,6 +65,7 @@ export async function invoiceAction(db: D1Database, job: Job, actor: Actor, inpu
   }
   const amount_cents = input.kind === 'deposit' ? cents(input.amount_cents) : input.kind==='cost_plus'?sources.cost_billing!.total_cents:sources.application!.current_cents
   need(input.kind==='cost_plus'?amount_cents!==0:amount_cents>0, 'An invoice needs a nonzero cost adjustment or positive gross amount')
+  if(input.kind==='deposit'&&job.cost_records?.opening){const openingBilled=sum(job.cost_records.opening.rows.map(r=>r.completed_cents+r.stored_cents)),issuedGross=sum(invoiceRows(job).filter(i=>i.issued&&i.kind!=='cost_plus').map(i=>i.issued!.gross_cents));need(amount_cents+issuedGross<=sources.current_budget.contract_cents-openingBilled,'A new deposit must fit the contract remaining after imported billing and native issued requests',409,'invoice_opening_balance')}
   if (input.kind === 'milestone' && input.amount_cents !== undefined) need(input.amount_cents === amount_cents, 'Milestone amount comes from its issued application')
   const record: Invoice = { id: crypto.randomUUID(), kind: input.kind, status: 'draft', description: text(input.description, 'description', 2000), due_on: date(input.due_on, 'due_on'), terms: text(input.terms, 'terms', 4000), recipient_email, amount_cents, ...(source_application_id ? { source_application_id } : {}), prepared_by: stamp(actor), source_digest: invoiceDigest(sources), sources, lines: [], receipts: [], deposit_applications: [] }
   record.lines = invoiceLines(job, record, sources)
