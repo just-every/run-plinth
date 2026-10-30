@@ -32,6 +32,10 @@ export default async function({request,origin,claim,displayName,returnTo}) {
   const packet=await call('jobs/'+job.id+'/agent-closeout',{expected_version:job.version,title:sensitive?'Synthetic SSN 123-45-6789':'Reviewed closeout packet',source_keys:[],requirements:[{id:'manual',kind:'manual',title:'Missing operating manual',source_keys:[],proposed_owner:'Synthetic supplier',reason:'Recorded closeout requirement'}]})
   await call('jobs/'+job.id+'/agent-closeout/'+packet.record.id+'/review',{expected_version:packet.version,digest:packet.record.digest,confirm:true,statement:'Owner reviewed the missing evidence and consents to unsent drafting only'})
  }
+ for(const job of (await call('jobs',undefined,'GET')).jobs.filter(j=>j.status==='active')){
+  const available=await call(`jobs/${job.id}/agent-forecasts/sources`,undefined,'GET')
+  await call(`jobs/${job.id}/agent-forecasts`,{expected_version:available.version,as_of:'2026-10-28',due_on:'2026-11-01',reference:'Owner-reviewed conformance forecast request',sources:available.sources.filter(s=>s.key==='estimate').map(s=>({key:s.key,revision:s.revision,as_of:'2026-10-28',valid_until:'2027-10-28'}))})
+ }
  const catalog=async(kind,value)=>(await call('estimate-catalog',{kind,name:'Synthetic '+kind,reason:'Reviewed synthetic conformance source',value})).entry
  for(const sensitive of [false,true]) {
  const rate=await catalog('rate',{vendor:'Synthetic supplier',effective_on:'2026-01-01',unit:'ft',cost_cents:100,sell_cents:200,reference:'Synthetic source quote'})
