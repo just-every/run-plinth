@@ -377,7 +377,11 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal((await f.request(archivedQuestion.root,{method:'DELETE',cookie,body:{expected_version:questionCurrent.version}})).status,200)
     assert.equal((await f.request(archivedQuestion.root+'/agent-answers/'+savedQuestion.id,{cookie})).status,404)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
+<<<<<<< HEAD
     assert.equal((await f.json('/api/plinth/jobs/'+recoveryArchive.c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:recoveryArchive.c.job.version}})).status,200)
+=======
+    const openingCurrent=(await f.json('/api/plinth/jobs/'+openingCase.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+openingCase.job.id,{method:'DELETE',cookie,body:{expected_version:openingCurrent.version}})).status,200);const openingWithdrawn=await f.json('/api/plinth/imports/'+openingCommit.value.job.id+'/originals',{cookie});assert.equal(openingWithdrawn.status,200);assert.equal(openingWithdrawn.value.originals.length,2);assert.ok(openingWithdrawn.value.originals.every(o=>o.original.status==='unavailable'),'Both financial source originals are withdrawn before old archive replay is fenced')
+>>>>>>> a6a7f4a (Complete reviewed opening downloads and erasure proof [skip ci])
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
@@ -385,6 +389,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.ok(!erasedRows.some(r=>r.table==='pl_background_work'&&archivedExport.tasks.some(t=>t.id===r.row.id)),'Erasure removes archived export captures and outputs')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===archivedQuestion.job.id),'Erasure removes question packets, retained answers and linked drafts before backup replay is fenced')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===costJobId))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===openingCase.job.id),'Imported historical costs and SOV are absent before the later erasure journal fences recovery')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===signedArchive.job.id),'Signed change artifacts and private costs disappear before old archive recovery is fenced')
     assert.ok(!erasedRows.some(item=>item.table==='pl_plan_file_chunks'&&item.row.job_id===job.id),'DOC-001 erasure removes every large plan chunk')
     assert.ok(!erasedRows.some(item=>item.table==='pl_jobs'&&item.row.id===job.id),'DOC-004 erasure removes the complete register before old-archive replay is fenced')

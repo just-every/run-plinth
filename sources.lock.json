@@ -4833,7 +4833,7 @@
       "executable": false
     },
     "src/ui/opening-import.tsx": {
-      "sha256": "dc040e6894febc948a6cd240a495a1bb468da3da020d93c92ce3274709e8ded2",
+      "sha256": "512a5d706f07b580cacfc08725e1bb2a5cece72b04cdf7fd5dbeed888c5ce255",
       "executable": false
     },
     "src/ui/payments.tsx": {
@@ -5433,7 +5433,7 @@
       "executable": false
     },
     "tests/journeys/workbook-import.mjs": {
-      "sha256": "3c358d343354024ccca812993395c61334fe44033be977b02f7d44a7a2e050b2",
+      "sha256": "6096e18ab333f073928a97f1471a2670c5963c938385e8d5f4deb39ea8a6910f",
       "executable": false
     },
     "tests/plinth/agent-answers-support.mjs": {
@@ -5529,7 +5529,7 @@
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
-      "sha256": "6e269b8a6912c855c2932f898f107e46d8d915f7435e0aea79e023eb9cb082c0",
+      "sha256": "6d9b35cc4eb75d9abb8120e343f4217fac7894c79d7bb338c784a66f527af3bc",
       "executable": false
     },
     "tests/plinth/payment-fixture.mjs": {
@@ -5545,7 +5545,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "905d7b53c8c0b618c0424d82959c3a8e9ec60dc7075521cfaf398b1f221e03ec",
+      "sha256": "02c17bacb0c0cf0a8a4a22356d2e355948b18f4096f94760e8d0dd6165d859c0",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
