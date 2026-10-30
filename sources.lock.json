@@ -3289,7 +3289,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
+      "sha256": "a575ae0835806be857783fbf4ad461a74ff635f04c4b59c9b79bbedc69ad2671",
       "executable": false
     },
     "src/plinth/agent-learning.ts": {
@@ -5497,7 +5497,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
+      "sha256": "ea90eb89de23374143804e77124da99e4e37d11ce50d815ea82b10fc813017f8",
       "executable": false
     },
     "tests/plinth/agent-runs-support.mjs": {
@@ -5613,7 +5613,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "dcb88667a63397cf1d2178859c13e2e53cc7022b49a54e8b2cca1e303a6ca815",
+      "sha256": "13c4c8405cbcca320ec575dbd809e80d4ac73bcac19c4c1a9e3ca6d0767d6e16",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

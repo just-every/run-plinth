@@ -29,7 +29,8 @@ async function sources(job:Job):Promise<Source[]> {
   ...(job.quotes.some(q=>q.status==='accepted')?{estimate:job.quotes.filter(q=>q.status==='accepted')}:{}),
   ...(budget?{budget}:{}),
   ledger:{currency:ledger.currency,budget_revision:ledger.budget_revision,rows:ledger.rows.map(r=>({cost_code:r.cost_code,posted_actual_cents:r.posted_actual_cents,open_commitment_cents:r.open_commitment_cents,sources:r.sources})),reconciliations:job.cost_records?.reconciliations??[]},
-  ...(job.schedules.length?{schedule:{tasks:job.schedules,calendar:workingCalendar(job.schedule_calendar,job.time_zone),constraints:job.schedule_constraints??[]}}:{}),
+  // The planner revision invalidates packets computed with unreviewed job records.
+  ...(job.schedules.length?{schedule:{planner:'reviewed-schedule-only-v1',tasks:job.schedules,calendar:workingCalendar(job.schedule_calendar,job.time_zone),constraints:job.schedule_constraints??[]}}:{}),
   ...(job.schedule_actuals?.length?{quantities:job.schedule_actuals}:{}),
   ...(job.orders.length?{procurement:job.orders.map(o=>({id:o.id,revision:o.amendments?.filter(a=>a.status==='approved').length??0,status:o.status,promised_on:o.promised_on,amount_cents:o.amount_cents,lines:o.lines,receipts:o.receipts,amendments:o.amendments}))}:{}),
   ...(job.trade_invitations?.length?{confirmations:job.trade_invitations}:{}),
@@ -60,8 +61,11 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
  }
  let schedule:unknown=null
  if(has('schedule')){
-  const candidate=structuredClone(job),calendar=workingCalendar(job.schedule_calendar,job.time_zone),observed=text(input.observed_at,'Observation instant',40)
-  need(Number.isFinite(Date.parse(observed))&&wallClock(Date.parse(observed),job.time_zone??'UTC').date===input.as_of,'Observation instant must fall on the assumption date')
+  const reviewed=selected.find(s=>s.key==='schedule')!.facts as {tasks:Job['schedules'];calendar:ReturnType<typeof workingCalendar>;constraints:NonNullable<Job['schedule_constraints']>}
+  const calendar=structuredClone(reviewed.calendar),observed=text(input.observed_at,'Observation instant',40)
+  // Build the planner input from reviewed facts; native bid and RFI records confer no review authority.
+  const candidate:Job={id:job.id,version:job.version,name:'',client_email:'',address:'',status:'active',created_by:stamp(actor),quotes:[],schedules:structuredClone(reviewed.tasks),diary:[],variations:[],orders:[],claims:[],approvals:[],schedule_calendar:calendar,time_zone:calendar.time_zone,schedule_constraints:structuredClone(reviewed.constraints)}
+  need(Number.isFinite(Date.parse(observed))&&wallClock(Date.parse(observed),calendar.time_zone??'UTC').date===input.as_of,'Observation instant must fall on the assumption date')
   const production=input.production??[],deliveries=input.deliveries??[]
   need(Array.isArray(production)&&production.length<=100&&Array.isArray(deliveries)&&deliveries.length<=100,'Provide bounded task assumptions')
   const measured:{task_id:string;actual_id:string;installed_quantity:string;remaining_quantity:string;elapsed_minutes:number;minutes_per_unit:string;remaining_minutes:number}[]=[],seen=new Set<string>()
@@ -85,7 +89,7 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
    const p=object(value),task=candidate.schedules.find(t=>t.id===p.task_id),order=job.orders.find(o=>o.id===p.order_id)
    need(task&&task.status==='booked'&&order&&order.status==='issued'&&order.promised_on&&!linked.has(task.id),'Choose one issued dated order for an existing task',409,'forecast_delivery');linked.add(task.id)
    // A promise is a dated assumption, never proof of physical receipt.
-   const available=new Date(zonedInstant(order.promised_on,0,job.time_zone??'UTC')).toISOString();if(Date.parse(available)>Date.parse(task.start))task.start=available
+   const available=new Date(zonedInstant(order.promised_on,0,calendar.time_zone??'UTC')).toISOString();if(Date.parse(available)>Date.parse(task.start))task.start=available
   }
   // Project remaining work forward; retained physical actuals are not rewritten by the planner.
   candidate.schedule_actuals=[]
