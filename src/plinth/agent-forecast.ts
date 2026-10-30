@@ -5,6 +5,7 @@ import { costLedger } from './cost-ledger'
 import { digest } from './cost-model'
 import { previewSchedule } from './schedule-plan'
 import { workingCalendar, workingMinutes } from './schedule-calendar'
+import { wallClock, zonedInstant } from './time-zone'
 import { localDate } from './remittances'
 import { jobOf, readClock, saveJob } from './store'
 
@@ -12,12 +13,14 @@ type Kind = 'estimate'|'budget'|'ledger'|'schedule'|'quantities'|'procurement'|'
 interface Source { key:Kind; id:string; revision:string; facts:unknown }
 interface ReviewedSource extends Source { as_of:string; valid_until:string }
 interface Uncertainty { source:string; state:'withheld'|'unavailable'|'stale'|'unverified'; owner_id:string; due_on:string; reason:string }
-interface RequestPacket { id:string; reviewed_by:Stamp; as_of:string; sources:ReviewedSource[]; assumptions:Input; uncertainties:Uncertainty[]; forecast:unknown; digest:string; revoked_by?:Stamp; proposal_id?:string }
+interface RequestPacket { format:'plinth-agent-forecast-v1'; job_id:string; id:string; reviewed_by:Stamp; as_of:string; sources:ReviewedSource[]; assumptions:Input; uncertainties:Uncertainty[]; forecast:unknown; digest:string; revoked_by?:Stamp; proposal_id?:string }
 export interface AgentForecastState { requests:RequestPacket[]; proposals:{id:string;request_id:string;packet_digest:string;prepared_by:Stamp;packet:RequestPacket}[] }
 const state=(job:Job)=>job.agent_forecasts??={requests:[],proposals:[]}
 const json=(value:unknown)=>Response.json(value,{headers:{'cache-control':'private, no-store','x-content-type-options':'nosniff'}})
 const decimal=(v:unknown,name:string)=>{const s=String(v);need(/^\d{1,9}(\.\d{1,3})?$/.test(s),name+' requires a nonnegative decimal with up to three places');const [n,f='']=s.split('.');return BigInt(n!)*1000n+BigInt(f.padEnd(3,'0'))}
+const quantity=(v:unknown,name:string)=>{const s=String(v);need(/^\d{1,12}(\.\d{1,4})?$/.test(s),name+' requires a nonnegative decimal with up to four places');const [n,f='']=s.split('.');return BigInt(n!)*10_000n+BigInt(f.padEnd(4,'0'))}
 const units=(n:bigint)=>`${n/1000n}.${String(n%1000n).padStart(3,'0')}`
+const quantityText=(n:bigint)=>n%10n===0n?units(n/10n):`${n/10_000n}.${String(n%10_000n).padStart(4,'0')}`
 
 /** Only these native facts can enter a review. Private originals and raw payroll stay at their existing doors. */
 async function sources(job:Job):Promise<Source[]> {
@@ -58,7 +61,7 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
  let schedule:unknown=null
  if(has('schedule')){
   const candidate=structuredClone(job),calendar=workingCalendar(job.schedule_calendar,job.time_zone),observed=text(input.observed_at,'Observation instant',40)
-  need(Number.isFinite(Date.parse(observed))&&new Date(observed).toISOString().slice(0,10)===input.as_of,'Observation instant must fall on the assumption date')
+  need(Number.isFinite(Date.parse(observed))&&wallClock(Date.parse(observed),job.time_zone??'UTC').date===input.as_of,'Observation instant must fall on the assumption date')
   const production=input.production??[],deliveries=input.deliveries??[]
   need(Array.isArray(production)&&production.length<=100&&Array.isArray(deliveries)&&deliveries.length<=100,'Provide bounded task assumptions')
   const measured:{task_id:string;actual_id:string;installed_quantity:string;remaining_quantity:string;elapsed_minutes:number;minutes_per_unit:string;remaining_minutes:number}[]=[],seen=new Set<string>()
@@ -67,14 +70,14 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
    const p=object(value),id=text(p.task_id,'Task',100),task=candidate.schedules.find(t=>t.id===id),actual=job.schedule_actuals?.findLast(a=>a.task_id===id)
    need(task&&task.status==='booked'&&actual?.installed&&!seen.has(id),'Choose one current task with recorded installed quantity',409,'forecast_quantity');seen.add(id)
    need(p.unit===actual.installed.unit,'Production units must match the recorded quantity',409,'forecast_quantity')
-   const total=decimal(p.total_quantity,'total_quantity'),installed=decimal(actual.installed.quantity,'installed quantity'),elapsed=workingMinutes(Date.parse(actual.actual_start),Date.parse(observed),calendar)
+   const total=quantity(p.total_quantity,'total_quantity'),installed=quantity(actual.installed.quantity,'installed quantity'),elapsed=workingMinutes(Date.parse(actual.actual_start),Date.parse(observed),calendar)
    need(total>=installed&&installed>0n&&Number.isSafeInteger(elapsed)&&elapsed>0,'Review positive measured progress and elapsed working minutes',409,'forecast_quantity')
-   const remaining=total-installed,remaining_minutes=Number((BigInt(elapsed)*remaining+installed-1n)/installed),perUnit=(BigInt(elapsed)*1_000_000n+installed/2n)/installed
+   const remaining=total-installed,remaining_minutes=Number((BigInt(elapsed)*remaining+installed-1n)/installed),perUnit=(BigInt(elapsed)*10_000_000n+installed/2n)/installed
    need(remaining_minutes<=525600,'Remaining work exceeds the supported planner horizon')
-   task.start=observed;task.duration_minutes=remaining_minutes;task.milestone=remaining_minutes===0
+   task.start=new Date(observed).toISOString();task.duration_minutes=remaining_minutes;task.milestone=remaining_minutes===0
    const cost=costAssumptions.find(c=>c.cost_code===actual.installed!.cost_code)
-   if(cost&&(cost.remaining_quantity!==units(remaining)||cost.minutes_per_unit!==units(perUnit)))unknown.push({source:'productivity:'+id,state:'unverified',owner_id:actor.id,due_on:String(input.due_on),reason:'Reviewed cost assumptions differ from measured elapsed productivity; elapsed time is not attested crew labor'})
-   measured.push({task_id:id,actual_id:actual.id,installed_quantity:actual.installed.quantity,remaining_quantity:units(remaining),elapsed_minutes:elapsed,minutes_per_unit:units(perUnit),remaining_minutes})
+   if(cost&&(quantity(cost.remaining_quantity,'Remaining cost quantity')!==remaining||cost.minutes_per_unit!==units(perUnit)))unknown.push({source:'productivity:'+id,state:'unverified',owner_id:actor.id,due_on:String(input.due_on),reason:'Reviewed cost assumptions differ from measured elapsed productivity; elapsed time is not attested crew labor'})
+   measured.push({task_id:id,actual_id:actual.id,installed_quantity:actual.installed.quantity,remaining_quantity:quantityText(remaining),elapsed_minutes:elapsed,minutes_per_unit:units(perUnit),remaining_minutes})
   }
   const linked=new Set<string>()
   for(const value of deliveries){
@@ -82,7 +85,7 @@ async function calculate(job:Job,actor:Actor,selected:ReviewedSource[],input:Inp
    const p=object(value),task=candidate.schedules.find(t=>t.id===p.task_id),order=job.orders.find(o=>o.id===p.order_id)
    need(task&&task.status==='booked'&&order&&order.status==='issued'&&order.promised_on&&!linked.has(task.id),'Choose one issued dated order for an existing task',409,'forecast_delivery');linked.add(task.id)
    // A promise is a dated assumption, never proof of physical receipt.
-   const available=order.promised_on+'T00:00:00.000Z';if(available>task.start)task.start=available
+   const available=new Date(zonedInstant(order.promised_on,0,job.time_zone??'UTC')).toISOString();if(Date.parse(available)>Date.parse(task.start))task.start=available
   }
   // Project remaining work forward; retained physical actuals are not rewritten by the planner.
   candidate.schedule_actuals=[]
@@ -132,7 +135,7 @@ export async function agentForecastResponse(request:Request,env:Bindings,actor:A
   for(const key of ['bids','field-time','accounting','cross-job-capacity'])uncertainties.push({source:key,state:'unavailable',owner_id:actor.id,due_on,reason:'Not integrated into this packet; no completeness or provider freshness claim'})
   // Only explicitly reviewed, currently dated groups may influence calculations.
   const usable=selected.filter(s=>s.valid_until>=as_of),assumptions={as_of,due_on,observed_at:input.observed_at,codes:input.codes,production:input.production,deliveries:input.deliveries,reference:text(input.reference,'Request assumptions',2000)}
-  const forecast=await calculate(job,actor,usable,assumptions,uncertainties),packet={id:crypto.randomUUID(),reviewed_by:stamp(actor),as_of,sources:selected,assumptions,uncertainties,forecast}
+  const forecast=await calculate(job,actor,usable,assumptions,uncertainties),packet={format:'plinth-agent-forecast-v1' as const,job_id:job.id,id:crypto.randomUUID(),reviewed_by:stamp(actor),as_of,sources:selected,assumptions,uncertainties,forecast}
   const row:RequestPacket={...packet,digest:await digest(packet)};records.requests.push(row);writes.push(env.DB.prepare('INSERT INTO pl_agent_forecast_reviews(request_id,job_id,owner_id,digest) VALUES(?,?,?,?)').bind(row.id,job.id,actor.id,row.digest));record=row
  }else{
   const row=(parts[3]==='latest'?records.requests.findLast(r=>r.reviewed_by.id===actor.id&&!r.revoked_by):records.requests.find(r=>r.id===parts[3]));need(row,'Reviewed request not found',404,'not_found');need(row.reviewed_by.id===actor.id,'Only the requesting owner may use this packet',403,'forbidden')
@@ -148,4 +151,29 @@ export async function agentForecastResponse(request:Request,env:Bindings,actor:A
  }
  await saveJob(env.DB,actor,previous,job,writes,clock)
  return json({record,version:job.version})
+}
+
+/** Shared transport receipts may be cached. Recheck private forecast custody before returning any receipt. */
+export async function forecastResultRefusal(env:Bindings,result:unknown,revision?:number|null):Promise<string|null>{
+ const record=(result as {record?:RequestPacket|{packet:RequestPacket}}|undefined)?.record
+ const packet=record&&('packet' in record?record.packet:record)
+ if(packet?.format!=='plinth-agent-forecast-v1')return null
+ if(revision!==undefined){const state=await env.DB.prepare('SELECT envelope,local_revision FROM agent_door_state WHERE id=1').first<{envelope:string|null;local_revision:number}>(),current=env.RER_OWNER_CLAIM_PUBLIC_KEYS?(state?.envelope?JSON.parse(state.envelope).revision:null):state?.local_revision||null;if(revision!==current)return 'forecast_policy_changed'}
+ const saved=await env.DB.prepare('SELECT data FROM pl_jobs WHERE id=?').bind(packet.job_id).first<{data:string}>()
+ if(!saved)return 'not_found'
+ const job=JSON.parse(saved.data) as Job,current=job.agent_forecasts?.requests.find(r=>r.id===packet.id)
+ if(!current||current.digest!==packet.digest)return 'forecast_review'
+ if(current.revoked_by)return 'forecast_revoked'
+ const owner=await env.DB.prepare("SELECT id FROM oa_operators WHERE id=? AND role='owner' AND status='active'").bind(current.reviewed_by.id).first()
+ if(!owner)return 'forbidden'
+ const grant=await env.DB.prepare('SELECT request_id FROM pl_agent_forecast_reviews WHERE request_id=? AND owner_id=? AND digest=?').bind(current.id,current.reviewed_by.id,current.digest).first()
+ if(!grant)return 'forecast_review_required'
+ return (await freshness(job,current)).length?'forecast_source_changed':null
+}
+export async function forecastResponseGuard(env:Bindings,response:Response):Promise<Response>{
+ if(!response.headers.get('content-type')?.includes('application/json'))return response
+ const value=await response.clone().json() as {id?:unknown;result?:{structuredContent?:unknown;_meta?:Record<string,unknown>&{'com.runeditrun/decision'?:{revision?:number|null}}}}
+ const code=await forecastResultRefusal(env,value.result?.structuredContent,value.result?._meta?.['com.runeditrun/decision']?.revision)
+ if(!code)return response
+ return Response.json({jsonrpc:'2.0',id:value.id,result:{resultType:'complete',content:[{type:'text',text:JSON.stringify({code})}],isError:true,_meta:{...value.result?._meta,'com.runeditrun/error':{code}}}},{status:200,headers:response.headers})
 }
