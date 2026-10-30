@@ -4,7 +4,9 @@ import { originalEmail } from './meeting-mail.mjs'
 
 /** Save actual local extraction output and prove current source grants still govern search and originals. */
 export async function reviewExtractedAttachments({ base, page, owner, client, job, capture, variants, capturePrefix }) {
+ const show = async name => { await capture(page, name); await page.setViewportSize({width:1440,height:1000}) }
  for (const [index, variant] of variants.entries()) {
+  await page.setViewportSize({width:1440,height:1000})
   const raw = originalEmail({ from: 'synthetic-plinth-530@example.com', to: 'builder@example.com', subject: `Private ${capturePrefix} original ${index}`, text: 'Original construction document for review.', file: variant })
   const captured = await owner.request.post(base + `/api/plinth/jobs/${job.id}/correspondence`, { headers: { origin: base }, data: { kind: 'capture', confirm: true, original_base64: raw.toString('base64') } })
   assert.equal(captured.status(), 201)
@@ -22,7 +24,7 @@ export async function reviewExtractedAttachments({ base, page, owner, client, jo
    await expect(page.getByRole('textbox',{name:'Human-supplied transcription',exact:true})).toHaveValue('')
    await expect(page.getByRole('textbox',{name:'Unverified extracted draft',exact:true})).toHaveCount(0)
    page.removeListener('request', observe); assert.deepEqual(outbound, [], 'Refused extraction follows no external link')
-   if (!variant.diagnostic) await capture(page, `${capturePrefix}-refused-${index}`)
+   if (!variant.diagnostic) await show(`${capturePrefix}-refused-${index}`)
    const lookup = await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/decision-search?` + new URLSearchParams({q:variant.name}))).json()
    assert.equal(lookup.count,1)
    assert.deepEqual(Buffer.from(await (await owner.request.get(base + lookup.results[0].files[0].href)).body()),variant.bytes)
@@ -36,17 +38,17 @@ export async function reviewExtractedAttachments({ base, page, owner, client, jo
   variant.inspect?.(generated)
   for (const term of [...variant.terms, ...(variant.required ?? [])]) assert.ok(generated.includes(term), `The original ${term} was extracted before any human edit`)
   if (variant.absent) for (const term of variant.absent) assert.ok(!generated.includes(term), `Inactive content ${term} is excluded`)
-  await capture(page, `${capturePrefix}-extracted-${index}`)
+  await show(`${capturePrefix}-extracted-${index}`)
   await page.getByRole('button', { name: 'Use text in editor', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Human-supplied transcription', exact: true })).toHaveValue(generated)
   await page.getByRole('button', { name: 'Review complete supplied text', exact: true }).click()
   const review = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Review complete supplied text', exact: true }) })
   await expect(review.locator('pre')).toHaveText(generated)
-  if (variant.inspect) await capture(page, `${capturePrefix}-complete-review-${index}`)
+  if (variant.inspect) await show(`${capturePrefix}-complete-review-${index}`)
   await review.getByRole('checkbox').check()
   await review.getByRole('button', { name: 'Confirm and save supplied text', exact: true }).click(); await expect(review).toHaveCount(0)
   await search(variant.terms.at(-1)); await expect(page.getByText('1 matching records', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Human-supplied transcription · Revision 1/)).toBeVisible(); await capture(page, `${capturePrefix}-search-${index}`)
+  await expect(page.getByText(/Human-supplied transcription · Revision 1/)).toBeVisible(); await show(`${capturePrefix}-search-${index}`)
   let source
   for (const term of variant.terms) {
    const result = await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/decision-search?` + new URLSearchParams({ q: term }))).json()

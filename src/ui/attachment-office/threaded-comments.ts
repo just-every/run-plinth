@@ -3,10 +3,11 @@ import { fail } from './types'
 import { attr, inSpace } from './xml'
 
 const relationship = 'http://schemas.microsoft.com/office/2017/10/relationships/'
+const canonical = (value: string) => /^\{?[0-9a-f-]{36}\}?$/i.test(value) ? value.replace(/[{}]/g, '').toLowerCase() : value
 const identifier = (value: string) => {
  if (!value || value.length > 256 || /[\s\x00-\x1f]/.test(value)) fail('a threaded comment or person identifier is missing or invalid.')
  // GUID spelling is case insensitive; arbitrary stored identifiers retain their case.
- return /^\{?[0-9a-f-]{36}\}?$/i.test(value) ? value.replace(/[{}]/g, '').toLowerCase() : value
+ return canonical(value)
 }
 const children = (root: Element, name: string) => [...root.children].filter(child => child.localName === name)
 type Comment = { id: string; key: string; parent: string; person: string; personId: string; date: string; cell: string; text: string; sheet: string; label: string }
@@ -18,6 +19,7 @@ export class ThreadedComments {
  private roots = new Map<string, string>()
  private depths = new Map<string, number>()
  private people = new Map<string, string>()
+ private rootCells = new Set<string>()
  constructor(private office: OfficePackage, private workbook: string) {}
 
  private internal(relation: Relation, kind: string) {
@@ -55,6 +57,7 @@ export class ThreadedComments {
     this.office.draft.hooks.check()
     if (element.localName !== 'threadedComment' || !inSpace(element, 'threaded')) fail('the threaded comment namespace or structure is unsupported.')
     const text = children(element, 'text')
+    if ([...element.getElementsByTagNameNS('*', '*')].some(child => !inSpace(child, 'threaded'))) fail('a threaded comment child namespace is unsupported.')
     if (text.length !== 1 || !inSpace(text[0], 'threaded') || text[0].children.length || [...element.children].some(child => !inSpace(child, 'threaded') || !['text', 'mentions', 'extLst'].includes(child.localName))) fail('a threaded comment text or child namespace is unsupported.')
     const id = attr(element, 'id'), key = identifier(id), parent = attr(element, 'parentId'), person = identifier(attr(element, 'personId')), cell = attr(element, 'ref'), date = attr(element, 'dT')
     if (!/^[A-Z]{1,3}[1-9]\d{0,6}$/.test(cell)) fail('a threaded comment cell reference is missing or invalid.')
@@ -70,7 +73,6 @@ export class ThreadedComments {
  async validate() {
   if (!this.parts.size) return
   await this.inventory()
-  const rootCells = new Set<string>()
   for (const comment of this.comments.values()) {
    if (!this.people.has(comment.person)) fail('a threaded comment refers to a missing stored author.')
    if (comment.parent) {
@@ -80,8 +82,8 @@ export class ThreadedComments {
     if (parent.cell !== comment.cell) fail('a threaded comment parent refers to a different cell.')
    } else {
     const cell = comment.sheet + '\n' + comment.cell
-    if (rootCells.has(cell)) fail('multiple threaded comment roots refer to the same sheet and cell.')
-    rootCells.add(cell)
+    if (this.rootCells.has(cell)) fail('multiple threaded comment roots refer to the same sheet and cell.')
+    this.rootCells.add(cell)
    }
   }
   for (const comment of this.comments.values()) {
@@ -110,9 +112,9 @@ export class ThreadedComments {
 
  fallback(sheet: string, cell: string, author: string, text: string) {
   const storedId = /^tc=(.+)$/i.exec(author)?.[1]
-  const comment = storedId ? this.comments.get(identifier(storedId)) : undefined
+  const comment = storedId ? this.comments.get(canonical(storedId)) : undefined
   if (comment && comment.sheet === sheet && comment.cell === cell) return `classic fallback for thread ${this.comments.get(this.roots.get(comment.key)!)!.id} (stored mirrored text)`
-  if (text.trimStart().startsWith('[Threaded comment]') && [...this.comments.values()].some(comment => comment.sheet === sheet && comment.cell === cell)) return 'classic comment (possible mirrored threaded fallback)'
+  if (text.trimStart().startsWith('[Threaded comment]') && this.rootCells.has(sheet + '\n' + cell)) return 'classic comment (possible mirrored threaded fallback)'
   return 'comment'
  }
 }

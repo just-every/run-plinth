@@ -32,7 +32,7 @@ export const threadedRecords = [
  { sheet: 'Revision checks', cell: 'A1', id: '{10000000-0000-0000-0000-000000000004}', parent: '{10000000-0000-0000-0000-000000000003}', author: 'Synthetic Plinth author one', person: '{20000000-0000-0000-0000-000000000001}', date: '2026-10-21T11:15:00+00:00', text: 'synthetic-plinth-thread-second-reply-9313' },
 ]
 export const fallbackTerm = 'synthetic-plinth-fallback-9314'
-export const sheetTerms = [...cellTerms, ...threadedRecords.map(record => record.text), fallbackTerm]
+export const sheetTerms = [...cellTerms, ...threadedRecords.map(record => record.text), fallbackTerm, 'synthetic-plinth-classic-author-9318']
 export const orphanTerms = ['synthetic-plinth-orphan-thread-9315', 'synthetic-plinth-unlisted-sheet-9316', 'synthetic-plinth-orphan-person-9317']
 const tc = 'http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments'
 const tr = 'http://schemas.microsoft.com/office/2017/10/relationships/'
@@ -63,14 +63,16 @@ async function addThreads(zip, damage) {
   zip.file(name, existing.replace('</Relationships>', rel('threadedComment', damage === 'external-comments' ? 'https://synthetic-plinth.invalid/comments' : `../threadedComments/thread${number}.xml`, damage === 'external-comments') + '</Relationships>'))
   const rows = records.filter(row => row.sheet === (number === 1 ? 'Cabinet clearances' : 'Revision checks'))
   // Replies are deliberately stored before their roots; identity, not order, defines the thread.
-  zip.file(`xl/threadedComments/thread${number}.xml`, xml(`<ThreadedComments xmlns="${damage === 'namespace' ? 'https://synthetic-plinth.invalid/threaded' : tc}">${rows.reverse().map(comment).join('')}</ThreadedComments>`))
+  let content = rows.reverse().map(comment).join('')
+  if (damage === 'child-namespace') content = content.replace('</text>', '</text><mentions><mention xmlns="https://synthetic-plinth.invalid/mention"/></mentions>')
+  zip.file(`xl/threadedComments/thread${number}.xml`, xml(`<ThreadedComments xmlns="${damage === 'namespace' ? 'https://synthetic-plinth.invalid/threaded' : tc}">${content}</ThreadedComments>`))
  }
  let people = [threadedRecords[0], threadedRecords[1]]
  if (damage === 'duplicate-person') people.push(people[0])
  if (damage === 'person-limit') people = Array.from({length:2001}, (_, i) => ({person:'synthetic-plinth-person-' + i,author:'Synthetic stored author'}))
  zip.file('xl/persons/person.xml', xml(`<personList xmlns="${damage === 'person-namespace' ? 'https://synthetic-plinth.invalid/people' : tc}">${people.map(row => `<person id="${row.person}" displayName="${row.author}"/>`).join('')}</personList>`))
  const classic = await read('xl/comments1.xml')
- zip.file('xl/comments1.xml', classic.replace('</authors>', `<author>tc=${threadedRecords[0].id}</author></authors>`).replace('</commentList>', `<comment ref="B1" authorId="1"><text><t>[Threaded comment] ${fallbackTerm}</t></text></comment></commentList>`))
+ zip.file('xl/comments1.xml', classic.replace('</authors>', `<author>tc=${threadedRecords[0].id}</author><author>tc=Synthetic Plinth note</author></authors>`).replace('</commentList>', `<comment ref="B1" authorId="1"><text><t>[Threaded comment] ${fallbackTerm}</t></text></comment><comment ref="C1" authorId="2"><text><t>synthetic-plinth-classic-author-9318</t></text></comment></commentList>`))
  // These parts are intentionally unreferenced, even though their content looks valid.
  zip.file('xl/threadedComments/orphan.xml', xml(`<ThreadedComments xmlns="${tc}">${comment({...threadedRecords[0],text:orphanTerms[0]})}</ThreadedComments>`))
  zip.file('xl/persons/orphan.xml', xml(`<personList xmlns="${tc}"><person id="unlisted" displayName="${orphanTerms[2]}"/></personList>`))

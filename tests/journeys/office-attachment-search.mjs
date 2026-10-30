@@ -26,6 +26,7 @@ export async function officeAttachmentSearch({ base, page, owner, client, job, c
     assert.ok(section.includes(`stored author ${record.author} (person ${record.person}); stored date ${record.date}\n${record.text}`))
    }
    assert.ok(generated.includes('Sheet Cabinet clearances comment A1 by Synthetic Plinth\nsynthetic-plinth-comment-9303'), 'Classic comments stay distinct')
+   assert.ok(generated.includes('Sheet Cabinet clearances comment C1 by tc=Synthetic Plinth note\nsynthetic-plinth-classic-author-9318'), 'A classic stored author name is not mistaken for a thread identifier')
    assert.ok(generated.includes(`classic fallback for thread ${threadedRecords[0].id} (stored mirrored text) B1`), 'Classic mirrored fallback is retained and labeled')
   } },
   { name: 'stored-site-slides.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', bytes: await presentationDocument(await image('VENTILATION CLEARANCE 48 INCHES')), terms: slideTerms, state: 'unsupported' },
@@ -36,7 +37,7 @@ export async function officeAttachmentSearch({ base, page, owner, client, job, c
  const diagnoses = [
   ['missing-author', /missing stored author/], ['missing-parent', /missing parent/], ['duplicate-id', /identifiers are duplicated/], ['duplicate-person', /person identifiers are duplicated/],
   ['cross-sheet', /crosses sheet boundaries/], ['cross-cell', /different cell/], ['cycle', /form a cycle/], ['missing-date', /stored date is missing or invalid/], ['bad-cell', /cell reference is missing or invalid/],
-  ['namespace', /namespace or structure is unsupported/], ['person-namespace', /inventory namespace or structure is unsupported/], ['relationship-namespace', /relationship namespace is unsupported/],
+  ['namespace', /namespace or structure is unsupported/], ['child-namespace', /child namespace is unsupported/], ['person-namespace', /inventory namespace or structure is unsupported/], ['relationship-namespace', /relationship namespace is unsupported/],
   ['missing-inventory', /one internal person inventory/], ['external-comments', /require internal relationships/], ['external-people', /require internal relationships/],
   ['comment-limit', /10,000-comment processing limit/], ['person-limit', /2,000-person processing limit/], ['reply-limit', /64-level reply processing limit/],
  ]
