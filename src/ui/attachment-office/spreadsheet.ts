@@ -1,7 +1,7 @@
 import type { OfficePackage } from './package'
 import { Pictures } from './pictures'
 import { fail } from './types'
-import { attr, elements, inSpace } from './xml'
+import { attr, elements, inSpace, isSheetCell } from './xml'
 import { ThreadedComments } from './threaded-comments'
 
 const richText = (element: Element) => elements(element, 't', 'sheet').map(text => text.textContent ?? '').join('')
@@ -71,7 +71,7 @@ export async function extractSpreadsheet(office: OfficePackage, main: string) {
   const name = attr(sheet, 'name'), state = attr(sheet, 'state'), label = `Sheet ${name}${state && state !== 'visible' ? ` (${state})` : ''}`
   if (!name || sheetNames.has(name)) fail('workbook sheet names are missing or duplicated.')
   sheetNames.add(name); draft.hooks.progress(`Reading ${label}…`)
-  const path = await office.referenced(main, attr(sheet, 'id', 'rel'))
+  const path = await office.referenced(main, attr(sheet, 'id', 'rel'), ['worksheet', 'chartsheet'])
   if (sheetPaths.has(path)) fail('workbook sheet parts are duplicated.')
   sheetPaths.add(path)
   currentSheets.push({ path, label })
@@ -96,7 +96,7 @@ export async function extractSpreadsheet(office: OfficePackage, main: string) {
    draft.hooks.check()
    if (++cells > 100_000) fail('more than 100,000 stored spreadsheet cells are unsupported.')
    const coordinate = attr(cell, 'r')
-   if (!/^[A-Z]{1,3}[1-9]\d{0,6}$/.test(coordinate) || coordinates.has(coordinate)) fail('spreadsheet cell references are invalid or duplicated.')
+   if (!isSheetCell(coordinate) || coordinates.has(coordinate)) fail('spreadsheet cell references are invalid or duplicated.')
    coordinates.add(coordinate)
    const value = cellValue(cell, strings), formula = formulaText(cell, formulas)
    draft.add(`${label} cell ${coordinate}`, [value, formula].filter(Boolean).join('\n'))

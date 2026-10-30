@@ -24,12 +24,12 @@ export async function spreadsheetDocument(image, damage) {
  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
 
-// Independent expected source records: one root and reply on each listed sheet.
+// Independent expected source records: each listed sheet has a thread, including a blank boundary cell.
 export const threadedRecords = [
  { sheet: 'Cabinet clearances', cell: 'B1', id: '{10000000-0000-0000-0000-000000000001}', parent: '', author: 'Synthetic Plinth author one', person: '{20000000-0000-0000-0000-000000000001}', date: '2026-10-20T08:30:00Z', text: 'synthetic-plinth-thread-root-9310' },
  { sheet: 'Cabinet clearances', cell: 'B1', id: '{10000000-0000-0000-0000-000000000002}', parent: '{10000000-0000-0000-0000-000000000001}', author: 'Synthetic Plinth author two', person: '{20000000-0000-0000-0000-000000000002}', date: '2026-10-20T09:45:00Z', text: 'synthetic-plinth-thread-reply-9311' },
- { sheet: 'Revision checks', cell: 'A1', id: '{10000000-0000-0000-0000-000000000003}', parent: '', author: 'Synthetic Plinth author two', person: '{20000000-0000-0000-0000-000000000002}', date: '2026-10-21T10:00:00Z', text: 'synthetic-plinth-thread-second-root-9312' },
- { sheet: 'Revision checks', cell: 'A1', id: '{10000000-0000-0000-0000-000000000004}', parent: '{10000000-0000-0000-0000-000000000003}', author: 'Synthetic Plinth author one', person: '{20000000-0000-0000-0000-000000000001}', date: '2026-10-21T11:15:00+00:00', text: 'synthetic-plinth-thread-second-reply-9313' },
+ { sheet: 'Revision checks', cell: 'XFD1048576', id: '{10000000-0000-0000-0000-000000000003}', parent: '', author: 'Synthetic Plinth author two', person: '{20000000-0000-0000-0000-000000000002}', date: '2026-10-21T10:00:00Z', text: 'synthetic-plinth-thread-second-root-9312' },
+ { sheet: 'Revision checks', cell: 'XFD1048576', id: '{10000000-0000-0000-0000-000000000004}', parent: '{10000000-0000-0000-0000-000000000003}', author: 'Synthetic Plinth author one', person: '{20000000-0000-0000-0000-000000000001}', date: '2026-10-21T11:15:00+00:00', text: 'synthetic-plinth-thread-second-reply-9313' },
 ]
 export const fallbackTerm = 'synthetic-plinth-fallback-9314'
 export const sheetTerms = [...cellTerms, ...threadedRecords.map(record => record.text), fallbackTerm, 'synthetic-plinth-classic-author-9318']
@@ -49,6 +49,9 @@ async function addThreads(zip, damage) {
  if (damage === 'cycle') records[0].parent = records[1].id
  if (damage === 'missing-date') records[0].date = ''
  if (damage === 'bad-cell') records[0].cell = 'bad'
+ if (damage === 'past-last-column') records[0].cell = 'XFE1'
+ if (damage === 'past-last-row') records[0].cell = 'A1048577'
+ if (damage === 'duplicate-root') records[1].parent = ''
  if (damage === 'reply-limit') for (let i = 0; i < 65; i++) records.push({ ...records[1], id: 'synthetic-plinth-depth-' + i, parent: i ? 'synthetic-plinth-depth-' + (i - 1) : records[1].id })
  if (damage === 'comment-limit') for (let i = 0; i < 10000; i++) records.push({ ...records[1], id: 'synthetic-plinth-comment-' + i })
  const read = async name => zip.file(name).async('string')
@@ -56,11 +59,17 @@ async function addThreads(zip, damage) {
  const types = await read('[Content_Types].xml')
  zip.file('[Content_Types].xml', types.replace('</Types>', '<Override PartName="/xl/persons/person.xml" ContentType="application/vnd.ms-excel.person+xml"/><Override PartName="/xl/threadedComments/thread1.xml" ContentType="application/vnd.ms-excel.threadedcomments+xml"/><Override PartName="/xl/threadedComments/thread2.xml" ContentType="application/vnd.ms-excel.threadedcomments+xml"/></Types>'))
  const workbookRels = await read('xl/_rels/workbook.xml.rels')
- zip.file('xl/_rels/workbook.xml.rels', workbookRels.replace('</Relationships>', (damage === 'missing-inventory' ? '' : rel('person', damage === 'external-people' ? 'https://synthetic-plinth.invalid/people' : 'persons/person.xml', damage === 'external-people')) + '</Relationships>'))
+ let currentWorkbookRels = workbookRels
+ if (damage === 'sheet-relationship') currentWorkbookRels = currentWorkbookRels.replace('/worksheet"', '/comments"')
+ if (damage === 'sheet-namespace') currentWorkbookRels = currentWorkbookRels.replace(`${r}/worksheet`, 'https://synthetic-plinth.invalid/worksheet')
+ zip.file('xl/_rels/workbook.xml.rels', currentWorkbookRels.replace('</Relationships>', (damage === 'missing-inventory' ? '' : rel('person', damage === 'external-people' ? 'https://synthetic-plinth.invalid/people' : 'persons/person.xml', damage === 'external-people')) + '</Relationships>'))
  for (const number of [1, 2]) {
   const name = `xl/worksheets/_rels/sheet${number}.xml.rels`
   const existing = zip.file(name) ? await read(name) : relations([])
-  zip.file(name, existing.replace('</Relationships>', rel('threadedComment', damage === 'external-comments' ? 'https://synthetic-plinth.invalid/comments' : `../threadedComments/thread${number}.xml`, damage === 'external-comments') + '</Relationships>'))
+  const threadPart = damage === 'reused-part' ? 1 : number
+  let threadRelation = rel('threadedComment', damage === 'external-comments' ? 'https://synthetic-plinth.invalid/comments' : `../threadedComments/thread${threadPart}.xml`, damage === 'external-comments')
+  if (damage === 'duplicate-relationship') threadRelation += threadRelation.replace('Id="threads"', 'Id="extra-thread"')
+  zip.file(name, existing.replace('</Relationships>', threadRelation + '</Relationships>'))
   const rows = records.filter(row => row.sheet === (number === 1 ? 'Cabinet clearances' : 'Revision checks'))
   // Replies are deliberately stored before their roots; identity, not order, defines the thread.
   let content = rows.reverse().map(comment).join('')

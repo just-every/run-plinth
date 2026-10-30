@@ -1,4 +1,6 @@
 import { spreadsheetDocument, threadedRecords } from '../fixtures/spreadsheet-document.mjs'
+import { reviewStoredWorkbook } from './threaded-recovery-support.mjs'
+import { png as workbookImage } from '../fixtures/unextractable-documents.mjs'
 import { questionFixture } from './agent-answers-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import {openingJob} from './opening-support.mjs'
@@ -77,7 +79,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await current(`/selections/${archiveSelection.id}/present`,{revision_id:archiveSelection.revisions[0].id})
     await current(`/selections/${archiveSelection.id}/reminder`,{revision_id:archiveSelection.revisions[0].id,reason:'Archive pending decision reminder, not sent',attachments:[{name:'decision-source.pdf',mime:'application/pdf',base64:drawingBytes.toString('base64')}]})
     const meeting=await current('/meetings',{title:'Archive site meeting',held_on:'2026-10-26',agenda:'Review the exact fixture decision',minutes:'Builder reviewed the fixture specification on site.',attendees:['Builder'],decisions:'Keep the archive fixture decision',tags:['fixture'],sheet:'A1',cost_code:'22-400',actions:[{title:'Record the resolved fixture answer',owner_email:'builder@example.com',due_on:'2026-11-01'}]})
-    const threadedOriginal=await spreadsheetDocument(Buffer.from(png,'base64'))
+    const threadedOriginal=await spreadsheetDocument(workbookImage)
     const originalEmail=Buffer.from(['From: Trade Estimator <synthetic-plinth-archive-sub@example.com>','To: builder@example.com','Subject: Archive private subcontractor bid','Message-ID: <synthetic-plinth-archive-bid@example.com>','MIME-Version: 1.0','Content-Type: multipart/mixed; boundary="synthetic-plinth-archive"','','--synthetic-plinth-archive','Content-Type: text/plain','','Private archive bid body','','--synthetic-plinth-archive','Content-Type: application/pdf; name="archive-bid.pdf"','Content-Disposition: attachment; filename="archive-bid.pdf"','Content-Transfer-Encoding: base64','',drawingBytes.toString('base64'),'','--synthetic-plinth-archive','Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="stored-threads.xlsx"','Content-Disposition: attachment; filename="stored-threads.xlsx"','Content-Transfer-Encoding: base64','',threadedOriginal.toString('base64'),'','--synthetic-plinth-archive--',''].join('\r\n'))
     const capturedEmail=await f.json(`/api/plinth/jobs/${job.id}/correspondence`,{method:'POST',cookie:f.owner,body:{kind:'capture',original_base64:originalEmail.toString('base64'),confirm:true}});assert.equal(capturedEmail.status,201,JSON.stringify(capturedEmail.value))
     const captured= capturedEmail.value.messages.find(m=>m.id===capturedEmail.value.id)
@@ -87,11 +89,15 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const transcriptionReview=await f.json(`/api/plinth/jobs/${job.id}/decision-search/transcription-preview`,{method:'POST',cookie:f.owner,body:{source:transcriptionSource,checksum:originalHit.file_checksum,expected_version:job.version,text:transcriptionText}});assert.equal(transcriptionReview.status,200)
     const transcriptionSaved=await f.json(`/api/plinth/jobs/${job.id}/decision-search/transcriptions`,{method:'POST',cookie:f.owner,body:{...transcriptionReview.value,confirm:true}});assert.equal(transcriptionSaved.status,200);job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     const threadedFile=captured.files.find(file=>file.name==='stored-threads.xlsx'),threadedSource='files:'+threadedFile.id
-    const threadedText=threadedRecords.map(row=>[row.sheet,row.cell,row.id,row.parent||'root',row.author,row.person,row.date,row.text].join(' | ')).join('\n')
+    const workbookOwner=f.owner
+    await f.close();f=undefined
+    const threadedText=await reviewStoredWorkbook(source,job.id,threadedFile.name,threadedOriginal)
+    f=await createFixture({persistTo:source,ownerCookie:workbookOwner,stripeEdge:processor.handler,webhookReceiver:async()=>new Response(null,{status:202})})
+    job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     const threadedHit=(await f.json(`/api/plinth/jobs/${job.id}/decision-search?`+new URLSearchParams({source:threadedSource}),{cookie:f.owner})).value.results[0]
     assert.equal(threadedHit.extraction.status,'unsupported')
-    const threadedReview=await f.json(`/api/plinth/jobs/${job.id}/decision-search/transcription-preview`,{method:'POST',cookie:f.owner,body:{source:threadedSource,checksum:threadedHit.file_checksum,expected_version:job.version,text:threadedText}});assert.equal(threadedReview.status,200)
-    const threadedSaved=await f.json(`/api/plinth/jobs/${job.id}/decision-search/transcriptions`,{method:'POST',cookie:f.owner,body:{...threadedReview.value,confirm:true}});assert.equal(threadedSaved.status,200)
+    const threadedSaved=await f.json(`/api/plinth/jobs/${job.id}/decision-search/transcriptions?`+new URLSearchParams({source:threadedSource}),{cookie:f.owner});assert.equal(threadedSaved.status,200)
+    assert.deepEqual(threadedSaved.value.revisions.map(row=>row.text),[threadedText],'The CLI archives the exact browser-generated and fully reviewed draft')
     job=(await f.json(`/api/plinth/jobs/${job.id}`,{cookie:f.owner})).value.job
     await current(`/meetings/${meeting.id}/complete`,{action_id:meeting.actions[0].id,answer:'The exact fixture decision is retained.',message_id:captured.id,links:[{kind:'selection',id:archiveSelection.id}]})
     const archiveClient=await f.invite('client@example.com','Client Chen'),archiveDelegate=await f.invite('synthetic-plinth-301@example.com','Archive delegated designer')

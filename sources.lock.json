@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "54cee54473d28d5cf813ac8f66af70541c4287d87d3964019c30cc58ebd2d596",
+      "sha256": "dce9ad33d11f2463c155f44c15daf79287a3e80ed3b932f191f3337010bca287",
       "executable": false
     },
     "DEMO.md": {
@@ -185,7 +185,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "1e6afcb2129108991d5be32842c19950aad4bf7e3cfdd5375c2a051b5f8c4b6b",
+      "sha256": "e1f962de545f1303f684a1ab8161aa58d6b6a277136dc9cd84296ce1fd1d1bbc",
       "executable": false
     },
     "docs/ESTIMATE-PERFORMANCE.md": {
@@ -1021,7 +1021,7 @@
       "executable": false
     },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "c2beb0f71e4c4aa4c8953374405203f692c85b407a20c7079c31853edf91b16b",
+      "sha256": "4ad3f7f25cf79a7ea80e6e2c2902202712c98c198f2e37ce96fe0f98bc3f4df6",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
@@ -4541,7 +4541,7 @@
       "executable": false
     },
     "src/ui/attachment-office/package.ts": {
-      "sha256": "4f7a7ff52fa1cbbc3734fd58fc3b544c8f172c031f6e6efa2e81c07ae2179f74",
+      "sha256": "42587929953cc23756c97fdbf92e0c22c3048156b68b3ec0e0cceb0c4ade96e3",
       "executable": false
     },
     "src/ui/attachment-office/pictures.ts": {
@@ -4553,11 +4553,11 @@
       "executable": false
     },
     "src/ui/attachment-office/spreadsheet.ts": {
-      "sha256": "45d8bce2f707fd54a5aa94284e615aa4b24981d21c5d2d9f224376a6d860c440",
+      "sha256": "269ccfce0fb611dd34255ef4a6c4bb9ef911999d980fc1c3aa095b3846c09e1d",
       "executable": false
     },
     "src/ui/attachment-office/threaded-comments.ts": {
-      "sha256": "da1e4cddb3cc8af02956efe20eadbd4531bce775acec5740dfed71089b9278dc",
+      "sha256": "3db53f63cf39055e435de719faedc9b444a6989bba79da26e5f806e9e7b70aa6",
       "executable": false
     },
     "src/ui/attachment-office/types.ts": {
@@ -4569,7 +4569,7 @@
       "executable": false
     },
     "src/ui/attachment-office/xml.ts": {
-      "sha256": "b3415eedc7e4045f5cb3f85c7402ad1764d184cd17d7e8d1f40da95adeae050c",
+      "sha256": "7da3ff847e74472134cc8e61a4b74925ec63b23f6c0afec574df3afe65d221ed",
       "executable": false
     },
     "src/ui/attachment-office/zip-directory.ts": {
@@ -5189,7 +5189,7 @@
       "executable": false
     },
     "tests/fixtures/spreadsheet-document.mjs": {
-      "sha256": "9f67913928df4b1cfb3727ef5aa2e8176431629b9e9a94992fbed3d4ba4ba55e",
+      "sha256": "f2ba3704cc20613ec5a7bf0b38691735357548b9d6d117748607ec63be125f10",
       "executable": false
     },
     "tests/fixtures/takeoff-plan.mjs": {
@@ -5325,7 +5325,7 @@
       "executable": false
     },
     "tests/journeys/office-attachment-search.mjs": {
-      "sha256": "ca3f1ab7a89eb88dcd91f1a107f632fbc13470bd0c0d0cc7f0df1490520afaf6",
+      "sha256": "b9207db64c8e559c78ea7670c73f17498ca959f0655b7866a481a6c9ff5ffa52",
       "executable": false
     },
     "tests/journeys/open-attachment-search.mjs": {
@@ -5549,7 +5549,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "4691faefcfb0745eab9aebdc818c32504f82319c3b311fab316e3cf498b5d48e",
+      "sha256": "5fd31293bbfdf70d97f06b33eafdeb86f1ccd4c55bbce2395343c1f75ad4b734",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
@@ -5618,6 +5618,10 @@
     },
     "tests/plinth/submittal-support.mjs": {
       "sha256": "f5600e2ebc58dc7bac7fba9bd642e88ac37ef607d707a66d21357cfa3acf06d2",
+      "executable": false
+    },
+    "tests/plinth/threaded-recovery-support.mjs": {
+      "sha256": "652a3d13ad92458d52513f187b921ab10bfdcea1a8fddac8f2c6fdd5f74572f2",
       "executable": false
     },
     "tests/plinth/us-conventions.test.mjs": {

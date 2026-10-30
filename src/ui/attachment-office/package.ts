@@ -1,6 +1,6 @@
 import { Archive } from './archive'
 import { fail, type Draft } from './types'
-import { attr, elements, parseXml } from './xml'
+import { attr, elements, NS, parseXml } from './xml'
 import { ZIP_LIMITS } from './zip-directory'
 
 export type Relation = { id: string; type: string; kind: string; target: string; external: boolean }
@@ -65,9 +65,10 @@ export class OfficePackage {
   if (main.length !== 1) fail('the package must have one internal main Office document.')
   return main[0].target
  }
- async referenced(part: string, id: string, kind?: string) {
+ async referenced(part: string, id: string, kind?: string | string[]) {
   const relation = (await this.rels(part)).get(id)
-  if (!relation || relation.external || (kind && relation.kind !== kind)) fail('a required document relationship is missing or unsupported.')
+  const kinds = typeof kind === 'string' ? [kind] : kind
+  if (!relation || relation.external || (kinds && !kinds.some(value => NS.rel.some(space => relation.type === space + '/' + value)))) fail('a required document relationship is missing or unsupported.')
   return relation.target
  }
  audit() {

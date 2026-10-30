@@ -15,6 +15,13 @@ export const attr = (element: Element, name: string, space?: Space) => space
  ? [...element.attributes].find(attribute => attribute.localName === name && NS[space].includes(attribute.namespaceURI ?? ''))?.value ?? ''
  : element.getAttribute(name) ?? ''
 
+export function isSheetCell(value: string) {
+ const match = /^([A-Z]{1,3})([1-9]\d{0,6})$/.exec(value)
+ if (!match) return false
+ const column = [...match[1]].reduce((total, letter) => total * 26 + letter.charCodeAt(0) - 64, 0)
+ return column <= 16384 && Number(match[2]) <= 1048576
+}
+
 export function parseXml(bytes: Uint8Array, check: () => void): Document {
  check()
  let source: string

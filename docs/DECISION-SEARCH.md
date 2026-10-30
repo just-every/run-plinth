@@ -53,7 +53,9 @@ text rather than treated as another conversation.
 
 Missing authors or parents, duplicate identities, cross-sheet or cross-cell
 parents, cycles, unsupported namespaces and external threaded relationships
-refuse the whole draft. Unreferenced comment parts, person inventories and sheets
+refuse the whole draft. Workbook sheets must use supported internal worksheet or
+chart-sheet relationships; comment coordinates must be within Excel's stored
+cell grid. Reused comment parts and multiple roots at one cell are refused. Unreferenced comment parts, person inventories and sheets
 are excluded. Additional bounds are 10,000 comments, 2,000 stored people and 64
 reply levels within the existing package, text and time limits. No linked content
 is fetched, and no extraction output is adopted or saved automatically.

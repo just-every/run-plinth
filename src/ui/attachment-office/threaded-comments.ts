@@ -1,6 +1,6 @@
 import type { OfficePackage, Relation } from './package'
 import { fail } from './types'
-import { attr, inSpace } from './xml'
+import { attr, inSpace, isSheetCell } from './xml'
 
 const relationship = 'http://schemas.microsoft.com/office/2017/10/relationships/'
 const canonical = (value: string) => /^\{?[0-9a-f-]{36}\}?$/i.test(value) ? value.replace(/[{}]/g, '').toLowerCase() : value
@@ -60,7 +60,7 @@ export class ThreadedComments {
     if ([...element.getElementsByTagNameNS('*', '*')].some(child => !inSpace(child, 'threaded'))) fail('a threaded comment child namespace is unsupported.')
     if (text.length !== 1 || !inSpace(text[0], 'threaded') || text[0].children.length || [...element.children].some(child => !inSpace(child, 'threaded') || !['text', 'mentions', 'extLst'].includes(child.localName))) fail('a threaded comment text or child namespace is unsupported.')
     const id = attr(element, 'id'), key = identifier(id), parent = attr(element, 'parentId'), person = identifier(attr(element, 'personId')), cell = attr(element, 'ref'), date = attr(element, 'dT')
-    if (!/^[A-Z]{1,3}[1-9]\d{0,6}$/.test(cell)) fail('a threaded comment cell reference is missing or invalid.')
+    if (!isSheetCell(cell)) fail('a threaded comment cell reference is missing or invalid.')
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/.test(date) || !Number.isFinite(Date.parse(date))) fail('a threaded comment stored date is missing or invalid.')
     if (this.comments.has(key)) fail('threaded comment identifiers are duplicated across the workbook.')
     if (this.comments.size >= 10000) fail('threaded comments exceed the 10,000-comment processing limit.')
