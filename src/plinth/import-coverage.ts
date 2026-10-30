@@ -4,12 +4,13 @@ import { authorize, readAtomic, guard } from '../modules/import-kit/src/d1/datab
 import { validatedProvenance, inventoryGuards, custodyGuards } from '../modules/import-kit/src/d1/integrity.ts'
 import { exactRows } from '../modules/import-kit/src/d1/sets.ts'
 import { sql } from '../modules/import-kit/src/d1/database.ts'
+import type { HistoryEvidence } from './import-history.ts'
 import { inspectAcceptedJobs, IMPORT_VERSION, type CsvInspection } from './import-source.ts'
 
 export type Disposition = 'proposed' | 'imported' | 'duplicate' | 'conflict' | 'invalid' | 'unsupported' | 'blocked' | 'erased' | 'reversed'
 export interface CoverageRow {
   row: number | null; externalId?: string; disposition: Disposition; reason: string
-  targetId?: string; imported?: boolean; columns?: { field: string; column: number; line: number; character: number; treatment: string }[]
+  targetId?: string; imported?: boolean; history?: HistoryEvidence; columns?: { field: string; column: number; line: number; character: number; treatment: string }[]
 }
 const treatments: Record<string, string> = {
   external_id: 'Stable source identity', title: 'Draft job and quote title',
@@ -34,7 +35,7 @@ export function coverageReport(inspection: CsvInspection, rows?: CoverageRow[], 
     format: 'accepted-jobs-csv', mappingRevision: IMPORT_VERSION, fingerprint: fingerprint ?? null,
     artifact: { name: 'accepted-jobs.csv', sha256: inspection.sha256, bytes: inspection.bytes },
     declaration: inspection.declaration ?? null, declarationVerified: false,
-    scope: 'Accepted jobs CSV only; attachments, signatures, history and continuing-job adoption are not mapped',
+    scope: 'Accepted jobs CSV with optional unverified historical records and originals; source history never grants native approval or posts money',
     counts: { total: dispositions.length, ...counts }, diagnostics: inspection.diagnostics,
     fields: inspection.header.map(cell => ({ field: cell.value, ...cell.location, treatment: treatments[cell.value] ?? 'Unsupported; never silently skipped' })),
     rows: dispositions,
@@ -89,6 +90,13 @@ export async function importCoverage(context: D1ImportContext, input: { plan: Im
     const retainedColumns = coordinates?.columns
     rows.push({
       row: coordinates?.row ?? entry.source.location.row ?? index + 2, externalId: entry.source.sourceId, targetId: id, disposition, reason, imported,
+      history: (() => {
+        const history = (entry.source.payload as { source_history?: HistoryEvidence }).source_history
+        return history && { ...history, files: history.files.map(file => ({ ...file,
+          outcome: file.disposition === 'missing' ? 'missing' : disposition,
+          custody: file.disposition === 'missing' ? 'not supplied' : !job ? 'supplied for preview' : plan.source.artifacts.some(artifact => artifact.name === file.artifact && artifact.original?.status === 'available') ? 'retained original' : 'unavailable after erasure',
+        })) }
+      })(),
       columns: retainedColumns?.map(cell => ({ ...cell, treatment: treatments[cell.field] ?? 'Unsupported' })) ?? fields?.map((cell, i) => ({ field: inspection!.header[i]?.value ?? '', column: i + 1, line: cell.location.line, character: cell.location.character, treatment: treatments[inspection!.header[i]?.value] ?? 'Unsupported' })),
     })
   }
@@ -98,7 +106,10 @@ export async function importCoverage(context: D1ImportContext, input: { plan: Im
   const report = coverageReport(inspection ?? fallback, rows, job?.fingerprint ?? plan.fingerprint)
   const declarations = plan.entries.filter(entry => !entry.erased).map(entry => (entry.source.payload as Record<string, unknown>).source_declaration)
   return {
-    ...report, declaration: job?.erasedRecords ? null : declarations[0] ?? report.declaration,
+    ...report,
+    historyCounts: Object.fromEntries(['historical','duplicate','unsupported','supplied','missing'].map(key => [key, rows.reduce((n, row) => n + [...row.history?.records ?? [], ...row.history?.files ?? []].filter(item => item.disposition === key).length, 0)])),
+    fileCounts: Object.fromEntries(['proposed','imported','duplicate','conflict','reversed','missing'].map(key => [key, rows.reduce((n,row) => n + (row.history?.files.filter(file => file.outcome === key).length ?? 0),0)])),
+    declaration: job?.erasedRecords ? null : declarations[0] ?? report.declaration,
     originalStatus: artifact.original?.status ?? 'unavailable', job: job ? { id: job.id, state: job.state, checkpoint: job.checkpoint, total: job.total } : null,
   }
 }
