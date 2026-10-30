@@ -58,6 +58,8 @@ try{
  assert.deepEqual(unexpected,[],'Actual PDF pixels and local OCR resources never leave this installation')
  const checked=(await read()).sets[0];assert.equal(checked.sheets[0].number,'A1');assert.equal(checked.drawing_review.proposals.at(-1).number,'AI');assert.equal(checked.drawing_review.reviews.at(-1).number,'A1')
  await drawing.getByLabel('Annotation X',{exact:true}).fill('90');await drawing.getByLabel('Annotation Y',{exact:true}).fill('160');await drawing.getByLabel('Revision annotation',{exact:true}).fill('Reviewed waterproofing markup tied to permit revision A');await drawing.getByRole('button',{name:'Save source annotation',exact:true}).click()
+ // Wait for the annotation's committed version before preparing the next decision.
+ await expect(drawing.getByRole('form',{name:'Save source annotation',exact:true}).getByRole('status')).toHaveText('Saved.')
  await reviewPanel.getByText('Review a detail link',{exact:true}).click()
  const linkForm=reviewPanel.locator('form').filter({has:page.getByRole('button',{name:'Approve exact detail link',exact:true})})
  await linkForm.getByLabel('Reviewed link target',{exact:true}).selectOption(two.id);await linkForm.getByLabel('Detail link label',{exact:true}).fill('Open A2 detail')

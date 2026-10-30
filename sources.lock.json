@@ -5289,7 +5289,7 @@
       "executable": false
     },
     "tests/journeys/drawing-review.mjs": {
-      "sha256": "13a9a015f4e2e2bc8e4f74963b11ec42bf9d54d79e4ddde1326b2e70aac1040c",
+      "sha256": "232a148569647e3f744832e814db252857c2753281dbada9b13bb64920f46676",
       "executable": false
     },
     "tests/journeys/estimate-performance.mjs": {
