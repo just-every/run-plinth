@@ -61,7 +61,10 @@ export async function extractSpreadsheet(office: OfficePackage, main: string) {
   if (sharedDocument.documentElement.localName !== 'sst' || !inSpace(sharedDocument.documentElement, 'sheet')) fail('the shared string table has an unsupported structure.')
   strings = elements(sharedDocument, 'si', 'sheet').map(richText)
  }
- const sheets = elements(document, 'sheet', 'sheet')
+ const inventories = [...document.documentElement.children].filter(element => element.localName === 'sheets' && inSpace(element, 'sheet'))
+ if (inventories.length !== 1) fail('the workbook must contain one supported current sheet inventory.')
+ const sheets = [...inventories[0].children]
+ if (sheets.some(element => element.localName !== 'sheet' || !inSpace(element, 'sheet') || element.children.length)) fail('the current workbook sheet inventory structure or namespace is unsupported.')
  if (!sheets.length || sheets.length > 200) fail('a workbook must contain between one and 200 sheets.')
  const threads = new ThreadedComments(office, main), currentSheets: { path: string; label: string }[] = []
  let cells = 0

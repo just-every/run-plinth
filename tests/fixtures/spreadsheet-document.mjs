@@ -60,6 +60,13 @@ async function addThreads(zip, damage) {
  zip.file('[Content_Types].xml', types.replace('</Types>', '<Override PartName="/xl/persons/person.xml" ContentType="application/vnd.ms-excel.person+xml"/><Override PartName="/xl/threadedComments/thread1.xml" ContentType="application/vnd.ms-excel.threadedcomments+xml"/><Override PartName="/xl/threadedComments/thread2.xml" ContentType="application/vnd.ms-excel.threadedcomments+xml"/></Types>'))
  const workbookRels = await read('xl/_rels/workbook.xml.rels')
  let currentWorkbookRels = workbookRels
+ // A retained extension and a loose relationship do not make this an active sheet.
+ currentWorkbookRels = currentWorkbookRels.replace('</Relationships>', `<Relationship Id="unlisted" Type="${r}/worksheet" Target="worksheets/unlisted.xml"/></Relationships>`)
+ let workbook = await read('xl/workbook.xml')
+ workbook = workbook.replace('</workbook>', `<extLst><ext uri="synthetic-plinth-retained-sheet"><retained xmlns="https://synthetic-plinth.invalid/metadata"><sheet xmlns="${s}" xmlns:r="${r}" name="Unlisted historical sheet" sheetId="3" r:id="unlisted"/></retained></ext></extLst></workbook>`)
+ if (damage === 'sheet-inventory-namespace') workbook = workbook.replace('<sheets>', '<sheets xmlns="https://synthetic-plinth.invalid/sheets">')
+ if (damage === 'nested-sheet-entry') workbook = workbook.replace('</sheets>', `<retained><sheet name="Unlisted historical sheet" sheetId="3" r:id="unlisted"/></retained></sheets>`)
+ zip.file('xl/workbook.xml', workbook)
  if (damage === 'sheet-relationship') currentWorkbookRels = currentWorkbookRels.replace('/worksheet"', '/comments"')
  if (damage === 'sheet-namespace') currentWorkbookRels = currentWorkbookRels.replace(`${r}/worksheet`, 'https://synthetic-plinth.invalid/worksheet')
  zip.file('xl/_rels/workbook.xml.rels', currentWorkbookRels.replace('</Relationships>', (damage === 'missing-inventory' ? '' : rel('person', damage === 'external-people' ? 'https://synthetic-plinth.invalid/people' : 'persons/person.xml', damage === 'external-people')) + '</Relationships>'))

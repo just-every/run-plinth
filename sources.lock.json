@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "dce9ad33d11f2463c155f44c15daf79287a3e80ed3b932f191f3337010bca287",
+      "sha256": "d1c35123addb326b8cb0a2f9fcc6cc18f2533e265fc0ccf031237dcd0a288884",
       "executable": false
     },
     "DEMO.md": {
@@ -185,7 +185,7 @@
       "executable": false
     },
     "docs/DECISION-SEARCH.md": {
-      "sha256": "e1f962de545f1303f684a1ab8161aa58d6b6a277136dc9cd84296ce1fd1d1bbc",
+      "sha256": "9ee58beaab4ddf19f510816e6634c3eb52f7384576a8647c698daaf1c14c1443",
       "executable": false
     },
     "docs/ESTIMATE-PERFORMANCE.md": {
@@ -4553,7 +4553,7 @@
       "executable": false
     },
     "src/ui/attachment-office/spreadsheet.ts": {
-      "sha256": "269ccfce0fb611dd34255ef4a6c4bb9ef911999d980fc1c3aa095b3846c09e1d",
+      "sha256": "d8108af87a892df0a87c00cbb750ea94975402bd90edf51794b9d27a7937c742",
       "executable": false
     },
     "src/ui/attachment-office/threaded-comments.ts": {
@@ -5189,7 +5189,7 @@
       "executable": false
     },
     "tests/fixtures/spreadsheet-document.mjs": {
-      "sha256": "f2ba3704cc20613ec5a7bf0b38691735357548b9d6d117748607ec63be125f10",
+      "sha256": "9da82e703f68bbb78afaf43f2727f54d3cd1973da83386b5d8bddcb18a07a8d3",
       "executable": false
     },
     "tests/fixtures/takeoff-plan.mjs": {
@@ -5325,7 +5325,7 @@
       "executable": false
     },
     "tests/journeys/office-attachment-search.mjs": {
-      "sha256": "b9207db64c8e559c78ea7670c73f17498ca959f0655b7866a481a6c9ff5ffa52",
+      "sha256": "6a147e6d1373f40b11922393d7ca75834b7e4ebd45bc881eb9bb94faf85a59ab",
       "executable": false
     },
     "tests/journeys/open-attachment-search.mjs": {

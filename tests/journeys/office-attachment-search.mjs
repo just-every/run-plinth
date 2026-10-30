@@ -41,6 +41,7 @@ export async function officeAttachmentSearch({ base, page, owner, client, job, c
   ['cross-sheet', /crosses sheet boundaries/], ['cross-cell', /different cell/], ['cycle', /form a cycle/], ['missing-date', /stored date is missing or invalid/], ['bad-cell', /cell reference is missing or invalid/],
   ['past-last-column', /cell reference is missing or invalid/], ['past-last-row', /cell reference is missing or invalid/], ['duplicate-root', /multiple threaded comment roots/],
   ['sheet-relationship', /document relationship is missing or unsupported/], ['sheet-namespace', /document relationship is missing or unsupported/], ['reused-part', /referenced by multiple sheets/], ['duplicate-relationship', /duplicate threaded comment relationships/],
+  ['sheet-inventory-namespace', /one supported current sheet inventory/], ['nested-sheet-entry', /sheet inventory structure or namespace is unsupported/],
   ['namespace', /namespace or structure is unsupported/], ['child-namespace', /child namespace is unsupported/], ['person-namespace', /inventory namespace or structure is unsupported/], ['relationship-namespace', /relationship namespace is unsupported/],
   ['missing-inventory', /one internal person inventory/], ['external-comments', /require internal relationships/], ['external-people', /require internal relationships/],
   ['comment-limit', /10,000-comment processing limit/], ['person-limit', /2,000-person processing limit/], ['reply-limit', /64-level reply processing limit/],
