@@ -5,6 +5,7 @@ import type { Bindings } from '../../auth.server'
 import { nativeCall, nativeVersion, safe } from './native'
 import { learningTools } from './learning'
 import { recordClasses } from './classes'
+import { closeoutTools } from './closeout'
 
 interface Action { name:string; path:string; clauses:string[]; fields:string[]; readOnly?:boolean; title:string }
 const actions:Action[]=[
@@ -59,5 +60,6 @@ export function tools(env: Bindings):ToolDefinition[] {
  definitions.push(...learningTools(env))
  definitions.push(...answerTools(env))
  definitions.push(...recoveryEvidenceTools(env))
+ definitions.push(...closeoutTools(env))
  return definitions
 }
