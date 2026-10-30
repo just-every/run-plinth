@@ -1,4 +1,5 @@
 import type { Actor, Job } from './model'
+import { assignedJob } from './auth'
 import { need } from './model'
 import { jobs } from './store'
 
@@ -10,7 +11,7 @@ export function satisfactionValues(job:Job,actor?:Actor) {
 /** Responses keep the people and companies involved at the source; report access uses today's grants. */
 export async function satisfactionReport(db:D1Database,actor:Actor) {
  need(['owner','admin','project_manager'].includes(actor.role)&&(!actor.permissions||actor.permissions.matrix.reports.view&&actor.permissions.matrix.documents.view),'Satisfaction reports are office-only',403,'forbidden')
- const allowed=(await jobs(db)).filter(j=>!actor.team||actor.role!=='project_manager'&&!actor.permissions||actor.team.job_ids.includes(j.id))
+ const allowed=(await jobs(db)).filter(j=>assignedJob(actor,j)&&(!actor.team||actor.role!=='project_manager'&&!actor.permissions||actor.team.job_ids.includes(j.id)))
  const responses=allowed.flatMap(job=>(job.satisfaction?.surveys??[]).filter(s=>s.response).map(s=>({job_id:job.id,job_name:job.name,survey_id:s.id,source:s.source,score:s.response!.score,answers:s.response!.answers,comment:s.response!.comment,context:s.context,follow_up:s.follow_up??null})))
  const group=(kind:'managers'|'crew'|'subs')=>{
   const groups=new Map<string,{id:string;name:string;trade?:string;count:number;score_total:number;low_scores:number}>()

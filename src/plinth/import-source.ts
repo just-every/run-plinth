@@ -59,6 +59,13 @@ function cells(csv: string): { table: CsvCell[][]; diagnostics: CsvDiagnostic[] 
   return { table, diagnostics }
 }
 
+/** Strict workbook CSV values share the retained coordinate-aware CSV parser. */
+export function csvCells(csv: string): string[][] {
+  const parsed = cells(csv)
+  if (parsed.diagnostics.length) invalid(parsed.diagnostics[0].message)
+  return parsed.table.map(row => row.map(cell => cell.value))
+}
+
 export function inspectAcceptedJobs(csv: string, declaration?: SourceDeclaration): CsvInspection {
   if (typeof csv !== 'string' || !csv.length) invalid('Upload a CSV file')
   const bytes = Buffer.from(csv, 'utf8')
