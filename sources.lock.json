@@ -1277,7 +1277,7 @@
       "executable": false
     },
     "src/modules/agent-door/credentials.ts": {
-      "sha256": "db6bdea37e116f838b4fe5837ffc5e4bc747d0ee98b35f02642c8dcbf46a026b",
+      "sha256": "5de7f1ccb653ebac225969e7bafbddd15d43986937928272eff6fbadc096383c",
       "executable": false
     },
     "src/modules/agent-door/errors.ts": {
