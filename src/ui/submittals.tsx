@@ -58,7 +58,7 @@ function SubmittalRecord({row,data,jobId,mutate}:{row:Submittal;data:SubmittalVi
   {data.manage&&<details ref={resubmission}><summary>Resubmit a new vendor version</summary><SubmittalSubmission data={data} row={row} submit="Resubmit vendor package" action={async body=>{await mutate(`/${row.id}/resubmit`,{cycle_id:current.id,...body});if(resubmission.current)resubmission.current.open=false}}/></details>}
   {(row.notices??[]).map(notice=><p key={notice.id}>Supplier notice · cycle {row.cycles.find(c=>c.id===notice.cycle_id)?.revision} · {notice.to}: {notice.label} · {notice.by.name}</p>)}
   {data.manage&&current.decision&&order.vendor_email&&!(row.notices??[]).some(n=>n.cycle_id===current.id&&!['refused','development'].includes(n.status))&&<details><summary>Notify supplier of this review</summary>
-   <p>Send the current disposition, review comments, annotations and original vendor files to {order.vendor_email}. This notice does not release procurement.</p>
+   <p>Send the current disposition, review comments and annotations to {order.vendor_email}. Original vendor files are attached when supported. Managed mail lists the retained originals and their checksums instead. This notice does not release procurement.</p>
    <Form submit="Send supplier disposition" action={async f=>mutate(`/${row.id}/notify`,{cycle_id:current.id,product_reference:current.product_reference,to:order.vendor_email,confirm:f.get('confirm')==='on'})}>
     <label><input name="confirm" type="checkbox" required/> I authorize sharing this exact review and its originals with this supplier.</label>
    </Form>
