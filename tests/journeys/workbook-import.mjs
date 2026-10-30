@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium,expect} from '@playwright/test'
-import {workbookInput} from '../fixtures/workbook-estimate.mjs'
+import {legacyWorkbook} from '../fixtures/workbook-xls.mjs'
+import {workbookInput,catalogInput,costInput} from '../fixtures/workbook-estimate.mjs'
 const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS,state=process.env.PLINTH_STATE
 assert.ok(base&&shots&&state,'Use the installed application with native sign-in')
 await mkdir(shots,{recursive:true})
@@ -47,7 +48,7 @@ try{
   await page.setViewportSize({width,height:1000})
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal page overflow')
   if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}
-  await page.screenshot({path:`${shots}/workbook-preview-${width}.png`,fullPage:true,animations:'disabled'})
+  await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${shots}/workbook-preview-${width}.png`,fullPage:true,animations:'disabled'})
  }
  await page.setViewportSize({width:1440,height:1000})
  // Editing the mapping removes the old approval; the public door also refuses the stale digest.
@@ -70,7 +71,59 @@ try{
  const download=page.waitForEvent('download');await surface.getByRole('button',{name:'Download retained original',exact:true}).click();const file=await download,stream=await file.createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);assert.equal(Buffer.concat(chunks).toString('base64'),input.base64)
  const replay=await call('/imports/workbook/commit',{...input,fingerprint:reviewed.value.fingerprint});assert.equal(replay.status,200);assert.equal((await call('/jobs')).value.jobs.length,jobs.length)
  const unchanged=(await call('/jobs/'+job.id)).value.job;assert.deepEqual({quotes:unchanged.quotes,budgets:unchanged.budgets,sov:unchanged.sov},economics)
- for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:`${shots}/workbook-adopted-${width}.png`,fullPage:true,animations:'disabled'})}
+ for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${shots}/workbook-adopted-${width}.png`,fullPage:true,animations:'disabled'})}
+ const upload=async source=>{
+  await surface.getByLabel('Estimate workbook',{exact:true}).setInputFiles({name:source.name,mimeType:source.name.endsWith('.xls')?'application/vnd.ms-excel':'text/csv',buffer:Buffer.from(source.base64,'base64')})
+  const response=page.waitForResponse(r=>r.url().endsWith('/imports/workbook/inspect'))
+  await surface.getByRole('button',{name:'Inspect workbook',exact:true}).click();const r=await response;assert.equal(r.status(),200)
+ }
+ const proof=async name=>{for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${shots}/${name}-${width}.png`,fullPage:true,animations:'disabled'})}await page.setViewportSize({width:1440,height:1000})}
+ const legacy={...input,...legacyWorkbook({tag:'synthetic-plinth-browser-legacy',continued:true})}
+ await upload(legacy)
+ await surface.getByLabel('Imported estimate title',{exact:true}).fill('Synthetic legacy estimate')
+ await surface.getByLabel('Draft client email',{exact:true}).fill(input.client_email)
+ await surface.getByLabel('Code mappings',{exact:true}).fill('FRAME=06-100\nBOARD=09-200')
+ await surface.getByLabel('Unit mappings',{exact:true}).fill('feet=ft\nsheets=sheet')
+ await surface.getByRole('combobox',{name:'Duplicate rows',exact:true}).selectOption('skip-identical')
+ await surface.getByLabel('Excluded rows and reasons',{exact:true}).fill('5=Invalid source code held for correction')
+ await surface.getByRole('checkbox',{name:'I reviewed the cached formula values',exact:false}).check()
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('2 coded lines · Selling $6.69 · Cost $4.49',{exact:true})).toBeVisible()
+ await surface.getByText('Source cell provenance',{exact:true}).click()
+ await expect(surface.getByText('Quantity · Estimate!F3 · 1.25 · Cached formula: (5/4)',{exact:true})).toBeVisible()
+ await proof('legacy-workbook-preview')
+ const rates=catalogInput('synthetic-plinth-browser-catalog')
+ await upload(rates)
+ await surface.getByRole('combobox',{name:'Import type',exact:true}).selectOption('catalog')
+ await surface.getByLabel('Imported catalog title',{exact:true}).fill(rates.title)
+ await surface.getByLabel('Code mappings',{exact:true}).fill('FRAME=06-100\nBOARD=09-200')
+ await surface.getByLabel('Unit mappings',{exact:true}).fill('feet=ft\nsheets=sheet')
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('2 catalog rates · Selling $4.34 · Cost $2.80',{exact:true})).toBeVisible()
+ await proof('catalog-workbook-preview')
+ await surface.getByRole('checkbox',{name:'Approve this exact file, mapping and row resolution',exact:true}).check()
+ await surface.getByRole('button',{name:'Adopt catalog rates once',exact:true}).click()
+ await expect(surface.getByText('Catalog rates imported for reviewed future estimates.',{exact:false})).toBeVisible()
+ const nativeRates=(await call('/estimate-catalog')).value.entries
+ assert.equal(nativeRates.length,2);assert.deepEqual(nativeRates.map(r=>r.revisions[0].value.cost_cents).sort((a,b)=>a-b),[79,201])
+ let native=await call(`/jobs/${imported.id}/quotes/${quote.id}/accept`,{expected_version:imported.version,method:'signed',evidence:'Reviewed imported source agreement',schedule_choice:{kind:'none',reason:'Separate native planning'}});assert.equal(native.status,200,JSON.stringify(native.value))
+ const sourceCosts=costInput(native.value.job,'synthetic-plinth-browser-costs')
+ await upload(sourceCosts)
+ await surface.getByRole('combobox',{name:'Import type',exact:true}).selectOption('costs')
+ await surface.getByLabel('Cost import title',{exact:true}).fill(sourceCosts.title)
+ await surface.getByRole('button',{name:'Load accepted jobs',exact:true}).click()
+ await surface.getByRole('combobox',{name:'Destination job',exact:true}).selectOption(imported.id)
+ await surface.getByLabel('Code mappings',{exact:true}).fill('TIME=06-100\nEXPENSE=09-200')
+ await surface.getByLabel('Unit mappings',{exact:true}).fill('hours=hour\neach=each')
+ await surface.getByRole('button',{name:'Preview coded estimate',exact:true}).click()
+ await expect(surface.getByText('2 cost drafts · Actual $175.01',{exact:true})).toBeVisible()
+ await proof('cost-workbook-preview')
+ await surface.getByRole('checkbox',{name:'Approve this exact file, mapping and row resolution',exact:true}).check()
+ await surface.getByRole('button',{name:'Import cost drafts once',exact:true}).click()
+ await expect(surface.getByText('Time and expense drafts imported.',{exact:false})).toBeVisible()
+ native=await call(`/jobs/${imported.id}/costs/sources`);assert.equal(native.status,200);assert.equal(native.value.sources.length,2);assert.ok(native.value.sources.every(row=>!row.approved_by));assert.deepEqual(native.value.sources.map(row=>row.amount_cents),[12501,5000])
+ assert.equal((await call(`/jobs/${imported.id}/costs`)).value.totals.posted_actual_cents,0,'Importing draft sources never posts an actual cost')
+ const untouched=(await call('/jobs/'+job.id)).value.job;assert.deepEqual({quotes:untouched.quotes,budgets:untouched.budgets,sov:untouched.sov},economics)
  await owner.close()
- console.log('Workbook import PASS: native upload, two sheets, coded fractional preview and exports, cache review and invalid-row resolution, stale mapping refusal, exact originals, replay and unchanged accepted economics; screens 1440 and 390')
+ console.log('Workbook import PASS: native upload, two sheets, coded fractional preview and exports, cache review and invalid-row resolution, stale mapping refusal, exact originals, replay and unchanged accepted economics; legacy XLS, dated catalog rates and native time and expense drafts; screens 1440 and 390')
 }finally{await browser.close()}

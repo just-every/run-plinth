@@ -1,3 +1,6 @@
+import {costWorkbook,costWorkbookDigest} from './workbook-costs'
+import {jobOf} from './store'
+import {costs} from './cost-model'
 import type { Bindings } from '../auth.server'
 import {
   applyD1ImportBatches, createD1ImportJob, planD1Import, readD1ImportJob,
@@ -5,7 +8,7 @@ import {
   type D1ImportContext,
 } from '../modules/import-kit/src/d1/index.ts'
 import { authorize, requireOwner } from './auth.ts'
-import { DomainError, need } from './model.ts'
+import { DomainError, need, text } from './model.ts'
 import { acceptedJobsSource, sourceDeclaration, IMPORT_VERSION, IMPORT_LIMITS } from './import-source.ts'
 import { acceptedJobsMapping } from './import-mapping.ts'
 import { importContext } from './import-context.ts'
@@ -74,9 +77,21 @@ export async function importResponse(request: Request, env: Bindings): Promise<R
     if (request.method === 'POST' && ['/workbook/inspect','/workbook/preview','/workbook/commit'].includes(route)) {
       const input = await body(request), book = await readWorkbook(input)
       if (route === '/workbook/inspect') return respond(workbookInspection(book))
-      const { source, draft, canAdopt } = workbookSource(book,input)
+      if(['catalog','costs'].includes((input.mapping as {purpose?:string})?.purpose??'')&&route==='/workbook/preview'&&input.reviewed_at===undefined)input.reviewed_at=new Date(Date.now()).toISOString()
+      let prepared=workbookSource(book,input)
+      if(prepared.draft.kind==='costs'){
+        const previous=await jobOf(env.DB,actor,text(input.job_id,'Destination job',100)),receipt=costs(previous).workbook_imports?.find(r=>r.id===previous.id+':'+book.hash)
+        if(route==='/workbook/commit'&&receipt){
+          need(receipt.input_digest===costWorkbookDigest(input),'The cost file or mapping changed. Use its original journal.',409,'REVIEW_FINGERPRINT_MISMATCH')
+          const prior=await env.DB.prepare('SELECT id,fingerprint FROM ik_jobs WHERE destination=? AND principal_id=? AND operation_key=?').bind(context.destination,context.authorization.principalId,'workbook:'+book.hash).first<{id:string;fingerprint:string}>()
+          need(prior&&prior.fingerprint===input.fingerprint,'Approve the original preview before replay',409,'REVIEW_FINGERPRINT_MISMATCH')
+          return respond({job:await readD1ImportJob(prior.id,context)})
+        }
+        prepared=await costWorkbook(prepared.source,prepared.draft,previous,actor,input)
+      }
+      const {source,draft,canAdopt}=prepared
       const plan = await planD1Import(source,acceptedJobsMapping(actor),context)
-      if (route === '/workbook/preview') return respond({draft,canAdopt,fingerprint:plan.fingerprint,source:workbookInspection(book)})
+      if (route === '/workbook/preview') return respond({draft,canAdopt,...(draft.reviewed_at?{reviewed_at:draft.reviewed_at}:{}),fingerprint:plan.fingerprint,source:workbookInspection(book)})
       need(input.fingerprint === plan.fingerprint, 'The workbook or mapping changed. Preview and approve again.',409,'REVIEW_FINGERPRINT_MISMATCH')
       need(canAdopt,'Resolve every rejected row or explicitly exclude it with a reason before adoption',409,'workbook_diagnostics')
       const approved = {...context,reviewedFingerprint:plan.fingerprint,operationKey:`workbook:${book.hash}`}

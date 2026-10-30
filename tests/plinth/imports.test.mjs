@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { workbookInput, estimateWorkbook } from '../fixtures/workbook-estimate.mjs'
+import {legacyWorkbook} from '../fixtures/workbook-xls.mjs'
+import { workbookInput, estimateWorkbook, catalogInput, costInput } from '../fixtures/workbook-estimate.mjs'
 import { createFixture } from './helpers.mjs'
 
 const csv = await readFile(new URL('../fixtures/import-accepted-jobs.csv', import.meta.url), 'utf8')
@@ -184,6 +185,18 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
    assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,false)
    assert.equal((await call('/workbook/commit',{...broken,fingerprint:review.value.fingerprint})).status,409)
   }
+  for(const options of [{missingCache:true},{unsupported:true},{macro:true}]){
+   const broken={...input,...legacyWorkbook(options)},review=await call('/workbook/preview',broken)
+   assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,false)
+   assert.equal((await call('/workbook/commit',{...broken,fingerprint:review.value.fingerprint})).status,409)
+  }
+  for(const options of [{},{continued:true}]){
+   const legacy={...input,...legacyWorkbook(options)},review=await call('/workbook/preview',legacy)
+   assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
+   assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
+   assert.equal(review.value.draft.provenance[1].cells.quantity.formula,'(5/4)')
+   assert.equal(review.value.draft.provenance[1].cells.quantity.address,'F3')
+  }
   assert.deepEqual(await jobs(),[])
   const review=await call('/workbook/preview',input);assert.equal(review.status,200,JSON.stringify(review.value));assert.equal(review.value.canAdopt,true)
   assert.equal(review.value.draft.source_totals.total_cents,1422);assert.equal(review.value.draft.source_totals.cost_total_cents,947);assert.deepEqual(review.value.draft.source_totals.rows.map(r=>r.disposition),['included','included','duplicate','excluded']);assert.equal(review.value.draft.total_cents,669);assert.equal(review.value.draft.cost_total_cents,449)
@@ -210,8 +223,39 @@ test('Owner-reviewed coded workbooks retain exact cells, reconcile cents and fen
   const clientView=await f.json(`/api/plinth/jobs/${imported.id}`,{cookie:client});assert.equal(clientView.status,200);assert.equal(clientView.value.job.import_evidence,undefined);assert.equal(clientView.value.job.quotes[0].lines[0].cost_unit_cents,undefined)
   assert.equal((await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint})).status,200)
   const unchanged=(await jobs())[0];assert.deepEqual(unchanged.quotes,accepted.value.job.quotes);assert.deepEqual(unchanged.budgets,accepted.value.job.budgets)
-  const erased=await f.json(`/api/plinth/jobs/${imported.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:unchanged.version}});assert.equal(erased.status,200)
-  const custody=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(custody.value.originals[0].original.status,'unavailable')
+  const costSource=costInput(unchanged),costPreview=await call('/workbook/preview',costSource);assert.equal(costPreview.status,200,JSON.stringify(costPreview.value));assert.equal(costPreview.value.canAdopt,true);assert.equal(costPreview.value.draft.total_cents,17501)
+  const costsRoot=`/api/plinth/jobs/${imported.id}/costs`,costSources=async()=>(await f.json(costsRoot+'/sources',{cookie:f.owner})).value
+  assert.deepEqual((await costSources()).sources,[])
+  const costApproval={...costSource,reviewed_at:costPreview.value.reviewed_at,fingerprint:costPreview.value.fingerprint}
+  assert.equal((await call('/workbook/commit',{...costApproval,expected_version:costSource.expected_version+1})).status,409);assert.deepEqual((await costSources()).sources,[])
+  const costCommitted=await call('/workbook/commit',costApproval);assert.equal(costCommitted.status,200,JSON.stringify(costCommitted.value))
+  let importedSources=await costSources();assert.equal(importedSources.sources.length,2);assert.ok(importedSources.sources.every(s=>!s.approved_by));assert.deepEqual(importedSources.sources.map(s=>s.amount_cents),[12501,5000])
+  let actual=await f.json(costsRoot,{cookie:f.owner});assert.equal(actual.value.totals.posted_actual_cents,0)
+  const originalCost=await f.request(costsRoot+'/sources/'+importedSources.sources[1].id+'/original',{cookie:f.owner});assert.equal(originalCost.status,200);assert.equal(Buffer.from(await originalCost.arrayBuffer()).toString('base64'),costSource.base64)
+  assert.equal((await f.json(costsRoot+'/sources/'+importedSources.sources[0].id+'/approve',{method:'POST',cookie:f.owner,body:{expected_version:importedSources.version}})).status,403)
+  const reviewer=await f.invite(['cost-reviewer','dev.localhost'].join('@'),'Native cost reviewer','admin')
+  for(const row of importedSources.sources){const current=await costSources();const approved=await f.json(costsRoot+'/sources/'+row.id+'/approve',{method:'POST',cookie:reviewer,body:{expected_version:current.version}});assert.equal(approved.status,200,JSON.stringify(approved.value))}
+  actual=await f.json(costsRoot,{cookie:f.owner});assert.equal(actual.value.totals.posted_actual_cents,17501)
+  assert.equal((await call('/workbook/commit',costApproval)).status,200);assert.equal((await costSources()).sources.length,2)
+  const retainedCosts=await call('/'+costCommitted.value.job.id+'/undo');assert.equal(retainedCosts.status,200,JSON.stringify(retainedCosts.value));assert.ok(retainedCosts.value.report.dispositions.some(d=>d.disposition==='retained'))
+  const currentJob=(await jobs())[0];assert.deepEqual(currentJob.quotes,accepted.value.job.quotes);assert.deepEqual(currentJob.budgets,accepted.value.job.budgets)
+  const erased=await f.json(`/api/plinth/jobs/${imported.id}`,{method:'DELETE',cookie:f.owner,body:{expected_version:currentJob.version}});assert.equal(erased.status,200)
+  const custody=await f.json(`${prefix}/${adopted.value.job.id}/originals`,{cookie:f.owner});assert.equal(custody.value.originals[0].original.status,'unavailable');const costCustody=await f.json(`${prefix}/${costCommitted.value.job.id}/originals`,{cookie:f.owner});assert.equal(costCustody.status,200);assert.equal(costCustody.value.originals[0].original.status,'unavailable')
   await call('/workbook/commit',{...input,fingerprint:review.value.fingerprint});assert.equal((await jobs()).length,0)
+  // Catalog adoption uses the same owner-reviewed custody and never creates a job or changes an accepted rate.
+  const catalog=async()=>{const r=await f.json('/api/plinth/estimate-catalog',{cookie:f.owner});assert.equal(r.status,200);return r.value.entries}
+  const importCatalog=async tag=>{const source=catalogInput(tag),preview=await call('/workbook/preview',source);assert.equal(preview.status,200,JSON.stringify(preview.value));assert.equal(preview.value.canAdopt,true);const approved={...source,reviewed_at:preview.value.reviewed_at,fingerprint:preview.value.fingerprint};return {source,preview:preview.value,approved}}
+  const first=await importCatalog('synthetic-plinth-catalog-1');assert.deepEqual(await catalog(),[])
+  assert.equal((await call('/workbook/commit',{...first.approved,mapping:{...first.source.mapping,currency:'AUD'}})).status,400);assert.deepEqual(await catalog(),[])
+  const committed=await call('/workbook/commit',first.approved);assert.equal(committed.status,200,JSON.stringify(committed.value))
+  let rates=await catalog();assert.equal(rates.length,2);assert.deepEqual(rates.map(r=>r.revisions[0].value.sell_cents).sort((a,b)=>a-b),[101,333]);assert.ok(rates.every(r=>r.revisions[0].approved_by.role==='owner'&&r.revisions[0].import_evidence.artifact_sha256===first.preview.draft.artifact_sha256))
+  assert.equal((await call('/workbook/commit',first.approved)).value.job.id,committed.value.job.id);assert.equal((await catalog()).length,2);assert.equal((await jobs()).length,0)
+  const retained=await f.json(`${prefix}/${committed.value.job.id}/originals`,{cookie:f.owner});assert.equal(retained.value.originals[0].original.base64,first.source.base64)
+  assert.equal((await call(`/${committed.value.job.id}/undo`)).status,200);assert.deepEqual(await catalog(),[])
+  const second=await importCatalog('synthetic-plinth-catalog-2'),adoptedRates=await call('/workbook/commit',second.approved);assert.equal(adoptedRates.status,200,JSON.stringify(adoptedRates.value));rates=await catalog()
+  const frame=rates.find(r=>r.name==='Framing rate')
+  const assembly=await f.json('/api/plinth/estimate-catalog',{method:'POST',cookie:f.owner,body:{kind:'assembly',name:'Native assembly uses imported rate',reason:'Owner reviewed future work',value:{unit:'ft',parts:[{id:'frame',rate_id:frame.id,description:'Framing',cost_code:'06-100',phase:'Structure',category:'labor',units_per_dimension:'1',productivity:'1',waste_percent:'0'}]}}});assert.equal(assembly.status,201,JSON.stringify(assembly.value))
+  const undone=await call(`/${adoptedRates.value.job.id}/undo`);assert.equal(undone.status,200,JSON.stringify(undone.value));assert.ok(undone.value.report.dispositions.some(d=>d.disposition==='retained'));assert.equal((await catalog()).length,3,'Native dependencies preserve the complete imported catalog group')
+
  }finally{await f.close()}
 })
