@@ -9,7 +9,7 @@ const base=process.env.PLINTH_URL,shots=process.env.PLINTH_SCREENSHOTS
 assert.ok(base&&shots)
 assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))
 const state=process.env.PLINTH_STATE,entrance=state?undefined:process.env.PLINTH_OWNER_OPEN??(await readFile('.rer/local/open-url','utf8')).trim()
-const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLINTH_CHROMIUM_PATH,args:['--use-mock-keychain','--password-store=basic',...(process.env.PLINTH_CHROMIUM_PATH?['--no-sandbox']:[])]})
 await mkdir(shots,{recursive:true})
 try {
  const owner=await browser.newContext(state?{storageState:state}:{}),client=await browser.newContext(),page=await owner.newPage(),clientPage=await client.newPage()
