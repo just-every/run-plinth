@@ -2,6 +2,7 @@ import type { OfficePackage } from './package'
 import { Pictures } from './pictures'
 import { fail } from './types'
 import { attr, elements, inSpace } from './xml'
+import { ThreadedComments } from './threaded-comments'
 
 const richText = (element: Element) => elements(element, 't', 'sheet').map(text => text.textContent ?? '').join('')
 type SharedFormula = { cell: string; text: string }
@@ -34,12 +35,9 @@ function formulaText(cell: Element, formulas: Map<string, SharedFormula>) {
  fail('a spreadsheet formula has no stored expression.')
 }
 
-async function comments(office: OfficePackage, sheet: string, label: string) {
+async function comments(office: OfficePackage, sheet: string, label: string, threads: ThreadedComments) {
  for (const relation of (await office.rels(sheet)).values()) {
   if (relation.external) continue
-  if (relation.kind === 'threadedComment' || relation.kind === 'threadedComments') {
-   office.draft.notes.add(`Threaded comments in ${label} are unsupported and were not read.`); continue
-  }
   if (relation.kind !== 'comments') continue
   const document = await office.xml(relation.target)
   if (!inSpace(document.documentElement, 'sheet') || document.documentElement.localName !== 'comments') fail('spreadsheet comments have an unsupported structure.')
@@ -47,7 +45,8 @@ async function comments(office: OfficePackage, sheet: string, label: string) {
   for (const comment of elements(document, 'comment', 'sheet')) {
    const authorId = attr(comment, 'authorId')
    if (!/^\d+$/.test(authorId) || Number(authorId) >= authors.length) fail('a spreadsheet comment has no stored author.')
-   office.draft.add(`${label} comment ${attr(comment, 'ref')} by ${authors[Number(authorId)]}`, richText(comment))
+   const cell = attr(comment, 'ref'), author = authors[Number(authorId)], text = richText(comment)
+   office.draft.add(`${label} ${threads.fallback(sheet, cell, author, text)} ${cell} by ${author}`, text)
   }
  }
 }
@@ -64,14 +63,23 @@ export async function extractSpreadsheet(office: OfficePackage, main: string) {
  }
  const sheets = elements(document, 'sheet', 'sheet')
  if (!sheets.length || sheets.length > 200) fail('a workbook must contain between one and 200 sheets.')
+ const threads = new ThreadedComments(office, main), currentSheets: { path: string; label: string }[] = []
  let cells = 0
- const sheetNames = new Set<string>()
+ const sheetNames = new Set<string>(), sheetPaths = new Set<string>()
  for (const sheet of sheets) {
   draft.hooks.check()
   const name = attr(sheet, 'name'), state = attr(sheet, 'state'), label = `Sheet ${name}${state && state !== 'visible' ? ` (${state})` : ''}`
   if (!name || sheetNames.has(name)) fail('workbook sheet names are missing or duplicated.')
   sheetNames.add(name); draft.hooks.progress(`Reading ${label}…`)
   const path = await office.referenced(main, attr(sheet, 'id', 'rel'))
+  if (sheetPaths.has(path)) fail('workbook sheet parts are duplicated.')
+  sheetPaths.add(path)
+  currentSheets.push({ path, label })
+  await threads.read(path, label)
+ }
+ await threads.validate()
+ for (const { path, label } of currentSheets) {
+  draft.hooks.progress(`Reading ${label}…`)
   const sheetDocument = await office.xml(path), root = sheetDocument.documentElement
   if (!inSpace(root, 'sheet') || !['worksheet', 'chartsheet'].includes(root.localName)) fail('a sheet has an unsupported structure.')
   if (root.localName === 'chartsheet') draft.notes.add(`${label} contains a chart. Chart visuals and calculations were not extracted.`)
@@ -97,8 +105,8 @@ export async function extractSpreadsheet(office: OfficePackage, main: string) {
   for (const field of ['oddHeader', 'evenHeader', 'firstHeader', 'oddFooter', 'evenFooter', 'firstFooter']) {
    for (const element of elements(root, field, 'sheet')) draft.add(`${label} ${field}`, element.textContent ?? '')
   }
-  await comments(office, path, label)
   await pictures.from(path, label)
+  await comments(office, path, label, threads)
  }
  draft.notes.add('Spreadsheet values are the stored cache, not recalculated results. Number formatting and date serials are unchanged. Hidden sheets, rows and cells are included. Header and footer formatting codes are retained as text.')
 }
