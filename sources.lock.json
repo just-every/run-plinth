@@ -3261,7 +3261,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
+      "sha256": "a575ae0835806be857783fbf4ad461a74ff635f04c4b59c9b79bbedc69ad2671",
       "executable": false
     },
     "src/plinth/agent-learning.ts": {
@@ -3605,7 +3605,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "81a3bf190ea76afc2ef61927d0dfc7e2916ff62eac019c6721388c43960db06f",
+      "sha256": "ba161bb5e1ed2b710217d8d72724f5cb886605df9ddb4ca8cac0183953de144a",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -5453,7 +5453,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
+      "sha256": "ea90eb89de23374143804e77124da99e4e37d11ce50d815ea82b10fc813017f8",
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {
@@ -5561,7 +5561,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "27bbaf69d666429cfec5af5b56fff162fd8bbf21f9b08eb63c2ee151af131b97",
+      "sha256": "851274b7faead7dc1e716438edb2567c1bc44c60d92b9d5774c0e8c84ec80d3e",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
