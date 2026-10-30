@@ -161,7 +161,7 @@
       "executable": false
     },
     "docs/AGENT-DOOR.md": {
-      "sha256": "41a200719310955aa56dddfff714a4018661161eb99557dfe29ef3ea090ffaf7",
+      "sha256": "55448a9e055dec3bba18340f2c639380827d167f0c50502881a6105f74faac09",
       "executable": false
     },
     "docs/AGENT-LEARNING.md": {
@@ -297,7 +297,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "9764eb99ef086b94a435115dc9313275309961f91512ceadbfdd5726c8bc2a5a",
+      "sha256": "785663fee075d3f187bc712c3f28decbc93827b2cbb11001e102c76e0ee4f8c6",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -522,6 +522,10 @@
     },
     "migrations/core/202610292204_agent_forecast_reviews.sql": {
       "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
+      "executable": false
+    },
+    "migrations/core/202610292205_agent_forecast_custody.sql": {
+      "sha256": "7c18e28b28f8b2944e36aefd5b2ee472c2f4ade96495e06fa8408cde4e65f8fe",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -805,7 +809,7 @@
       "executable": false
     },
     "RELEASE.json": {
-      "sha256": "d05e76aa6e9be7ed5b17ecdd10e5ae2d7f53a3780400a4c78b74edda03e8358a",
+      "sha256": "9a5049dc8c4e80547e1482f2054b678fc11cfd3c25471ac524ace24d340266be",
       "executable": false
     },
     "rer-project.json": {
@@ -3257,7 +3261,7 @@
       "executable": false
     },
     "src/plinth/agent-door/index.ts": {
-      "sha256": "22f01cfc8e5eb7129a6c0c47bc5f20a25ef20c76b80a3474ec1dd96a99ede371",
+      "sha256": "8934e469da4d61e8234c0ac85ca674c2c5966be75bfc4992fb3a9fa9627a7d85",
       "executable": false
     },
     "src/plinth/agent-door/learning.ts": {
@@ -3285,7 +3289,7 @@
       "executable": false
     },
     "src/plinth/agent-forecast.ts": {
-      "sha256": "ea8dfca7e6623d9a6020e9c5a78071a63f2d7cae30fef9d66a1489d49d3945bc",
+      "sha256": "a20201b28047e98478cdc9741febe49448760a08d27ee064f2c78c86c52ad56a",
       "executable": false
     },
     "src/plinth/agent-learning.ts": {
@@ -5493,7 +5497,7 @@
       "executable": false
     },
     "tests/plinth/agent-forecast-support.mjs": {
-      "sha256": "2ed8c0d5c0051b7996f2838f63e88add1d325d2d13a8c9c173f173d876ae8e85",
+      "sha256": "6d6cbdc4a292f4327a75446cca91266cebc32bc89eafeed42bbc501f2b0049c2",
       "executable": false
     },
     "tests/plinth/agent-runs-support.mjs": {
