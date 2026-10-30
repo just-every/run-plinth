@@ -3617,7 +3617,7 @@
       "executable": false
     },
     "src/plinth/import-source.ts": {
-      "sha256": "83d09c6e842d1f42ab4a1c2ec833e02b1490642e8d3345d47f671c00f310882d",
+      "sha256": "1121c6574505a98d41bd8b9e3d44f4246b541bb8d7ac5a3330e3db7cbb669172",
       "executable": false
     },
     "src/plinth/import-targets.ts": {
@@ -4241,7 +4241,7 @@
       "executable": false
     },
     "src/plinth/workbook-xls.ts": {
-      "sha256": "2a0f3e6f34f60b3c9dd65c5fce5799a0015746946533244867b3316eb01bbf8b",
+      "sha256": "1adf758b5074d3e9d72dd31d290e5a7517b77f8692eaa473cfd77e7edd651bf5",
       "executable": false
     },
     "src/router.tsx": {
@@ -5081,7 +5081,7 @@
       "executable": false
     },
     "src/ui/workspace.tsx": {
-      "sha256": "ba091b5e5af70f06a7e9ed2bf3df97802a18c72a3b833c555384314ed5b063cd",
+      "sha256": "5489bb0b726ce8219fdf3f4102ab6157f8571fbaa63f49bca95b93d2c66c316d",
       "executable": false
     },
     "test-budget.json": {

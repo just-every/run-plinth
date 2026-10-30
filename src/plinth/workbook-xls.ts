@@ -46,16 +46,16 @@ function formula(data: Uint8Array): string | undefined {
  const take = (n: number) => { need(at + n <= data.length, 'Excel formula tokens are truncated'); const p = at; at += n; return p }
  const pop = () => { const value = stack.pop(); need(value !== undefined, 'Excel formula has incomplete operands'); return value }
  while (at < data.length) {
-  const token = data[take(1)]!
-  if (token === 0x1e) stack.push(String(u16(data, take(2))))
-  else if (token === 0x1f) stack.push(numeric(float(data, take(8))))
-  else if ([0x24, 0x44, 0x64].includes(token)) { const p = take(4), col = u16(data, p + 2) & 0x3fff; need(col < 256, 'Unsupported Excel formula column'); stack.push(column(col) + (u16(data, p) + 1)) }
-  else if ([0x25, 0x45, 0x65].includes(token)) { const p = take(8); stack.push(`${column(u16(data, p + 4) & 255)}${u16(data, p) + 1}:${column(u16(data, p + 6) & 255)}${u16(data, p + 2) + 1}`) }
-  else if ([3,4,5,6].includes(token)) { const right = pop(), left = pop(); stack.push(`(${left}${({3:'+',4:'-',5:'*',6:'/'})[token]}${right})`) }
-  else if (token === 0x12 || token === 0x13) stack.push(`${token === 0x13 ? '-' : '+'}${pop()}`)
-  else if (token === 0x15) stack.push(`(${pop()})`)
-  else if (token === 0x19) { const p = take(3); if (data[p] !== 0x10) return undefined; stack.push(`SUM(${pop()})`) }
-  else if ([0x22,0x42,0x62].includes(token)) { const p = take(3), count = data[p]!; if (u16(data,p+1) !== 4 || count < 1 || count > stack.length) return undefined; stack.push(`SUM(${stack.splice(-count).join(',')})`) }
+  const opcode = data[take(1)]!
+  if (opcode === 0x1e) stack.push(String(u16(data, take(2))))
+  else if (opcode === 0x1f) stack.push(numeric(float(data, take(8))))
+  else if ([0x24, 0x44, 0x64].includes(opcode)) { const p = take(4), col = u16(data, p + 2) & 0x3fff; need(col < 256, 'Unsupported Excel formula column'); stack.push(column(col) + (u16(data, p) + 1)) }
+  else if ([0x25, 0x45, 0x65].includes(opcode)) { const p = take(8); stack.push(`${column(u16(data, p + 4) & 255)}${u16(data, p) + 1}:${column(u16(data, p + 6) & 255)}${u16(data, p + 2) + 1}`) }
+  else if ([3,4,5,6].includes(opcode)) { const right = pop(), left = pop(); stack.push(`(${left}${({3:'+',4:'-',5:'*',6:'/'})[opcode]}${right})`) }
+  else if (opcode === 0x12 || opcode === 0x13) stack.push(`${opcode === 0x13 ? '-' : '+'}${pop()}`)
+  else if (opcode === 0x15) stack.push(`(${pop()})`)
+  else if (opcode === 0x19) { const p = take(3); if (data[p] !== 0x10) return undefined; stack.push(`SUM(${pop()})`) }
+  else if ([0x22,0x42,0x62].includes(opcode)) { const p = take(3), count = data[p]!; if (u16(data,p+1) !== 4 || count < 1 || count > stack.length) return undefined; stack.push(`SUM(${stack.splice(-count).join(',')})`) }
   else return undefined
  }
  return stack.length === 1 ? stack[0] : undefined

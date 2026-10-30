@@ -59,7 +59,7 @@ function cells(csv: string): { table: CsvCell[][]; diagnostics: CsvDiagnostic[] 
   return { table, diagnostics }
 }
 
-/** Parse workbook CSV with the same quoting diagnostics as accepted-job CSV. */
+/** Strict workbook CSV values share the retained coordinate-aware CSV parser. */
 export function csvCells(csv: string): string[][] {
   const parsed = cells(csv)
   if (parsed.diagnostics.length) invalid(parsed.diagnostics[0].message)
