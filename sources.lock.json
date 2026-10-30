@@ -4557,7 +4557,7 @@
       "executable": false
     },
     "src/ui/attachment-office/threaded-comments.ts": {
-      "sha256": "0a3150b507309aaef28f2a326e4382074294a3a2fa3ac27900f48d36a7a055dc",
+      "sha256": "da1e4cddb3cc8af02956efe20eadbd4531bce775acec5740dfed71089b9278dc",
       "executable": false
     },
     "src/ui/attachment-office/types.ts": {
@@ -5189,7 +5189,7 @@
       "executable": false
     },
     "tests/fixtures/spreadsheet-document.mjs": {
-      "sha256": "3400bd0dc3dc745e8c4bd5221aa997270c93c966d3ed1287d7bad17a2bd0e0e9",
+      "sha256": "9f67913928df4b1cfb3727ef5aa2e8176431629b9e9a94992fbed3d4ba4ba55e",
       "executable": false
     },
     "tests/fixtures/takeoff-plan.mjs": {
@@ -5325,7 +5325,7 @@
       "executable": false
     },
     "tests/journeys/office-attachment-search.mjs": {
-      "sha256": "9d528d7fc1b44dedf0a843a1cfdd61f97801415a4dc5cd9813fa7a557a86d0ff",
+      "sha256": "ca3f1ab7a89eb88dcd91f1a107f632fbc13470bd0c0d0cc7f0df1490520afaf6",
       "executable": false
     },
     "tests/journeys/open-attachment-search.mjs": {
@@ -5369,7 +5369,7 @@
       "executable": false
     },
     "tests/journeys/review-extracted-attachment.mjs": {
-      "sha256": "b525d2f697184eb54596964785a5ece71ba8b9b8b5d2386f8f0bd747307e45c9",
+      "sha256": "bd075f5f128c1f9b800bc0c423a90c72d08153dec0a0699d375b193249f9a729",
       "executable": false
     },
     "tests/journeys/rfis.mjs": {
