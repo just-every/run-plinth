@@ -1,5 +1,6 @@
 import { recoveryEvidenceResponse } from './agent-recovery-evidence'
 import { answerResponse } from './agent-answers'
+import { agentForecastResponse } from './agent-forecast'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
@@ -111,6 +112,7 @@ async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import(
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
  job={...job,recovery_evidence:undefined,agent_answers:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
+ job={...job,agent_forecasts:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
@@ -131,6 +133,7 @@ async function body(request:Request):Promise<Input>{need((request.headers.get('c
 async function handle(request:Request,original:Bindings):Promise<Response>{return nativePlinth(request,original,await authorize(request,original))}
 /** Native dispatcher shared by HTTP and explicitly declared door tools. Authentication stays at each caller. */
 export async function nativePlinth(request:Request,original:Bindings,actor:Actor):Promise<Response>{const env=runtimeBindings(original),parts=new URL(request.url).pathname.slice('/api/plinth/'.length).split('/').filter(Boolean),method=request.method
+ const forecastPacket=await agentForecastResponse(request,env,actor,parts,body);if(forecastPacket)return forecastPacket
  const versioned=await apiV1Response(request,env,actor,parts,body,r=>handle(r,env));if(versioned)return versioned
  const connections=await connectorsResponse(request,env,actor,parts,body);if(connections)return connections
  if(parts[0]==='agent-credentials'&&parts.length===1&&method==='POST'){requireOwner(actor);const input=await body(request);const credential=await operatorAuth(env).mintCredential(request,{expiresInSeconds:input.expires_in_seconds===undefined?86400:Number(input.expires_in_seconds)});return json({credential},201)}

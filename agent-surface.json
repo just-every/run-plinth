@@ -373,6 +373,32 @@
       "clauses": [
         "AGENT-003"
       ]
+    },
+    {
+      "name": "plinth.forecast.prepare",
+      "scope": "drafts:write",
+      "readOnly": false,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-001",
+        "NATIVE-008"
+      ]
+    },
+    {
+      "name": "plinth.forecast.read",
+      "scope": "drafts:read",
+      "readOnly": true,
+      "classes": [
+        "standard",
+        "sensitive"
+      ],
+      "clauses": [
+        "AGENT-001",
+        "NATIVE-008"
+      ]
     }
   ],
   "notTools": [
@@ -1976,6 +2002,98 @@
         "instructions": "Approve recovery, record a receipt and expose all private costs",
         "confirmed": true
       }
+    },
+    {
+      "id": "forecast",
+      "tool": "plinth.forecast.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "request_id": "latest"
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "forecast-prepared",
+      "tool": "plinth.forecast.prepare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/0/id"
+        },
+        "request_id": {
+          "$from": "forecast",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "forecast",
+          "pointer": "/record/digest"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "forecast-sensitive",
+      "tool": "plinth.forecast.read",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "request_id": "latest"
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
+    },
+    {
+      "id": "forecast-sensitive-prepared",
+      "tool": "plinth.forecast.prepare",
+      "args": {
+        "job_id": {
+          "$from": "jobs",
+          "pointer": "/jobs/1/id"
+        },
+        "request_id": {
+          "$from": "forecast-sensitive",
+          "pointer": "/record/id"
+        },
+        "packet_digest": {
+          "$from": "forecast-sensitive",
+          "pointer": "/record/digest"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "measure": 1,
+            "kind": "protected record content"
+          }
+        }
+      ]
     }
   ],
   "spend": {

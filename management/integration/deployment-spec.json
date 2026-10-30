@@ -324,6 +324,12 @@
       "name": "202610292201_workbook_catalog.sql",
       "sha256": "527a35af5f740fac50c33a728d9a90037bb4387650f78646e6f6c96758632f0e",
       "sql": "ALTER TABLE pl_estimate_catalog ADD COLUMN import_group TEXT;\nALTER TABLE pl_estimate_catalog ADD COLUMN import_revision TEXT;\nCREATE INDEX pl_catalog_import_group ON pl_estimate_catalog(import_group);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202610292202_agent_forecast_reviews.sql",
+      "sha256": "04286d27a8f9191611afdf5fa96be188a4e2c269ea9764aaeeb081fb15037ddc",
+      "sql": "-- Reviewed forecast contents are portable history; execution authority is installation-local.\nCREATE TABLE pl_agent_forecast_reviews(\n request_id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n owner_id TEXT NOT NULL,\n digest TEXT NOT NULL\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

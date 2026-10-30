@@ -59,5 +59,19 @@ export function tools(env: Bindings):ToolDefinition[] {
  definitions.push(...learningTools(env))
  definitions.push(...answerTools(env))
  definitions.push(...recoveryEvidenceTools(env))
+ for(const readOnly of [true,false])definitions.push(defineTool({
+  name:'plinth.forecast.'+(readOnly?'read':'prepare'),title:readOnly?'Read reviewed forecast facts':'Prepare reviewed forecast proposal',description:'Consumes only the exact owner-reviewed forecast packet. Refuses changed sources and revoked requests; never approves economics or publishes dates.',scope:readOnly?'drafts:read':'drafts:write',readOnly,
+  inputSchema:{type:'object',properties:{job_id:id,request_id:id,packet_digest:{type:'string'},expected_version:{type:'integer',minimum:1}},required:['job_id','request_id',...(!readOnly?['packet_digest']:[])],additionalProperties:false},
+  outputSchema:{type:'object',properties:{record:{},version:{type:'integer'}},required:['record','version']},classes:['standard','sensitive'],clauses:['AGENT-001','NATIVE-008'],untrusted:true,
+  async classify(args,ctx){const value=await nativeCall(env,ctx.person,'jobs/'+encodeURIComponent(String(args.job_id))+'/agent-forecasts/'+encodeURIComponent(String(args.request_id)),'GET',undefined,ctx);return recordClasses(safe(value.packet))},
+  async revision(args,ctx){const value=await nativeCall(env,ctx.person,'jobs/'+encodeURIComponent(String(args.job_id))+'/agent-forecasts/'+encodeURIComponent(String(args.request_id)),'GET',undefined,ctx);return value.version as number},
+  summary(args){return {target:{id:String(args.request_id),name:'Owner-reviewed forecast request'},items:['Prepare proposed forecast only']}},
+  async run(args,ctx){const path='jobs/'+encodeURIComponent(String(args.job_id))+'/agent-forecasts/'+encodeURIComponent(String(args.request_id)),review=await nativeCall(env,ctx.person,path,'GET',undefined,ctx)
+   if(readOnly)return {result:{record:safe(review.packet),version:review.version}}
+   const value=await nativeCall(env,ctx.person,path+'/prepare','POST',{expected_version:args.expected_version??review.version,packet_digest:args.packet_digest},ctx)
+   ctx.emit('job.draft-prepared','plinth://jobs/'+String(args.job_id),{tool:'plinth.forecast.prepare',version:value.version})
+   return {result:{record:safe(value.record),version:value.version}}
+  },
+ }))
  return definitions
 }
