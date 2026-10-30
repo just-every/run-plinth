@@ -109,3 +109,10 @@ export function acceptedJobsSource(csv: string, declaration?: SourceDeclaration,
     }),
   } }
 }
+
+/** Workbook CSV uses the same strict quoting parser without accepted-job columns. */
+export function csvCells(csv: string): string[][] {
+  const parsed = cells(csv)
+  if (parsed.diagnostics.length) invalid(parsed.diagnostics[0].message)
+  return parsed.table.map(row => row.map(cell => cell.value))
+}
