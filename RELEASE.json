@@ -38,7 +38,8 @@
     "migrations/core/202610230200_roles.sql",
     "migrations/core/202610240100_base79.sql",
     "migrations/core/202610292201_workbook_catalog.sql",
-    "migrations/core/202610292202_closeout_cache.sql"
+    "migrations/core/202610292202_closeout_cache.sql",
+    "migrations/core/202610292203_agent_runs.sql"
   ],
   "breaking": false,
   "agentUpdateInstructions": "Install the exact source and locked dependencies, review the declared mail provider setup, and preserve applied migration bytes. No native release or tag is produced by this preparation."

@@ -3,6 +3,7 @@ import { answerTools } from './answers'
 import { defineTool, type ToolContext, type ToolDefinition, type JsonSchemaObject } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
 import { nativeCall, nativeVersion, safe } from './native'
+import { runTools } from './runs'
 import { learningTools } from './learning'
 import { recordClasses } from './classes'
 import { closeoutTools } from './closeout'
@@ -61,5 +62,6 @@ export function tools(env: Bindings):ToolDefinition[] {
  definitions.push(...answerTools(env))
  definitions.push(...recoveryEvidenceTools(env))
  definitions.push(...closeoutTools(env))
+ definitions.push(...runTools(env))
  return definitions
 }
