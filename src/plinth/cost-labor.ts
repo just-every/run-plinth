@@ -3,9 +3,8 @@ import { cents, find, need, object, recordApproval, stamp, sum, text, type Actor
 import { appendEntry, costCode, costDate, costs, digest, document, positive, period, type CostSource } from './cost-model'
 import { localDate } from './remittances'
 const rounded=(n:bigint,d:bigint)=>cents(Number((2n*n+d)/(2n*d)))
-export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,action?:string):Promise<CostSource>{
+export async function prepareCostSource(job:Job,actor:Actor,input:Input,by=stamp(actor),identity:string=crypto.randomUUID()):Promise<CostSource>{
  const state=costs(job)
- if(!id){
   need(input.kind==='time'||input.kind==='expense'||input.kind==='equipment','Choose time, expense or equipment')
   const kind=input.kind,reference=text(input.reference,'Source reference',200)
   need(!state.sources.some(s=>s.reference.toLowerCase()===reference.toLowerCase()),'Source reference already recorded',409,'cost_duplicate')
@@ -19,7 +18,13 @@ export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,ac
    amount_cents=sum([base,burden]);Object.assign(detail,{minutes,hour_cents,burden_bps,base_cents:base,burden_cents:burden})
   }
   if(input.warranty_cost_id!==undefined){need(kind==='expense','Only an expense can match an existing callback cost');const existing=(job.warranties?.cases??[]).flatMap(c=>c.costs).find(c=>c.id===input.warranty_cost_id);need(existing&&existing.amount_cents===amount_cents&&existing.cost_code===input.cost_code,'Callback cost amount and code must match exactly',409,'cost_callback');need(!state.sources.some(s=>s.detail.warranty_cost_id===existing.id),'Callback cost is already matched',409,'cost_duplicate');detail.warranty_cost_id=existing.id}
-  const row:CostSource={id:crypto.randomUUID(),kind,reference,...costDate(input),cost_code:costCode(job,input.cost_code),amount_cents,prepared_by:stamp(actor),detail,...(kind==='expense'?{document:await document(input.document)}:{})}
+  const row:CostSource={id:identity,kind,reference,...costDate(input),cost_code:costCode(job,input.cost_code),amount_cents,prepared_by:by,detail,...(kind==='expense'?{document:await document(input.document)}:{})}
+ return row
+}
+export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,action?:string):Promise<CostSource>{
+ const state=costs(job)
+ if(!id){
+  const row=await prepareCostSource(job,actor,input)
   state.sources.push(row);return row
  }
  const row=find(state.sources,id)
@@ -31,7 +36,7 @@ export async function sourceAction(job:Job,actor:Actor,input:Input,id?:string,ac
  need(!(state.policy?.separate_approval??true)||actor.id!==row.prepared_by.id,'A different authorized person must approve this source',403,'cost_separation')
  const posting_period=period(input.posting_period??row.period);requireOpenCostPeriod(job,posting_period)
  if(!row.detail.warranty_cost_id)appendEntry(job,actor,{source_id:row.id,source_line_id:row.id,source_kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,dated_on:row.dated_on,period:posting_period,matches:[]})
- row.posted_period=posting_period;row.approved_by=stamp(actor);recordApproval(job,actor,'cost.source.approve',{id:row.id,prepared_by:row.prepared_by},{id:row.id,kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,period:row.period,detail:row.detail,document_checksum:row.document?.checksum});return row
+ row.posted_period=posting_period;row.approved_by=stamp(actor);recordApproval(job,actor,'cost.source.approve',{id:row.id,prepared_by:row.prepared_by},{id:row.id,kind:row.kind,cost_code:row.cost_code,amount_cents:row.amount_cents,period:row.period,detail:row.detail,document_checksum:row.document?.checksum??state.workbook_imports?.find(i=>i.id===row.workbook_import_id)?.document.checksum});return row
 }
 /** Deliberately narrow documented CSV, not a provider export claim. Whole-file review is atomic. */
 export async function payrollAction(job:Job,actor:Actor,input:Input){

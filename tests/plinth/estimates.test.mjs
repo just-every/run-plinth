@@ -1,3 +1,4 @@
+import {catalogInput} from '../fixtures/workbook-estimate.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createFixture } from './helpers.mjs'
@@ -18,6 +19,16 @@ const csvRows = text => text.trim().split('\r\n').map(row => [...row.matchAll(/"
 test('EST-001 — exact coded multi-trade costs/sell, selected alternates, immutable revisions and reconciled exports', async () => {
  const f = await createFixture()
  try {
+  const sourceCsv='\ufeffid,description,code,phase,category,quantity,unit,rate_unit,unit_cents,cost_unit_cents\r\nsynthetic-plinth-trim,"Measured, trim",TRIM,Finish,material,18.125,inches,feet,1201,801\r\n'
+  const source={name:'synthetic-plinth-trim.csv',base64:Buffer.from(sourceCsv).toString('base64'),title:'CSV measured trim',client_email:['estimate-client','example.com'].join('@'),mapping:{sheet:'CSV',columns:{id:'A',description:'B',code:'C',phase:'D',category:'E',quantity:'F',unit:'G',rate_unit:'H',unit_cents:'I',cost_unit_cents:'J'},codes:{TRIM:'06-200'},units:{inches:'in',feet:'ft'},currency:'USD',duplicates:'reject'}}
+  const inspect=await f.json('/api/plinth/imports/workbook/inspect',{method:'POST',cookie:f.owner,body:source});assert.equal(inspect.status,200)
+  const workbookPreview=await f.json('/api/plinth/imports/workbook/preview',{method:'POST',cookie:f.owner,body:source});assert.equal(workbookPreview.status,200,JSON.stringify(workbookPreview.value));assert.equal(workbookPreview.value.canAdopt,true)
+  assert.equal(workbookPreview.value.draft.total_cents,1814);assert.equal(workbookPreview.value.draft.cost_total_cents,1210)
+  assert.equal((await f.json('/api/plinth/imports/workbook/commit',{method:'POST',cookie:f.owner,body:{...source,fingerprint:workbookPreview.value.fingerprint}})).status,200)
+  const imported=(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs.find(j=>j.name===source.title)
+  const importedReport=await f.json(`/api/plinth/jobs/${imported.id}/quotes/${imported.quotes[0].id}/cost-codes.json`,{cookie:f.owner});assert.equal(importedReport.status,200)
+  assert.equal(importedReport.value.total_cents,1814);assert.equal(importedReport.value.cost_total_cents,1210);{const conversion=importedReport.value.lines[0].conversion,[n,nd]=rational(conversion.numerator),[d,dd]=rational(conversion.denominator);assert.equal(n*dd*12n,d*nd)}
+  assert.equal(importedReport.value.lines[0].description,'Measured, trim');assert.equal(imported.import_evidence.provenance[0].cells.quantity.value,'18.125')
   const client = await f.invite('estimate-client@example.com'), foreign = await f.invite('other-estimate@example.com'), agent = await f.agent()
   let response = await f.json('/api/plinth/jobs', { method: 'POST', cookie: f.owner, body: { name: 'Measured kitchen and exterior remodel', client_email: 'estimate-client@example.com' } })
   assert.equal(response.status, 201); let job = response.value.job
@@ -138,8 +149,15 @@ test('EST-002 — dated vendor catalogs, waste/productivity assemblies and dimen
   const client=await f.invite('catalog-client@example.com'),agent=await f.agent()
   const post=(path,body,options={})=>f.json(path,{method:'POST',cookie:f.owner,body,...options})
   const catalog=async(kind,name,value)=>{const r=await post('/api/plinth/estimate-catalog',{kind,name,value,reason:'Estimator reviewed source rates and construction method'});assert.equal(r.status,201,JSON.stringify(r.value));return r.value.entry}
-  const material=await catalog('rate','Cascade drywall board',{vendor:'Cascade Supply',effective_on:'2026-10-01',unit:'square feet',cost_cents:125,sell_cents:200,reference:'Supplier quote CS-1042'})
-  const labor=await catalog('rate','Wall crew hourly',{vendor:'Northwest Interiors',effective_on:'2026-10-01',unit:'hour',cost_cents:6000,sell_cents:9000,reference:'Crew agreement NW-26'})
+  const ratesSource=catalogInput('synthetic-plinth-estimator-rates',[
+   ['synthetic-plinth-board','Cascade drywall board','BOARD','square feet','200','125','Cascade Supply','2026-10-01','Supplier quote CS-1042'],
+   ['synthetic-plinth-crew','Wall crew hourly','CREW','hour','9000','6000','Northwest Interiors','2026-10-01','Crew agreement NW-26'],
+  ]);ratesSource.mapping.codes={BOARD:'09-M',CREW:'09-L'};ratesSource.mapping.units={'square feet':'square feet',hour:'hour'}
+  const importedReview=await post('/api/plinth/imports/workbook/preview',ratesSource);assert.equal(importedReview.status,200,JSON.stringify(importedReview.value));assert.equal(importedReview.value.canAdopt,true)
+  const importedCommit=await post('/api/plinth/imports/workbook/commit',{...ratesSource,reviewed_at:importedReview.value.reviewed_at,fingerprint:importedReview.value.fingerprint});assert.equal(importedCommit.status,200,JSON.stringify(importedCommit.value))
+  const importedCatalog=await f.json('/api/plinth/estimate-catalog',{cookie:f.owner});assert.equal(importedCatalog.status,200)
+  const material=importedCatalog.value.entries.find(r=>r.name==='Cascade drywall board'),labor=importedCatalog.value.entries.find(r=>r.name==='Wall crew hourly')
+  assert.equal(material.revisions[0].import_evidence.provenance.cells.unit_cents.address,'E2');assert.equal(labor.revisions[0].import_evidence.provenance.cells.cost_unit_cents.address,'F3')
   const part=(id,rate_id,category,productivity,waste_percent)=>({id,rate_id,description:category==='labor'?'Hang and finish wall':'Drywall board',cost_code:category==='labor'?'09-L':'09-M',phase:'Interior walls',category,units_per_dimension:'1',productivity,waste_percent})
   const assembly=await catalog('assembly','Interior wall assembly',{unit:'square feet',parts:[part('board',material.id,'material','1','10'),part('crew',labor.id,'labor','40','0')]})
   const template=await catalog('template','Occupied remodel walls',{kind:'remodel',dimensions:{wall_area:'400'},items:[{id:'walls',assembly_id:assembly.id,dimension:'wall_area'}]})

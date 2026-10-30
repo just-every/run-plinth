@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Badge, Action, api, Form, money } from './shared'
+import { OpeningImport } from './opening-import'
+import { WorkbookImport } from './workbook-import'
 import { Page } from './shell'
 
 function download(name: string, body: BlobPart, type: string) {
@@ -21,7 +23,7 @@ function Coverage({ report }: { report: any }) {
 export function Imports({onChange}: {onChange: () => Promise<void>}) {
   const [csv, setCsv] = useState(''), [declaration, setDeclaration] = useState<any>(), [preview, setPreview] = useState<any>(), [coverage, setCoverage] = useState<any>(), [reports, setReports] = useState<Record<string, any>>({}), [jobs, setJobs] = useState<any[]>([]), [loaded,setLoaded] = useState(false)
   async function refresh() { const result = await api('/imports'); setJobs(result.jobs); setLoaded(true) }
-  return <Page title="Move in" lead="Bring accepted jobs in from a CSV. Review the dry run, approve the exact file, then inspect or undo its journal."><div className="split import-workspace">
+  return <Page title="Move in" lead="Review imported jobs and coded estimates before adopting inert drafts."><WorkbookImport onChange={async()=>{await refresh();await onChange()}}/><OpeningImport onChange={async()=>{await refresh();await onChange()}}/><div className="split import-workspace">
     <section className="card"><div className="card-head"><h2>Preview your file</h2><span className="muted">Accepted jobs CSV</span></div><p className="card-lead">Use the documented columns below. Imported jobs remain drafts until you confirm their source acceptance.</p><code className="csv-header">external_id,title,client_email,site_address,quote_cents,accepted_on</code><p className="muted">Money is whole USD cents; dates use YYYY-MM-DD. Maximum 100 rows. No accounts are created and no messages sent.</p>
       <Form submit="Dry run CSV" reset={false} action={async f => {
         setPreview(undefined); setCoverage(undefined)

@@ -1,0 +1,4 @@
+.workspace .workbook-import .check { display: flex; align-items: flex-start; gap: 10px; margin-block: 16px; }
+.workspace .workbook-import .check input { flex: none; width: auto; margin: 3px 0 0; }
+
+.workspace .opening-import .lines thead th { font-size: 13.5px; }
