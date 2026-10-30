@@ -377,11 +377,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal((await f.request(archivedQuestion.root,{method:'DELETE',cookie,body:{expected_version:questionCurrent.version}})).status,200)
     assert.equal((await f.request(archivedQuestion.root+'/agent-answers/'+savedQuestion.id,{cookie})).status,404)
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
-<<<<<<< HEAD
     assert.equal((await f.json('/api/plinth/jobs/'+recoveryArchive.c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:recoveryArchive.c.job.version}})).status,200)
-=======
     const openingCurrent=(await f.json('/api/plinth/jobs/'+openingCase.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+openingCase.job.id,{method:'DELETE',cookie,body:{expected_version:openingCurrent.version}})).status,200);const openingWithdrawn=await f.json('/api/plinth/imports/'+openingCommit.value.job.id+'/originals',{cookie});assert.equal(openingWithdrawn.status,200);assert.equal(openingWithdrawn.value.originals.length,2);assert.ok(openingWithdrawn.value.originals.every(o=>o.original.status==='unavailable'),'Both financial source originals are withdrawn before old archive replay is fenced')
->>>>>>> a6a7f4a (Complete reviewed opening downloads and erasure proof [skip ci])
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
