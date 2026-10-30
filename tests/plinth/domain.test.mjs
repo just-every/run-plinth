@@ -1,3 +1,4 @@
+import {submittalFixture} from './submittal-support.mjs'
 import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
@@ -933,6 +934,28 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   assert.equal((await f.request(root+'/submittals/files/'+first.attachments[0].id,{cookie:f.owner})).status,404)
   assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
  }finally{await f.close()}
+
+ const managed=await createFixture({mailProvider:'rer'})
+ try{
+  const s=await submittalFixture(managed,await createActiveJob(managed),{notify:true})
+  const messages=()=>managed.messages.filter(message=>message.to.includes(s.order.vendor_email))
+  assert.deepEqual(s.row.notices.map(n=>n.status),['accepted','accepted'],'Managed mail notifies the supplier of both rejected and approved reviews')
+  assert.equal(messages().length,2,'Each explicit owner send reaches the managed relay once')
+  for(const [index,disposition] of ['rejected','approved'].entries()){
+   const message=messages()[index],cycle=s.row.cycles[index],notice=s.row.notices[index]
+   assert.equal(message.wire.to,s.order.vendor_email);assert.equal(message.wire.messageKey,notice.id)
+   assert.equal(Object.hasOwn(message.wire,'replyTo'),false);assert.equal(Object.hasOwn(message.wire,'attachments'),false)
+   for(const term of [cycle.product_reference,cycle.decision.comment,'Disposition: '+disposition,...cycle.annotations.map(a=>a.text)])assert.ok(message.text.includes(term))
+   assert.ok(message.text.includes('managed mail does not attach files'))
+   assert.ok(message.text.includes('Contact the sender:'))
+   for(const file of cycle.attachments)assert.ok(message.text.includes(`${file.name} (${file.mime}, ${file.size} bytes; SHA-256 ${file.checksum})`))
+   const original=await managed.request('/api/plinth/jobs/'+s.job.id+'/submittals/files/'+cycle.attachments[0].id,{cookie:managed.owner})
+   assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),index===0?s.original:s.revised)
+  }
+  const before=messages().length,cycle=s.row.cycles[1]
+  const replay=await managed.json('/api/plinth/jobs/'+s.job.id+'/submittals/'+s.row.id+'/notify',{method:'POST',cookie:managed.owner,body:{expected_version:s.job.version,cycle_id:cycle.id,product_reference:cycle.product_reference,to:s.order.vendor_email,confirm:true}})
+  assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved');assert.equal(messages().length,before)
+ }finally{await managed.close()}
 })
 
 test('Owner follow-up previews retain revisions, respect current consent and authority, and stop resolved work without side effects',async()=>{

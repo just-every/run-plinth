@@ -30,8 +30,12 @@ An existing issued commitment cannot acquire a retroactive review requirement.
 Submittal review sends no automatic supplier notice. Prepare the PO with its
 supplier email, then open **Notify supplier of this review** on the current
 completed cycle. The signed-in owner explicitly authorizes sending the
-reviewed originals as attachments together with the exact product version,
-disposition, comments, annotations and specified-scope deviations. The notice
+exact product version, disposition, comments, annotations and specified-scope
+deviations. Providers supporting attachments include the reviewed originals.
+RER managed mail instead identifies each retained original by filename, media
+type, byte size and SHA-256 checksum, and names the sender’s contact address
+in the body. It does not attach files or grant supplier access to the office
+register. The notice
 does not issue a PO or release procurement. Other recipients, older cycles,
 unreviewed packages, changed commitment terms, revoked reviewers and suppressed mailboxes are refused.
 Use an authorized alternative channel for a suppressed mailbox.

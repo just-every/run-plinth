@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "c20fd00fa814068e48b0a34cf2ff08a210db94a62abf5f87ae93368f755ca1ab",
+      "sha256": "cdf5eaeaa99cfa21a0343856cfc9392c0d9e1ddc6b22a4477544886b6f84343a",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "e7f3c41a475a40080a276877071f4689e4e5271f540f5d73be53a0fa3aa6d77e",
+      "sha256": "44d7727cb616438dc5da8d0600f12b2bfe4da9d55002cd84d1f6cf9589701643",
       "executable": false
     },
     "DEMO.md": {
@@ -173,7 +173,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "304e8bf3f0a98cac0a0722e870be219c84f962ce9ef3aa5cd6a81535ba0a1b30",
+      "sha256": "a9f89cdc542c451e19509bf975267c4168e311b4212d0ac34343a91d66087b29",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -277,7 +277,7 @@
       "executable": false
     },
     "docs/SUBMITTALS.md": {
-      "sha256": "5784d8e6b4609f19fe9de31079fc74a8598df2e4624088a0b97f6531ec58bce7",
+      "sha256": "cdf44d20d55c1fe4c452e6f0c856a64bfac78a2e5663616d9f12e34ac05df5b7",
       "executable": false
     },
     "docs/WARRANTY-SERVICE.md": {
@@ -4085,7 +4085,7 @@
       "executable": false
     },
     "src/plinth/submittal-notice.ts": {
-      "sha256": "38aa714758220b05b224b1701075e2bf23fb5a4881089c6759ba63428007116f",
+      "sha256": "e76dc530400cfdfa02047d79ca9aef93711197f8d1158424d122039c58c5a267",
       "executable": false
     },
     "src/plinth/submittals.ts": {
@@ -4957,7 +4957,7 @@
       "executable": false
     },
     "src/ui/submittals.tsx": {
-      "sha256": "ce842fbe09e59c898105f12bfb8ab69c992c9038ec6d6006cb075e0b178e7421",
+      "sha256": "e39229c5a8dae82ad4116253e8a3a54b5582affeb54c5e9ec072fb043dfbb1f8",
       "executable": false
     },
     "src/ui/takeoff-forms.tsx": {
@@ -5437,7 +5437,7 @@
       "executable": false
     },
     "tests/plinth/domain.test.mjs": {
-      "sha256": "2904846254790d62f55a237fd7ab326297d78f3fc3f6f5cb13e3a6b61c9194c6",
+      "sha256": "0f2394ba17dec4c34c0e86461413a1503f56c11c46a4768f0f05b5c8630abdb7",
       "executable": false
     },
     "tests/plinth/drawing-review-support.mjs": {
@@ -5453,7 +5453,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "d55f6e5733e97bc7bb785b002d9ec991bf54cf3e8d6a815ccaff5ce31e50f5a5",
+      "sha256": "c101b7edc517f79bd98dabbf7d5d3836d0c35ff639a88553f37505036106496d",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
