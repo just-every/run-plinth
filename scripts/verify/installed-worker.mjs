@@ -1,12 +1,12 @@
 import { createServer } from 'node:net'
 import { readFile, readdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
 import { unstable_splitSqlQuery } from 'wrangler'
 import { diagnostic } from './diagnostics.mjs'
 
 // The same emitted entry and assets deployed by rer build; never the API-only test entry.
-export async function installedWorker(outboundService, { now } = {}) {
+export async function installedWorker(outboundService, { now, persistTo } = {}) {
  const socket = createServer()
  await new Promise((resolve, reject) => { socket.once('error', reject); socket.listen(0, '127.0.0.1', resolve) })
  const port = socket.address().port
@@ -19,17 +19,17 @@ export async function installedWorker(outboundService, { now } = {}) {
   STRIPE_SECRET_KEY: 'synthetic-plinth-4', STRIPE_WEBHOOK_SECRET: 'synthetic-plinth-webhook-secret-1',
  }
  const errors = []
- const mf = new Miniflare(convertV4MiniflareOptions({
+ const mf = new Miniflare({...convertV4MiniflareOptions({
   host: '127.0.0.1', port, unsafeTriggerHandlers: true, modulesRoot: resolve('dist/server'),
   modules: [...(now === undefined ? [] : [{ type: 'ESModule', path: resolve('dist/server/pinned-clock.mjs'), contents: `import worker from './index.js'; const NativeDate=Date; globalThis.Date=class extends NativeDate { constructor(...args){super(...(args.length?args:[${Number(now)}]))} static now(){return ${Number(now)}} }; export default worker;` }]), { type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
   compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
-  d1Databases: ['DB'], bindings, outboundService,
+  d1Databases: persistTo?{DB:'local-foundation-only'}:['DB'], ...(persistTo?{d1Persist:join(persistTo,'.wrangler/state/v3/d1')}:{}), bindings, outboundService,
   assets: { directory: resolve('dist/client'), binding: 'ASSETS', run_worker_first: true, routerConfig: { has_user_worker: true } },
   handleUncaughtError: error => { errors.push(diagnostic(error.stack ?? error, bindings)); if (errors.length > 5) errors.shift() },
- }))
+ }),...(persistTo?{resourcePersistencePath:join(persistTo,'.wrangler/state/v3')}:{})})
  try {
   const db = await mf.getD1Database('DB')
-  for (const file of (await readdir('migrations/core')).filter(file => file.endsWith('.sql')).sort()) {
+  if(!persistTo)for (const file of (await readdir('migrations/core')).filter(file => file.endsWith('.sql')).sort()) {
    const statements = unstable_splitSqlQuery(await readFile('migrations/core/' + file, 'utf8')).filter(sql => sql.replace(/--[^\n]*/g, '').trim())
    if (statements.length) await db.batch(statements.map(sql => db.prepare(sql)))
   }
