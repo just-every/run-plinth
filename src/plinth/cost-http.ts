@@ -1,3 +1,4 @@
+import {openingCsv} from './opening-export'
 import { accountingRead, accountingWrite, nativePeriodClose } from './accounting-authority'
 import { costAccess, costLedgerVisible, drawPacket, costCapabilities } from './cost-access'
 import { cashReport, periodAction } from './cost-periods'
@@ -30,6 +31,7 @@ export async function costResponse(request:Request,original:Bindings):Promise<Re
   if(!m[2]||m[2]==='ledger'&&!m[3]){const report=costLedger(previous),code=new URL(request.url).searchParams.get('code');return json(code?{...report,rows:report.rows.filter(r=>r.cost_code===code)}:report)}
   if(m[2]==='bills'&&m[3]&&m[4]==='original'){const d=find(costs(previous).bills,m[3]).document;await env.DB.batch([auditStatement(env.DB,actor,{kind:'export',action:'cost.bill.original',job_id:previous.id,subject_kind:'cost_bill',subject_id:m[3],detail:{checksum:d.checksum}})]);return new Response(Uint8Array.from(atob(d.base64),c=>c.charCodeAt(0)),{headers:{...headers,'content-type':d.mime,'content-disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(d.name),'content-security-policy':"default-src 'none'; sandbox",'x-content-sha256':d.checksum}})}
   if(m[2]==='cash'&&!m[3])return json(cashReport(previous,Object.fromEntries(new URL(request.url).searchParams)))
+  if(m[2]==='opening.csv'&&!m[3]){const opening=costs(previous).opening;need(opening,'No adopted opening balance exists',404,'not_found');return new Response(openingCsv(opening),{headers:{...headers,'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename=opening-balances.csv'}})}
   if(m[2]==='periods'&&!m[3])return json({periods:costs(previous).periods??[]})
   if(m[2]==='records'&&!m[3])return json(await costRecords(env.DB,previous))
   if(m[2]==='views'&&!m[3])return json({views:(costs(previous).views??[]).filter(v=>v.sharing==='shared'||v.created_by===actor.id)})
