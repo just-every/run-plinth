@@ -1,4 +1,5 @@
 import { proveQuestionAnswers } from './agent-answers-support.mjs'
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
@@ -12,6 +13,21 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
  const path=(suffix='')=>`/api/plinth/jobs/${job.id}${suffix}`
  const mutate=async(suffix,body={},credentials={cookie:f.owner})=>f.json(path(suffix),{method:'POST',...credentials,body:{expected_version:job.version,...body}})
  await t.test('private transport, matching client scope and credential authority',async()=>{
+  const reused=await reusedAssemblyEstimate(f)
+  const inventory=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(inventory.status,200);assert.match(inventory.headers.get('content-disposition'),/attachment/)
+  const manifest=await inventory.json();assert.ok(manifest.records.some(row=>row.kind==='pl_jobs'));assert.ok(manifest.records.some(row=>row.kind==='revision-reference'));assert.ok(manifest.exclusions.length)
+  assert.equal(new Set(manifest.records.map(row=>row.identity)).size,manifest.records.length,'Repeated catalog references retain unique inventory locations')
+  assert.equal(manifest.records.filter(row=>row.kind==='revision-reference'&&row.identity.includes('/assemblies/')&&row.identity.endsWith(encodeURIComponent(reused.assembly.id))).length,4,'Both room assembly references and their immutable approval snapshots remain in the inventory')
+  const admin=await f.invite(['synthetic-plinth-admin','example.com'].join('@'),'Synthetic administrator','admin')
+  const snapshot=(await f.json(path(),{cookie:f.owner})).value.job,mailCount=f.messages.length
+  const same=await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest}});assert.equal(same.status,200);assert.equal(same.value.matches,true)
+  const changed=structuredClone(manifest),record=changed.records.find(row=>row.kind==='pl_jobs');record.sha256='0'.repeat(64);changed.records.splice(changed.records.findIndex(row=>row.kind==='revision-reference'),1);changed.records.push({kind:'pl_jobs',identity:'synthetic-plinth-missing',sha256:'1'.repeat(64)})
+  changed.controls[0].issued_gross_cents++
+  const comparison=await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest:changed}});assert.equal(comparison.status,200);assert.equal(comparison.value.matches,false);assert.ok(comparison.value.records.mismatched.includes(record.identity));assert.deepEqual(comparison.value.records.missing,['synthetic-plinth-missing']);assert.equal(comparison.value.records.extra.length,1);assert.equal(comparison.value.control_totals.match,false)
+  for(const credentials of [{cookie:client},{cookie:other},{cookie:admin},{token:agent},{}]){assert.ok([401,403].includes((await f.request('/api/plinth/recovery/manifest.json',credentials)).status));assert.ok([401,403].includes((await f.request('/api/plinth/recovery/reconcile',{...credentials,method:'POST',body:{manifest}})).status))}
+  const invalid=structuredClone(manifest);invalid.records.push(invalid.records[0]);assert.equal((await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest:invalid}})).status,400)
+  assert.deepEqual((await f.json(path(),{cookie:f.owner})).value.job,snapshot);assert.equal(f.messages.length,mailCount);assert.deepEqual((await f.json('/api/plinth/recovery/manifest.json',{cookie:f.owner})).value,manifest)
+
   assert.equal((await f.request('/api/plinth/jobs')).status,401)
   assert.equal((await f.request(path(),{cookie:other})).status,404)
   const listing=await f.json('/api/plinth/jobs',{cookie:other});assert.equal(listing.value.jobs.length,0)
@@ -70,7 +86,7 @@ test('Plinth residential job lifecycle through authenticated HTTP',async t=>{
   const photo=job.diary[0];const response=await f.request(path(),{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(response.status,200)
   assert.equal((await f.request(path(),{cookie:f.owner})).status,404)
   assert.equal((await f.request(path(`/diary/${photo.id}/attachments/${photo.attachments[0].id}`),{cookie:f.owner})).status,404)
-  const credentials=await f.json('/api/plinth/agent-credentials',{cookie:f.owner});for(const credential of credentials.value.credentials){assert.equal((await f.request(`/api/plinth/agent-credentials/${credential.id}/revoke`,{method:'POST',cookie:f.owner,body:{}})).status,200)}assert.equal((await f.request('/api/plinth/jobs',{token:agent})).status,401)
+  const credentials=await f.json('/api/plinth/agent-credentials',{cookie:f.owner});for(const credential of credentials.value.credentials){assert.equal((await f.request(`/api/plinth/agent-credentials/${credential.id}/revoke`,{method:'POST',cookie:f.owner,body:{}})).status,200)}assert.equal((await f.request('/api/plinth/jobs',{token:agent})).status,401);assert.equal((await f.request('/api/plinth/recovery/manifest.json',{token:agent})).status,401)
   const signout=await f.request('/auth/signout',{method:'POST',cookie:f.owner,body:{}});assert.equal(signout.status,204);assert.equal((await f.request('/api/plinth/jobs',{cookie:f.owner})).status,401)
  })
  }finally{await f.close()}

@@ -1,4 +1,5 @@
 import { questionFixture } from './agent-answers-support.mjs'
+import {reusedAssemblyEstimate} from '../fixtures/recovery-catalog.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import {openingJob} from './opening-support.mjs'
 import {openingInput} from '../fixtures/workbook-opening.mjs'
@@ -248,11 +249,20 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archivedRoom=structuredClone(job.room_boards[0])
     const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),recoveryArchive=await recoveryEvidenceFixture(f)
     await recoveryArchive.assess();const archivedRecovery=structuredClone(recoveryArchive.recovery)
+    await reusedAssemblyEstimate(f)
     const archivedExport=await archiveExportWork(f,job)
     const archivedQuestion=await questionFixture(f)
     const retainedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/answers',{packet_digest:archivedQuestion.packet.digest,analysis:archivedQuestion.analysis})
     const linkedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/prepare',{packet_digest:archivedQuestion.packet.digest,answer_id:retainedAnswer.record.id,input:{kind:'diary',date:'2026-10-28',note:'Retained unresolved completion review'}})
     const savedQuestion=(await f.json(archivedQuestion.root+'/agent-answers/'+archivedQuestion.packet.id,{cookie:f.owner})).value.record
+    const sourceManifestResponse=await f.request('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(sourceManifestResponse.status,200)
+    const sourceManifest=await sourceManifestResponse.json()
+    assert.ok(!sourceManifest.tables.some(row=>row.name==='pl_recovery_evidence_grants'),'Installation-local recovery review grants remain outside the semantic inventory')
+    assert.ok(!sourceManifest.tables.some(table=>table.name==='pl_learning_consents'),'Recovery comparison excludes nonportable agent-learning consent')
+    const control=sourceManifest.controls.find(row=>row.currency==='USD')
+    assert.equal(control.issued_invoices,3);assert.equal(openingLedger.totals.posted_actual_cents,28000,'Reviewed opening costs remain in the recovered inventory');assert.equal(control.posted_cost_cents,74500+6000+9000+28000);assert.equal(control.receipts_cents,5500);assert.equal(control.deposit_applications_cents,4000);assert.equal(control.write_offs_cents,1000);assert.equal(control.corrections_cents,-2500)
+    assert.ok(sourceManifest.files.some(file=>file.sha256===archivedRoom.revisions[0].files[0].checksum&&file.size===roomFiles()[0].bytes.length),'Inventory measures actual original bytes independently')
+    assert.ok(sourceManifest.files.every(file=>file.verified),'Every retained original agrees with its stored checksum and size')
     const cookie=f.owner; await f.close();f=undefined
     const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -319,7 +329,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.equal(recoveredPortalJob.orders.find(o=>o.id===archivedSubmittal.order.id).submittal_release.cycle_id,archivedSubmittal.row.cycles[1].id)
     assert.deepEqual(recoveredPortalJob.meetings,job.meetings,'DOC-005 private meeting, assigned completion and immutable work snapshot survive CLI recovery');assert.deepEqual(recoveredPortalJob.meeting_shares,originalRows.filter(r=>r.table==='pl_jobs'&&r.row.id===job.id).map(r=>JSON.parse(r.row.data).meeting_shares)[0],'DOC-005 extracts and prior recipient consent survive privately while pending delivery remains inert')
     for(const table of ['pl_mail_messages','pl_mail_files','pl_mail_originals','pl_decision_metadata','pl_file_transcriptions']){const records=records=>records.filter(r=>r.table===table&&r.row.job_id===job.id);assert.ok(records(originalRows).length>0);assert.deepEqual(records(restoredRows),records(originalRows),'DOC-005 private original email, file bytes, checksums and annotations survive recovery')}
-    const recoveredSearch=await createFixture({persistTo:destination,ownerCookie:cookie});try{assert.equal((await recoveredSearch.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@')}})).status,202);const confirmation=new URL(recoveredSearch.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(value=>new URL(value).pathname==='/auth/confirm'));const signedIn=await recoveredSearch.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);const receivingCookie=signedIn.headers.get('set-cookie').split(';')[0];await proveRecoveredWork(recoveredSearch,receivingCookie,archivedExport);
+    const recoveredSearch=await createFixture({persistTo:destination,ownerCookie:cookie});try{assert.equal((await recoveredSearch.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@')}})).status,202);const confirmation=new URL(recoveredSearch.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(value=>new URL(value).pathname==='/auth/confirm'));const signedIn=await recoveredSearch.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);const receivingCookie=signedIn.headers.get('set-cookie').split(';')[0];const restoredManifest=await recoveredSearch.json('/api/plinth/recovery/manifest.json',{cookie:receivingCookie});assert.equal(restoredManifest.status,200);assert.deepEqual(restoredManifest.value.controls,sourceManifest.controls);assert.deepEqual(restoredManifest.value.files,sourceManifest.files);const recoveryComparison=await recoveredSearch.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:receivingCookie,body:{manifest:sourceManifest}});assert.equal(recoveryComparison.status,200);assert.equal(recoveryComparison.value.matches,true,JSON.stringify(recoveryComparison.value));await proveRecoveredWork(recoveredSearch,receivingCookie,archivedExport);
       const recoveryRoot='/api/plinth/jobs/'+recoveryArchive.c.job.id+'/recovery-evidence',history=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id,{cookie:receivingCookie});assert.equal(history.status,200);assert.deepEqual(history.value.case,archivedRecovery)
       const recoveredVersion=history.value.version,recoveredObservation={...recoveryArchive.observation(),expected_version:recoveredVersion}
       assert.equal((await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:recoveredObservation})).value.error,'recovery_review_required','An archive restores history but never its source review grant')
@@ -379,6 +389,9 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const erasedResponse=await f.request(`/api/plinth/jobs/${costJobId}`,{method:'DELETE',cookie,body:{expected_version:costCurrent.version}});assert.equal(erasedResponse.status,200)
     assert.equal((await f.json('/api/plinth/jobs/'+recoveryArchive.c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:recoveryArchive.c.job.version}})).status,200)
     const openingCurrent=(await f.json('/api/plinth/jobs/'+openingCase.job.id,{cookie})).value.job;assert.equal((await f.request('/api/plinth/jobs/'+openingCase.job.id,{method:'DELETE',cookie,body:{expected_version:openingCurrent.version}})).status,200);const openingWithdrawn=await f.json('/api/plinth/imports/'+openingCommit.value.job.id+'/originals',{cookie});assert.equal(openingWithdrawn.status,200);assert.equal(openingWithdrawn.value.originals.length,2);assert.ok(openingWithdrawn.value.originals.every(o=>o.original.status==='unavailable'),'Both financial source originals are withdrawn before old archive replay is fenced')
+    const afterErasureManifest=await f.json('/api/plinth/recovery/manifest.json',{cookie:f.owner});assert.equal(afterErasureManifest.status,200)
+    const erasedComparison=await f.json('/api/plinth/recovery/reconcile',{method:'POST',cookie:f.owner,body:{manifest:sourceManifest}});assert.equal(erasedComparison.status,200);assert.equal(erasedComparison.value.matches,false);assert.ok(erasedComparison.value.records.missing.some(identity=>identity.includes(job.id)));assert.ok(!afterErasureManifest.value.records.some(row=>row.kind==='pl_jobs'&&row.identity.includes(job.id)));assert.ok(erasedComparison.value.files.missing.length)
+    assert.equal((await f.request('/api/plinth/jobs/'+job.id,{cookie:f.owner})).status,404,'Comparing the old manifest cannot restore erased records')
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
