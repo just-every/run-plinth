@@ -3,7 +3,7 @@ import { fail, type Draft } from './types'
 import { attr, elements, parseXml } from './xml'
 import { ZIP_LIMITS } from './zip-directory'
 
-export type Relation = { id: string; kind: string; target: string; external: boolean }
+export type Relation = { id: string; type: string; kind: string; target: string; external: boolean }
 const relationshipNamespace = 'http://schemas.openxmlformats.org/package/2006/relationships'
 
 function targetPath(part: string, target: string) {
@@ -51,7 +51,7 @@ export class OfficePackage {
     const target = external ? '' : targetPath(part, attr(element, 'Target'))
     if (!external && !this.archive.has(target)) fail('an internal relationship target is missing.')
     if (external) this.draft.notes.add('External links were not followed. Linked files and linked pictures were not read.')
-    result.set(id, { id, kind, target, external })
+    result.set(id, { id, type, kind, target, external })
    }
    return result
   })()

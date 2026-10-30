@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createActiveJob, createFixture, setPortalFeatures } from './helpers.mjs'
+import { spreadsheetDocument, threadedRecords } from '../fixtures/spreadsheet-document.mjs'
 import { searchDocument } from '../fixtures/search-document.mjs'
 
 import { imageDocument, protectedDocument, unsupportedDocument, png } from '../fixtures/unextractable-documents.mjs'
@@ -28,6 +29,7 @@ test('Supplied attachment text requires exact human review and current source au
    { bytes: protectedDocument, mime: 'application/pdf', status: 'failed', term: 'synthetic-plinth-protected-9101' },
    { bytes: unsupportedDocument, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', status: 'unsupported', term: 'synthetic-plinth-docx-9102' },
    { bytes: Buffer.concat([Buffer.from([255]), Buffer.from('synthetic-plinth-invalid-9103\n' + 'Reviewed façade clearance. '.repeat(90) + '\nsynthetic-plinth-end-3')]), mime: 'text/plain', status: 'failed', term: 'synthetic-plinth-invalid-9103' },
+   { bytes: await spreadsheetDocument(png), mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', status: 'unsupported', term: 'synthetic-plinth-thread-root-9310', text: threadedRecords.map(row => [row.sheet, row.cell, row.id, row.parent || 'root', row.author, row.person, row.date, row.text].join(' | ')).join('\n') },
    { bytes: searchDocument([...Array.from({ length: 200 }, () => 'synthetic-plinth-9008'), 'synthetic-plinth-limited-9104']), mime: 'application/pdf', status: 'limited', term: 'synthetic-plinth-limited-9104' },
   ]
   const before = f.messages.length
@@ -38,8 +40,13 @@ test('Supplied attachment text requires exact human review and current source au
    assert.equal([message.subject, message.body, ...message.files.map(file => file.name)].some(value => value.includes(variant.term)), false, 'The original-content term is absent from the filename and message')
    const hit = (await search({ source })).value.results[0]
    assert.equal(hit.extraction.status, variant.status); assert.equal(hit.file_checksum, createHash('sha256').update(variant.bytes).digest('hex'))
-   const text = index === 3 ? variant.bytes.subarray(1).toString('utf8') : variant.term
+   const text = variant.text ?? (index === 3 ? variant.bytes.subarray(1).toString('utf8') : variant.term)
    assert.equal((await search({ q: variant.term })).value.count, 0)
+   if (variant.text) {
+    const other = await createActiveJob(f, 'synthetic-plinth-9320')
+    const cross = await api('/jobs/' + other.id + '/decision-search/transcription-preview', {method:'POST',body:{source,checksum:hit.file_checksum,expected_version:other.version,text}})
+    assert.equal(cross.status,404,'A captured threaded original cannot be reviewed in another job')
+   }
    const review = await preview(hit, text, index === 1 ? admin : f.owner); assert.equal(review.status, 200, JSON.stringify(review.value)); assert.equal(review.value.text, text)
    assert.equal((await inspect(source)).value.revisions.length, 0, 'Preview writes no transcription')
    assert.equal((await save(review.value, index === 1 ? admin : f.owner, { confirm: false })).status, 409)
