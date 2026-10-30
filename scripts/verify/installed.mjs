@@ -64,7 +64,7 @@ try {
  await client.storageState({ path: clientState })
  await browser.close(); browser = undefined
  console.log(`Installed ${name}: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic`)
- for(const journeyName of name==='plans'?['plans','submittals','drawing-review','room-boards']:name==='office'?['estimates','invoices']:[name]){
+ for(const journeyName of name==='plans'?['plans','submittals','drawing-review','room-boards','recovery-reconciliation']:name==='office'?['estimates','invoices']:[name]){
  journey = spawn(process.execPath, [`tests/journeys/${journeyName}.mjs`], { env: process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
  // Assertion stacks must never disclose a native confirmation URL or token.
  const redact = line => line.replace(/https?:\/\/[^\s"'<>]*\/auth\/confirm[^\s"'<>]*/g, '[native confirmation withheld]').replace(/(?:pi|seti)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+/g, '[provider secret withheld]')
