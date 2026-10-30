@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "86c8b3e04914d7d71fe8a0b49d0e0188032a8b3ed69b59cff15b4cce2f88b95e",
+      "sha256": "5ebc79ea768fe1cacddc43460d49ce736fba30b1da395ae05cade6109f280cf5",
       "executable": false
     },
     "DEMO.md": {
@@ -277,7 +277,7 @@
       "executable": false
     },
     "docs/SUBMITTALS.md": {
-      "sha256": "9a9a35413911a8f7021e98c1d6580fe4146bb77a67406f9a261a4e31e37425b9",
+      "sha256": "5784d8e6b4609f19fe9de31079fc74a8598df2e4624088a0b97f6531ec58bce7",
       "executable": false
     },
     "docs/WARRANTY-SERVICE.md": {
@@ -4093,7 +4093,7 @@
       "executable": false
     },
     "src/plinth/submittal-notice.ts": {
-      "sha256": "909028c2fd995f45665ef7108e5c6f2e7978383af9d593a34a05d872cdaba38b",
+      "sha256": "38aa714758220b05b224b1701075e2bf23fb5a4881089c6759ba63428007116f",
       "executable": false
     },
     "src/plinth/submittals.ts": {
@@ -5561,7 +5561,7 @@
       "executable": false
     },
     "tests/plinth/purchase-orders.test.mjs": {
-      "sha256": "e43304d2dd9a588439a3af14d39c9dd32a67305fa42fd27cecc87f26f01f913f",
+      "sha256": "9bfb2337ec4d476f4ee6fe53d221261d49fa892835796f12c6100d2381ae6cb1",
       "executable": false
     },
     "tests/plinth/recovery-evidence-support.mjs": {
