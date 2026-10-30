@@ -1,4 +1,5 @@
 import { questionFixture } from './agent-answers-support.mjs'
+import {closeoutFixture,closeoutMcp} from './closeout-support.mjs'
 import {archiveExportWork,proveRecoveredWork} from './background-recovery-support.mjs'
 import {openingJob} from './opening-support.mjs'
 import {openingInput} from '../fixtures/workbook-opening.mjs'
@@ -253,6 +254,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const retainedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/answers',{packet_digest:archivedQuestion.packet.digest,analysis:archivedQuestion.analysis})
     const linkedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/prepare',{packet_digest:archivedQuestion.packet.digest,answer_id:retainedAnswer.record.id,input:{kind:'diary',date:'2026-10-28',note:'Retained unresolved completion review'}})
     const savedQuestion=(await f.json(archivedQuestion.root+'/agent-answers/'+archivedQuestion.packet.id,{cookie:f.owner})).value.record
+    const closeout=await closeoutFixture(f,job),closeoutPacket=await closeout.capture()
+    await closeout.review(closeoutPacket)
+    const closeoutDraft=await closeout.ok('/agent-closeout/'+closeoutPacket.id+'/drafts',closeout.draft(closeoutPacket))
+    const archivedCloseout=(await closeout.list()).value.packets;job=await closeout.read()
     const cookie=f.owner; await f.close();f=undefined
     const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
@@ -309,6 +314,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.deepEqual(recoveredQuestion.agent_answers,[savedQuestion],'Reviewed question sources, citations, separated answers and the once-only draft link survive real CLI recovery')
     assert.equal(recoveredQuestion.diary.find(d=>d.id===linkedAnswer.record.draft.id).status,'draft','Recovery cannot publish a question-derived log')
     const recoveredPortalJob=JSON.parse(recoveredJob.row.data)
+    assert.deepEqual(recoveredPortalJob.agent_closeout,archivedCloseout,'Exact closeout packets, original source references, review attribution and unsent history survive CLI recovery')
     assert.deepEqual(recoveredPortalJob.room_boards,[archivedRoom],'Room measurements, immutable revisions and pinned product snapshots survive CLI recovery')
     for(const original of roomFiles()){
       const file=archivedRoom.revisions[0].files.find(f=>f.name===original.name),beforeFile=originalRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id),afterFile=restoredRows.find(r=>r.table==='pl_attachments'&&r.row.id===file.id)
@@ -326,6 +332,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const evidenceReview=await recoveredSearch.json(recoveryRoot+'/preview',{method:'POST',cookie:receivingCookie,body:{case_id:archivedRecovery.id,expected_version:recoveredVersion}});assert.equal(evidenceReview.status,200)
       const consent=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/review',{method:'POST',cookie:receivingCookie,body:{expected_version:recoveredVersion,digest:evidenceReview.value.digest,confirm:true}});assert.equal(consent.status,200)
       const fresh=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:{...recoveredObservation,expected_version:consent.value.version,packet_id:consent.value.record.id,observation_id:'synthetic-plinth-restored-observation'}});assert.equal(fresh.status,200);assert.equal(fresh.value.record.comparison.overall_restoration,'unverified');
+      const closeoutRoot='/api/plinth/jobs/'+job.id+'/agent-closeout';const restoredCloseout=await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie});assert.deepEqual(restoredCloseout.value.packets,archivedCloseout);const refusedCloseout=await recoveredSearch.json(closeoutRoot+'/'+closeoutPacket.id+'/drafts',{method:'POST',cookie:receivingCookie,body:{expected_version:restoredCloseout.value.version,...closeout.draft(closeoutPacket),request_id:'synthetic-plinth-restored-draft'}});assert.equal(refusedCloseout.status,409,'Restored review consent cannot authorize new drafting');assert.equal(refusedCloseout.value.error,'closeout_authority');assert.deepEqual((await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie})).value.packets[0].drafts,[closeoutDraft]);
       const recoveredCoverage=await recoveredSearch.json('/api/plinth/imports/'+importId+'/coverage',{cookie:receivingCookie});
       assert.equal(recoveredCoverage.status,200,JSON.stringify(recoveredCoverage.value));
       assert.deepEqual(recoveredCoverage.value.coverage,sourceCoverage.value.coverage,'Source declarations, row locations, mapping revision, digest and actual dispositions survive a real CLI round trip');
