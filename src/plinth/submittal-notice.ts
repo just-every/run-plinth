@@ -33,6 +33,7 @@ export async function sendSubmittalNotice(env: Bindings, previous: Job, actor: A
  need(!(row.notices ?? []).some(n => n.cycle_id === cycle.id && n.status !== 'refused' && n.status !== 'development'), 'This cycle already has a send attempt; reconcile the recorded outcome without resending', 409, 'mail_reserved')
  const sender = operatorMail(env)
  need(sender && env.MAIL_FROM, 'Supplier mail is not configured; nothing was sent', 409, 'mail_unconfigured')
+ const managed = env.MAIL_PROVIDER === 'rer'
  const attachments = []
  for (const file of cycle.attachments) {
   const original = await decisionDownload(env.DB, previous, cycle.attachments, file.id)
@@ -40,7 +41,7 @@ export async function sendSubmittalNotice(env: Bindings, previous: Job, actor: A
  }
  const outcomeName = cycle.decision!.disposition.replaceAll('_', ' ')
  const subject = `Submittal ${outcomeName}: ${row.title} (cycle ${cycle.revision})`
- const body = [previous.name, `Supplier: ${order.supplier}`, `Commitment: ${order.description}`, `Vendor product: ${cycle.product_reference}`, `Required review date: ${cycle.required_on}`, `Specified scope: ${cycle.specified_scope}`, `Deviation: ${cycle.deviation || 'None declared'}`, `Disposition: ${outcomeName}`, `Reviewer: ${cycle.decision!.by.name}`, `Review comments: ${cycle.decision!.comment}`, ...cycle.annotations.map(a => `Annotation on ${find(cycle.attachments, a.file_id).name}, page ${a.page}: ${a.text} (${a.by.name})`), '', 'The exact reviewed originals are attached. This notice does not issue an order or authorize procurement.'].join('\n')
+ const body = [previous.name, `Supplier: ${order.supplier}`, `Commitment: ${order.description}`, `Vendor product: ${cycle.product_reference}`, `Required review date: ${cycle.required_on}`, `Specified scope: ${cycle.specified_scope}`, `Deviation: ${cycle.deviation || 'None declared'}`, `Disposition: ${outcomeName}`, `Reviewer: ${cycle.decision!.by.name}`, `Review comments: ${cycle.decision!.comment}`, ...cycle.annotations.map(a => `Annotation on ${find(cycle.attachments, a.file_id).name}, page ${a.page}: ${a.text} (${a.by.name})`), '', ...(managed ? ['Reviewed originals retained in Plinth; managed mail does not attach files:', ...cycle.attachments.map(file => `${file.name} (${file.mime}, ${file.size} bytes; SHA-256 ${file.checksum})`), `Contact the sender: ${actor.email}`] : ['The exact reviewed originals are attached.']), 'This notice does not issue an order or authorize procurement.'].join('\n')
  const notice: SubmittalNotice = { id: crypto.randomUUID(), cycle_id: cycle.id, to: order.vendor_email!, by: stamp(actor), subject, body, status: 'unknown', label: 'Provider outcome unknown; reconcile with the supplier before any further action' }
  const reserved = structuredClone(previous)
  ;(find(reserved.submittals!, id).notices ??= []).push(notice)
@@ -55,7 +56,7 @@ export async function sendSubmittalNotice(env: Bindings, previous: Job, actor: A
   await checkWarrantySend(env.DB, latest, seen, current.guards, actor)
   const text = body + optional.text
   called = true
-  const message = { deliveryId: notice.id, from: env.MAIL_FROM, to: [notice.to], replyTo: actor.email, subject, text, html: '<pre>' + text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</pre>', headers: {}, attachments, ...(optional.unsubscribe ? { unsubscribe: optional.unsubscribe } : {}) }
+  const message = { deliveryId: notice.id, from: env.MAIL_FROM, to: [notice.to], ...(managed ? { messageKey: notice.id } : { replyTo: actor.email, attachments }), subject, text, html: '<pre>' + text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</pre>', headers: {}, ...(optional.unsubscribe ? { unsubscribe: optional.unsubscribe } : {}) }
   const result = await sender.send(message)
   if (result.status === 'accepted') { outcome.status = 'accepted'; outcome.label = 'Accepted by the mail provider; delivery is not confirmed'; outcome.provider_message_id = result.providerMessageId ?? undefined }
   else if (result.status === 'development') { outcome.status = 'development'; outcome.label = 'Development mail suppressed; nothing sent to the supplier' }
