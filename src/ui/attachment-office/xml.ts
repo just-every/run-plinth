@@ -6,6 +6,7 @@ export const NS = {
  slide: ['http://schemas.openxmlformats.org/presentationml/2006/main', 'http://purl.oclc.org/ooxml/presentationml/main'],
  drawing: ['http://schemas.openxmlformats.org/drawingml/2006/main', 'http://purl.oclc.org/ooxml/drawingml/main'],
  rel: ['http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'http://purl.oclc.org/ooxml/officeDocument/relationships'],
+ threaded: ['http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments'],
 }
 export type Space = keyof typeof NS
 export const inSpace = (element: Element, space: Space) => NS[space].includes(element.namespaceURI ?? '')

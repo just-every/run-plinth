@@ -21,7 +21,7 @@ originals fail visibly without copying partial output. Every PDF page is read
 within those bounds. Linked Word headers, footers, footnotes, endnotes and text
 boxes are included. Spreadsheet formulas and saved values are read without
 recalculation; slide layouts and masters can repeat text. Embedded objects,
-equations, threaded comments and unsupported pictures can remain unread;
+equations, other threaded-comment formats and unsupported pictures can remain unread;
 the draft shows these limitations. Legacy binary Office files have a bounded
 local reader: main Word text and declared footnotes, grouped headers and footers,
 annotations, endnotes and text boxes, saved spreadsheet cell values and current
@@ -42,6 +42,21 @@ explicitly. Scripts are
 never executed; HTML linked resources are not fetched, and SVG external
 references are refused. Markup layout, outlined vector glyphs, embedded objects
 and unsupported parts still require manual inspection and supplied text.
+
+XLSX threaded comments include stored roots and replies from current workbook
+sheets and their internal relationships. The draft retains each sheet and cell,
+comment, thread and parent identity, stored author from the internal person
+inventory, and stored date. Those names and dates are historical document
+attribution, never current account authority or approval. Classic comments are
+preserved separately; a matching stored threaded fallback is labeled as mirrored
+text rather than treated as another conversation.
+
+Missing authors or parents, duplicate identities, cross-sheet or cross-cell
+parents, cycles, unsupported namespaces and external threaded relationships
+refuse the whole draft. Unreferenced comment parts, person inventories and sheets
+are excluded. Additional bounds are 10,000 comments, 2,000 stored people and 64
+reply levels within the existing package, text and time limits. No linked content
+is fetched, and no extraction output is adopted or saved automatically.
 
 Modern Office charts contribute saved titles, labels, raw cache values and
 formulas. They are not recalculated or rendered; caches can be stale. OpenDocument
