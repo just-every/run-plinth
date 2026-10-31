@@ -18,6 +18,8 @@ try{
  await page.goto(base+`/app?job=${job.id}&tab=Purchasing`)
  const purchase=page.locator('form').filter({has:page.getByRole('button',{name:'Prepare purchase order',exact:true})})
  await purchase.getByLabel('Supplier',{exact:true}).fill('Synthetic window supplier')
+ const vendorEmail=['synthetic-plinth-submittal-supplier','example.test'].join('@')
+ await purchase.getByLabel('Supplier email',{exact:true}).fill(vendorEmail)
  await purchase.getByLabel('Goods or services',{exact:true}).fill('Window package W1')
  await purchase.getByLabel('Order amount',{exact:true}).fill('1200')
  await purchase.getByRole('button',{name:'Prepare purchase order',exact:true}).click()
@@ -56,6 +58,17 @@ try{
   await expect(cycle.getByText('Review comments: '+comment,{exact:false})).toBeVisible()
  }
  await review(first,'rejected','Reject the first package and resubmit low-e glazing')
+ async function notify(disposition,bytes){
+  await record.getByText('Notify supplier of this review',{exact:true}).click()
+  const form=record.locator('form').filter({has:page.getByRole('button',{name:'Send supplier disposition',exact:true})})
+  await form.getByRole('checkbox').check();await form.getByRole('button',{name:'Send supplier disposition',exact:true}).click()
+  await expect(record.getByText('Supplier notice · cycle ',{exact:false}).filter({hasText:disposition==='rejected'?'cycle 1':'cycle 2'})).toContainText('Accepted by the mail provider; delivery is not confirmed')
+  const response=await fetch(process.env.PLINTH_PROVIDER_EDGE_URL+'/mail/latest?email='+encodeURIComponent(vendorEmail)),mail=(await response.json()).message
+  assert.ok(mail.text.includes('Disposition: '+disposition));assert.ok(mail.text.includes(disposition==='rejected'?'Reject the first package and resubmit low-e glazing':'Revised glazing matches the specified W1 scope'))
+  assert.deepEqual(Buffer.from(mail.attachments[0].content,'base64'),bytes)
+  assert.equal(mail.attachments[0].filename,'synthetic-plinth-window.pdf')
+ }
+ await notify('rejected',original)
  const capture=async(label)=>{for(const width of [1440,390]){
   await page.setViewportSize({width,height:1000});await panel.scrollIntoViewIfNeeded()
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Submittal workspace fits the viewport')
@@ -72,8 +85,11 @@ try{
  const second=record.getByRole('region',{name:'Review cycle 2',exact:true})
  await second.getByText('Review this vendor version',{exact:true}).click()
  await review(second,'approved','Revised glazing matches the specified W1 scope')
+ await notify('approved',revised)
  const read=async()=>(await (await owner.request.get(base+'/api/plinth/jobs/'+job.id+'/submittals')).json())
  const current=await read(),row=current.register[0],cycle=row.cycles[1],release={cycle_id:cycle.id,order_id:row.order_id,product_reference:cycle.product_reference,confirm:true}
+ const noticeBody={cycle_id:cycle.id,product_reference:cycle.product_reference,to:vendorEmail,confirm:true}
+ const replay=await request('/jobs/'+job.id+'/submittals/'+row.id+'/notify',{expected_version:current.version,...noticeBody});assert.equal(replay.status(),409);assert.equal((await replay.json()).error,'mail_reserved')
  for(const body of [{...release,product_reference:'Unreviewed window model'},{...release,cycle_id:row.cycles[0].id},{...release,order_id:'different-commitment'}]){
   const before=await read(),r=await request('/jobs/'+job.id+'/submittals/'+row.id+'/release',{expected_version:before.version,...body});assert.equal(r.status(),409);assert.deepEqual(await read(),before)
  }
@@ -88,5 +104,5 @@ try{
  for(const [review,bytes] of [[row.cycles[0],original],[row.cycles[1],revised]]){const r=await owner.request.get(base+'/api/plinth/jobs/'+job.id+'/submittals/files/'+review.attachments[0].id);assert.equal(r.status(),200);assert.deepEqual(await r.body(),bytes)}
  await capture('approved')
  await owner.close()
- console.log('DOC-004 PASS: installed rejection, annotated originals, resubmission, exact approval and procurement gate; changed screens at 1440 and 390')
+ console.log('DOC-004 PASS: installed rejection, annotated originals, supplier dispositions with exact attached bytes, resubmission, exact approval and procurement gate; changed screens at 1440 and 390')
 }finally{await browser.close()}

@@ -1,6 +1,7 @@
 import { proveQuestionAnswers } from './agent-answers-support.mjs'
 import { proveDrawingReview } from './drawing-review-support.mjs'
 import {closeoutFixture,closeoutAddress,closeoutMcp} from './closeout-support.mjs'
+import {submittalFixture} from './submittal-support.mjs'
 import {setPortalFeatures} from './helpers.mjs'
 import { scannedPlan, takeoffPlan } from '../fixtures/takeoff-plan.mjs'
 import test from 'node:test'
@@ -861,7 +862,12 @@ test('DOC-001 — approved plan sets supersede exact sheets, notify current reci
 })
 
 test('DOC-004 — native window submittal cycles preserve vendor originals and exact reviewer decisions while procurement refuses unsafe release',async()=>{
- const f=await createFixture()
+ let mailOutcome='accepted',onSupplierMail
+ const vendorEmail=['synthetic-plinth-submittal-supplier','example.test'].join('@')
+ const f=await createFixture({mailResponse:async message=>{
+  if(message.to.includes(vendorEmail)){await onSupplierMail?.();if(mailOutcome==='refused')return Response.json({message:'Synthetic supplier refusal'},{status:422});if(mailOutcome==='unknown')return Response.json({message:'Synthetic uncertain provider response'},{status:503})}
+  return Response.json({id:'synthetic-plinth-1'})
+ }})
  try{
   const address=n=>['synthetic-plinth-submittal-'+n,'example.test'].join('@')
   const client=await f.invite(address(1),'Submittal client'),manager=await f.invite(address(2),'Designated reviewer','admin'),other=await f.invite(address(3),'Other manager','admin')
@@ -873,7 +879,7 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   const act=async(path,body={},cookie=f.owner)=>{const r=await f.json(root+path,{method:'POST',cookie,body:{expected_version:job.version,...body}});if(r.status===200)job=r.value.job;return r}
   const ok=async(path,body={},cookie)=>{const r=await act(path,body,cookie);assert.equal(r.status,200,JSON.stringify(r.value));return r.value.record}
   const unchanged=async(path,body,credentials=f.owner,code)=>{const before=await read(),audit=(await f.db.prepare('SELECT count(*) AS n FROM pl_audit').first()).n,attachments=(await f.db.prepare('SELECT count(*) AS n FROM pl_attachments').first()).n;const r=await act(path,body,credentials);assert.ok([400,403,409].includes(r.status),JSON.stringify(r));if(code)assert.equal(r.value.error,code);assert.deepEqual((await read()).value,before.value);assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_audit').first()).n,audit);assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments').first()).n,attachments);return r}
-  const order=await ok('/orders',{supplier:'Synthetic window supplier',description:'Window schedule W1',amount_cents:120000})
+  const order=await ok('/orders',{supplier:'Synthetic window supplier',description:'Window schedule W1',amount_cents:120000,vendor_email:vendorEmail})
   const original=takeoffPlan(),revised=takeoffPlan(true)
   const submission=(product,bytes,extra={})=>({product_reference:product,required_on:'2026-11-12',specified_scope:'W1 insulated low-e window package',reviewer_id:reviewer.id,deviates:false,attachments:[{name:'synthetic-plinth-window.pdf',mime:'application/pdf',base64:bytes.toString('base64')}],...extra})
   let row=await ok('/submittals',{title:'Window package',order_id:order.id,...submission('Window version one',original,{deviates:true,deviation:'The proposed glass omits the low-e coating'})})
@@ -902,6 +908,25 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   row=await ok(path+'/annotate',{cycle_id:first.id,file_id:first.attachments[0].id,page:1,text:'Coating missing on the submitted glazing schedule'},manager)
   row=await ok(path+'/review',{...review,disposition:'rejected',comment:'Reject this glass and resubmit the specified coating'},manager)
   const rejected=structuredClone(row.cycles[0])
+  const notice=cycle=>({cycle_id:cycle.id,product_reference:cycle.product_reference,to:vendorEmail,confirm:true})
+  const supplierMessages=()=>f.messages.filter(m=>m.to.includes(vendorEmail))
+  await unchanged(path+'/notify',notice(first),manager,'forbidden')
+  await unchanged(path+'/notify',notice(first),client)
+  await unchanged(path+'/notify',{...notice(first),to:address(1)},f.owner,'recipient')
+  await unchanged(path+'/notify',{...notice(first),confirm:false})
+  assert.equal(supplierMessages().length,0,'Unauthorized or unconfirmed disclosures never call the provider')
+  row=await ok(path+'/notify',notice(first))
+  assert.equal(row.notices[0].status,'accepted');assert.equal(row.notices[0].by.role,'owner')
+  assert.equal(supplierMessages().length,1)
+  assert.ok(supplierMessages()[0].text.includes('Disposition: rejected'))
+  assert.ok(supplierMessages()[0].text.includes(rejected.decision.comment))
+  assert.ok(supplierMessages()[0].text.includes(rejected.annotations[0].text))
+  assert.ok(supplierMessages()[0].text.includes(rejected.deviation))
+  assert.deepEqual(Buffer.from(supplierMessages()[0].attachments[0].content,'base64'),original)
+  assert.deepEqual(row.cycles[0],rejected,'Sending preserves the immutable reviewed cycle')
+  await unchanged(path+'/notify',notice(first),f.owner,'mail_reserved')
+  assert.equal(supplierMessages().length,1,'Replay cannot send a second supplier notice')
+
   await unchanged(path+'/review',{...review,comment:'Rewrite the rejected disposition'},manager,'immutable')
   await unchanged(path+'/release',release(first),f.owner,'submittal_unapproved')
   await unchanged(path+'/annotate',{cycle_id:first.id,file_id:first.attachments[0].id,page:1,text:'Rewrite closed review'},manager,'immutable')
@@ -911,6 +936,16 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   await unchanged(path+'/review',{cycle_id:second.id,disposition:'approved',comment:'Missing consent',confirm:false},manager)
   row=await ok(path+'/review',{cycle_id:second.id,disposition:'approved',comment:'Current glazing matches W1',confirm:true},manager)
   assert.deepEqual(row.cycles[0],rejected);assert.equal(row.cycles[1].decision.by.id,reviewer.id)
+  await unchanged(path+'/notify',notice(first),f.owner,'submittal_version')
+  mailOutcome='refused';row=await ok(path+'/notify',notice(second))
+  assert.equal(row.notices.at(-1).status,'refused');assert.equal(job.orders[0].status,'draft','Disposition mail alone never releases procurement')
+  mailOutcome='accepted';row=await ok(path+'/notify',notice(second))
+  assert.equal(row.notices.at(-1).status,'accepted');assert.match(row.notices.at(-1).label,/delivery is not confirmed/)
+  const approvedMail=supplierMessages().at(-1)
+  assert.ok(approvedMail.text.includes('Disposition: approved'));assert.ok(approvedMail.text.includes(second.product_reference))
+  assert.deepEqual(Buffer.from(approvedMail.attachments[0].content,'base64'),revised)
+  assert.equal(row.notices.at(-1).by.role,'owner');assert.equal(row.notices.at(-1).cycle_id,second.id)
+
   await unchanged(path+'/release',release(second,{product_reference:'Other window model'}),f.owner,'submittal_mismatch')
   await unchanged(path+'/release',release(second,{order_id:'different-commitment'}),f.owner,'submittal_mismatch')
   await unchanged(path+'/release',release(first),f.owner,'submittal_version')
@@ -929,6 +964,7 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   assert.equal((await f.json(root+'/submittals',{token:await f.agent()})).status,403)
   const beforeRevoke=structuredClone((await read()).value.register)
   assert.equal((await f.json('/api/plinth/team/'+reviewer.id,{method:'PUT',cookie:f.owner,body:{expected_version:1,role:'project_manager',job_ids:[],po_limit_cents:200000}})).status,200)
+  await unchanged(path+'/notify',notice(second),f.owner,'submittal_authority')
   await unchanged('/orders/'+order.id+'/receive',{amount_cents:100,reference:'Unsafe receipt'},f.owner,'submittal_authority')
   assert.equal((await f.json(root+'/submittals',{cookie:manager})).status,404)
   assert.deepEqual((await read()).value.register,beforeRevoke)
@@ -938,12 +974,51 @@ test('DOC-004 — native window submittal cycles preserve vendor originals and e
   const third=row.cycles[2]
   await ok(path+'/review',{cycle_id:third.id,disposition:'revise_resubmit',comment:'Provide a clearer mullion detail',confirm:true},manager)
   await unchanged(path+'/release',release(third),f.owner,'submittal_unapproved')
+  // A suppressed mailbox cannot be bypassed by calling the review a required notice.
+  await f.db.prepare('INSERT INTO pl_mail_suppressions(email,reason,source,at) VALUES(?,?,?,?)').bind(vendorEmail,'bounced','synthetic-plinth-1',new Date().toISOString()).run()
+  const beforeSuppressed=supplierMessages().length
+  await unchanged(path+'/notify',notice(third),f.owner,'mail_suppressed')
+  assert.equal(supplierMessages().length,beforeSuppressed)
+  await f.db.prepare('DELETE FROM pl_mail_suppressions WHERE email=?').bind(vendorEmail).run()
+  mailOutcome='unknown';row=await ok(path+'/notify',notice(third))
+  assert.equal(row.notices.at(-1).status,'unknown');assert.ok(supplierMessages().at(-1).text.includes('Disposition: revise resubmit'))
+  const beforeUnknown=supplierMessages().length
+  await unchanged(path+'/notify',notice(third),f.owner,'mail_reserved')
+  assert.equal(supplierMessages().length,beforeUnknown,'Unknown transport outcomes cannot be resent')
+
   assert.equal((await f.json(root,{cookie:f.owner})).value.job.approvals.some(a=>a.kind.startsWith('submittal.')),false,'Submittal decisions are served only through the gated register')
-  const erased=await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:job.version}});assert.equal(erased.status,200)
+  row=await ok(path+'/resubmit',{cycle_id:third.id,...submission('Window version four',revised)})
+  const fourth=row.cycles.at(-1)
+  await ok(path+'/review',{cycle_id:fourth.id,disposition:'approved',comment:'Latest mullion detail checked',confirm:true},manager)
+  onSupplierMail=async()=>{const current=await read();const erased=await f.json(root,{method:'DELETE',cookie:f.owner,body:{expected_version:current.value.version}});assert.equal(erased.status,200)}
+  mailOutcome='accepted'
+  assert.equal((await act(path+'/notify',notice(fourth))).status,404,'Late provider completion cannot recreate an erased person or job')
   assert.equal((await read()).status,404)
   assert.equal((await f.request(root+'/submittals/files/'+first.attachments[0].id,{cookie:f.owner})).status,404)
   assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_attachments WHERE job_id=?').bind(job.id).first()).n,0)
  }finally{await f.close()}
+
+ const managed=await createFixture({mailProvider:'rer'})
+ try{
+  const s=await submittalFixture(managed,await createActiveJob(managed),{notify:true})
+  const messages=()=>managed.messages.filter(message=>message.to.includes(s.order.vendor_email))
+  assert.deepEqual(s.row.notices.map(n=>n.status),['accepted','accepted'],'Managed mail notifies the supplier of both rejected and approved reviews')
+  assert.equal(messages().length,2,'Each explicit owner send reaches the managed relay once')
+  for(const [index,disposition] of ['rejected','approved'].entries()){
+   const message=messages()[index],cycle=s.row.cycles[index],notice=s.row.notices[index]
+   assert.equal(message.wire.to,s.order.vendor_email);assert.equal(message.wire.messageKey,notice.id)
+   assert.equal(Object.hasOwn(message.wire,'replyTo'),false);assert.equal(Object.hasOwn(message.wire,'attachments'),false)
+   for(const term of [cycle.product_reference,cycle.decision.comment,'Disposition: '+disposition,...cycle.annotations.map(a=>a.text)])assert.ok(message.text.includes(term))
+   assert.ok(message.text.includes('managed mail does not attach files'))
+   assert.ok(message.text.includes('Contact the sender:'))
+   for(const file of cycle.attachments)assert.ok(message.text.includes(`${file.name} (${file.mime}, ${file.size} bytes; SHA-256 ${file.checksum})`))
+   const original=await managed.request('/api/plinth/jobs/'+s.job.id+'/submittals/files/'+cycle.attachments[0].id,{cookie:managed.owner})
+   assert.equal(original.status,200);assert.deepEqual(Buffer.from(await original.arrayBuffer()),index===0?s.original:s.revised)
+  }
+  const before=messages().length,cycle=s.row.cycles[1]
+  const replay=await managed.json('/api/plinth/jobs/'+s.job.id+'/submittals/'+s.row.id+'/notify',{method:'POST',cookie:managed.owner,body:{expected_version:s.job.version,cycle_id:cycle.id,product_reference:cycle.product_reference,to:s.order.vendor_email,confirm:true}})
+  assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved');assert.equal(messages().length,before)
+ }finally{await managed.close()}
 })
 
 test('Owner follow-up previews retain revisions, respect current consent and authority, and stop resolved work without side effects',async()=>{

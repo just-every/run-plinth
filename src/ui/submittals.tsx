@@ -56,7 +56,14 @@ function SubmittalRecord({row,data,jobId,mutate}:{row:Submittal;data:SubmittalVi
    <label><input name="confirm" type="checkbox" required/> Release only this exact product for this commitment.</label>
   </Form>}
   {data.manage&&<details ref={resubmission}><summary>Resubmit a new vendor version</summary><SubmittalSubmission data={data} row={row} submit="Resubmit vendor package" action={async body=>{await mutate(`/${row.id}/resubmit`,{cycle_id:current.id,...body});if(resubmission.current)resubmission.current.open=false}}/></details>}
-  <p>Supplier notification is not sent by this review. Send the reviewed originals and disposition through your authorized supplier channel.</p>
+  {(row.notices??[]).map(notice=><p key={notice.id}>Supplier notice · cycle {row.cycles.find(c=>c.id===notice.cycle_id)?.revision} · {notice.to}: {notice.label} · {notice.by.name}</p>)}
+  {data.manage&&current.decision&&order.vendor_email&&!(row.notices??[]).some(n=>n.cycle_id===current.id&&!['refused','development'].includes(n.status))&&<details><summary>Notify supplier of this review</summary>
+   <p>Send the current disposition, review comments and annotations to {order.vendor_email}. Original vendor files are attached when supported. Managed mail lists the retained originals and their checksums instead. This notice does not release procurement.</p>
+   <Form submit="Send supplier disposition" action={async f=>mutate(`/${row.id}/notify`,{cycle_id:current.id,product_reference:current.product_reference,to:order.vendor_email,confirm:f.get('confirm')==='on'})}>
+    <label><input name="confirm" type="checkbox" required/> I authorize sharing this exact review and its originals with this supplier.</label>
+   </Form>
+  </details>}
+  {data.manage&&!order.vendor_email&&<p>Add the supplier email when preparing the purchase order to send review dispositions.</p>}
  </article>
 }
 function SubmittalSubmission({data,row,submit,action}:{data:SubmittalView;row?:Submittal;submit:string;action:(body:Record<string,unknown>)=>Promise<void>}) {
