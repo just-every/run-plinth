@@ -89,6 +89,7 @@ import { acceptQuote, approveVariation, prepareQuote, prepareVariation } from '.
 import { checkConflicts, approveSchedule, issueOrder, prepareOrder, prepareSchedule, receiveOrder } from './operations'
 import { orderAction, orderResponse } from './purchase-orders'
 import { sendOrder } from './purchase-order-send'
+import { sendSubmittalNotice } from './submittal-notice'
 import { approveDiary, prepareDiary, serveAttachment } from './attachments'
 import { customersResponse } from './customers'
 import { getCustomer } from './customers'
@@ -260,6 +261,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===5&&parts[2]==='invoices'&&parts[4]==='send'){const sent=await sendInvoice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='send-email'){const sent=await sendMeetingEmail(env,previous as MeetingSharingJob,actor,input,parts[3]!,clock);return json({job:display(sent,actor),role:role(actor)})}
  if(parts.length===5&&parts[2]==='orders'&&parts[4]==='send'){const sent=await sendOrder(env,previous,actor,parts[3]!,input,clock);return json({job:display((await named(env.DB,[sent]))[0]!,actor),record:sent.orders.find(o=>o.id===parts[3]),role:role(actor)})}
+ if(parts.length===5&&parts[2]==='submittals'&&parts[4]==='notify'){const sent=await sendSubmittalNotice(env,previous,actor,parts[3]!,input,clock);need(sent,'The job was erased while sending',404,'not_found');return json({job:display(sent,actor),record:sent.submittals!.find(s=>s.id===parts[3]),role:role(actor)})}
  if(parts.length===5&&parts[2]==='continuity'&&parts[4]==='notify'){const sent=await sendContinuityNotice(env,previous,actor,parts[3]!,input,clock);return json({job:display(sent,actor),role:role(actor)})}
  const job=structuredClone(previous);let record:unknown;let writes:D1PreparedStatement[]=[];const category=parts[2],id=parts[3],action=parts[4]
  await reportNativeGate(env.DB,previous,actor,category,id,action)

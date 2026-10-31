@@ -27,7 +27,7 @@ export async function submittalReviewers(db: D1Database, job: Job): Promise<Subm
  return eligible
 }
 const sameAuthority = (a: SubmittalReviewer, b: SubmittalReviewer) => a.id === b.id && a.operator_version === b.operator_version && a.team_version === b.team_version && a.role_version === b.role_version
-async function currentReviewer(db: D1Database, job: Job, cycle: SubmittalCycle) {
+export async function currentReviewer(db: D1Database, job: Job, cycle: SubmittalCycle) {
  const current = (await submittalReviewers(db, job)).find(p => p.id === cycle.reviewer.id)
  need(current && sameAuthority(current, cycle.reviewer), 'The designated reviewer authority changed; submit a new review cycle', 409, 'submittal_authority')
  return current
