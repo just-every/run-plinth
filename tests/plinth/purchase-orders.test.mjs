@@ -93,9 +93,17 @@ test('SUB-005 — itemized cost-coded vendor PO from the budget: acknowledgment,
   assert.equal(approvedDocument.status,200);assert.equal(approvedDocument.value.order.submittal.cycle_id,currentCycle.id);assert.equal(approvedDocument.value.order.submittal.product_reference,'Window W1 version two')
   assert.equal(job.approvals.find(a=>a.subject_id===gatedOrder&&a.kind==='purchase_order').snapshot.submittal_release.cycle_id,currentCycle.id)
 
+  const notifyBody={cycle_id:currentCycle.id,product_reference:currentCycle.product_reference,to:submittal.order.vendor_email,confirm:true}
+  r=await act('/submittals/'+gatedRow.id+'/notify',notifyBody)
+  assert.equal(r.status,200,JSON.stringify(r.value));assert.equal(r.value.record.notices.at(-1).status,'accepted')
+  assert.deepEqual(Buffer.from(windowSent().at(-1).attachments[0].content,'base64'),submittal.revised)
+  const beforeStaleNotice=windowSent().length
+
   r=await act('/orders/'+gatedOrder+'/amend',{reason:'Revised window dimensions',lines:[{id:'windows',description:'Revised W1 windows',cost_code:'12-350',quantity:'1',unit:'package',unit_cents:125000}],budget_impact_cents:5000,date_impact_days:0})
   assert.equal(r.status,200,JSON.stringify(r.value))
   const beforeGate=structuredClone(job)
+  r=await act('/submittals/'+gatedRow.id+'/notify',notifyBody)
+  assert.equal(r.value.error,'submittal_mismatch');assert.deepEqual(job,beforeGate);assert.equal(windowSent().length,beforeStaleNotice,'A stale approval notice never reaches the supplier after proposed economics change')
   r=await act('/orders/'+gatedOrder+'/approve-amendment',{budget_impact_cents:5000,date_impact_days:0})
   assert.equal(r.value.error,'submittal_mismatch');assert.deepEqual(job,beforeGate,'A mismatched approved package changes no commitment terms')
   r=await act('/submittals/'+gatedRow.id+'/resubmit',{cycle_id:currentCycle.id,...submittal.submission('Window W1 version three',submittal.revised)})
