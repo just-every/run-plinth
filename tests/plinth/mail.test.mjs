@@ -193,6 +193,98 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   assert.equal((await f.request('/auth/operator/status', { method: 'POST', cookie: f.owner, body: { operatorId: clientPerson.id, status: 'inactive' } })).status, 200)
   assert.equal((await find({ q: 'Natural oak' }, s.client)).status, 401)
   assert.equal((await f.request(`/api/plinth${path}/correspondence/files/${inbound.files[0].id}`, { cookie: s.client })).status, 401)
+  // Delegated actions use the same current people checks as extracts, without granting raw meetings.
+  const {createReleasedScope}=await import('./helpers.mjs')
+  const email=n=>['synthetic-plinth-delegate-'+n,'example.test'].join('@')
+  const people={}
+  for(const [name,base] of [['field','admin'],['custom','admin'],['sub','member'],['contact','member'],['attendee','admin'],['unassigned','admin']]) {
+   const cookie=await f.invite(email(name),'Synthetic '+name,base)
+   const person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email(name));people[name]={cookie,person,version:0}
+  }
+  const team=async(name,role,ids=[job.id],extra={})=>{const p=people[name],r=await s.api('/team/'+p.person.id,{method:'PUT',body:{expected_version:p.version,role,job_ids:ids,po_limit_cents:0,...extra}});assert.equal(r.status,200,JSON.stringify(r.value));p.version=r.value.member.version}
+  await team('field','superintendent');await team('attendee','crew');await team('unassigned','project_manager',[])
+  let role=(await s.api('/roles',{method:'POST',body:{copy_of:'project_manager',name:'Synthetic delegated document viewer',permissions:{documents:{create:false}}}})).value.role
+  await team('custom','custom',[job.id],{role_id:role.id})
+  const documents=async view=>{const r=await s.api('/roles/'+role.id,{method:'PUT',body:{expected_version:role.version,permissions:{documents:{view}}}});assert.equal(r.status,200);role=r.value.role}
+  job=await read();const released=await createReleasedScope(f,job,email('sub'),'Delegation fixtures');job=released.job
+  const customer=(await s.api('/customers',{method:'POST',body:{name:'Synthetic delegate household',kind:'household',contacts:[{id:'synthetic-plinth-contact',name:'Synthetic contact',email:email('contact')}],properties:[{id:'synthetic-plinth-property',label:'Site',address:'Synthetic delegation site'}]}})).value.customer
+  const act=async(route,body={},cookie=f.owner)=>{job=await read();return s.api(path+route,{method:'POST',cookie,body:{expected_version:job.version,...body}})}
+  const clientLink={customer_id:customer.id,property_id:'synthetic-plinth-property',client_contact_ids:['synthetic-plinth-contact']}
+  assert.equal((await act('/customer',clientLink)).status,200)
+  const delegateInput=(name,kind)=>({title:'Synthetic action for '+name,owner_kind:kind,owner_email:email(name),due_on:'2026-11-06',confirm_title:true,...(kind==='sub'?{subcontract_id:released.scope.id}:{})})
+  const inbox=cookie=>s.api('/meeting-inbox/'+job.id,{cookie})
+  const finish=async(name,action,body={})=>{job=await read();return s.api(`/meeting-inbox/${job.id}/actions/${action.id}/complete`,{method:'POST',cookie:people[name].cookie,body:{expected_version:job.version,answer:'Synthetic resolved '+name,links:[],...body}})}
+  const delegateActions={}
+  const beforeDelegation=f.messages.length
+  for(const [name,kind] of [['field','office'],['contact','client'],['sub','sub'],['custom','office']]) {
+   const missing=await act(`/meetings/${meeting.id}/add-action`,{...delegateInput(name,kind),confirm_title:false});assert.equal(missing.status,400,'A delegated title needs explicit manager confirmation')
+   const r=await act(`/meetings/${meeting.id}/add-action`,delegateInput(name,kind));assert.equal(r.status,200,JSON.stringify(r.value));delegateActions[name]=r.value.record
+   const view=await inbox(people[name].cookie);assert.equal(view.status,200);assert.deepEqual(view.value.actions,[{id:r.value.record.id,title:'Synthetic action for '+name,due_on:'2026-11-06',assigner:{name:'Builder',at:r.value.record.by.at},meeting_on:'2026-10-26',completed:false}])
+   assert.equal(view.value.shares.length,0)
+   const global=(await s.api('/meeting-inbox',{cookie:people[name].cookie})).value;assert.equal(global.jobs.length,1);assert.deepEqual(global.jobs[0].actions,view.value.actions)
+   for(const secret of ['agenda','minutes','attendees','decisions','owner_email','meeting_id','assignment_history'])assert.equal(JSON.stringify(view.value.actions).includes('"'+secret+'"'),false)
+  }
+  const agent=await f.agent(),agentOptions={cookie:undefined,token:agent}
+  const afterSignIns=f.messages.length
+  // Raw meeting results, sources and counts stay closed for every excluded audience.
+  for(const name of ['field','contact','sub','custom','attendee','unassigned']) {
+   const cookie=people[name].cookie
+   assert.ok([403,404].includes((await s.api(path+'/meetings',{cookie})).status))
+   const source=await s.api(path+'/decision-search?'+new URLSearchParams({source:'meetings:'+meeting.id,q:meeting.title}),{cookie})
+   assert.ok([403,404].includes(source.status)||source.status===200&&source.value.count===0)
+   const projection=await s.api(path,{cookie});if(projection.status===200)assert.equal(projection.value.job.meetings,undefined)
+  }
+  assert.equal((await s.api('/meeting-inbox',agentOptions)).status,403)
+  assert.equal((await s.api(path+'/meetings',agentOptions)).status,403)
+  assert.equal((await s.api(path+'/decision-search?q=oak',agentOptions)).status,403)
+  job=await read();const unchanged=structuredClone(job)
+  assert.equal((await finish('field',delegateActions.contact)).status,404,'A delegate cannot complete another person action')
+  assert.equal((await s.api(`/meeting-inbox/${job.id}/actions/${delegateActions.field.id}/complete`,{method:'POST',body:{expected_version:job.version,answer:'Unassigned owner must not complete',links:[]}})).status,404)
+  assert.equal((await s.api(`/meeting-inbox/${job.id}/actions/${delegateActions.field.id}/complete`,{method:'POST',...agentOptions,body:{expected_version:job.version,answer:'Agent must not complete',links:[]}})).status,403)
+  assert.equal((await act(`/meetings/${meeting.id}/complete`,{action_id:delegateActions.field.id,answer:'Another manager must not complete',links:[{kind:'selection',id:s.selection}]},pm)).status,403)
+  assert.deepEqual(await read(),unchanged,'Refused completions commit no job or history change')
+  const schedule=(await act('/schedules',{trade:'Synthetic delegated trade',description:'Synthetic visible field task',start:'2026-11-06T08:00:00Z',end:'2026-11-06T09:00:00Z'})).value.record
+  assert.equal((await finish('field',delegateActions.field,{links:[{kind:'selection',id:s.selection}]})).status,404,'A private selection is not a field work source')
+  assert.equal((await finish('field',delegateActions.field,{message_id:inbound.id})).status,404,'A delegate cannot cite private office correspondence')
+  assert.equal((await finish('field',delegateActions.field,{links:[{kind:'schedule',id:schedule.id}]})).status,200)
+  for(const name of ['contact','sub','custom'])assert.equal((await finish(name,delegateActions[name])).status,200,'The current delegate completes their own action')
+  job=await read();const completedVersion=job.version
+  assert.equal((await finish('field',delegateActions.field)).status,409,'A completed delegate action cannot replay')
+  assert.equal((await read()).version,completedVersion,'Replayed completion changes nothing')
+  for(const name of Object.keys(delegateActions))assert.equal(job.meetings[0].actions.find(a=>a.id===delegateActions[name].id).completion.by.id,people[name].person.id)
+  const completedClient=structuredClone(job.meetings[0].actions.find(a=>a.id===delegateActions.contact.id).completion)
+  const appended=await act(`/meetings/${meeting.id}/add-links`,{action_id:delegateActions.contact.id,links:[{kind:'selection',id:s.selection}]});assert.equal(appended.status,200)
+  const appendedLink=appended.value.record.appended_links[0];assert.equal(appendedLink.by.name,'Builder');assert.equal((await s.api(appendedLink.links[0].href.replace('/api/plinth',''))).status,200)
+  assert.equal((await s.api(appendedLink.links[0].href.replace('/api/plinth',''),{cookie:people.contact.cookie})).status,403)
+  assert.deepEqual(appended.value.record.completion,completedClient,'Appending work retains the original attributed answer')
+  const subCompletion=structuredClone((await read()).meetings[0].actions.find(a=>a.id===delegateActions.sub.id).completion)
+  const subLinks=await act(`/meetings/${meeting.id}/add-links`,{action_id:delegateActions.sub.id,links:[{kind:'selection',id:s.selection}]});assert.equal(subLinks.status,200);assert.equal(subLinks.value.record.appended_links[0].by.name,'Builder');assert.deepEqual(subLinks.value.record.completion,subCompletion)
+  const orphan={}
+  for(const [name,kind] of [['field','office'],['contact','client'],['sub','sub'],['custom','office']])orphan[name]=(await act(`/meetings/${meeting.id}/add-action`,{...delegateInput(name,kind),title:'Outstanding '+name})).value.record
+  await team('field','superintendent',[])
+  assert.equal((await act('/customer',{...clientLink,client_contact_ids:[]})).status,200)
+  assert.equal((await act(`/subcontracts/${released.scope.id}/access`,{hold:true,reason:'Scope release withdrawn'})).status,200)
+  await documents(false)
+  for(const name of Object.keys(orphan)) {
+   assert.ok([403,404].includes((await finish(name,orphan[name])).status),'Loss of current delegate authority refuses completion')
+   const action=(await read()).meetings[0].actions.find(a=>a.id===orphan[name].id);assert.equal(action.completion,undefined);assert.equal(action.owner_email,email(name))
+   assert.ok(![200].includes((await inbox(people[name].cookie)).status),'Lost authority removes the action projection')
+  }
+  await team('field','superintendent')
+  const crossKind=await act(`/meetings/${meeting.id}/reassign`,{action_id:orphan.field.id,owner_kind:'client',owner_email:email('contact'),confirm_title:true,reason:'Current client takes the reviewed action'})
+  assert.equal(crossKind.status,403,'A new delegate must have current authority')
+  assert.equal((await act('/customer',clientLink)).status,200)
+  const reassignment=await act(`/meetings/${meeting.id}/reassign`,{action_id:orphan.field.id,owner_kind:'client',owner_email:email('contact'),confirm_title:true,reason:'Client takes the reviewed outstanding action'})
+  assert.equal(reassignment.status,200);assert.deepEqual(reassignment.value.record.assignment_history[0],{previous_owner_email:email('field'),previous_owner_kind:'office',owner_email:email('contact'),owner_kind:'client',reason:'Client takes the reviewed outstanding action',by:reassignment.value.record.assignment_history[0].by});assert.equal(reassignment.value.record.assignment_history[0].by.name,'Builder')
+  assert.equal((await finish('field',orphan.field)).status,404,'Restored authority does not undo cross-kind reassignment')
+  assert.equal((await finish('contact',orphan.field)).status,200)
+  await documents(true);assert.equal((await finish('custom',orphan.custom)).status,200,'Current document-view is enough for an assigned custom delegate')
+  // A delegate reminder remains outside this clause, even with a reviewed extract.
+  const share=await act(`/meetings/${meeting.id}/share`,{operation_id:'synthetic-plinth-delegate-no-reminder',confirm:true,title:'Safe field context',body:'Reviewed field action context',recipients:[{email:email('field'),kind:'office',can_comment:false}]});assert.equal(share.status,200)
+  const reminder=await s.api(`/meeting-inbox/${job.id}/${share.value.record.id}/email-copy`,{method:'POST',cookie:people.field.cookie,body:{expected_version:(await read()).version,kind:'action_reminder',action_id:orphan.field.id,operation_id:'synthetic-plinth-no-delegate-reminder',confirm:true}});assert.equal(reminder.status,409)
+  await f.scheduled(Date.parse('2026-11-08T12:00:00Z'))
+  assert.ok(afterSignIns>=beforeDelegation);assert.equal(f.messages.length,afterSignIns,'Delegation, completions, links, revocation and reassignment send no provider messages')
+  job=await read()
   const hold = await s.api('/holds', { method: 'POST', body: { subject_kind: 'job', subject_id: job.id, kind: 'legal_hold', reason: 'Meeting decision disputed', confirm: true } }); assert.equal(hold.status, 201)
   assert.equal((await s.api(path, { method: 'DELETE', body: { expected_version: job.version } })).value.error, 'retention_hold')
   assert.equal((await find({ q: 'resolved from the exact' })).value.count, 1)

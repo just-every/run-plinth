@@ -1,3 +1,5 @@
+import { roleGate } from './role-gate'
+import { clientAccess } from './job-customers'
 import { requireJobManager } from './auth'
 import { find, need, object, stamp, text, type Actor, type Input, type Job, type Stamp } from './model'
 import { day } from './purchase-order-model'
@@ -55,7 +57,12 @@ export async function completeMeetingDelegate(db: D1Database, job: Job, actor: A
  need(authority, 'Your action authority changed', 403, 'forbidden')
  need(!row.completion, 'Action already completed', 409, 'completed')
  const message_id = input.message_id === undefined ? undefined : text(input.message_id, 'Source message', 100)
- if (message_id) need((await thread(db, job.id, actor)).some(m => m.id === message_id), 'Source message not found', 404, 'not_found')
+ if (message_id) {
+  need(row.owner_kind !== 'sub' && (actor.role !== 'member' || await clientAccess(db, job, actor.email)), 'Source message not found', 404, 'not_found')
+  let permitted = true
+  try { roleGate(actor, new Request(`https://plinth.invalid/api/plinth/jobs/${job.id}/correspondence`)) } catch { permitted = false }
+  need(permitted && (await thread(db, job.id, actor)).some(m => m.id === message_id), 'Source message not found', 404, 'not_found')
+ }
  const links = input.links === undefined || Array.isArray(input.links) && input.links.length === 0 ? [] : await workLinks(permitted, input.links)
  links.forEach((link,index) => { link.href = `/api/plinth/jobs/${job.id}/meetings/${meeting.id}/links/${row.id}/${index}` })
  row.completion = { answer: text(input.answer, 'Resolved answer', 20000), links, ...(message_id ? { message_id } : {}), by: stamp(actor) }
@@ -104,6 +111,7 @@ export async function meetingAction(db: D1Database, job: Job, actor: Actor, inpu
   meeting.history.push({ kind: 'links-appended', by: stamp(actor), detail: row.id }); return { record: row, writes: guards }
  }
  need(action === 'complete', 'Unknown meeting action', 404, 'not_found')
+ if (row.owner_kind && row.owner_kind !== 'manager' && row.owner_email === actor.email.toLowerCase()) return { record: row, writes: await completeMeetingDelegate(db, job, actor, input, row.id, job) }
  need((!row.owner_kind || row.owner_kind === 'manager') && row.owner_email === actor.email.toLowerCase(), 'Only the currently assigned action owner completes it', 403, 'forbidden'); need(!row.completion, 'Action already completed', 409, 'completed')
  const authority = await officeAuthority(db, job, row.owner_email); need(authority, 'The action owner no longer manages this job', 403, 'forbidden'); guards.push(...authorityGuards(db, authority))
  const message_id = input.message_id === undefined ? undefined : text(input.message_id, 'Source message', 100)

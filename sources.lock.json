@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "f36eb9c8802182da538a44858e0c5bd3c1a1991f879b08a8bad7f1d8615a54f9",
+      "sha256": "702387f8fba06589441f46505d9cc2d4ed544911df7984291e66791a4281238b",
       "executable": false
     },
     "DEMO.md": {
@@ -1041,7 +1041,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "451c9204bee3b3e721300a70d97898e564b4a3094a01059a15fe671efa48ae99",
+      "sha256": "46848c35282f0fefecf1611e57b4e11cce23255c014758489d0d9eb716f5aeb4",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -3765,7 +3765,7 @@
       "executable": false
     },
     "src/plinth/meetings.ts": {
-      "sha256": "bf52c72516a7fe09194f4483f8fd9569631394faacd3171da7a3f5561562632d",
+      "sha256": "c8b2b3e016fa794abcc4a265249f42ce3a33ae672f403f8deacd522cc0a1d98b",
       "executable": false
     },
     "src/plinth/model.ts": {
@@ -4873,7 +4873,7 @@
       "executable": false
     },
     "src/ui/meetings.tsx": {
-      "sha256": "aa415650a864cc3e5f1a889aa106bad91096e3863e8a13f18f04da093fb36804",
+      "sha256": "c512fe699f85ebadc3bd59e015a38028df0660e061c07074ff44dc3f6fbd3b74",
       "executable": false
     },
     "src/ui/money.tsx": {
@@ -5360,6 +5360,10 @@
       "sha256": "832ef3b236049e1f5bdd04d22a9027bb67664f32d7ccf168038bfb3ecf6a1171",
       "executable": false
     },
+    "tests/journeys/meeting-delegation.mjs": {
+      "sha256": "55a30017118e0c0e76a4960cdea4ca138dd3d90231cea54d91dc17a8e44786cc",
+      "executable": false
+    },
     "tests/journeys/meeting-mail.mjs": {
       "sha256": "eab6512e20683402bdc214cf6b3f9a9883da3e19551f7c60e05d102de950680c",
       "executable": false
@@ -5585,7 +5589,7 @@
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
-      "sha256": "b5fe1598cd64598d40901c89e38b525d74678714154f6cf51bf76f4edb7a70b6",
+      "sha256": "91c0249f424bacb752da5483160a30264ab789dd0d37fb390eeae764d5db820e",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
@@ -5605,7 +5609,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "f98d2f16cd43dee57415f58c61daa6f89dbb2dd2329b9bc1ed2dce8259ca4c3d",
+      "sha256": "6859217691059621bc9fe8b33f82bf5d0b8c174624c938386a23e4ff46c9626e",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
