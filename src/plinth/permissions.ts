@@ -34,7 +34,7 @@ export function requirement(method: string, relative: string): Requirement | 'co
  if (parts[0] === 'plan-inbox') return { feature:'documents', action:'view' }
  if (parts[0] === 'jobs' && parts[2] === 'plans' && method === 'POST' && parts.at(-1) === 'acknowledge') return { feature:'documents', action:'view' }
  if (parts[0] === 'jobs' && parts[2] === 'plans' && method === 'POST' && parts.at(-1) === 'annotate') return { feature:'documents', action:'create' }
- if (parts[0] === 'meeting-inbox') return { feature: 'documents', action: method === 'GET' || parts.at(-1) === 'email-copy' ? 'view' : 'create' }
+ if (parts[0] === 'meeting-inbox') return { feature: 'documents', action: method === 'GET' || parts.at(-1) === 'email-copy' || parts[2] === 'actions' && parts.at(-1) === 'complete' ? 'view' : 'create' }
  if (parts[0] === 'jobs' && parts.length === 1 && method === 'POST') return { feature: 'leads', action: 'create' }
  if (method === 'GET' && job && parts[2] === 'costs' && parts[3] === 'access' && parts.length === 4) return 'common'
  const cost = costRequirement(method, relative); if (job && parts[2] === 'costs') return cost

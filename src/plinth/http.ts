@@ -162,7 +162,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  const setup=await companyResponse(request,env.DB,actor,parts,body);if(setup)return setup
  const pricing=await pricingResponse(request,env.DB,actor,parts,body);if(pricing)return pricing
  const catalog=await catalogResponse(request,env.DB,actor,parts,body);if(catalog)return catalog
- const meetingInbox=await meetingInboxResponse(request,env,actor,parts,body);if(meetingInbox)return meetingInbox
+ const meetingInbox=await meetingInboxResponse(request,env,actor,parts,body,display);if(meetingInbox)return meetingInbox
  const rfiInbox=await rfiInboxResponse(request,env,actor,parts,body);if(rfiInbox)return rfiInbox
  const tradePortal=await tradePortalResponse(request,env,actor,parts,body);if(tradePortal)return tradePortal
  const resource=await resourceResponse(request,env.DB,actor,parts,body);if(resource)return resource
@@ -201,6 +201,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  }
  if(parts.length===4&&parts[2]==='decision-search'&&parts[3]==='metadata'&&method==='POST'){const input=await body(request);const sources=await decisionSearch(env.DB,previous,display(previous,actor),actor,new URLSearchParams());return json({metadata:await annotateDecision(env.DB,previous,actor,input,sources.results.map(r=>r.source))})}
  if(parts.length===3&&parts[2]==='decision-search'&&method==='GET')return json(await decisionSearch(env.DB,previous,display(previous,actor),actor,new URL(request.url).searchParams))
+ if(parts.length===9&&parts[2]==='meetings'&&parts[4]==='links'&&parts[6]==='appended'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.appended_links?.[Number(parts[7])]?.links[Number(parts[8])];need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===7&&parts[2]==='meetings'&&parts[4]==='links'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.completion?.links.find((_,index)=>String(index)===parts[6]);need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===3&&parts[2]==='meetings'&&method==='GET'){meetingAccess(actor);return json({meetings:previous.meetings??[]})}
  if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='email-preview'&&method==='GET')return json(await meetingEmailPreview(env,previous as MeetingSharingJob,actor,parts[3]!,new URL(request.url).searchParams.get('request_id')??''))

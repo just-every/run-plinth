@@ -1,3 +1,4 @@
+import { MeetingInbox } from './meeting-sharing'
 import { FollowupSettings } from './followup-rules'
 import { PlanInbox } from './plans'
 import { SatisfactionReport } from './satisfaction'
@@ -37,11 +38,11 @@ export function Workspace() {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read jobs.'); throw cause }
     finally { setLoading(false) }
   }
-  useEffect(() => { const params=new URLSearchParams(window.location.search);if(params.get('view')==='plans')setView('plans'); const job = params.get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
+  useEffect(() => { const params=new URLSearchParams(window.location.search);if(params.get('view')==='plans')setView('plans');if(params.get('view')==='meetings')setView('meetings'); const job = params.get('job'); if (job) setSelected(job); refresh().catch(e => setError(e.message)); api('/auth/session').then(s => setMe(s.operator)).catch(() => {}) }, [])
   // The open job is in the address (?job=…&tab=…), so a reload or a shared link reopens it.
   useEffect(() => { if (!ready) return; const url = new URL(window.location.href); if (selected) url.searchParams.set('job', selected); else { url.searchParams.delete('job'); url.searchParams.delete('tab') } window.history.replaceState(null, '', url) }, [selected, ready])
   const manager = role === 'owner' || role === 'admin' || role === 'manager'
-  const go = (to: View) => { const url=new URL(window.location.href);for(const key of ['plan_job','plan_set','plan_sheet'])url.searchParams.delete(key);if(to==='plans')url.searchParams.set('view','plans');else url.searchParams.delete('view');window.history.replaceState(null,'',url);setView(to); setSelected(''); setMenu(false); if (to === 'jobs') void refresh().catch(() => {}) }
+  const go = (to: View) => { const url=new URL(window.location.href);for(const key of ['plan_job','plan_set','plan_sheet'])url.searchParams.delete(key);if(to==='plans'||to==='meetings')url.searchParams.set('view',to);else url.searchParams.delete('view');window.history.replaceState(null,'',url);setView(to); setSelected(''); setMenu(false); if (to === 'jobs') void refresh().catch(() => {}) }
   const open = (id: string) => { const url = new URL(window.location.href);for(const key of ['view','plan_job','plan_set','plan_sheet'])url.searchParams.delete(key); url.searchParams.delete('tab'); window.history.replaceState(null, '', url); setView('jobs'); setSelected(id); setMenu(false); setQuery('') }
   const words = query.trim()
   useEffect(() => {
@@ -83,6 +84,7 @@ export function Workspace() {
         {(error || loading) && <ReadState label="Refreshing jobs" loading={loading} error={error} retry={refresh}/>}
         {words && <ReadState label="Searching jobs" loading={searching} error={searchError} retry={async () => { setSearchAttempt(value => value + 1) }}/>}
         {view === 'plans' && <PlanInbox/>}
+        {view === 'meetings' && <MeetingInbox/>}
         {view === 'todos' && <Todos jobs={jobs}/>}
         {view === 'subcontractor-records' && <SubcontractorRecords/>}
         {view === 'bids' && <BidInbox/>}

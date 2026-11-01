@@ -14,6 +14,7 @@ const common: Rule[] = [
  rule('GET', 'plan-inbox'), rule('GET', `jobs/${id}/plans`), rule('GET', `jobs/${id}/plans/${id}/files/${id}`), rule('POST', `jobs/${id}/plans/${id}/acknowledge`), rule('POST', `jobs/${id}/plans/${id}/annotate`),
  rule('GET', `meeting-inbox(?:/${id})?(?:/${id}/(?:export\\.json|decision-search))?`), rule('POST', `meeting-inbox/${id}/${id}/(?:feedback|email-copy)`),
  rule('GET', `meeting-inbox/${id}/decision-search`),
+ rule('POST', `meeting-inbox/${id}/actions/${id}/complete`),
  rule('GET', 'search'),
  rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/forecast`),
  rule('GET', `jobs/${id}/takeoff-files/${id}`), rule('GET', `jobs/${id}/diary/${id}/attachments/${id}`),
@@ -33,8 +34,8 @@ const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
  ],
  // Superintendents record the day: logs are saved as drafts for the office to publish, and observations are captured with photos.
  superintendent: [...common, rule('GET', `jobs/${id}/time`), rule('POST', `jobs/${id}/time`), rule('POST', `jobs/${id}/time/${id}/correct`), rule('POST', `jobs/${id}/time/(?:consent|location)`), rule('POST', `jobs/${id}/diary`), rule('POST', `jobs/${id}/punch/issues`), rule('POST', `jobs/${id}/schedule-actuals`)],
- bookkeeper: [rule('GET', `jobs/${id}/costs/period-preview`), rule('POST', `jobs/${id}/costs/period-reviews`), rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs(?:/(?:ledger|bills|forecasts|cash|periods))?`), rule('GET', `jobs/${id}/costs/bills/${id}/original`), rule('POST', `jobs/${id}/costs/bills`), rule('POST', `jobs/${id}/costs/bills/${id}/(?:recode|review|route)`), rule('POST', `jobs/${id}/costs/reconcile`)],
- reader: [rule('GET', `report-schedules(?:/${id}/downloads/${id})?`),rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs/draw-packet`)],
+ bookkeeper: [rule('GET', `meeting-inbox(?:/${id})?`),rule('POST', `meeting-inbox/${id}/actions/${id}/complete`),rule('GET', `jobs/${id}/costs/period-preview`), rule('POST', `jobs/${id}/costs/period-reviews`), rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs(?:/(?:ledger|bills|forecasts|cash|periods))?`), rule('GET', `jobs/${id}/costs/bills/${id}/original`), rule('POST', `jobs/${id}/costs/bills`), rule('POST', `jobs/${id}/costs/bills/${id}/(?:recode|review|route)`), rule('POST', `jobs/${id}/costs/reconcile`)],
+ reader: [rule('GET', `meeting-inbox(?:/${id})?`),rule('POST', `meeting-inbox/${id}/actions/${id}/complete`),rule('GET', `report-schedules(?:/${id}/downloads/${id})?`),rule('GET', `jobs/${id}/costs/access`), rule('GET', 'jobs'), rule('GET', `jobs/${id}`), rule('GET', `jobs/${id}/costs/draw-packet`)],
  crew: [...common, rule('GET', `jobs/${id}/time`), rule('POST', `jobs/${id}/time`), rule('POST', `jobs/${id}/time/${id}/correct`), rule('POST', `jobs/${id}/time/(?:consent|location)`)],
 }
 export function roleGate(actor: Actor, request: Request) {

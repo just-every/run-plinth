@@ -1,6 +1,7 @@
 import { MeetingEmailRequests, RequestMeetingCopy } from './meeting-email'
 import { useEffect, useState } from 'react'
 import type { JobProps } from './job'
+import type { OwnMeetingAction } from '../plinth/meetings'
 import type { Meeting } from '../plinth/meetings'
 import type { MeetingShare, MeetingShareRecipientInput, PublicMeetingShare } from '../plinth/meeting-sharing-model'
 import { api, Field, Form } from './shared'
@@ -23,8 +24,20 @@ export function MeetingSharing({ job, meeting, role, mutate, refresh }: JobProps
 }
 
 export function SharedMeetingDecisions({ job, refresh: refreshJob }: Pick<JobProps,'job'|'refresh'>) {
+ const [actions,setActions]=useState<OwnMeetingAction[]>([]),[work,setWork]=useState<{kind:string;id:string;title:string}[]>([])
  const [shares,setShares]=useState<PublicMeetingShare[]>([]),[version,setVersion]=useState(job.version),[error,setError]=useState('')
- const load=()=>api('/meeting-inbox').then(r=>{const current=r.jobs.find((j:{id:string})=>j.id===job.id);setShares(current?.shares??[]);setVersion(current?.version??job.version)}).catch(e=>setError(e.message))
- useEffect(()=>{void load()},[job.id])
- return <section className="card"><h2>Shared meeting decisions</h2><p>Only the reviewed excerpts explicitly shared with you appear here. Feedback goes privately to the office.</p>{error&&<p role="alert" className="error">{error}</p>}{!shares.length&&<p className="empty">No meeting decisions have been shared with you.</p>}{shares.map(s=><section className="side-section" key={s.id}><h3>{s.title}</h3><p style={{whiteSpace:'pre-wrap'}}>{s.body}</p><p>{s.by.name} · {s.by.at}</p><a href={`/api/plinth/meeting-inbox/${job.id}/${s.id}/export.json`} download>Download shared extract</a>{s.feedback.map(f=><p key={f.id}>{f.by.name}: {f.body}</p>)}<RequestMeetingCopy job={job} share={s} version={version} refresh={async()=>{await load();await refreshJob()}}/>{s.can_comment&&<Form submit="Send private feedback" action={async f=>{await api(`/meeting-inbox/${job.id}/${s.id}/feedback`,{expected_version:version,body:f.get('body'),operation_id:crypto.randomUUID()});await load();await refreshJob()}}><label>Feedback about this extract<textarea name="body" rows={3} required/></label></Form>}</section>)}</section>
+ const load=()=>api(`/meeting-inbox/${job.id}`).then(current=>{setShares(current.shares);setActions(current.actions);setWork(current.work);setVersion(current.version);setError('')}).catch(e=>{setShares([]);setActions([]);setWork([]);if(!String(e.message).includes('not found'))throw e}).catch(e=>setError(e.message))
+ useEffect(()=>{void load()},[job.id,job.version])
+ return <><MyMeetingActions jobId={job.id} actions={actions} work={work} version={version} refresh={load}/><section className="card"><h2>Shared meeting decisions</h2><p>Only the reviewed excerpts explicitly shared with you appear here. Feedback goes privately to the office.</p>{error&&<p role="alert" className="error">{error}</p>}{!shares.length&&<p className="empty">No meeting decisions have been shared with you.</p>}{shares.map(s=><section className="side-section" key={s.id}><h3>{s.title}</h3><p style={{whiteSpace:'pre-wrap'}}>{s.body}</p><p>{s.by.name} · {s.by.at}</p><a href={`/api/plinth/meeting-inbox/${job.id}/${s.id}/export.json`} download>Download shared extract</a>{s.feedback.map(f=><p key={f.id}>{f.by.name}: {f.body}</p>)}<RequestMeetingCopy job={job} share={s} version={version} refresh={async()=>{await load();await refreshJob()}}/>{s.can_comment&&<Form submit="Send private feedback" action={async f=>{await api(`/meeting-inbox/${job.id}/${s.id}/feedback`,{expected_version:version,body:f.get('body'),operation_id:crypto.randomUUID()});await load();await refreshJob()}}><label>Feedback about this extract<textarea name="body" rows={3} required/></label></Form>}</section>)}</section></>
+}
+
+function MyMeetingActions({jobId,actions,work,version,refresh}:{jobId:string;actions:OwnMeetingAction[];work:{kind:string;id:string;title:string}[];version:number;refresh:()=>Promise<unknown>}) {
+ return <section className="card"><h2>My meeting actions</h2>{!actions.length&&<p className="empty">No current meeting actions assigned to you.</p>}{actions.map(a=><section className="side-section" key={a.id}><h3>{a.title}</h3><p>Due {a.due_on} · meeting {a.meeting_on}</p><p>Assigned by {a.assigner.name} at {a.assigner.at}</p>{a.completed?<p>Completed</p>:<Form submit="Complete my action" action={async f=>{const chosen=String(f.get('work')??''),[kind,id]=chosen.split(':');await api(`/meeting-inbox/${jobId}/actions/${a.id}/complete`,{expected_version:version,answer:f.get('answer'),links:chosen?[{kind,id}]:[]});await refresh()}}><label>Resolved answer<textarea name="answer" required rows={3}/></label>{work.length>0&&<label>Changed work<select name="work"><option value="">The office will append the changed work</option>{work.map(w=><option key={w.kind+w.id} value={`${w.kind}:${w.id}`}>{w.kind}: {w.title}</option>)}</select></label>}<p>Completing this action approves no work, price or date and sends nothing.</p></Form>}</section>)}</section>
+}
+
+export function MeetingInbox() {
+ const [jobs,setJobs]=useState<{id:string;name:string;version:number}[]>([]),[error,setError]=useState('')
+ const load=()=>api('/meeting-inbox').then(r=>{setJobs(r.jobs);setError('')}).catch(e=>{setJobs([]);setError(e.message)})
+ useEffect(()=>{void load()},[])
+ return <><h1 tabIndex={-1}>Meeting inbox</h1>{error&&<p role="alert" className="error">{error}</p>}{!jobs.length&&!error&&<p>No current meeting actions or shared decisions.</p>}{jobs.map(j=><section key={j.id}><h2>{j.name}</h2><SharedMeetingDecisions job={j as JobProps['job']} refresh={load}/></section>)}</>
 }
