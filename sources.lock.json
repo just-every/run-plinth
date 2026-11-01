@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "702387f8fba06589441f46505d9cc2d4ed544911df7984291e66791a4281238b",
+      "sha256": "d9dc90778e30a3079a6481afaf99019584d195d26151ec4d9de2c49156f8f12a",
       "executable": false
     },
     "DEMO.md": {
@@ -3633,7 +3633,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "8ce12b6353d48f0890abbee02b735f9fae91e15327c1a22b88f26cd4eeb3ac2e",
+      "sha256": "43994d6e10aaffef64abdaed83487c96c6b0002c14f74ebbd01d7e7377477f87",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -5589,7 +5589,7 @@
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
-      "sha256": "91c0249f424bacb752da5483160a30264ab789dd0d37fb390eeae764d5db820e",
+      "sha256": "356839fff0adedfec352e3d6f582843b6484ded405828f9bd390ffc8cec96c0a",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {

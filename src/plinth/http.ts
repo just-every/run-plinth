@@ -116,7 +116,7 @@ function display(job:Job,actor:Actor):any {
  job={...job,recovery_evidence:undefined,agent_closeout:undefined,agent_answers:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
-  return {...native,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
+  return {...native,meetings:undefined,meeting_shares:undefined,meeting_office_access:false,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
  }
  if(actor.role!=='owner'){job={...job,room_boards:undefined};delete job.followup;delete job.import_evidence}
  job={...job,estimate_performance:undefined,submittals:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('plans.')&&!a.kind.startsWith('submittal.')&&!a.kind.startsWith('estimate.performance.')),satisfaction:undefined,plan_sets:undefined,report_schedules:undefined,meeting_shares:undefined,meeting_office_access:!actor.permissions&&['owner','admin','project_manager'].includes(actor.role)} as Job

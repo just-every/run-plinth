@@ -225,6 +225,14 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
    for(const secret of ['agenda','minutes','attendees','decisions','owner_email','meeting_id','assignment_history'])assert.equal(JSON.stringify(view.value.actions).includes('"'+secret+'"'),false)
   }
   const agent=await f.agent(),agentOptions={cookie:undefined,token:agent}
+  const {runPolicy,runMcp}=await import('./agent-runs-support.mjs');await runPolicy(f)
+  const agentJob=await runMcp(f,agent,'plinth.jobs.get',{job_id:job.id});assert.equal(agentJob.status,200);assert.equal(agentJob.value.result.isError,false)
+  assert.ok(!Object.hasOwn(agentJob.value.result.structuredContent.job,'meetings'),'The MCP job projection must not expose raw meetings')
+  assert.equal(agentJob.value.result.structuredContent.job.meeting_office_access,false)
+  const resourceUri='plinth://jobs/'+job.id
+  const agentResource=await f.request('/mcp',{method:'POST',token:agent,headers:{Accept:'application\u002fjson, text\u002fevent-stream','MCP-Protocol-Version':'2026-07-28','Mcp-Method':'resources\u002fread','Mcp-Name':resourceUri},body:{jsonrpc:'2.0',id:9105,method:'resources\u002fread',params:{uri:resourceUri,_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}}})
+  assert.equal(agentResource.status,200);const resourceValue=await agentResource.json();assert.ok(!resourceValue.error,JSON.stringify(resourceValue))
+  const resourceJob=JSON.parse(resourceValue.result.contents[0].text);assert.ok(!Object.hasOwn(resourceJob,'meetings'),'The MCP job resource must not expose raw meetings');assert.equal(resourceJob.meeting_office_access,false)
   const afterSignIns=f.messages.length
   // Raw meeting results, sources and counts stay closed for every excluded audience.
   for(const name of ['field','contact','sub','custom','attendee','unassigned']) {
