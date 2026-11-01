@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "c568636ef784cc7efb9eceddfa39dad6f7cc6ae53dd772f7f23643583f9f8a2a",
+      "sha256": "fdbc67af246cd212f86e10cc374979171dcd0346f7ed4f53a8f30111725a6574",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "d8264420bdaec7dcdbff8a1f94e2a86b6b4a5a8f73e2e9524749f3a005f85e50",
+      "sha256": "f36eb9c8802182da538a44858e0c5bd3c1a1991f879b08a8bad7f1d8615a54f9",
       "executable": false
     },
     "DEMO.md": {
@@ -177,7 +177,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "baec3de661a439a5b6e76bdc48c21c883d592a6beeb8ed650d26e663af3ec34d",
+      "sha256": "f65c1dd243f1920ba403f426a985213767dec57ae2b0347136d4d5c319bbf069",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -810,6 +810,10 @@
     },
     "rer-setup.json": {
       "sha256": "7d62bc9dac64bc4658a122b4488c55ed59cab074c743d7f429e007249bc82733",
+      "executable": false
+    },
+    "RULINGS.md": {
+      "sha256": "0d85c185e1ed42e458897cfbff2b2f329f8918884229f8dd903b65f67b6861e8",
       "executable": false
     },
     "RUN-LOCALLY.md": {
