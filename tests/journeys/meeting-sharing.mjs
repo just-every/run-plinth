@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 
-export async function sharingJourney({ base, entrance, browser, page, clientPage, owner, client, job, meeting, ownerEmail, email, selection, capture }) {
+export async function sharingJourney({ base, entrance, browser, page, clientPage, owner, client, job, meeting, ownerEmail, email, selection, capture: takeCapture }) {
+ const viewport={width:1440,height:1000}
+ await page.setViewportSize(viewport);await clientPage.setViewportSize(viewport)
+ const capture=async(p,name)=>{await takeCapture(p,name);await p.setViewportSize(viewport)}
  const mailOutcome=process.env.PLINTH_MAIL_OUTCOME??'Development mail suppressed; nothing sent'
  const read=async()=>job=(await(await owner.request.get(base+'/api/plinth/jobs/'+job.id)).json()).job
  const post=async(path,data)=>{const r=await owner.request.post(base+'/api/plinth'+path,{headers:{origin:base},data});assert.ok(r.ok(),path+' '+await r.text());return r.json()}
@@ -28,7 +31,7 @@ export async function sharingJourney({ base, entrance, browser, page, clientPage
  // Recover an orphaned action through the installed reassignment review.
  const pmEmail=`synthetic-plinth-${Date.now()}@dev.localhost`
  assert.equal((await owner.request.post(base+'/auth/invite',{headers:{origin:base},data:{email:pmEmail,displayName:'Morgan Site Lead',role:'admin',returnTo:'/app'}})).status(),202)
- const field=await browser.newContext(),fieldPage=await field.newPage()
+ const field=await browser.newContext({viewport}),fieldPage=await field.newPage()
  if(process.env.PLINTH_STATE){const {nativeSignIn}=await import('../../scripts/verify/native-signin.mjs');await nativeSignIn(fieldPage,pmEmail)}
  else {const entry=new URL(entrance),hash=new URLSearchParams(entry.hash.slice(1));hash.set('as',pmEmail);hash.set('next',`/auth/dev/enter?as=${encodeURIComponent(pmEmail)}&returnTo=/app`);entry.hash=hash.toString();await fieldPage.goto(entry.href);await fieldPage.waitForURL(u=>!u.pathname.startsWith('/auth/')&&!u.pathname.startsWith('/__dev/'))}
  const person=(await(await owner.request.get(base+'/api/plinth/team')).json()).team.find(p=>p.email===pmEmail)

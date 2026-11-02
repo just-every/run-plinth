@@ -525,7 +525,7 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   }
   for(const attempt of delegateSends){
    const current=(await restarted.json('/api/plinth'+path,{cookie})).value.job
-   const stored=current.meeting_shares.find(row=>row.id===attempt.share.id).email_requests.find(row=>row.id===attempt.request.id);assert.equal(stored.status,attempt.status);assert.equal(stored.body,attempt.review.body)
+   const stored=recovered.value.shares.find(row=>row.id===attempt.share.id).email_requests.find(row=>row.id===attempt.request.id);assert.equal(stored.status,attempt.status);assert.equal(stored.body,attempt.review.body)
    const replay=await restarted.json('/api/plinth'+path+`/meeting-shares/${attempt.share.id}/send-email`,{method:'POST',cookie,body:{expected_version:current.version,request_id:attempt.request.id,digest:attempt.review.digest,confirm:true}});assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved')
   }
   assert.equal(restarted.messages.length,0,'Restart cannot replay an accepted or uncertain delivery')

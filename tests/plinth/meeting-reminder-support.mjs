@@ -10,7 +10,7 @@ export async function delegateReminderJourney(s, meeting, controls) {
  const people={}
  for(const [name,role,kind] of [['field','admin','office'],['custom','admin','office'],['client','member','client'],['sub','member','sub']]) {
   const email=['synthetic-plinth-reminder-'+name,'example.test'].join('@'),cookie=await f.invite(email,'Synthetic reminder '+name,role)
-  const person=(await s.api('/team')).value.team.find(p=>p.email===email)
+  const person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email)
   people[name]={email,cookie,person,kind,teamVersion:0}
  }
  const team=async(p,ids,extra={})=>{const r=await s.api('/team/'+p.person.id,{method:'PUT',body:{expected_version:p.teamVersion,role:p.kind==='office'?'superintendent':'crew',job_ids:ids,po_limit_cents:0,...extra}});assert.equal(r.status,200);p.teamVersion=r.value.member.version}
@@ -26,7 +26,7 @@ export async function delegateReminderJourney(s, meeting, controls) {
  const request=async(p,action=p.action,share=p.share,extra={})=>{await read();return s.api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{method:'POST',cookie:p.cookie,body:{expected_version:job.version,operation_id:crypto.randomUUID(),kind:'action_reminder',action_id:action.id,confirm:true,...extra}})}
  const preview=(p,r)=>s.api(root+`/meeting-shares/${p.share.id}/email-preview?request_id=${r.id}`)
  const send=async(p,r,review,version)=>{await read();return s.api(root+`/meeting-shares/${p.share.id}/send-email`,{method:'POST',body:{expected_version:version??job.version,request_id:r.id,digest:review.digest,confirm:true}})}
- const state=async(p,r)=>(await read()).meeting_shares.find(row=>row.id===p.share.id).email_requests.find(row=>row.id===r.id)
+ const state=async(p,r)=>(await s.api(root+`/meetings/${meeting.id}/shares`)).value.shares.find(row=>row.id===p.share.id).email_requests.find(row=>row.id===r.id)
  const pending=async p=>{const r=await request(p);assert.equal(r.status,200,JSON.stringify(r.value));const review=await preview(p,r.value.record);assert.equal(review.status,200,JSON.stringify(review.value));return {record:r.value.record,review:review.value}}
  const refused=async(p,attempt,error)=>{
   const before=f.messages.length,previous=structuredClone(await read())
@@ -53,7 +53,7 @@ export async function delegateReminderJourney(s, meeting, controls) {
   const attempt=await pending(p)
   const before=f.messages.length
   assert.equal((await request(p)).value.error,'mail_pending')
-  assert.equal((await s.api(root+`/meeting-shares/${p.share.id}/email-preview?request_id=${attempt.record.id}`,{cookie:p.cookie})).status,403,'A delegate cannot review their own outgoing reminder')
+  assert.equal((await s.api(root+`/meeting-shares/${p.share.id}/email-preview?request_id=${attempt.record.id}`,{cookie:p.cookie})).status,p.kind==='sub'?404:403,'A delegate cannot review their own outgoing reminder')
   assert.equal((await send(p,attempt.record,{...attempt.review,digest:'synthetic-plinth-stale-review'})).value.error,'mail_review')
   assert.equal(f.messages.length,before)
   if(name==='custom') {
@@ -67,9 +67,11 @@ export async function delegateReminderJourney(s, meeting, controls) {
    const gate={entered:Promise.withResolvers(),release:Promise.withResolvers()};controls.gate(gate)
    const version=(await read()).version
    const attempts=Promise.all([send(p,attempt.record,attempt.review,version),send(p,attempt.record,attempt.review,version)])
+   let gateError
    try {await Promise.race([gate.entered.promise,new Promise((_,reject)=>{const t=setTimeout(()=>reject(Error('Delegate reminder did not reach the provider')),20000);t.unref();gate.entered.promise.then(()=>clearTimeout(t))})]);assert.equal((await state(p,attempt.record)).status,'unknown','Reservation persists before the provider response')}
-   finally {gate.release.resolve();controls.gate(undefined)}
-   assert.deepEqual((await attempts).map(r=>r.status).sort(),[200,409])
+   catch(error){gateError=error} finally {gate.release.resolve();controls.gate(undefined)}
+   const results=await attempts;if(gateError)throw gateError
+   assert.deepEqual(results.map(r=>r.status).sort(),[200,409])
   } else {
    controls.uncertain(name==='sub')
    try {assert.equal((await send(p,attempt.record,attempt.review)).status,200)} finally {controls.uncertain(false)}
@@ -96,10 +98,10 @@ export async function delegateReminderJourney(s, meeting, controls) {
  const p=people.field;await team(p,[job.id]);p.share=await publish(p)
  const completed=await pending(p)
  await read();const finish=await s.api(`/meeting-inbox/${job.id}/actions/${p.action.id}/complete`,{method:'POST',cookie:p.cookie,body:{expected_version:job.version,answer:'Synthetic clearance checked',links:[]}});assert.equal(finish.status,200)
- await refused(p,completed,'meeting_action');assert.equal((await request(p)).value.error,'meeting_action')
+ await refused(p,completed,'meeting_action');assert.equal((await request(p)).value.error,'meeting_action');assert.equal((await request(p,p.action,p.share,{cancel:true,request_id:completed.record.id})).status,200)
  p.action=await newAction(p,'Synthetic reassigned reminder action');const reassigned=await pending(p)
  await act(`/meetings/${meeting.id}/reassign`,{action_id:p.action.id,owner_email:['builder','example.com'].join('@'),owner_kind:'manager',reason:'Synthetic builder takes the outstanding action'})
- await refused(p,reassigned,'meeting_action');assert.equal((await request(p)).value.error,'meeting_action')
+ await refused(p,reassigned,'meeting_action');assert.equal((await request(p)).value.error,'meeting_action');assert.equal((await request(p,p.action,p.share,{cancel:true,request_id:reassigned.record.id})).status,200)
  p.action=await newAction(p,'Synthetic suppressed reminder action');const suppressed=await pending(p)
  const unsubscribe=new URL(suppressed.review.body.match(/https?:\/\/\S+\/api\/plinth\/mail\/unsubscribe\/\S+/)[0])
  assert.equal((await fetch(f.origin+unsubscribe.pathname,{method:'POST'})).status,200)
