@@ -42,13 +42,18 @@ test('Supplied attachment text requires exact human review and current source au
    assert.equal(hit.extraction.status, variant.status); assert.equal(hit.file_checksum, createHash('sha256').update(variant.bytes).digest('hex'))
    const text = variant.text ?? (index === 3 ? variant.bytes.subarray(1).toString('utf8') : variant.term)
    assert.equal((await search({ q: variant.term })).value.count, 0)
-   if (variant.text) {
+   if (index === 0 || variant.text) {
     const other = await createActiveJob(f, 'synthetic-plinth-9320')
     const cross = await api('/jobs/' + other.id + '/decision-search/transcription-preview', {method:'POST',body:{source,checksum:hit.file_checksum,expected_version:other.version,text}})
-    assert.equal(cross.status,404,'A captured threaded original cannot be reviewed in another job')
+    assert.equal(cross.status,404,'A captured original cannot be reviewed in another job')
    }
    const review = await preview(hit, text, index === 1 ? admin : f.owner); assert.equal(review.status, 200, JSON.stringify(review.value)); assert.equal(review.value.text, text)
    assert.equal((await inspect(source)).value.revisions.length, 0, 'Preview writes no transcription')
+   if (index === 0) {
+    const snapshot = structuredClone(await read())
+    assert.equal((await save(review.value, admin)).status, 409, 'The full review belongs to its exact reviewer')
+    assert.deepEqual(await read(), snapshot, 'A different reviewer cannot append or change the job')
+   }
    assert.equal((await save(review.value, index === 1 ? admin : f.owner, { confirm: false })).status, 409)
    assert.equal((await save(review.value, index === 1 ? admin : f.owner, { text: text + ' changed' })).status, 409)
    assert.equal((await preview(hit, text, f.owner, { checksum: '0'.repeat(64) })).status, 409)
@@ -71,7 +76,13 @@ test('Supplied attachment text requires exact human review and current source au
     for (const key of ['tag', 'sheet', 'cost_code', 'sender']) assert.equal((await search({ ...filters, [key]: 'synthetic-plinth-no-match' })).value.count, 0)
     assert.equal((await api(filtered.value.results[0].href.replace('/api/plinth', ''))).value.results[0].source, source)
     const next = await preview(hit, 'synthetic-plinth-revised-9013'); assert.equal((await save(next.value)).status, 200); await read()
-    assert.equal((await inspect(source)).value.revisions.length, 2); assert.equal((await search({ q: 'synthetic-plinth-scan-9100' })).value.count, 0, 'Only the latest revision is indexed')
+    const revisions = (await inspect(source)).value.revisions
+    assert.deepEqual(revisions.map(row => [row.revision, row.text, row.checksum]), [[1, text, hit.file_checksum], [2, 'synthetic-plinth-revised-9013', hit.file_checksum]])
+    assert.ok(revisions.every(row => row.supplied_by.id === revisions[0].supplied_by.id && row.supplied_by.at))
+    const revisedHit = (await search({ source })).value.results[0]
+    assert.equal(revisedHit.file_checksum, hit.file_checksum); assert.deepEqual(revisedHit.extraction, hit.extraction)
+    assert.deepEqual(Buffer.from(await (await f.request(revisedHit.files[0].href, { cookie: f.owner })).arrayBuffer()), variant.bytes)
+    assert.equal(revisions.length, 2); assert.equal((await search({ q: 'synthetic-plinth-scan-9100' })).value.count, 0, 'Only the latest revision is indexed')
    }
   }
   assert.equal(f.messages.length, before, 'Capture, review and transcription save send nothing')
@@ -103,12 +114,18 @@ test('Supplied attachment text requires exact human review and current source au
   const adminReview = await preview(hit, 'synthetic-plinth-authority-9018', admin)
   const person = (await api('/team')).value.team.find(person => person.email === 'synthetic-plinth-9006@example.com')
   response = await api('/team/' + person.id, { method: 'PUT', body: { expected_version: person.version ?? 0, role: 'project_manager', job_ids: [job.id], po_limit_cents: 1000000 } }); assert.equal(response.status, 200, JSON.stringify(response.value))
+  const authoritySnapshot = structuredClone(await read())
   assert.equal((await save(adminReview.value, admin)).status, 403)
+  assert.deepEqual(await read(), authoritySnapshot, 'Revoked review authority makes no write')
   const hold = await api('/holds', { method: 'POST', body: { subject_kind: 'job', subject_id: job.id, kind: 'legal_hold', reason: 'synthetic-plinth-9019', confirm: true } }); assert.equal(hold.status, 201)
   assert.equal((await api(base, { method: 'DELETE', body: { expected_version: job.version } })).value.error, 'retention_hold'); assert.equal((await inspect(source)).value.revisions.length, 1)
+  assert.equal((await search({ q: 'synthetic-plinth-revised-9013' })).value.count, 1, 'A refused erasure retains searchable supplied text and originals')
   assert.equal((await api('/holds/' + hold.value.hold.id + '/release', { method: 'POST', body: { reason: 'synthetic-plinth-9020' } })).status, 200)
   assert.equal((await api(base, { method: 'DELETE', body: { expected_version: job.version } })).status, 200)
   assert.equal((await inspect(source)).status, 404); assert.equal((await search({ q: 'synthetic-plinth-revised-9013' })).status, 404)
-  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_file_transcriptions WHERE job_id=?').bind(job.id).first()).n, 0)
+  for (const table of ['pl_mail_messages', 'pl_mail_originals', 'pl_mail_files', 'pl_decision_metadata', 'pl_file_transcriptions']) assert.equal((await f.db.prepare(`SELECT count(*) AS n FROM ${table} WHERE job_id=?`).bind(job.id).first()).n, 0)
+  assert.equal((await f.request(hit.files[0].href, { cookie: f.owner })).status, 404)
+  assert.equal((await save(adminReview.value)).status, 404, 'A retained review cannot resurrect an erased source')
+  console.log('PROBE DOC-008 5-6: transcription preview and save -> consent, reviewer, stale, replay, cross-job and revoked refusals; retained checksum-bound revisions; held erase refused, released erase removes every correspondence custody table')
  } finally { await f.close() }
 })

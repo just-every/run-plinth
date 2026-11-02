@@ -6,12 +6,12 @@ export function originalEmail({ from, to, subject, text, file, id = crypto.rando
  return Buffer.from([`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Message-ID: <synthetic-plinth-${id}@example.com>`, 'Authentication-Results: mx.synthetic.local; spf=pass; dkim=pass', 'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="synthetic-plinth-journey"', '', '--synthetic-plinth-journey', 'Content-Type: text/plain; charset=utf-8', '', text, '', '--synthetic-plinth-journey', `Content-Type: ${file.mime ?? 'application/pdf'}; name="${file.name}"`, `Content-Disposition: attachment; filename="${file.name}"`, 'Content-Transfer-Encoding: base64', '', file.bytes.toString('base64'), '', '--synthetic-plinth-journey--', ''].join('\r\n'))
 }
 /** Real local Email Routing transport invokes the installed Worker's email event. */
-export async function meetingCorrespondence({ base, page, owner, job, email, post, capture }) {
+export async function meetingCorrespondence({ base, page, owner, job, email, post, capture, searchTerm = '' }) {
  const publicMessage = await post(`/jobs/${job.id}/correspondence`, { kind: 'message', subject: 'Cabinet drawing requested after site review', body: 'Please reply with the reviewed service clearances.' })
  const thread = (await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/correspondence`)).json()).messages
  const outgoing = thread.find(m => m.id === publicMessage.id)
  assert.ok(outgoing.reply_to, 'Configure the local reply domain for this installed email journey')
- const drawing = searchDocument(), raw = originalEmail({ from: email, to: outgoing.reply_to, subject: 'Reviewed cabinet service drawing', text: 'The reviewed cabinet service drawing is attached for the meeting action.', file: { name: 'client-service-drawing.pdf', bytes: drawing } })
+ const drawing = searchDocument(['Reviewed service clearances', 'Final sheet confirms service-clearance-2418', searchTerm]), raw = originalEmail({ from: email, to: outgoing.reply_to, subject: 'Reviewed cabinet service drawing', text: 'The reviewed cabinet service drawing is attached for the meeting action. ' + searchTerm, file: { name: 'client-service-drawing.pdf', bytes: drawing } })
  const emailBase=process.env.PLINTH_EMAIL_URL
  assert.ok(emailBase && ['localhost','127.0.0.1'].includes(new URL(emailBase).hostname), 'Use this installation’s local Worker transport listener')
  const transport = new URL('/cdn-cgi/local/email', emailBase)
