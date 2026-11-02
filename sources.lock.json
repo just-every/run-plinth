@@ -3761,7 +3761,7 @@
       "executable": false
     },
     "src/plinth/meeting-raw-grants.ts": {
-      "sha256": "0af4b770bc5b130d402a014dafd5885bd833f733d6c1c1fad12c24ecd221c0d8",
+      "sha256": "616ee7c0045896e6a827f9d8cff64f3d63206be8dbf3f3b6be526c934ba73564",
       "executable": false
     },
     "src/plinth/meeting-share-http.ts": {
@@ -3973,7 +3973,7 @@
       "executable": false
     },
     "src/plinth/role-gate.ts": {
-      "sha256": "ad90aaa5e0b7961323f1447aa82b08e38ea3237986c4d4621dea0c40c209e974",
+      "sha256": "7026a9512f38d7c060c64af94372c249d4ea28edfd222758c845c50c7463a19f",
       "executable": false
     },
     "src/plinth/role-model.ts": {
@@ -5621,7 +5621,7 @@
       "executable": false
     },
     "tests/plinth/meeting-raw-support.mjs": {
-      "sha256": "5ff1fb5d6d49a49f3deb9a169e8845ad516e38a7f2a6d80330d1279e2b92b847",
+      "sha256": "3b73f48c8b9eb8c90be59331a17f817a7195b21a92e5c99628f2dce6c7fe211a",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {

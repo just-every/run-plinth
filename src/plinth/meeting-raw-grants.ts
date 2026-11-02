@@ -19,7 +19,7 @@ async function authority(db: D1Database, job: Job, email: string) {
  const recipient = await recipientAuthority(db, job, { email, kind: 'office', can_comment: false })
  if (!recipient || recipient.operator_role !== 'admin') return null
  const team = await teamGrant(db, recipient.operator_id)
- return team && ['superintendent', 'project_manager', 'estimator', 'bookkeeper', 'reader'].includes(team.grant.role) && team.grant.job_ids.includes(job.id) ? recipient : null
+ return team && ['superintendent', 'project_manager', 'estimator', 'bookkeeper'].includes(team.grant.role) && team.grant.job_ids.includes(job.id) ? recipient : null
 }
 async function active(db: D1Database, job: Job, grant: MeetingRawGrant, generation: number) {
  if (grant.revocation || grant.auth_generation !== generation) return false

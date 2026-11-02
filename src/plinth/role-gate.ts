@@ -43,6 +43,6 @@ export function roleGate(actor: Actor, request: Request) {
  if (actor.permissions) enforce(actor, request)
  if (!(actor.role in rules)) return
  const path = new URL(request.url).pathname, prefix = '/api/plinth/'
- const allowed = path.startsWith(prefix) && [...rules[actor.role as keyof typeof rules], ...(['superintendent','estimator','bookkeeper','reader'].includes(actor.role) ? rawMeetingReads : [])].some(([method, pattern]) => method === request.method && pattern.test(path.slice(prefix.length).replace(/\/+$/, '')))
+ const allowed = path.startsWith(prefix) && [...rules[actor.role as keyof typeof rules], ...(['superintendent','estimator','bookkeeper'].includes(actor.role) ? rawMeetingReads : [])].some(([method, pattern]) => method === request.method && pattern.test(path.slice(prefix.length).replace(/\/+$/, '')))
  need(allowed, 'This role does not include that route', 403, 'forbidden')
 }

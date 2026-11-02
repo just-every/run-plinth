@@ -6,13 +6,16 @@ export async function proveRawMeetingGrants(f, jobId, meeting, people) {
  const job=async()=>(await get(root)).value.job
  const act=async(path,body,cookie=f.owner,token)=>f.json(root+path,{method:'POST',cookie:token?undefined:cookie,token,body:{expected_version:(await job()).version,...body}})
  const office=await f.invite(address('office'),'Raw office bookkeeper','admin')
- const unrelated=await f.invite(address('unrelated'),'Unassigned office','admin')
+ await f.invite(address('unrelated'),'Unassigned office','admin')
+ await f.invite(address('reader'),'Assigned report reader','admin')
  const all=(await get('/api/plinth/team')).value.team,officePerson=all.find(p=>p.email===address('office'))
  assert.equal((await f.json('/api/plinth/team/'+officePerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'bookkeeper',job_ids:[jobId],po_limit_cents:0}})).status,200)
+ const readerPerson=all.find(p=>p.email===address('reader'))
+ assert.equal((await f.json('/api/plinth/team/'+readerPerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'reader',job_ids:[jobId],po_limit_cents:0}})).status,200)
  const grant=(email,cookie=f.owner,extra={})=>act(`/meetings/${meeting.id}/raw-grant`,{email,reason:'Review the site coordination minutes for assigned work',confirm:true,operation_id:crypto.randomUUID(),...extra},cookie)
  const agent=await f.agent()
  const before=(await job()).version, mail=f.messages.length
- for(const email of [people.clientEmail,people.subEmail,people.customEmail,address('unrelated')])assert.equal((await grant(email)).status,403)
+ for(const email of [people.clientEmail,people.subEmail,people.customEmail,address('unrelated'),address('reader')])assert.equal((await grant(email)).status,403)
  assert.equal((await grant(people.fieldEmail,people.field)).status,403)
  assert.equal((await act(`/meetings/${meeting.id}/raw-grant`,{email:people.fieldEmail,reason:'Agent cannot authorize',confirm:true,operation_id:crypto.randomUUID()},undefined,agent)).status,403)
  assert.equal((await grant(people.fieldEmail,f.owner,{reason:''})).status,400)
