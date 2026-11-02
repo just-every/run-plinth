@@ -103,6 +103,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archiveActionPerson=(await f.json('/api/plinth/team',{cookie:f.owner})).value.team.find(p=>p.email===archiveActionEmail)
     assert.equal((await f.json('/api/plinth/team/'+archiveActionPerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'superintendent',job_ids:[job.id],po_limit_cents:0}})).status,200)
     const archiveAction=await current(`/meetings/${meeting.id}/add-action`,{title:'Archive delegated field confirmation',owner_kind:'office',owner_email:archiveActionEmail,confirm_title:true,due_on:'2026-11-06'})
+    const historicRaw=await current(`/meetings/${meeting.id}/raw-grant`,{email:archiveActionEmail,reason:'Archive field coordination review',confirm:true,operation_id:'synthetic-plinth-raw-archive-1'})
+    await current(`/meetings/${meeting.id}/revoke-raw-grant`,{grant_id:historicRaw.id,reason:'Retain the first withdrawn authorization',confirm:true,operation_id:'synthetic-plinth-raw-archive-2'})
+    const archivedRaw=await current(`/meetings/${meeting.id}/raw-grant`,{email:archiveActionEmail,reason:'Current source-installation field review',confirm:true,operation_id:'synthetic-plinth-raw-archive-3'})
+    assert.equal((await f.json(`/api/plinth/jobs/${job.id}/meetings/${meeting.id}/export.json`,{cookie:archiveActionCookie})).status,200)
     const archiveOwn=(await f.json('/api/plinth/meeting-inbox/'+job.id,{cookie:archiveActionCookie})).value.actions
     assert.deepEqual(archiveOwn.map(a=>a.id),[archiveAction.id])
     const archiveShare=await current(`/meetings/${meeting.id}/share`,{operation_id:'synthetic-plinth-archive-share',confirm:true,title:'Reviewed fixture decision for the client',body:'The reviewed fixture selection remains ready for the next meeting.',recipients:[{email:'client@example.com',kind:'client',can_comment:true}]})
@@ -381,6 +385,21 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const receivingDelegate=delegateConfirmation.headers.get('set-cookie').split(';')[0]
       assert.equal(recoveredSearch.messages.length,beforeDelegateSignIn+1,'The native delegate sign-in produces exactly its own email')
       const restoredOwn=await recoveredSearch.json('/api/plinth/meeting-inbox/'+job.id,{cookie:receivingDelegate});assert.equal(restoredOwn.status,200);assert.deepEqual(restoredOwn.value.actions,archiveOwn)
+      assert.deepEqual(restoredOwn.value.raw_meetings,[],'Source raw grants retain history but cannot authorize the receiving installation')
+      const restoredRawRoot=`/api/plinth/jobs/${job.id}/meetings/${meeting.id}`
+      assert.equal((await recoveredSearch.json(restoredRawRoot+'/export.json',{cookie:receivingDelegate})).status,403)
+      const rawSource=new URLSearchParams({source:'meetings:'+meeting.id})
+      assert.equal((await recoveredSearch.json(`/api/plinth/meeting-inbox/${job.id}/decision-search?`+rawSource,{cookie:receivingDelegate})).value.count,0)
+      const rawHistory=await recoveredSearch.json(restoredRawRoot+'/raw-grants',{cookie:receivingCookie})
+      assert.equal(rawHistory.value.grants.length,2);assert.ok(rawHistory.value.grants.every(g=>!g.active));assert.equal(rawHistory.value.grants[0].revocation.reason,'Retain the first withdrawn authorization')
+      let rawVersion=(await recoveredSearch.json('/api/plinth/jobs/'+job.id,{cookie:receivingCookie})).value.job.version
+      const freshRaw=await recoveredSearch.json(restoredRawRoot+'/raw-grant',{method:'POST',cookie:receivingCookie,body:{expected_version:rawVersion,email:archiveActionEmail,reason:'Receiving owner authorizes this exact meeting',confirm:true,operation_id:'synthetic-plinth-raw-receiving-1'}});assert.equal(freshRaw.status,200)
+      const rawExport=await recoveredSearch.json(restoredRawRoot+'/export.json',{cookie:receivingDelegate});assert.equal(rawExport.status,200);assert.equal(rawExport.value.minutes,meeting.minutes);assert.equal(rawExport.value.raw_grants,undefined);assert.ok(rawExport.value.actions.every(a=>!a.completion||a.completion.links.length===0),'Restored raw grant exposes no retained linked source snapshots')
+      assert.equal((await recoveredSearch.json(`/api/plinth/meeting-inbox/${job.id}/decision-search?`+rawSource,{cookie:receivingDelegate})).value.count,1)
+      rawVersion=(await recoveredSearch.json('/api/plinth/jobs/'+job.id,{cookie:receivingCookie})).value.job.version
+      assert.equal((await recoveredSearch.json(restoredRawRoot+'/revoke-raw-grant',{method:'POST',cookie:receivingCookie,body:{expected_version:rawVersion,grant_id:freshRaw.value.record.id,reason:'Receiving review finished',confirm:true,operation_id:'synthetic-plinth-raw-receiving-2'}})).status,200)
+      assert.equal((await recoveredSearch.json(restoredRawRoot+'/export.json',{cookie:receivingDelegate})).status,403)
+      console.log('PROBE DOC-010 7: native CLI archive restore -> raw history retained; originating grant inert; receiving owner grant reads and revokes; later journal fences old archive')
       const receivingTeam=await recoveredSearch.json('/api/plinth/team/'+archiveActionPerson.id,{method:'PUT',cookie:receivingCookie,body:{expected_version:1,role:'superintendent',job_ids:[],po_limit_cents:0}});assert.equal(receivingTeam.status,200)
       const completionPath=`/api/plinth/meeting-inbox/${job.id}/actions/${archiveAction.id}/complete`
       let receivingJob=(await recoveredSearch.json('/api/plinth/jobs/'+job.id,{cookie:receivingCookie})).value.job

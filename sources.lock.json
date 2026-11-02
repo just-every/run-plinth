@@ -1049,7 +1049,7 @@
       "executable": false
     },
     "scripts/verify/installed.mjs": {
-      "sha256": "46848c35282f0fefecf1611e57b4e11cce23255c014758489d0d9eb716f5aeb4",
+      "sha256": "ebfb45fd7278e9ba5365e8ca57d03fb56be832b93a3c93b86405f58bf0e02dca",
       "executable": false
     },
     "scripts/verify/native-signin.mjs": {
@@ -3645,7 +3645,7 @@
       "executable": false
     },
     "src/plinth/http.ts": {
-      "sha256": "feedcfe04099a54e11d9897d7b30dd9d03cef30919e8fa53f21ec248443ff9fa",
+      "sha256": "befac46a28671194f84122d083dc1db0ad835ac1667346c6e79d535fb3fd57ad",
       "executable": false
     },
     "src/plinth/import-context.ts": {
@@ -3765,7 +3765,7 @@
       "executable": false
     },
     "src/plinth/meeting-share-http.ts": {
-      "sha256": "23a787d3f3f8efeff963fe51287e1a3b002ae86e15ffb72a3bddc4c73909f116",
+      "sha256": "75c90e809b4733f1712d256cde212ba4a4c3909d46002617060e9793e631a740",
       "executable": false
     },
     "src/plinth/meeting-share-mail.ts": {
@@ -5388,6 +5388,10 @@
       "sha256": "eab6512e20683402bdc214cf6b3f9a9883da3e19551f7c60e05d102de950680c",
       "executable": false
     },
+    "tests/journeys/meeting-raw-grants.mjs": {
+      "sha256": "3b614de28ee94105f991a8f2e588163cd36499746e862d00bde4dec8fa95f2c1",
+      "executable": false
+    },
     "tests/journeys/meeting-sharing.mjs": {
       "sha256": "d9607a8fefb69b411b74fcbe190a6340529ef42734d7d008ef36af4d0cdeccb8",
       "executable": false
@@ -5637,7 +5641,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "728956a40a9ad2990e24fb48c9f2cbb6cdb5f52fe2ba9b8a5186dbe4954ab607",
+      "sha256": "c7863c8a7d11ccb2360aea71857e90abe66a227d195abb5b2df58b83228ea7cf",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {

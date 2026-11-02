@@ -85,7 +85,7 @@ import { assignedJob, authenticated, authorize, isFieldRole, isTeamRole, require
 import { permissionView, roleJobView } from './role-view'
 import { rolesResponse } from './roles'
 import { teamResponse } from './team'
-import { emptyJob, DomainError, need, object, recordApproval, type Actor, type Input, type Job } from './model'
+import { find, emptyJob, DomainError, need, object, recordApproval, type Actor, type Input, type Job } from './model'
 import { insertJob, jobOf, jobs, readClock, saveJob, transaction } from './store'
 import { acceptQuote, approveVariation, prepareQuote, prepareVariation } from './quotes'
 import { checkConflicts, approveSchedule, issueOrder, prepareOrder, prepareSchedule, receiveOrder } from './operations'

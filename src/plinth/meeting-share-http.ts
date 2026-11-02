@@ -1,3 +1,4 @@
+import type { DecisionHit } from './decision-search'
 import { projectRawMeetings } from './meeting-raw-grants'
 import { ownMeetingActions, completeMeetingDelegate, meetingWorkChoices } from './meetings'
 import { assignedJob } from './auth'
@@ -37,7 +38,7 @@ export async function meetingInboxResponse(request: Request, env: Bindings, acto
  if (parts.length === 3 && parts[2] === 'decision-search' && request.method === 'GET') {
   const params = new URL(request.url).searchParams, query = (params.get('q') ?? '').toLowerCase(), source = params.get('source')
   need(query.length <= 200, 'Search filters are limited to 200 characters')
-  const results = entry.shares.filter(s => !('revocation' in s && s.revocation) && (!source || source === 'meeting-extracts:' + s.id) && (!query || [s.title,s.body].join('\n').toLowerCase().includes(query))).map(s => ({ source:'meeting-extracts:'+s.id,title:s.title,text:s.body,sender:s.by.name,tags:[],sheet:'',cost_code:'',href:`/api/plinth/meeting-inbox/${entry.job.id}/${s.id}/export.json` }))
+  const results: DecisionHit[] = entry.shares.filter(s => !('revocation' in s && s.revocation) && (!source || source === 'meeting-extracts:' + s.id) && (!query || [s.title,s.body].join('\n').toLowerCase().includes(query))).map(s => ({ source:'meeting-extracts:'+s.id,title:s.title,text:s.body,sender:s.by.name,tags:[],sheet:'',cost_code:'',href:`/api/plinth/meeting-inbox/${entry.job.id}/${s.id}/export.json` }))
   for (const m of entry.raw_meetings) {
    const text = [m.agenda,m.minutes,m.decisions,...m.actions.map(a=>[a.title,a.completion?.answer].join('\n'))].join('\n')
    if ((!source || source === 'meetings:'+m.id) && (!query || [m.title,text].join('\n').toLowerCase().includes(query))) results.push({source:'meetings:'+m.id,title:m.title,text,sender:m.by.name,tags:m.tags,sheet:m.sheet,cost_code:m.cost_code,href:`/api/plinth/jobs/${entry.job.id}/meetings/${m.id}/export.json`})
