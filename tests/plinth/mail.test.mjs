@@ -1,3 +1,4 @@
+import { proveRawMeetingGrants } from './meeting-raw-support.mjs'
 import { searchDocument } from '../fixtures/search-document.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -418,6 +419,8 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
    assert.equal((await s.api(`/meeting-inbox/${job.id}/decision-search?q=field`,{cookie})).value.count,1)
   }
   assert.equal((await inbox(other)).value.jobs.length,0)
+  await proveRawMeetingGrants(f,job.id,meeting,{clientEmail:recipients[0].email,subEmail:recipients[3].email,customEmail:customPerson.email,fieldEmail:fieldPerson.email,field,admin})
+  await read()
   const feedback=async(cookie,body)=>{const current=(await inbox(cookie)).value.jobs[0];return s.api(`/meeting-inbox/${job.id}/${share.id}/feedback`,{method:'POST',cookie,body:{expected_version:current.version,operation_id:crypto.randomUUID(),body}})}
   assert.equal((await feedback(s.client,'Client question for the office only')).status,200)
   assert.equal((await feedback(field,'Field observation for the office only')).status,200)

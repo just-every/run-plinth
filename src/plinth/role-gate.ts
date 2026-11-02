@@ -21,6 +21,7 @@ const common: Rule[] = [
  rule('GET', 'todos'), rule('GET', 'todos/preferences'), rule('POST', 'todos/preferences'), rule('GET', `jobs/${id}/todos`), rule('GET', `jobs/${id}/todos/${id}`), rule('POST', `jobs/${id}/todos/${id}/(?:complete|reopen|comment)`),
  rule('GET', `jobs/${id}/punch`), rule('GET', `jobs/${id}/punch/export\\.(?:json|csv)`), rule('GET', `jobs/${id}/punch/files/${id}`),
 ]
+const rawMeetingReads: Rule[] = [rule('GET', `jobs/${id}/meetings(?:/${id})?(?:/export\\.json)?`), rule('GET', `jobs/${id}/decision-search`), rule('GET', `meeting-inbox(?:/${id})?(?:/decision-search)?`)]
 const rules: Record<Exclude<TeamRole, 'project_manager'>, Rule[]> = {
  // Leads are jobs still in quoting until CRM-002 adds the pipeline; proposals are quote revisions. Acceptance, selections, change orders, money records and award decisions stay with the office.
  estimator: [
@@ -42,6 +43,6 @@ export function roleGate(actor: Actor, request: Request) {
  if (actor.permissions) enforce(actor, request)
  if (!(actor.role in rules)) return
  const path = new URL(request.url).pathname, prefix = '/api/plinth/'
- const allowed = path.startsWith(prefix) && rules[actor.role as keyof typeof rules]?.some(([method, pattern]) => method === request.method && pattern.test(path.slice(prefix.length).replace(/\/+$/, '')))
+ const allowed = path.startsWith(prefix) && [...rules[actor.role as keyof typeof rules], ...(['superintendent','estimator','bookkeeper'].includes(actor.role) ? rawMeetingReads : [])].some(([method, pattern]) => method === request.method && pattern.test(path.slice(prefix.length).replace(/\/+$/, '')))
  need(allowed, 'This role does not include that route', 403, 'forbidden')
 }
