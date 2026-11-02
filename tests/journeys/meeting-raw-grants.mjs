@@ -25,6 +25,7 @@ try {
  await team('field','superintendent',[job.id]);await team('office','bookkeeper',[job.id])
  const copied=await post(owner,'/roles',{copy_of:'project_manager',name:'Copied meeting observer'});await team('custom','custom',[job.id],copied.role.id)
  const ownerEmail=(await get(owner,'/team')).team.find(p=>p.role==='owner').email
+ await act('/quotes',{lines:[{description:'Kitchen cabinetry and appliance coordination',quantity:1,unit_cents:1480000}]});await act('/quotes/'+job.quotes[0].id+'/accept',{method:'signed',evidence:'Client returned the signed kitchen scope',schedule_choice:{kind:'none',reason:'Coordinate the site task separately'}})
  const task=await act('/schedules',{trade:'Cabinetry',description:'Install reviewed cabinet layout',start:'2026-11-06T08:00:00Z',end:'2026-11-06T10:00:00Z'})
  const meeting=await act('/meetings',{title:'Kitchen clearance review',held_on:'2026-11-02',agenda:'Review appliance and cabinet clearances',minutes:'Allow 42 inches at the island. Confirm the revised refrigerator opening before cabinetry.',decisions:'Use the reviewed island layout and retain the appliance clearance.',attendees:['Builder','Jordan','Morgan'],tags:['kitchen'],sheet:'A-201',cost_code:'06-400',actions:[{title:'Check refrigerator opening on site',owner_email:ownerEmail,due_on:'2026-11-05'}]})
  await act(`/meetings/${meeting.id}/complete`,{action_id:meeting.actions[0].id,answer:'The refrigerator opening matches the reviewed layout.',links:[{kind:'schedule',id:task.id}]})

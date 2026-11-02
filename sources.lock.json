@@ -5389,7 +5389,7 @@
       "executable": false
     },
     "tests/journeys/meeting-raw-grants.mjs": {
-      "sha256": "3b614de28ee94105f991a8f2e588163cd36499746e862d00bde4dec8fa95f2c1",
+      "sha256": "9051ca6b39b3338af639be09e8c6d17c00d4f889e62342ff1a8d68717bbe4b11",
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
