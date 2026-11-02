@@ -533,7 +533,7 @@
       "executable": false
     },
     "OPERATIONS.json": {
-      "sha256": "f90ee1dc0b4a8e89cead8007457adb1d2815a813f5d6cdb46b071f23b729e2c1",
+      "sha256": "106c6d8bea5646f1160881fb601cf992ba4b2fcc3cb2ce73952fc84fda088b09",
       "executable": false
     },
     "OPERATIONS.md": {
@@ -1001,7 +1001,7 @@
       "executable": false
     },
     "scripts/installer/local.mjs": {
-      "sha256": "4cd5b0fa3937c81d5e6107522ce4288344ec7559473ccb8a6e9d4169dd8dc546",
+      "sha256": "cfa85e4498800c427146bb53c6a1530a053463698cae2fd648fc51709c96cd8d",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -3541,7 +3541,7 @@
       "executable": false
     },
     "src/plinth/decision-file-search.ts": {
-      "sha256": "40326c43caed812b11248d53fb50c9c3cbe4e00b220d88a184ca7f3f1fe58f07",
+      "sha256": "a3526fbceaa654d3f0e89c4cbfa78ee979ec953c1c4ddfa2b651a3e7bf70a14f",
       "executable": false
     },
     "src/plinth/decision-files.ts": {
@@ -3553,7 +3553,7 @@
       "executable": false
     },
     "src/plinth/decision-search.ts": {
-      "sha256": "5819c78a6024fffcf51944f792959cab7e3e0ddd43d36f5b0c9435401e2d57d0",
+      "sha256": "2c95dad1fc78df0bd9cdd6bf142e14532dd103b52fac8820f9995fb509556792",
       "executable": false
     },
     "src/plinth/delivery-permissions.ts": {
@@ -3613,7 +3613,7 @@
       "executable": false
     },
     "src/plinth/file-text.ts": {
-      "sha256": "9dab8b3af8ff1e2e3f5b9730292363cd60db643fcdbaac5185ba02e71eaeb2ee",
+      "sha256": "b516c18257d094e3b111cb159f8d1f84159b3ad4d0743ff58884db5205749da3",
       "executable": false
     },
     "src/plinth/file-transcriptions.ts": {
@@ -3725,7 +3725,7 @@
       "executable": false
     },
     "src/plinth/mail-capture.ts": {
-      "sha256": "4b91b11fa4972042ea105c8d5293098a05123acdd1d7c4380d73fd94f2e4d161",
+      "sha256": "af4d831cf5e9892c9d5a529d6573f669e2a64ae465f09cb8b81d23d035397906",
       "executable": false
     },
     "src/plinth/mail-content.ts": {
@@ -3737,7 +3737,7 @@
       "executable": false
     },
     "src/plinth/mail-http.ts": {
-      "sha256": "ffe2462a976eb8bd0b5f98d19702959e2be714b33cf00579e3569008b66a4417",
+      "sha256": "2374f57d25e0ed8dc812aa78104abbb3637a26bb83a6bb1adf01d0eb51dfdebd",
       "executable": false
     },
     "src/plinth/mail-inbound.ts": {
@@ -4065,7 +4065,7 @@
       "executable": false
     },
     "src/plinth/scheduled.ts": {
-      "sha256": "4f51986ca0497e739ea877f7d5d8160e7bfd6b3ca88e8e0a2b4a7cfe21c6e9d1",
+      "sha256": "94d378fc93d67066e129761cb329ad828fce7bd928593e341a286e2f05f3062e",
       "executable": false
     },
     "src/plinth/scope-contacts.ts": {

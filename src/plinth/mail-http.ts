@@ -1,3 +1,4 @@
+import { fileExtractionResponse } from './file-extraction-work'
 import { captureJobMail } from './mail-capture'
 import { digest } from './attachments'
 import type { Bindings } from '../auth.server'
@@ -23,9 +24,10 @@ export async function jobMailResponse(request: Request, env: Bindings, actor: Ac
   need(bytes.length === original.size && await digest(bytes) === original.checksum, 'Original email integrity check failed', 503, 'document_integrity')
   return new Response(bytes, { headers: { ...headers, 'content-type': 'application/octet-stream', 'content-disposition': 'attachment; filename=original-email.eml', 'content-security-policy': "default-src 'none'; sandbox" } })
  }
- if (parts.length === 5 && parts[3] === 'files' && request.method === 'GET') {
+ if ((parts.length === 5 && request.method === 'GET' || parts.length === 6 && parts[5] === 'extraction') && parts[3] === 'files') {
   const file = await env.DB.prepare('SELECT f.name,f.mime,f.bytes,f.checksum,f.size,m.visibility,m.counterparty FROM pl_mail_files f JOIN pl_mail_messages m ON m.id=f.message_id WHERE f.id=? AND f.job_id=?').bind(parts[4], job.id).first<{ name: string; mime: string; bytes: ArrayBuffer; checksum: string; size: number; visibility: string; counterparty: string }>()
   need(file && (actor.role !== 'member' || file.visibility === 'client' && file.counterparty === actor.email.toLowerCase()), 'File not found', 404, 'not_found')
+  if (parts.length === 6) return fileExtractionResponse(request, env.DB, actor, job, parts[4]!, body)
   const bytes = new Uint8Array(file.bytes)
   need(bytes.length === file.size && await digest(bytes) === file.checksum, 'Original attachment integrity check failed', 503, 'document_integrity')
   // Sender-supplied bytes are never rendered by this origin: always a download, never the sender's declared type.

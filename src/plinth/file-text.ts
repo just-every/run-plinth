@@ -123,3 +123,53 @@ export async function extractFileText(bytes: Uint8Array, mime: string): Promise<
  }
  return result
 }
+
+
+export interface PdfTextStep {
+ pages: { page: number; text: string }[]
+ total: number | null
+ complete: boolean
+ error?: string
+}
+/** A checkpoint contains whole pages only. A failed page is retried from its start. */
+export async function extractPdfTextStep(bytes: Uint8Array, after: number): Promise<PdfTextStep> {
+ const pages: PdfTextStep['pages'] = []
+ if (bytes.length > MAX_BYTES || !pdfRuntimeSupported()) return { pages, total: null, complete: false, error: 'PDF extraction is unavailable within the original processing bounds' }
+ const task = getDocument({ data: bytes.slice(), BinaryDataFactory: EmbeddedResourcesOnly, useWorkerFetch: false, useWasm: false, useSystemFonts: false, disableFontFace: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, enableXfa: false, stopAtErrors: true, disableAutoFetch: true, disableRange: true, disableStream: true, verbosity: 0 })
+ let destruction: Promise<void> | undefined, timedOut = false, total: number | null = null, length = 0
+ const destroy = () => destruction ??= task.destroy()
+ const timer = setTimeout(() => { timedOut = true; void destroy().catch(() => {}) }, MAX_MS)
+ let result: PdfTextStep
+ try {
+  const pdf = await task.promise
+  total = pdf.numPages
+  for (let n = after + 1; n <= Math.min(total, after + 25); n++) {
+   if (timedOut) break
+   const page = await pdf.getPage(n), reader = page.streamTextContent({ disableNormalization: true }).getReader(), pieces: string[] = []
+   let pageLength = 0
+   try {
+    while (!timedOut) {
+     const chunk = await reader.read()
+     if (chunk.done) break
+     for (const item of chunk.value.items) if ('str' in item) {
+      const value = item.str + (item.hasEOL ? '\n' : ' ')
+      pageLength += value.length
+      if (pageLength > 250_000) throw new Error('page_bound')
+      pieces.push(value)
+     }
+    }
+   } finally { await reader.cancel(); reader.releaseLock(); page.cleanup() }
+   if (timedOut) break
+   // Stop before a whole page that would exceed this step; retain its predecessor.
+   if (length + pageLength > MAX_TEXT) break
+   pages.push({ page: n, text: pieces.join('') }); length += pageLength
+  }
+  result = { pages, total, complete: after + pages.length === total, ...(timedOut && !pages.length ? { error: 'PDF step reached its time limit; retry continues at the next page' } : {}) }
+ } catch {
+  result = { pages, total, complete: false, error: timedOut ? 'PDF step reached its time limit; retry continues at the next page' : 'PDF page could not be read within processing bounds; protected or damaged originals need separate handling' }
+ } finally {
+  clearTimeout(timer)
+  try { await destroy() } catch { /* Already completed pages are independent of parser cleanup. */ }
+ }
+ return result
+}
