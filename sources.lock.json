@@ -5645,7 +5645,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "7c8d3570360f691d095e623b965d8143f9f8626eced2e28b0c66c479d97e491a",
+      "sha256": "e42c37170cb358719db21c22f0966fa4674e8453baa00f90d79f2584d8ba1914",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
