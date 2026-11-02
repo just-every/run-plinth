@@ -121,7 +121,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "038c269e0914f36cca40c820717429413433bbfd9987b554fcd7d0a94d20f551",
+      "sha256": "837dbf1ab8d2ba85b2f00d1c361c24059871069b2dfc5f6085c55d865d67fb1e",
       "executable": false
     },
     "agent-surface.json": {
@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "12dbd6a12debce4158cc33fe0392ce547899cf7b2ae647cedb5902ce6c29bbac",
+      "sha256": "86eb2d2bf68afbd51ea5a158332ee3d2063f078b9da57d633e31c36e2963a3b1",
       "executable": false
     },
     "DEMO.md": {
@@ -177,7 +177,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "50a8b05239ebf7369f9030932226046497627b9793dcc502487a573915d19e24",
+      "sha256": "a48727b1e2d150ed35cd74bc9c04eab59a8760c2e85bc7bcfaf22ab53337069a",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -5285,7 +5285,7 @@
       "executable": false
     },
     "tests/journeys/attachment-transcription.mjs": {
-      "sha256": "51bd32a3406c6c14bc1b35206858f697a74814862d41e9232b810116d0f67bce",
+      "sha256": "9e34583870dae72af49b11c280dfe51f95de181cc6e9c02e738169e060eabb6c",
       "executable": false
     },
     "tests/journeys/audit.mjs": {
@@ -5385,7 +5385,7 @@
       "executable": false
     },
     "tests/journeys/meeting-mail.mjs": {
-      "sha256": "eab6512e20683402bdc214cf6b3f9a9883da3e19551f7c60e05d102de950680c",
+      "sha256": "828d0127fb0be58eab69147f174c0d960df2d5b1075c57bb190afbe3b804341e",
       "executable": false
     },
     "tests/journeys/meeting-raw-grants.mjs": {
@@ -5397,7 +5397,7 @@
       "executable": false
     },
     "tests/journeys/meetings.mjs": {
-      "sha256": "42cc6355793cff677e3fa0bf7921030017e801b307bc60f4f0bceaf55832ef34",
+      "sha256": "90d1d348f4c312ed9f094366e3466e580caf61737a390537d2c263d18f84c435",
       "executable": false
     },
     "tests/journeys/office-attachment-search.mjs": {
@@ -5529,7 +5529,7 @@
       "executable": false
     },
     "tests/plinth/attachment-search.test.mjs": {
-      "sha256": "10ac20a7c0d40759cc78793e4d4b1bfc0c4191a97adea2998dd81225e360d712",
+      "sha256": "5812358c11056b47cf7c2065fe682dc73516733336a69bce3b8c788a65855dab",
       "executable": false
     },
     "tests/plinth/audit.test.mjs": {
@@ -5617,7 +5617,7 @@
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
-      "sha256": "d8dcebdf4056295e14c7011bb188d5c1d1a5e227756b9ef70d2f5d85757aedf7",
+      "sha256": "40cf9314ea537439f8cddba4c24d9716444c914f0c40a9235460fa3255f6d48e",
       "executable": false
     },
     "tests/plinth/meeting-raw-support.mjs": {
@@ -5641,7 +5641,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "c7863c8a7d11ccb2360aea71857e90abe66a227d195abb5b2df58b83228ea7cf",
+      "sha256": "598bab4660fe64c2b09bf795edf78f503bd4b9672f41e166ac70c100efa9f0d8",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
