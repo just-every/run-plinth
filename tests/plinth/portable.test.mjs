@@ -1,3 +1,4 @@
+import { captureExtraction, extractionApi, finishExtraction, pageTerms } from './file-extraction-support.mjs'
 import { spreadsheetDocument, threadedRecords } from '../fixtures/spreadsheet-document.mjs'
 import { questionFixture } from './agent-answers-support.mjs'
 import {closeoutFixture,closeoutMcp} from './closeout-support.mjs'
@@ -83,6 +84,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const threadedOriginal=await spreadsheetDocument(Buffer.from(png,'base64'))
     const originalEmail=Buffer.from(['From: Trade Estimator <synthetic-plinth-archive-sub@example.com>','To: builder@example.com','Subject: Archive private subcontractor bid','Message-ID: <synthetic-plinth-archive-bid@example.com>','MIME-Version: 1.0','Content-Type: multipart/mixed; boundary="synthetic-plinth-archive"','','--synthetic-plinth-archive','Content-Type: text/plain','','Private archive bid body','','--synthetic-plinth-archive','Content-Type: application/pdf; name="archive-bid.pdf"','Content-Disposition: attachment; filename="archive-bid.pdf"','Content-Transfer-Encoding: base64','',drawingBytes.toString('base64'),'','--synthetic-plinth-archive','Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="stored-threads.xlsx"','Content-Disposition: attachment; filename="stored-threads.xlsx"','Content-Transfer-Encoding: base64','',threadedOriginal.toString('base64'),'','--synthetic-plinth-archive--',''].join('\r\n'))
     const capturedEmail=await f.json(`/api/plinth/jobs/${job.id}/correspondence`,{method:'POST',cookie:f.owner,body:{kind:'capture',original_base64:originalEmail.toString('base64'),confirm:true}});assert.equal(capturedEmail.status,201,JSON.stringify(capturedEmail.value))
+    await f.scheduled(Date.parse('2026-11-02T12:00:00Z'))
     const captured= capturedEmail.value.messages.find(m=>m.id===capturedEmail.value.id)
     for(const source of ['correspondence:'+captured.id,'files:'+captured.files[0].id]){const annotation=await f.json(`/api/plinth/jobs/${job.id}/decision-search/metadata`,{method:'POST',cookie:f.owner,body:{source,tags:['archive-bid'],sheet:'A1',cost_code:'22-400'}});assert.equal(annotation.status,200,JSON.stringify(annotation.value))}
     const transcriptionSource='files:'+captured.files[0].id,transcriptionText='A1 - Kitchen plan\nA2 - Laundry plan'
@@ -276,6 +278,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archivedRoom=structuredClone(job.room_boards[0])
     const {recoveryEvidenceFixture}=await import('./recovery-evidence-support.mjs'),recoveryArchive=await recoveryEvidenceFixture(f)
     await recoveryArchive.assess();const archivedRecovery=structuredClone(recoveryArchive.recovery)
+    const archivedExtraction=await captureExtraction(f,job)
+    await extractionApi(f,archivedExtraction).action((await extractionApi(f,archivedExtraction).read()).value.extraction,'continue')
     const archivedExport=await archiveExportWork(f,job)
     const archivedQuestion=await questionFixture(f)
     const retainedAnswer=await archivedQuestion.ok('/agent-answers/'+archivedQuestion.packet.id+'/answers',{packet_digest:archivedQuestion.packet.digest,analysis:archivedQuestion.analysis})
@@ -290,7 +294,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archivedRunState=(await runApi(f,'/'+archivedRun.run.id)).value.record
     const archivedRunSchedule=await runApi(f,'/schedules',{job_id:job.id,expected_job_version:job.version,starts_at:'2026-10-29T08:00:00.000Z',purpose:'Inert recovery review',confirm:true});assert.equal(archivedRunSchedule.status,201)
     const cookie=f.owner; await f.close();f=undefined
-    const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
+    const restarted=await createFixture({persistTo:source,ownerCookie:cookie});try{const api=extractionApi(restarted,archivedExtraction);const work=(await api.read()).value.extraction;assert.equal(work.progress,25);await restarted.scheduled(Date.parse('2026-11-02T12:00:00Z'));assert.equal((await api.read()).value.extraction.progress,50);assert.equal((await api.search(pageTerms[0])).value.results[0].text.split(pageTerms[0]).length-1,1);for(const task of archivedExport.tasks){const r=await restarted.json('/api/plinth/reports/work/'+task.id,{cookie});assert.equal(r.status,200);assert.equal(r.value.task.state,task.state);assert.equal(r.value.task.progress,task.progress)}}finally{await restarted.close()}
     const before=join(folder,'before.rer'), after=join(folder,'after.rer'), roundtrip=join(folder,'roundtrip.rer')
     succeeds(command(source,'export','--output',before))
     succeeds(command(destination,'import','--input',before,'--yes'))
@@ -365,6 +369,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     assert.deepEqual(recoveredPortalJob.meetings,job.meetings,'DOC-005 private meeting, assigned completion and immutable work snapshot survive CLI recovery');assert.deepEqual(recoveredPortalJob.meeting_shares,originalRows.filter(r=>r.table==='pl_jobs'&&r.row.id===job.id).map(r=>JSON.parse(r.row.data).meeting_shares)[0],'DOC-005 extracts and prior recipient consent survive privately while pending delivery remains inert')
     for(const table of ['pl_mail_messages','pl_mail_files','pl_mail_originals','pl_decision_metadata','pl_file_transcriptions']){const records=records=>records.filter(r=>r.table===table&&r.row.job_id===job.id);assert.ok(records(originalRows).length>0);assert.deepEqual(records(restoredRows),records(originalRows),'DOC-005 private original email, file bytes, checksums and annotations survive recovery')}
     const recoveredSearch=await createFixture({persistTo:destination,ownerCookie:cookie});try{assert.equal((await recoveredSearch.request('/auth/magic-link',{method:'POST',body:{email:['builder','example.com'].join('@')}})).status,202);const confirmation=new URL(recoveredSearch.messages.at(-1).text.match(/https?:\/\/[^\s<>]+/g).find(value=>new URL(value).pathname==='/auth/confirm'));const signedIn=await recoveredSearch.request('/auth/confirm',{method:'POST',body:{token:confirmation.searchParams.get('token')}});assert.equal(signedIn.status,303);const receivingCookie=signedIn.headers.get('set-cookie').split(';')[0];await proveRecoveredWork(recoveredSearch,receivingCookie,archivedExport);
+      const recoveredExtractionApi=extractionApi(recoveredSearch,archivedExtraction,receivingCookie),recoveredExtraction=(await recoveredExtractionApi.read()).value.extraction
+      assert.equal(recoveredExtraction.status,'review_required');assert.equal(recoveredExtraction.progress,50)
+      await recoveredSearch.scheduled(Date.parse('2026-11-02T13:00:00Z'));assert.equal((await recoveredExtractionApi.read()).value.extraction.progress,50,'Restored pending extraction has no automatic execution grant')
+      assert.equal((await recoveredExtractionApi.action(recoveredExtraction,'continue')).status,409)
+      assert.equal((await recoveredExtractionApi.action(recoveredExtraction,'review',{confirm:true,checksum:'wrong'})).status,400)
+      assert.equal((await recoveredExtractionApi.action(recoveredExtraction,'review',{confirm:true,checksum:archivedExtraction.checksum})).status,200)
+      await finishExtraction(recoveredSearch,archivedExtraction,receivingCookie)
+
       const recoveryRoot='/api/plinth/jobs/'+recoveryArchive.c.job.id+'/recovery-evidence',history=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id,{cookie:receivingCookie});assert.equal(history.status,200);assert.deepEqual(history.value.case,archivedRecovery)
       const recoveredVersion=history.value.version,recoveredObservation={...recoveryArchive.observation(),expected_version:recoveredVersion}
       assert.equal((await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:recoveredObservation})).value.error,'recovery_review_required','An archive restores history but never its source review grant')
@@ -475,6 +487,8 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     await f.close(); f=undefined
     succeeds(command(source,'export','--output',after))
     const erasedRows=rows(await archive(after))
+    assert.ok(!erasedRows.some(r=>r.table==='pl_file_extraction_work'&&r.row.job_id===job.id),'Erasure removes pending extraction custody before old recovery is fenced')
+    assert.ok(!erasedRows.some(r=>r.table==='pl_file_extraction_pages'&&r.row.file_id===archivedExtraction.file.id),'Erasure removes every derived page')
     assert.ok(!erasedRows.some(r=>r.table==='pl_jobs'&&r.row.id===recoveryArchive.c.job.id),'Erasure removes private recovery observations and evidence captures')
     assert.ok(!erasedRows.some(r=>r.table.startsWith('pl_agent_run')||r.table.startsWith('pl_agent_schedule')||r.table==='pl_agent_tickets'),'Erasure removes run packets, checkpoint payloads, schedules and tickets')
     assert.ok(!erasedRows.some(r=>r.table==='pl_background_work'&&archivedExport.tasks.some(t=>t.id===r.row.id)),'Erasure removes archived export captures and outputs')

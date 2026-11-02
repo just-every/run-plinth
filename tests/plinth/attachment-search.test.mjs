@@ -35,7 +35,8 @@ test('Supplied attachment text requires exact human review and current source au
   const before = f.messages.length
   for (const [index, variant] of variants.entries()) {
    const original = captureMail(9100 + index, variant.mime, variant.bytes)
-   const captured = await post('/correspondence', { kind: 'capture', confirm: true, original_base64: original.toString('base64') }); assert.equal(captured.status, 201, JSON.stringify(captured.value))
+   const captured = await post('/correspondence', { kind: 'capture', confirm: true, original_base64: original.toString('base64') }, index === 5 ? admin : f.owner); assert.equal(captured.status, 201, JSON.stringify(captured.value))
+   if (index !== 5) await f.scheduled(Date.parse('2026-11-02T12:00:00Z'))
    const message = captured.value.messages.find(message => message.id === captured.value.id), source = 'files:' + message.files[0].id
    assert.equal([message.subject, message.body, ...message.files.map(file => file.name)].some(value => value.includes(variant.term)), false, 'The original-content term is absent from the filename and message')
    const hit = (await search({ source })).value.results[0]
@@ -127,5 +128,56 @@ test('Supplied attachment text requires exact human review and current source au
   assert.equal((await f.request(hit.files[0].href, { cookie: f.owner })).status, 404)
   assert.equal((await save(adminReview.value)).status, 404, 'A retained review cannot resurrect an erased source')
   console.log('PROBE DOC-008 5-6: transcription preview and save -> consent, reviewer, stale, replay, cross-job and revoked refusals; retained checksum-bound revisions; held erase refused, released erase removes every correspondence custody table')
+ } finally { await f.close() }
+})
+
+test('Native PDF work automatically checkpoints beyond the search window and keeps private originals, failures and erasure fenced', async () => {
+ const { captureExtraction, extractionApi, finishExtraction, pageTerms } = await import('./file-extraction-support.mjs')
+ const f = await createFixture()
+ try {
+  const job = await createActiveJob(f, 'synthetic-plinth-9583'), c = await captureExtraction(f, job), api = extractionApi(f, c)
+  let work = (await api.read()).value.extraction
+  assert.equal(work.status, 'queued'); assert.equal(work.progress, 0)
+  assert.equal((await api.search(pageTerms[0])).value.count, 0, 'Search never parses pending native originals synchronously')
+  await f.scheduled(Date.parse('2026-11-02T12:00:00Z'), '* * * * *')
+  work = (await api.read()).value.extraction
+  assert.equal(work.progress, 25); assert.equal(work.status, 'queued')
+  assert.equal((await api.search(pageTerms[0])).value.count, 1); assert.equal((await api.search(pageTerms[250])).value.count, 0)
+  const concurrent = await Promise.all([api.action(work, 'continue'), api.action(work, 'continue')])
+  assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409]); assert.equal((await api.read()).value.extraction.progress, 50)
+  const before = f.messages.length
+  work = await finishExtraction(f, c)
+  assert.equal((await api.action(work, 'continue')).status, 409)
+  assert.equal(f.messages.length, before, 'Native extraction makes no provider request')
+  const client = await f.invite(['client', 'example.com'].join('@'))
+  const privateApi = extractionApi(f, c, client)
+  assert.equal((await privateApi.search(pageTerms[0])).value.count, 0)
+  assert.equal((await privateApi.read()).status, 404)
+  assert.equal((await privateApi.action(work, 'continue')).status, 404)
+  assert.equal((await f.request(c.root + '/correspondence/files/' + c.file.id, { cookie: client })).status, 404)
+  const token = await f.agent()
+  assert.equal((await f.json(c.path, { token })).status, 403)
+  const other = await createActiveJob(f, 'synthetic-plinth-9584')
+  assert.equal((await f.json(c.path.replace(job.id, other.id), { cookie: f.owner })).status, 404)
+  assert.equal((await f.json(c.root + '/correspondence', { method: 'POST', cookie: f.owner, body: { kind: 'capture', confirm: true, original_base64: c.original.toString('base64') } })).status, 409)
+  const failed = await captureExtraction(f, job, [], protectedDocument)
+  const failureApi = extractionApi(f, failed)
+  await f.scheduled(Date.parse('2026-11-02T13:00:00Z'))
+  const failure = (await failureApi.read()).value.extraction
+  assert.equal(failure.status, 'failed'); assert.equal(failure.progress, 0); assert.match(failure.detail, /could not be read/)
+  assert.equal((await failureApi.search('synthetic-plinth-protected-9101')).value.count, 0)
+  const retry = await failureApi.action(failure, 'retry'); assert.equal(retry.status, 200)
+  await f.scheduled(Date.parse('2026-11-02T14:00:00Z'))
+  assert.equal((await failureApi.read()).value.extraction.progress, 0, 'A locked original never invents a completed page')
+  assert.equal((await api.search(pageTerms[0])).value.results[0].text.split(pageTerms[0]).length - 1, 1, 'Retry cannot duplicate another original checkpoint')
+  const hold = await f.json('/api/plinth/holds', { method: 'POST', cookie: f.owner, body: { subject_kind: 'job', subject_id: job.id, kind: 'legal_hold', reason: 'Retain this original', confirm: true } }); assert.equal(hold.status, 201)
+  let current = (await f.json(c.root, { cookie: f.owner })).value.job
+  assert.equal((await f.json(c.root, { method: 'DELETE', cookie: f.owner, body: { expected_version: current.version } })).value.error, 'retention_hold')
+  assert.equal((await api.search(pageTerms[250])).value.count, 1)
+  assert.equal((await f.json('/api/plinth/holds/' + hold.value.hold.id + '/release', { method: 'POST', cookie: f.owner, body: { reason: 'Reviewed release' } })).status, 200)
+  assert.equal((await f.json(c.root, { method: 'DELETE', cookie: f.owner, body: { expected_version: current.version } })).status, 200)
+  assert.equal((await api.read()).status, 404); assert.equal((await api.action(work, 'continue')).status, 404)
+  for (const table of ['pl_file_extraction_work', 'pl_file_extraction_pages', 'pl_file_extraction_reviews']) assert.equal((await f.db.prepare('SELECT count(*) AS n FROM ' + table).first()).n, 0)
+  assert.equal((await api.search(pageTerms[0])).status, 404)
  } finally { await f.close() }
 })

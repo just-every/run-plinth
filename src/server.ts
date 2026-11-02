@@ -1,3 +1,5 @@
+import { dispatchFileExtraction } from './plinth/file-extraction-work'
+import { authenticated } from './plinth/auth'
 import { agentHttpBoundary } from './plinth/agent-door/http'
 import { plinthAgentDoor } from './plinth/agent-door/index'
 import { plinthScheduled } from './plinth/scheduled'
@@ -43,7 +45,12 @@ async function response(request: Request, env: Bindings, execution: ExecutionCon
   const imports = await importResponse(request, runtimeBindings(env))
   if (imports) return imports
   const product = await plinthResponse(request, runtimeBindings(env))
-  if (product) return product
+  if (product) {
+    // Capture commits custody first. Native extraction runs after the response,
+    // with durable scheduled continuation if this process stops.
+    if (product.status === 201 && request.method === 'POST' && new URL(request.url).pathname.endsWith('/correspondence') && authenticated.get(request)?.role === 'owner') execution.waitUntil(dispatchFileExtraction(runtimeBindings(env).DB).catch(() => { console.error('Native PDF extraction could not continue; its durable checkpoint is retained') }))
+    return product
+  }
   // The installed variant: the Lobby at / and the public claim state it reads.
   // Local dev serves the saved origin's data at its own port (RER_DEV_ORIGIN).
   const state = await setupStateResponse(request, runtimeBindings(env))

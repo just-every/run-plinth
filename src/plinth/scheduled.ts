@@ -1,3 +1,4 @@
+import { dispatchFileExtraction } from './file-extraction-work'
 import { dispatchAgentTickets } from './agent-run-schedules'
 import { dispatchReportSchedules } from './report-schedule'
 import { runtimeBindings, type Bindings } from '../auth.server'
@@ -6,7 +7,9 @@ import { warrantyScheduled } from './warranty-cron'
 import { dispatchBidFollowUps } from './bid-follow-up'
 
 export async function plinthScheduled(controller: ScheduledController, env: Bindings) {
+ if (controller.cron === '* * * * *') { await dispatchFileExtraction(runtimeBindings(env).DB); return }
  await Promise.all([dispatchConnectors(runtimeBindings(env)), warrantyScheduled(controller, env), dispatchReportSchedules(env, controller.scheduledTime)])
+ await dispatchFileExtraction(runtimeBindings(env).DB)
  await dispatchAgentTickets(runtimeBindings(env).DB,controller.scheduledTime)
  await dispatchBidFollowUps(runtimeBindings(env).DB, controller.scheduledTime)
 }

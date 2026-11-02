@@ -1,3 +1,4 @@
+import { enqueueFileExtraction } from './file-extraction-work'
 import { mailText } from './mail-content'
 import { normalizeInbound } from '../mail.events.mjs'
 import { requireJobManager } from './auth'
@@ -28,6 +29,7 @@ export async function captureJobMail(db: D1Database, actor: Actor, job: Job, inp
   db.prepare("INSERT INTO pl_mail_messages(id,job_id,direction,visibility,kind,required,counterparty,subject,body,status,label,message_id,sender_check,by_id,by_name,created_at,status_at) VALUES(?,?,'in','private','captured',0,?,?,?,'received','Original email captured by office; sender not independently verified',?,'office capture',?,?,?,?)").bind(id, job.id, mail.from.toLowerCase(), mail.subject.slice(0, 300), (mail.text ?? mailText(mail.html ?? '')).slice(0, 100_000), mail.messageId, actor.id, actor.name, now, now),
   db.prepare('INSERT INTO pl_mail_originals(message_id,job_id,checksum,size,bytes) VALUES(?,?,?,?,?)').bind(id, job.id, checksum, bytes.length, bytes),
   ...files.map(f => db.prepare('INSERT INTO pl_mail_files(id,message_id,job_id,name,mime,checksum,size,bytes) VALUES(?,?,?,?,?,?,?,?)').bind(f.id, id, job.id, f.name, f.mime, f.checksum, f.bytes.length, f.bytes)),
+  ...enqueueFileExtraction(db, actor, job, files),
  ]
  await transaction(db, actor, job, writes, undefined, { kind: 'record', action: 'mail.capture', subject_kind: 'mail', subject_id: id, job_id: job.id, detail: { attachments: files.length } })
  return id

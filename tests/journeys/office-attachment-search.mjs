@@ -31,7 +31,7 @@ export async function officeAttachmentSearch({ base, page, owner, client, job, c
   } },
   { name: 'stored-site-slides.pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', bytes: await presentationDocument(await image('VENTILATION CLEARANCE 48 INCHES')), terms: slideTerms, state: 'unsupported' },
   { name: 'stored-site-chart.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', bytes: await chartDocument(), terms: chartTerms, state: 'unsupported' },
-  { name: 'extended-source.pdf', mime: 'application/pdf', bytes: searchDocument(Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`)), terms: ['synthetic-plinth-extended-page-001-9209', 'synthetic-plinth-extended-page-101-9209', 'synthetic-plinth-extended-page-201-9209'], required: Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`), state: 'limited' },
+  { name: 'extended-source.pdf', mime: 'application/pdf', bytes: searchDocument(Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`)), terms: ['synthetic-plinth-extended-page-001-9209', 'synthetic-plinth-extended-page-101-9209', 'synthetic-plinth-extended-page-201-9209'], required: Array.from({ length: 201 }, (_, page) => `synthetic-plinth-extended-page-${String(page + 1).padStart(3, '0')}-9209`), state: 'queued' },
  ]
  await reviewExtractedAttachments({base,page,owner,client,job,capture,variants,capturePrefix:'attachment-office'})
  const diagnoses = [

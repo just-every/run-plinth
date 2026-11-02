@@ -191,5 +191,16 @@
   "environmentSources": {
     "CLOUDFLARE_ACCOUNT_ID": "Owner-account deployment instructions in OPERATIONS.md",
     "CLOUDFLARE_API_TOKEN": "Owner-account deployment instructions in OPERATIONS.md"
+  },
+  "backgroundWork": {
+    "pdfExtraction": {
+      "scope": "Owner-captured private correspondence PDF embedded text",
+      "stepPages": 25,
+      "stepCharacters": 1000000,
+      "pageCharacters": 250000,
+      "stepMilliseconds": 15000,
+      "scheduling": "One queued original per minute; the hourly business schedule remains separate",
+      "recovery": "Page checkpoints and methods survive; execution review is excluded and must be renewed by the destination owner"
+    }
   }
 }

@@ -36,5 +36,7 @@ export async function meetingCorrespondence({ base, page, owner, job, email, pos
  const captured = (await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/correspondence`)).json()).messages.find(m => m.kind === 'captured')
  assert.ok(captured?.files[0])
  assert.deepEqual(Buffer.from(await (await owner.request.get(base + `/api/plinth/jobs/${job.id}/correspondence/${captured.id}/original`)).body()), original)
+ const extractionPath=base+`/api/plinth/jobs/${job.id}/correspondence/files/${captured.files[0].id}/extraction`
+ await expect.poll(async()=> (await(await owner.request.get(extractionPath)).json()).extraction.status).toBe('complete')
  return { inbound, captured }
 }

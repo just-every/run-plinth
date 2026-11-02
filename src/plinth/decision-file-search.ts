@@ -1,3 +1,4 @@
+import { extractedMailText } from './file-extraction-work'
 import { digest } from './attachments'
 import { extractFileText, type FileText } from './file-text'
 import { need } from './model'
@@ -18,7 +19,8 @@ export async function searchableFile(db: D1Database, jobId: string, parent: Deci
   need(bytes.length === row.size, 'Original file integrity check failed', 503, 'document_integrity')
  }
  need(checksum && await digest(bytes) === checksum, 'Original file integrity check failed', 503, 'document_integrity')
- const extraction: FileText = await extractFileText(bytes, mime)
+ const native = file.table === 'pl_mail_files' ? await extractedMailText(db, file.id, checksum) : null
+ const extraction: FileText = native ? { text: native.text, status: 'complete' } : await extractFileText(bytes, mime)
  const supplied = await latestFileTranscription(db, jobId, 'files:' + file.id, checksum)
- return { ...parent, source: 'files:' + file.id, title: file.name, text: [extraction.text, ...(supplied ? ['Human-supplied transcription:\n' + supplied.text] : [])].filter(Boolean).join('\n\n'), file_checksum: checksum, ...(supplied ? { transcription: { revision: supplied.revision, supplied_by: supplied.supplied_by } } : {}), href: parent.href.replace(/source=[^&]+/, 'source=' + encodeURIComponent('files:' + file.id)), files: [{ name: file.name, href: file.href }], extraction: { status: extraction.status, ...(extraction.detail ? { detail: extraction.detail } : {}) } }
+ return { ...parent, source: 'files:' + file.id, title: file.name, text: [extraction.text, ...(supplied ? ['Human-supplied transcription:\n' + supplied.text] : [])].filter(Boolean).join('\n\n'), file_checksum: checksum, ...(supplied ? { transcription: { revision: supplied.revision, supplied_by: supplied.supplied_by } } : {}), href: parent.href.replace(/source=[^&]+/, 'source=' + encodeURIComponent('files:' + file.id)), files: [{ name: file.name, href: file.href }], extraction: native?.extraction ?? { status: extraction.status, ...(extraction.detail ? { detail: extraction.detail } : {}) } }
 }
