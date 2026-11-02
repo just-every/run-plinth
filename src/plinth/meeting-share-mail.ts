@@ -11,6 +11,7 @@ import { optionalNotice } from './mail-model'
 import { preferences } from './todo-notices'
 import { wallClock } from './time-zone'
 import { suppression } from './mail-store'
+import { meetingDelegateAuthority } from './meetings'
 
 export interface MeetingEmailRequest {
  id: string; operation_id: string; recipient_id: string; email: string; kind: 'minutes' | 'action_reminder'; action_id?: string
@@ -37,6 +38,11 @@ export async function requestMeetingEmail(db: D1Database, job: MeetingSharingJob
 async function currentAction(db: D1Database, job: MeetingSharingJob, share: MeetingShare, email: string, id: string) {
  const meeting = find(job.meetings ?? [], share.meeting_id), action = find(meeting.actions, id)
  need(!action.completion && action.owner_email === email, 'Only the current authorized owner of an outstanding action receives its reminder', 409, 'meeting_action')
+ if (action.owner_kind && action.owner_kind !== 'manager') {
+  const authority = await meetingDelegateAuthority(db, job, action)
+  need(authority, 'The delegate no longer has current action authority', 403, 'forbidden')
+  return { action, guards: meetingShareRecipientGuards(db, authority) }
+ }
  const authority = await officeAuthority(db, job, email); need(authority, 'The action owner no longer manages this job', 403, 'forbidden')
  return { action, guards: authorityGuards(db, authority) }
 }
@@ -58,7 +64,9 @@ async function eligible(db: D1Database, job: MeetingSharingJob, share: MeetingSh
  return { subject, body, guards }
 }
 async function outgoing(env: Bindings, job: MeetingSharingJob, share: MeetingShare, request: MeetingEmailRequest) {
- const value = await eligible(env.DB, job, share, request), optional = await optionalNotice(env, request.email)
+ const value = await eligible(env.DB, job, share, request)
+ need(!await suppression(env.DB, request.email), 'The recipient suppressed optional notices', 409, 'mail_suppressed')
+ const optional = await optionalNotice(env, request.email)
  return { ...value, body: value.body + optional.text, optional }
 }
 export async function meetingEmailPreview(env: Bindings, job: MeetingSharingJob, actor: Actor, shareId: string, requestId: string) {

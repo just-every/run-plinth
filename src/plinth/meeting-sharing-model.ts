@@ -20,6 +20,7 @@ export interface MeetingShare {
 export type MeetingSharingJob = Job & { meeting_shares?: MeetingShare[] }
 export interface PublicMeetingShare {
  id: string; title: string; body: string; by: { name: string; at: string }; can_comment: boolean
+ reminder_action_ids?: string[]
  email_copy?: { id: string; kind: string; status: string; label: string }
  feedback: { id: string; body: string; by: { name: string; at: string } }[]
 }
