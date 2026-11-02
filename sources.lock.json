@@ -5621,7 +5621,7 @@
       "executable": false
     },
     "tests/plinth/meeting-raw-support.mjs": {
-      "sha256": "8e956a4e4291e25457b09e4cabadd84c1efd6bc5e5e99705d09ff1a111a7f374",
+      "sha256": "c02feb84b4e90194e63b4383cc2045e9a618d38a41ed1fafc264cc64e012a23c",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
