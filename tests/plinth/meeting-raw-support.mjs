@@ -20,6 +20,8 @@ export async function proveRawMeetingGrants(f, jobId, meeting, people) {
  assert.equal((await job()).version,before,'Refused grants leave the job unchanged')
  const fieldGrant=await grant(people.fieldEmail);assert.equal(fieldGrant.status,200,JSON.stringify(fieldGrant.value))
  const officeGrant=await grant(address('office'),people.admin);assert.equal(officeGrant.status,200,JSON.stringify(officeGrant.value))
+ for(const route of ['/meetings',`/meetings/${meeting.id}/export.json`])assert.equal((await f.json(root+route,{token:agent})).status,403,'Owner-issued agents cannot consume raw meeting grants')
+ assert.equal((await grant(people.fieldEmail)).status,409,'A replay cannot create another active grant')
  const missing=await act('/meetings',{title:'Unshared office discussion',held_on:'2026-10-26',agenda:'Other meeting',minutes:'Unshared private raw marker',decisions:'Never disclosed',attendees:['Builder'],tags:[],sheet:'',cost_code:'',actions:[]});assert.equal(missing.status,200)
  const doors=async(cookie,visible)=>{
   const list=await get(root+'/meetings',cookie)
