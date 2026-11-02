@@ -32,7 +32,7 @@ export async function proveRawMeetingGrants(f, jobId, meeting, people) {
   const one=await get(root+'/meetings/'+meeting.id,cookie);assert.equal(one.status,visible?200:403)
   const exported=await get(root+'/meetings/'+meeting.id+'/export.json',cookie);assert.equal(exported.status,visible?200:403)
   if(visible){assert.equal(exported.value.minutes,meeting.minutes);assert.equal(exported.value.raw_grants,undefined);assert.ok(exported.value.actions.every(a=>!a.completion||a.completion.links.length===0),'No retained source snapshot crosses a raw grant')}
-  const search=await get(root+'/decision-search?'+new URLSearchParams({source:'meetings:'+meeting.id}),cookie);assert.equal(search.status,200);assert.equal(search.value.count,visible?1:0)
+  const search=await get(root+'/decision-search?'+new URLSearchParams({source:'meetings:'+meeting.id}),cookie);assert.equal(search.status,visible?200:403);if(visible)assert.equal(search.value.count,1)
   const inbox=await get('/api/plinth/meeting-inbox',cookie);assert.equal(inbox.status,200);assert.equal(inbox.value.jobs.flatMap(j=>j.raw_meetings).length,visible?1:0)
   if(visible){const shared=await get('/api/plinth/meeting-inbox/'+jobId+'/decision-search?'+new URLSearchParams({source:'meetings:'+meeting.id}),cookie);assert.equal(shared.value.count,1);assert.equal(shared.value.results[0].text.includes(meeting.minutes),true);assert.equal((await get(root+'/meetings/'+missing.value.record.id,cookie)).status,404)}
  }

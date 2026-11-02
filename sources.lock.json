@@ -3553,7 +3553,7 @@
       "executable": false
     },
     "src/plinth/decision-search.ts": {
-      "sha256": "d8d7486f29ff0f16516b8b3f5b6958eff77d87bb9c0629f44c1fa9730da34599",
+      "sha256": "fcdaeceb91d4ace6a79b40bd0f499f769fac25b30f051a6a84b3318ef687ee58",
       "executable": false
     },
     "src/plinth/delivery-permissions.ts": {
@@ -5389,7 +5389,7 @@
       "executable": false
     },
     "tests/journeys/meeting-raw-grants.mjs": {
-      "sha256": "9051ca6b39b3338af639be09e8c6d17c00d4f889e62342ff1a8d68717bbe4b11",
+      "sha256": "56cf09ee8c8839ebb1fbde8e92d3c394fd2690c4897005c26f3c967430a275b9",
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
@@ -5621,7 +5621,7 @@
       "executable": false
     },
     "tests/plinth/meeting-raw-support.mjs": {
-      "sha256": "3b73f48c8b9eb8c90be59331a17f817a7195b21a92e5c99628f2dce6c7fe211a",
+      "sha256": "51c2a9ae7ec157b00853a37ec34fe5f133bed592d400d29163c5af258c88496a",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
