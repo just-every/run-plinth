@@ -404,7 +404,9 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       for (const [path, bytes] of [[restoredMailRoot + '/' + captured.id + '/original', originalEmail], [restoredMailRoot + '/files/' + captured.files[0].id, drawingBytes]]) {
        const response = await recoveredSearch.request(path, { cookie: receivingCookie }); assert.equal(response.status, 200)
        assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes, 'Receiving owner downloads byte-identical captured originals')
-       assert.equal((await recoveredSearch.request(path, { cookie: receivingDelegate })).status, 404, 'Restored internal field authority supplies no private correspondence access')
+       const denied = await recoveredSearch.request(path, { cookie: receivingDelegate })
+       assert.equal(denied.status, 403, 'Restored internal field authority supplies no private correspondence access')
+       assert.equal((await denied.json()).error, 'forbidden')
       }
       const restoredQuery = '/api/plinth/jobs/' + job.id + '/decision-search?' + new URLSearchParams({ q: 'synthetic-plinth-archive-revision-9402', tag: 'archive-bid', sender: captured.counterparty, sheet: 'A1', cost_code: '22-400' })
       const restoredMatch = await recoveredSearch.json(restoredQuery, { cookie: receivingCookie })
