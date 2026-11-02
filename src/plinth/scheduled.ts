@@ -7,6 +7,7 @@ import { warrantyScheduled } from './warranty-cron'
 import { dispatchBidFollowUps } from './bid-follow-up'
 
 export async function plinthScheduled(controller: ScheduledController, env: Bindings) {
+ if (controller.cron === '* * * * *') { await dispatchFileExtraction(runtimeBindings(env).DB); return }
  await Promise.all([dispatchConnectors(runtimeBindings(env)), warrantyScheduled(controller, env), dispatchReportSchedules(env, controller.scheduledTime)])
  await dispatchFileExtraction(runtimeBindings(env).DB)
  await dispatchAgentTickets(runtimeBindings(env).DB,controller.scheduledTime)

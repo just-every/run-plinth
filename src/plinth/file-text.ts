@@ -135,7 +135,8 @@ export interface PdfTextStep {
 export async function extractPdfTextStep(bytes: Uint8Array, after: number): Promise<PdfTextStep> {
  const pages: PdfTextStep['pages'] = []
  if (bytes.length > MAX_BYTES || !pdfRuntimeSupported()) return { pages, total: null, complete: false, error: 'PDF extraction is unavailable within the original processing bounds' }
- const task = getDocument({ data: bytes.slice(), BinaryDataFactory: EmbeddedResourcesOnly, useWorkerFetch: false, useWasm: false, useSystemFonts: false, disableFontFace: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, enableXfa: false, stopAtErrors: true, disableAutoFetch: true, disableRange: true, disableStream: true, verbosity: 0 })
+ let task: ReturnType<typeof getDocument>
+ try { task = getDocument({ data: bytes.slice(), BinaryDataFactory: EmbeddedResourcesOnly, useWorkerFetch: false, useWasm: false, useSystemFonts: false, disableFontFace: true, isOffscreenCanvasSupported: false, isImageDecoderSupported: false, enableXfa: false, stopAtErrors: true, disableAutoFetch: true, disableRange: true, disableStream: true, verbosity: 0 }) } catch { return { pages, total: null, complete: false, error: 'PDF embedded-text parser could not be initialized' } }
  let destruction: Promise<void> | undefined, timedOut = false, total: number | null = null, length = 0
  const destroy = () => destruction ??= task.destroy()
  const timer = setTimeout(() => { timedOut = true; void destroy().catch(() => {}) }, MAX_MS)

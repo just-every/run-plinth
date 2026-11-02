@@ -136,6 +136,7 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   const originalBid=Buffer.from(mime({from:'Trade Estimator <synthetic-plinth-sub@example.com>',to:'builder@example.com',subject:'Private millwork bid',id:'<synthetic-plinth-bid-2418@example.com>',text:'Private commercial bid for this job only',file:{name:'millwork-bid.pdf',type:'application/pdf',bytes:bidBytes}}))
   const sentBeforeCapture=f.messages.length
   r=await s.send({kind:'capture',original_base64:originalBid.toString('base64'),confirm:true});assert.equal(r.status,201,JSON.stringify(r.value));assert.equal(f.messages.length,sentBeforeCapture,'Original capture never sends a message')
+  await f.scheduled(Date.parse('2026-11-02T12:00:00Z'))
   const captured=r.value.messages.find(m=>m.id===r.value.id),bidSource='correspondence:'+captured.id,bidFile='files:'+captured.files[0].id
   assert.equal(captured.visibility,'private');assert.equal(captured.counterparty,'synthetic-plinth-sub@example.com');assert.equal(captured.sender_check,'office capture')
   assert.equal((await s.send({kind:'capture',original_base64:originalBid.toString('base64'),confirm:true})).status,409,'An original is captured once per job')

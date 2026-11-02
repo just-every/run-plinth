@@ -199,7 +199,7 @@
       "stepCharacters": 1000000,
       "pageCharacters": 250000,
       "stepMilliseconds": 15000,
-      "scheduling": "One queued original per scheduled invocation",
+      "scheduling": "One queued original per minute; the hourly business schedule remains separate",
       "recovery": "Page checkpoints and methods survive; execution review is excluded and must be renewed by the destination owner"
     }
   }

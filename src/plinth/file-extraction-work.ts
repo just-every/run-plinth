@@ -24,7 +24,7 @@ async function reviewed(db: D1Database, id: string) {
  return !!await db.prepare(`SELECT w.file_id FROM pl_file_extraction_work w WHERE w.file_id=? AND ${reviewSql}`).bind(id).first()
 }
 export async function fileExtractionSummary(db: D1Database, work: Work) {
- return { status: await reviewed(db, work.file_id) ? work.state : 'review_required', method: work.method, progress: work.progress, total: work.total, version: work.version, checksum: work.checksum, ...(work.error ? { detail: work.error } : {}) }
+ return { status: ['complete', 'no_text'].includes(work.state) || await reviewed(db, work.file_id) ? work.state : 'review_required', method: work.method, progress: work.progress, total: work.total, version: work.version, checksum: work.checksum, ...(work.error ? { detail: work.error } : {}) }
 }
 /** Only the already authorized parent projection may call this reader. */
 export async function extractedMailText(db: D1Database, fileId: string, checksum: string) {
@@ -75,6 +75,7 @@ export async function fileExtractionResponse(request: Request, db: D1Database, a
   if (input.action === 'review') {
    need(input.confirm === true && input.checksum === work.checksum, 'Review the exact original before enabling recovered extraction', 400, 'review_required')
    await transaction(db, actor, job, [
+    db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_file_extraction_work WHERE file_id=? AND version=?) THEN 1 ELSE 0 END').bind(fileId, work.version),
     db.prepare('INSERT INTO pl_file_extraction_reviews(file_id,checksum,owner_id,owner_version) VALUES(?,?,?,?) ON CONFLICT(file_id) DO UPDATE SET checksum=excluded.checksum,owner_id=excluded.owner_id,owner_version=excluded.owner_version').bind(fileId, work.checksum, actor.id, actor.version),
     db.prepare('UPDATE pl_file_extraction_work SET version=version+1 WHERE file_id=? AND version=?').bind(fileId, work.version),
    ], undefined, { action: 'files.extraction.review', job_id: job.id, subject_kind: 'file', subject_id: fileId })
@@ -82,7 +83,7 @@ export async function fileExtractionResponse(request: Request, db: D1Database, a
    need(await reviewed(db, fileId), 'Restored work needs destination-owner review', 409, 'review_required')
    if (input.action === 'retry') {
     need(work.state === 'failed', 'Only failed extraction can retry', 409, 'conflict')
-    await transaction(db, actor, job, [db.prepare("UPDATE pl_file_extraction_work SET state='queued',error=NULL,version=version+1 WHERE file_id=? AND version=?").bind(fileId, work.version)])
+    await transaction(db, actor, job, [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_file_extraction_work WHERE file_id=? AND version=?) THEN 1 ELSE 0 END').bind(fileId, work.version), db.prepare("UPDATE pl_file_extraction_work SET state='queued',error=NULL,version=version+1 WHERE file_id=? AND version=?").bind(fileId, work.version)])
    } else {
     need(input.action === 'continue' && work.state === 'queued', 'No queued extraction to continue', 409, 'conflict')
     await advance(db, work, actor)

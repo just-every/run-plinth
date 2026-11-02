@@ -348,6 +348,12 @@
       "name": "202610292205_agent_forecast_custody.sql",
       "sha256": "7c18e28b28f8b2944e36aefd5b2ee472c2f4ade96495e06fa8408cde4e65f8fe",
       "sql": "-- Erasure removes private forecast copies retained by transport replay and review receipts.\nCREATE TRIGGER pl_agent_forecast_erasure BEFORE DELETE ON pl_jobs BEGIN\n DELETE FROM agent_door_calls\n WHERE json_extract(outcome,'$.result.record.packet.format')='plinth-agent-forecast-v1'\n   AND json_extract(outcome,'$.result.record.packet.job_id')=OLD.id;\n DELETE FROM agent_door_approvals\n WHERE json_extract(saved,'$.tool') IN ('plinth.forecast.read','plinth.forecast.prepare')\n   AND json_extract(saved,'$.args.job_id')=OLD.id;\n DELETE FROM agent_door_reviews\n WHERE json_extract(saved,'$.tool') IN ('plinth.forecast.read','plinth.forecast.prepare')\n   AND json_extract(saved,'$.args.job_id')=OLD.id;\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202611020100_file_extraction.sql",
+      "sha256": "67e7da5506ccfeeb6d9e9f1e071425a9a0dbf644938063ff5e21bd54e6d673f7",
+      "sql": "-- Native checkpoints belong to the exact original and disappear with its custody.\nCREATE TABLE pl_file_extraction_work (\n file_id TEXT PRIMARY KEY REFERENCES pl_mail_files(id) ON DELETE CASCADE,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n version INTEGER NOT NULL DEFAULT 1,\n state TEXT NOT NULL CHECK(state IN ('queued','complete','no_text','failed')),\n method TEXT NOT NULL,\n progress INTEGER NOT NULL DEFAULT 0,\n total INTEGER,\n error TEXT,\n updated_at TEXT NOT NULL\n);\nCREATE TABLE pl_file_extraction_pages (\n file_id TEXT NOT NULL REFERENCES pl_file_extraction_work(file_id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n page INTEGER NOT NULL,\n text TEXT NOT NULL,\n text_checksum TEXT NOT NULL,\n PRIMARY KEY(file_id,page)\n);\n-- Execution authority is deliberately excluded from portable archives.\nCREATE TABLE pl_file_extraction_reviews (\n file_id TEXT PRIMARY KEY REFERENCES pl_file_extraction_work(file_id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n owner_id TEXT NOT NULL,\n owner_version INTEGER NOT NULL\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -378,7 +384,8 @@
     "STRIPE_WEBHOOK_SECRET"
   ],
   "schedules": [
-    "0 * * * *"
+    "0 * * * *",
+    "* * * * *"
   ],
   "queueConsumers": [],
   "healthPath": "/health",
