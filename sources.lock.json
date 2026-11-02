@@ -541,7 +541,7 @@
       "executable": false
     },
     "OPERATIONS.md": {
-      "sha256": "cf6b5ef424bd1892937b065f7ee997354eec86c9243aa3994dd09eac6c437e6b",
+      "sha256": "853437bcf4e49234b44e2c4fca4027f523cd1da43a13d62ae2654f50db30ca79",
       "executable": false
     },
     "package.json": {
@@ -4333,7 +4333,7 @@
       "executable": false
     },
     "src/server.ts": {
-      "sha256": "efa8b4c2ab4ec2dea7876d20df5eee50f38089b823da1d7436a10661d7d03e0f",
+      "sha256": "dca5d6dab6bc71e6395d717d4156d52ff0284654cb5e864b74d850bba9feef20",
       "executable": false
     },
     "src/site/docs/DocsPage.tsx": {
@@ -4810,6 +4810,10 @@
     },
     "src/ui/estimate-revisions.tsx": {
       "sha256": "af5428011c530737d93b39929ee5ce0f4367cbcae768076765af678518d7a1b8",
+      "executable": false
+    },
+    "src/ui/file-extraction-progress.tsx": {
+      "sha256": "867ec80308b5baa86bc9b6d6201dd2b44b138c8573670971ac9e5da0df9cac03",
       "executable": false
     },
     "src/ui/file-transcription.tsx": {
@@ -5344,6 +5348,10 @@
       "sha256": "65aa2a4a02acae128844e85b4b4e465b24b35b9f145afc115fd61174a85b562c",
       "executable": false
     },
+    "tests/journeys/file-extraction.mjs": {
+      "sha256": "ede04b3da1c7739ac7f6a0ccf5eede61c7b7b742c58d5f700291ffcb5cfab315",
+      "executable": false
+    },
     "tests/journeys/followup-rules.mjs": {
       "sha256": "a2f4b04eebb7495c98326728020d0f8cc3ad1212d41bc737a189179202ea74d5",
       "executable": false
@@ -5385,7 +5393,7 @@
       "executable": false
     },
     "tests/journeys/meeting-mail.mjs": {
-      "sha256": "bd3214e0b8ff3c3cbcc09ed5dace34deefc5daa0afd206cf972ed6b4df14a205",
+      "sha256": "b064958b18e1dbe2dae017c7c3ca24bfc14b547905a6a3baf4dc8b4674816238",
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
@@ -5594,6 +5602,10 @@
     },
     "tests/plinth/estimates.test.mjs": {
       "sha256": "e519ec4b783af2f2e7f8af91f7aae47ae852b754d627fff77a342cfcbf4f6229",
+      "executable": false
+    },
+    "tests/plinth/file-extraction-support.mjs": {
+      "sha256": "5257eab24d84c5c3bbeae57467aaab4f513159d0884a2fd4a6de21519803f56b",
       "executable": false
     },
     "tests/plinth/followup-support.mjs": {

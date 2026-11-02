@@ -137,3 +137,27 @@ backup. Credentials and standing connector authority remain excluded.
 This native export workflow does not qualify credential rotation during large
 drawing or import work, background AI or other drawing and import processing,
 or external provider connector recovery.
+
+
+### Native correspondence PDF extraction
+
+An owner capture retains the original bytes and queues embedded PDF text work
+in the same custody transaction. The installed Worker starts a background step
+after capture; the separate minute schedule resumes durable pending work. Each
+step reads at most 25 whole pages, one million characters and 15 seconds. A page
+over 250,000 characters stops with an explicit failure; completed pages remain
+searchable. The original upload limits stay fixed. Image recognition, passwords
+and other document formats retain their existing separate boundaries.
+
+Decision search shows the method, completed page count, total when known, and
+any failure. The owner can process the next step or retry a failed step. Search
+reads completed checkpoints through the original's current parent access; it
+does not parse pending native PDFs. Human-supplied transcriptions remain separate.
+No remote resources are fetched and no password is accepted by this worker.
+
+Archives retain work and checksum-bound page checkpoints, excluding execution
+reviews. Completed text remains available through its source. Pending recovered
+work stays inactive until the destination owner reviews the exact original and
+enables extraction. Job holds protect custody; erasure removes work, page text
+and reviews with the original, and the existing later-journal recovery fence
+still applies.

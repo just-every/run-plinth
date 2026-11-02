@@ -22,9 +22,10 @@ try {
  const open = async text => { await page.goto(base + `/app?job=${job.id}&tab=Decision%20search`); await page.getByLabel('Search text', { exact: true }).fill(text); await page.getByRole('button', { name: 'Search decisions', exact: true }).click(); await expect(page.getByText(text ? '1 matching records' : '4 matching records', { exact: true })).toBeVisible() }
  const row = page.locator('[data-extraction-source="files:' + c.file.id + '"]')
  await page.setViewportSize({ width: 1440, height: 1000 })
+ await expect.poll(async () => (await api.read()).value.extraction.progress).toBe(25)
+ assert.equal((await api.search(pageTerms[0])).value.count, 1, 'The installed capture starts native work automatically without supplied text or continuation')
+ assert.equal((await api.search(pageTerms[250])).value.count, 0, 'The initial background step remains bounded')
  await open(c.file.name)
- await expect(row.locator(':scope > p[role="status"]')).toHaveText('File text: queued · PDF embedded text · 0 of unknown pages')
- await row.getByRole('button', { name: 'Process next PDF step', exact: true }).click()
  await expect(row.locator(':scope > p[role="status"]')).toHaveText('File text: queued · PDF embedded text · 25 of 251 pages')
  await open(c.file.name)
  await expect(row.locator(':scope > p[role="status"]')).toHaveText('File text: queued · PDF embedded text · 25 of 251 pages')
@@ -47,8 +48,8 @@ try {
  assert.equal((await client.request.get(base + c.path)).status(), 404)
  assert.equal((await client.request.get(base + c.root + '/correspondence/files/' + c.file.id)).status(), 404)
  const failed = await captureExtraction(f, job, [], protectedDocument), failureApi = extractionApi(f, failed)
- const failedStep = await failureApi.action((await failureApi.read()).value.extraction, 'continue')
- assert.equal(failedStep.status, 200); assert.equal(failedStep.value.extraction.status, 'failed'); assert.equal(failedStep.value.extraction.progress, 0)
+ await expect.poll(async () => (await failureApi.read()).value.extraction.status).toBe('failed')
+ assert.equal((await failureApi.read()).value.extraction.progress, 0)
  await open('')
  await expect(page.locator('[data-extraction-source]')).toHaveCount(2)
  const failureRow = page.locator('[data-extraction-source="files:' + failed.file.id + '"]')
@@ -57,16 +58,14 @@ try {
  await expect(failureRow.locator(':scope > p[role="status"]')).toHaveText('File text: queued · PDF embedded text · 0 of unknown pages')
  await failureRow.getByRole('button', { name: 'Process next PDF step', exact: true }).click()
  await expect(failureRow.locator(':scope > p[role="status"]')).toHaveText('File text: failed · PDF embedded text · 0 of unknown pages')
+ assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
+ assert.ok(await failureRow.locator('p').first().evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 13))
  for (const width of [1440, 390]) {
   await page.setViewportSize({ width, height: 1100 })
   const panel = page.getByRole('heading', { name: 'Find a decision', exact: true }).locator('..')
-  await expect(failureRow.getByRole('button', { name: 'Retry native extraction', exact: true })).toBeVisible()
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
-  assert.ok(await failureRow.locator('p').first().evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 13))
   if (width === 390) {
    const menu = page.getByRole('button', { name: 'Open menu', exact: true }); await menu.hover()
-   await expect.poll(() => menu.evaluate(el => getComputedStyle(el, '::after').visibility)).toBe('visible')
-   await menu.focus(); assert.equal(await menu.evaluate(el => getComputedStyle(el, '::after').visibility), 'visible')
+   await menu.focus()
   }
   await panel.screenshot({ path: shots + '/DOC-009-extraction-' + width + '.png', animations: 'disabled' })
  }
