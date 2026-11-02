@@ -7,7 +7,7 @@ import { teamGrant } from './team'
 import { warrantyGeneration } from './warranty-store'
 
 export interface MeetingRawGrant {
- id: string; operation_id: string; recipient: MeetingShareRecipient; reason: string; by: Stamp; auth_generation: number
+ id: string; operation_id: string; recipient: MeetingShareRecipient & { team_assignment_id: string }; reason: string; by: Stamp; auth_generation: number
  revocation?: { operation_id: string; reason: string; by: Stamp }
 }
 export const nativeMeetingReader = (actor: Actor, job: Job) => !!actor.session_id && !actor.credential_id && !actor.permissions && ['owner', 'admin', 'project_manager'].includes(actor.role) && assignedJob(actor, job)
@@ -19,12 +19,14 @@ async function authority(db: D1Database, job: Job, email: string) {
  const recipient = await recipientAuthority(db, job, { email, kind: 'office', can_comment: false })
  if (!recipient || recipient.operator_role !== 'admin') return null
  const team = await teamGrant(db, recipient.operator_id)
- return team && ['superintendent', 'project_manager', 'estimator', 'bookkeeper'].includes(team.grant.role) && team.grant.job_ids.includes(job.id) ? recipient : null
+ if (!team || !['superintendent', 'project_manager', 'estimator', 'bookkeeper'].includes(team.grant.role) || !team.grant.job_ids.includes(job.id)) return null
+ // Legacy assignments stay grantable; every subsequent team write has a unique identity.
+ return { ...recipient, team_assignment_id: team.grant.assignment_id ?? JSON.stringify(team.grant.updated_by) }
 }
 async function active(db: D1Database, job: Job, grant: MeetingRawGrant, generation: number) {
  if (grant.revocation || grant.auth_generation !== generation) return false
  const current = await authority(db, job, grant.recipient.email), saved = grant.recipient
- return !!current && current.operator_id === saved.operator_id && current.operator_version === saved.operator_version && current.team_version === saved.team_version
+ return !!current && current.operator_id === saved.operator_id && current.operator_version === saved.operator_version && current.team_version === saved.team_version && current.team_assignment_id === saved.team_assignment_id
 }
 /** History travels with the meeting; authority is bound to this installation and exact current assignment. */
 export async function rawGrantHistory(db: D1Database, job: Job, actor: Actor, meetingId: string) {
@@ -53,7 +55,7 @@ export async function rawGrantAction(db: D1Database, job: Job, actor: Actor, inp
  const record: MeetingRawGrant = { id: crypto.randomUUID(), operation_id, recipient, reason, by: stamp(actor), auth_generation: generation }
  ;(meeting.raw_grants ??= []).push(record)
  meeting.history.push({ kind: 'raw-granted', by: stamp(actor), detail: record.id })
- return { record, writes: [...recipientGuards(db, recipient), db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_auth_settings WHERE singleton=1 AND generation=?) THEN 1 ELSE 0 END').bind(generation)] }
+ return { record, writes: [...recipientGuards(db, recipient), db.prepare("INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_team WHERE operator_id=? AND COALESCE(json_extract(data,'$.assignment_id'),json_extract(data,'$.updated_by'))=?) THEN 1 ELSE 0 END").bind(recipient.operator_id, recipient.team_assignment_id), db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM oa_auth_settings WHERE singleton=1 AND generation=?) THEN 1 ELSE 0 END').bind(generation)] }
 }
 /** A raw grant never carries retained snapshots, private messages, grants or another record's authority. */
 function readOnly(meeting: Meeting): Meeting {

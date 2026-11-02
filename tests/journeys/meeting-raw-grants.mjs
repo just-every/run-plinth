@@ -21,7 +21,7 @@ try {
  let {job}=await post(owner,'/jobs',{name:'Alder kitchen coordination',client_email:people.client.email,address:'148 Alder Street, Portland'})
  const read=async()=>job=(await get(owner,'/jobs/'+job.id)).job
  const act=async(path,data={})=>{await read();const r=await post(owner,`/jobs/${job.id}`+path,{expected_version:job.version,...data});await read();return r.record}
- const team=async(key,role,ids,role_id)=>{const d=people[key],r=await post(owner,'/team/'+d.person.id,{expected_version:d.version,role,job_ids:ids,po_limit_cents:0,...(role_id?{role_id}:{})},'put');d.version=r.member.version}
+ const team=async(key,role,ids,role_id)=>{const d=people[key],r=await post(owner,'/team/'+d.person.id,{expected_version:d.version,role,job_ids:ids,po_limit_cents:0,...(role_id?{role_id}:{})},'put');d.version=r.member.version??0}
  await team('field','superintendent',[job.id]);await team('office','bookkeeper',[job.id])
  const copied=await post(owner,'/roles',{copy_of:'project_manager',name:'Copied meeting observer'});await team('custom','custom',[job.id],copied.role.id)
  const ownerEmail=(await get(owner,'/team')).team.find(p=>p.role==='owner').email
@@ -69,6 +69,20 @@ try {
  await open(people.field.page);await expect(people.field.page.getByText('No current raw meeting grants.',{exact:true})).toBeVisible();await expect(people.field.page.getByRole('heading',{name:meeting.title,exact:true})).toHaveCount(0);assert.equal((await people.field.context.request.get(base+`/api/plinth/jobs/${job.id}/meetings/${meeting.id}/export.json`)).status(),403);assert.equal((await people.field.context.request.get(base+`/api/plinth/jobs/${job.id}/decision-search?source=meetings:${meeting.id}`)).status(),403);assert.equal((await get(people.field.context,'/meeting-inbox')).jobs.flatMap(j=>j.raw_meetings).length,0);await capture(people.field.page,'revoked-reader')
  await team('office','bookkeeper',[]);await people.office.page.goto(base+'/app?view=meetings');await expect(people.office.page.getByRole('heading',{name:meeting.title,exact:true})).toHaveCount(0);assert.equal((await people.office.context.request.get(base+`/api/plinth/jobs/${job.id}/meetings/${meeting.id}/export.json`)).status(),404);await capture(people.office.page,'lost-assignment')
  await team('office','bookkeeper',[job.id]);await open(people.office.page);await expect(people.office.page.getByText('No current raw meeting grants.',{exact:true})).toBeVisible()
+ const lapsed=await act('/meetings/'+meeting.id+'/raw-grant',{email:people.field.email,reason:'Review the next site coordination step',confirm:true,operation_id:crypto.randomUUID()})
+ await team('field','superintendent',[]);await team('field','admin',[]);await team('field','superintendent',[job.id])
+ const unchanged=await read()
+ await open(people.field.page);await expect(people.field.page.getByText('No current raw meeting grants.',{exact:true})).toBeVisible();await expect(people.field.page.getByRole('heading',{name:meeting.title,exact:true})).toHaveCount(0)
+ for(const path of ['/meetings','/meetings/'+meeting.id,'/meetings/'+meeting.id+'/export.json','/decision-search?source=meetings:'+meeting.id])assert.equal((await people.field.context.request.get(base+'/api/plinth/jobs/'+job.id+path)).status(),403,'Recreated assignment supplies no fresh raw authorization')
+ assert.equal((await get(people.field.context,'/meeting-inbox')).jobs.flatMap(j=>j.raw_meetings).length,0)
+ assert.deepEqual(await read(),unchanged,'Refused reads retain all meeting history unchanged')
+ assert.equal((await get(owner,'/jobs/'+job.id+'/meetings/'+meeting.id+'/raw-grants')).grants.find(g=>g.id===lapsed.id).active,false)
+ await capture(people.field.page,'reassigned-denied')
+ await act('/meetings/'+meeting.id+'/raw-grant',{email:people.field.email,reason:'Fresh owner review of the recreated assignment',confirm:true,operation_id:crypto.randomUUID()})
+ await open(people.field.page);await expect(people.field.page.getByText(meeting.minutes,{exact:false})).toBeVisible()
+ assert.equal((await get(people.field.context,'/jobs/'+job.id+'/meetings/'+meeting.id+'/export.json')).minutes,meeting.minutes)
+ await capture(people.field.page,'fresh-grant-read')
+ console.log('PROBE DOC-010 BLOCKING B: installed superintendent reassignment after administrator transition -> raw pages, requests, search, counts and export stay closed until fresh owner authorization; history retained; 1440 and 390')
  assert.equal(await mail(),before,'Raw grants and reads never send mail')
  console.log('DOC-010 raw grants PASS: named field and office page, direct API, search, counts and private export; linked snapshots excluded; client, copied role, cross-job, revoked and lost-assignment reads refused; 1440 and 390. Native archive recovery is covered by the portable CLI journey.')
 } catch(error){for(const [i,ctx] of browser.contexts().entries())for(const p of ctx.pages())if(p.url().startsWith(base+'/app')){await p.screenshot({path:`${shots}/DOC-010-raw-failure-${i}.png`,fullPage:true});await writeFile(`${shots}/DOC-010-raw-failure-${i}.txt`,await p.locator('body').innerText());break}throw error} finally {await browser.close()}

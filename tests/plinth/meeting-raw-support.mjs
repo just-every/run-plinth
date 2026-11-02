@@ -49,8 +49,32 @@ export async function proveRawMeetingGrants(f, jobId, meeting, people) {
  assert.equal((await get(root+'/meetings',office)).status,404)
  assert.equal((await f.json('/api/plinth/team/'+officePerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:2,role:'bookkeeper',job_ids:[jobId],po_limit_cents:0}})).status,200)
  await doors(office,false)
+ assert.equal((await f.json('/api/plinth/team/'+officePerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:3,role:'admin'}})).status,200)
+ assert.equal((await f.json('/api/plinth/team/'+officePerson.id,{method:'PUT',cookie:f.owner,body:{expected_version:0,role:'bookkeeper',job_ids:[jobId],po_limit_cents:0}})).status,200)
+ await doors(office,false)
+ const fieldPerson=all.find(p=>p.email===people.fieldEmail)
+ assert.equal((await grant(people.fieldEmail)).status,200)
+ const assignField=async(role,job_ids)=>{
+  const person=(await get('/api/plinth/team')).value.team.find(p=>p.id===fieldPerson.id)
+  const result=await f.json('/api/plinth/team/'+person.id,{method:'PUT',cookie:f.owner,body:{expected_version:person.version??0,role,job_ids,po_limit_cents:0}})
+  assert.equal(result.status,200,JSON.stringify(result.value))
+ }
+ for(let cycle=0;cycle<2;cycle++){
+  await assignField('superintendent',[])
+  assert.equal((await get(root+'/meetings/'+meeting.id,people.field)).status,404)
+  await assignField('admin',[])
+  await assignField('superintendent',[jobId])
+  const unchanged=await job()
+  await doors(people.field,false)
+  assert.deepEqual(await job(),unchanged,'Reassignment reads cannot change meeting history or revive a grant')
+ }
+ const renewed=await grant(people.fieldEmail);assert.equal(renewed.status,200)
+ await doors(people.field,true)
+ assert.equal((await act('/meetings/'+meeting.id+'/revoke-raw-grant',{grant_id:renewed.value.record.id,reason:'Fresh review completed',confirm:true,operation_id:crypto.randomUUID()})).status,200)
+ await doors(people.field,false)
+ console.log('PROBE DOC-010 BLOCKING B: remove superintendent assignment, switch to administrator and reassign twice -> old grant stays inactive across API, search, counts, inbox and export; fresh owner grant restores access and revokes')
  const history=(await get(root+`/meetings/${meeting.id}/raw-grants`)).value.grants
- assert.equal(history.length,2);assert.equal(history.find(g=>g.id===fieldGrant.value.record.id).revocation.reason,'Field coordination review is finished');assert.ok(history.every(g=>g.active===false))
+ assert.equal(history.length,4);assert.equal(history.find(g=>g.id===fieldGrant.value.record.id).revocation.reason,'Field coordination review is finished');assert.ok(history.every(g=>g.active===false))
  assert.ok((await get('/api/plinth/audit?kind=permission')).value.events.some(e=>e.action==='meetings.raw-grant'))
  assert.equal(f.messages.length,mail,'Grant, reads, refusal and revocation send nothing')
  console.log('PROBE DOC-010 4: owner and administrator raw grants -> named field and office read minutes, decisions and actions; unsafe audiences and writes refused')

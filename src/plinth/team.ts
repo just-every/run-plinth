@@ -6,7 +6,7 @@ import { roleOf } from './role-store'
 
 /** A project manager is an operator-auth administrator narrowed to assigned jobs and an owner-set PO approval limit (USD cents, inclusive).
  * ROLE-002: an estimator, superintendent or crew member is the same narrowing with a different preset; their PO limit is always zero. */
-export interface TeamGrant { role: TeamRole | 'custom'; /** ROLE-006: a custom role names the operator-auth role it rides on and its definition. */ base?: TeamRole | 'admin'; role_id?: string; job_ids: string[]; po_limit_cents: number; updated_by: Stamp }
+export interface TeamGrant { /** Unique for every saved assignment, even when an administrator transition resets its version. */ assignment_id?: string; role: TeamRole | 'custom'; /** ROLE-006: a custom role names the operator-auth role it rides on and its definition. */ base?: TeamRole | 'admin'; role_id?: string; job_ids: string[]; po_limit_cents: number; updated_by: Stamp }
 const presets: TeamRole[] = ['project_manager', 'estimator', 'superintendent', 'crew', 'bookkeeper', 'reader']
 const headers = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }
 /** Read on every request, so a role or assignment change applies on that person's next request. */
@@ -42,7 +42,7 @@ export async function teamResponse(request: Request, db: D1Database, actor: Acto
  const job_ids = base === 'admin' ? [] : [...new Set((input.job_ids as unknown[]).map(j => text(j, 'job id', 100)))]
  const known = job_ids.length ? (await db.prepare(`SELECT count(*) AS n FROM pl_jobs WHERE id IN (${job_ids.map(() => '?').join(',')})`).bind(...job_ids).first<{ n: number }>())!.n : 0
  need(known === job_ids.length, 'Assign existing jobs only', 404, 'not_found')
- const role = input.role as TeamRole | 'custom', grant: TeamGrant = { role, ...(custom ? { base, role_id: custom.role.id } : {}), job_ids, po_limit_cents: role === 'project_manager' ? cents(input.po_limit_cents, 'po_limit_cents') : 0, updated_by: stamp(actor) }, version = (previous?.version ?? 0) + 1, data = JSON.stringify(grant)
+ const role = input.role as TeamRole | 'custom', grant: TeamGrant = { assignment_id: crypto.randomUUID(), role, ...(custom ? { base, role_id: custom.role.id } : {}), job_ids, po_limit_cents: role === 'project_manager' ? cents(input.po_limit_cents, 'po_limit_cents') : 0, updated_by: stamp(actor) }, version = (previous?.version ?? 0) + 1, data = JSON.stringify(grant)
  await transaction(db, actor, null, [stale, db.prepare('INSERT INTO pl_team(operator_id,version,data) VALUES(?,?,?) ON CONFLICT(operator_id) DO UPDATE SET version=excluded.version,data=excluded.data').bind(id, version, data), audit(`${id}:${role === 'custom' ? 'custom:' + custom!.role.id : role}:${version}`), ...(custom ? [db.prepare('INSERT INTO pl_guard(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM pl_roles WHERE id=? AND version=?) THEN 1 ELSE 0 END').bind(custom.role.id, custom.version)] : [])], clock)
  return Response.json({ member: { id, version, ...grant } }, { headers })
 }
