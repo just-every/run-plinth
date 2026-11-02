@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "85c31092a2b8e7a9a938779bda19c0f64e2dad8c288a313f54044c66f0cfff31",
+      "sha256": "12dbd6a12debce4158cc33fe0392ce547899cf7b2ae647cedb5902ce6c29bbac",
       "executable": false
     },
     "DEMO.md": {
@@ -3781,7 +3781,7 @@
       "executable": false
     },
     "src/plinth/meetings.ts": {
-      "sha256": "fe796c6d2398093d05bf24585ea3100bd571a171e3abaea18a03aca4f06e9f72",
+      "sha256": "f2ae60a26ba2af97d8b060ed6cf0423732f1036307a4715a6b9d59f02bd465eb",
       "executable": false
     },
     "src/plinth/model.ts": {
