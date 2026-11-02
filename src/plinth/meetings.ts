@@ -17,7 +17,7 @@ export interface MeetingAction {
  completion?: { answer: string; links: WorkLink[]; message_id?: string; by: Stamp }
  appended_links?: { links: WorkLink[]; by: Stamp }[]
 }
-export interface Meeting { id: string; title: string; held_on: string; agenda: string; minutes: string; attendees: string[]; decisions: string; tags: string[]; sheet: string; cost_code: string; by: Stamp; actions: MeetingAction[]; history: { kind: string; by: Stamp; detail: string }[] }
+export interface Meeting { raw_grants?: import('./meeting-raw-grants').MeetingRawGrant[]; id: string; title: string; held_on: string; agenda: string; minutes: string; attendees: string[]; decisions: string; tags: string[]; sheet: string; cost_code: string; by: Stamp; actions: MeetingAction[]; history: { kind: string; by: Stamp; detail: string }[] }
 export interface OwnMeetingAction { id: string; title: string; due_on: string; assigner: { name: string; at: string }; meeting_on: string; completed: boolean }
 /** Raw records remain office-only. An action assignment grants no raw meeting door. */
 export function meetingAccess(actor: Actor) { requireJobManager(actor); need(!actor.permissions, 'Meeting access is not included in this custom role', 403, 'forbidden') }

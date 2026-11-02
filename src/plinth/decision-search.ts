@@ -1,3 +1,4 @@
+import { projectRawMeetings } from './meeting-raw-grants'
 import { projectMeetingShares } from './meeting-sharing'
 import { thread } from './mail-store'
 import { decisionMetadata } from './decision-metadata'
@@ -20,7 +21,7 @@ export async function decisionSearch(db: D1Database, job: Job, projected: Source
   for (const file of files ?? []) pending.push({ parent: hit, file })
  }
  const office = ['owner', 'admin', 'project_manager'].includes(actor.role) && !actor.permissions
- if (!rfiOnly && office) for (const m of job.meetings ?? []) add('meetings', m.id, m.title, [m.agenda, m.minutes, m.decisions, ...m.attendees, ...m.actions.map(a => [a.title, a.completion?.answer].join('\n'))].join('\n'), author(m.by), m.tags, m.sheet, m.cost_code)
+ if (!rfiOnly) for (const m of await projectRawMeetings(db, job, actor)) add('meetings', m.id, m.title, [m.agenda, m.minutes, m.decisions, ...m.attendees, ...m.actions.map(a => [a.title, a.completion?.answer].join('\n'))].join('\n'), author(m.by), m.tags, m.sheet, m.cost_code)
  if (!rfiOnly && (office || actor.role === 'member')) for (const m of await thread(db, job.id, actor)) add('correspondence', m.id, m.subject, m.body, m.direction === 'in' ? m.counterparty : m.by_name, [], '', '', m.files.map(f => ({ ...f, table: 'pl_mail_files', href: `${base}/correspondence/files/${f.id}` })))
  for (const d of projected.diary) add('diary', d.id, d.date, d.note, author(d.prepared_by), [], '', '', d.attachments.map(f => ({ ...f, href: `${base}/diary/${d.id}/attachments/${f.id}` })))
  for (const t of projected.schedules) add('schedules', t.id, t.description, t.description, author(t.prepared_by))

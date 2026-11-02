@@ -10,6 +10,7 @@ import { submittalAccess, submittalAction, submittalFile, submittalReviewers, re
 import { planResponse } from './plan-http'
 import { satisfactionResponse } from './satisfaction'
 import { reportScheduleResponse } from './report-schedule'
+import { projectRawMeetings, rawGrantAction, rawGrantHistory } from './meeting-raw-grants'
 import { meetingAction, meetingAccess } from './meetings'
 import { meetingEmailPreview, sendMeetingEmail } from './meeting-share-mail'
 import { meetingInboxResponse } from './meeting-share-http'
@@ -205,7 +206,15 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(parts.length===3&&parts[2]==='decision-search'&&method==='GET')return json(await decisionSearch(env.DB,previous,display(previous,actor),actor,new URL(request.url).searchParams))
  if(parts.length===9&&parts[2]==='meetings'&&parts[4]==='links'&&parts[6]==='appended'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.appended_links?.[Number(parts[7])]?.links[Number(parts[8])];need(link,'Resolved source not found',404,'not_found');return json(link)}
  if(parts.length===7&&parts[2]==='meetings'&&parts[4]==='links'&&method==='GET'){meetingAccess(actor);const link=previous.meetings?.find(m=>m.id===parts[3])?.actions.find(a=>a.id===parts[5])?.completion?.links.find((_,index)=>String(index)===parts[6]);need(link,'Resolved source not found',404,'not_found');return json(link)}
- if(parts.length===3&&parts[2]==='meetings'&&method==='GET'){meetingAccess(actor);return json({meetings:previous.meetings??[]})}
+ if(parts[2]==='meetings'&&method==='GET'&&parts.length<=5&&(!parts[4]||parts[4]==='export.json'||parts[4]==='raw-grants')){
+  if(parts[4]==='raw-grants')return json({grants:await rawGrantHistory(env.DB,previous,actor,parts[3]!)})
+  const meetings=await projectRawMeetings(env.DB,previous,actor)
+  need(meetings.length||!parts[3]&&!actor.permissions&&['owner','admin','project_manager'].includes(actor.role),'Meeting not found',403,'forbidden')
+  if(!parts[3])return json({meetings,count:meetings.length})
+  const meeting=find(meetings,parts[3])
+  if(parts[4]==='export.json')return new Response(JSON.stringify(meeting),{headers:{...headers,'content-type':'application/json','content-disposition':'attachment; filename=meeting.json'}})
+  return json({meeting})
+ }
  if(parts.length===5&&parts[2]==='meeting-shares'&&parts[4]==='email-preview'&&method==='GET')return json(await meetingEmailPreview(env,previous as MeetingSharingJob,actor,parts[3]!,new URL(request.url).searchParams.get('request_id')??''))
  if(parts.length===5&&parts[2]==='meetings'&&parts[4]==='shares'&&method==='GET'){meetingAccess(actor);return json({shares:((previous as MeetingSharingJob).meeting_shares??[]).filter(share=>share.meeting_id===parts[3])})}
  const correspondence=await jobMailResponse(request,env,actor,previous,parts,body);if(correspondence)return correspondence
@@ -271,6 +280,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  if(category==='room-boards'&&(parts.length===3||parts.length===5)){const result=await roomBoardAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='submittals'&&(parts.length===3||parts.length===5)){const result=await submittalAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='meeting-shares'&&parts.length===5&&action==='revoke'){record=revokeMeetingShare(job as MeetingSharingJob,actor,input,id!)}
+ else if(category==='meetings'&&parts.length===5&&['raw-grant','revoke-raw-grant'].includes(action!)){const result=await rawGrantAction(env.DB,job,actor,input,id!,action==='revoke-raw-grant');record=result.record;writes=result.writes}
  else if(category==='meetings'&&parts.length===5&&action==='share'){const result=await publishMeetingShare(env.DB,job as MeetingSharingJob,actor,input,id!);record=result.record;writes=result.writes}
  else if(category==='meetings'&&(parts.length===3||parts.length===5)){const result=await meetingAction(env.DB,job,actor,input,id,action);record=result.record;writes=result.writes}
  else if(category==='portal-policy'&&parts.length===3)record=portalPolicy(job,actor,input)
