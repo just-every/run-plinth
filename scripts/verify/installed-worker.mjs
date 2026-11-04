@@ -21,7 +21,19 @@ export async function installedWorker(outboundService, { now } = {}) {
  const errors = []
  const mf = new Miniflare(convertV4MiniflareOptions({
   host: '127.0.0.1', port, unsafeTriggerHandlers: true, modulesRoot: resolve('dist/server'),
-  modules: [...(now === undefined ? [] : [{ type: 'ESModule', path: resolve('dist/server/pinned-clock.mjs'), contents: `import worker from './index.js'; const NativeDate=Date; globalThis.Date=class extends NativeDate { constructor(...args){super(...(args.length?args:[${Number(now)}]))} static now(){return ${Number(now)}} }; export default worker;` }]), { type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
+  modules: [...(now === undefined ? [] : [{ type: 'ESModule', path: resolve('dist/server/pinned-clock.mjs'), contents: `import worker from './index.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+const NativeDate=Date, clocks=new AsyncLocalStorage(), scenario=${Number(now)};
+const current=()=>clocks.getStore()??scenario;
+globalThis.Date=class extends NativeDate {
+ constructor(...args){super(...(args.length?args:[current()]))}
+ static now(){return current()}
+};
+// Native session expiry follows D1's live clock; business dates remain fixed per request.
+export default {...worker,fetch(request,env,ctx){
+ const clock=new URL(request.url).pathname.startsWith('/auth/')?NativeDate.now():scenario;
+ return clocks.run(clock,()=>worker.fetch(request,env,ctx));
+}};` }]), { type: 'ESModule', path: resolve('dist/server/index.js') }, ...(await readdir('dist/server/assets')).filter(file => file.endsWith('.js')).map(file => ({ type: 'ESModule', path: resolve('dist/server/assets', file) }))],
   compatibilityDate: '2026-09-08', compatibilityFlags: ['nodejs_compat'],
   d1Databases: ['DB'], bindings, outboundService,
   assets: { directory: resolve('dist/client'), binding: 'ASSETS', run_worker_first: true, routerConfig: { has_user_worker: true } },

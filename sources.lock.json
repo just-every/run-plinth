@@ -1049,7 +1049,7 @@
       "executable": false
     },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "c2beb0f71e4c4aa4c8953374405203f692c85b407a20c7079c31853edf91b16b",
+      "sha256": "466f5abc50f7eaccae77fe7209db9a926069702eaab545af393ef5cf9108dc94",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
