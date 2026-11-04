@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "10b1ebf4b9ef1d79f898d20181c1c1759a917e277bf4b1eb14212f5d09662a1a",
+      "sha256": "6b0987213daec940376568dff8cd0b9e33e5f9be04b0852110e63c64ef3977c2",
       "executable": false
     },
     "DEMO.md": {
@@ -3981,7 +3981,7 @@
       "executable": false
     },
     "src/plinth/role-gate.ts": {
-      "sha256": "7026a9512f38d7c060c64af94372c249d4ea28edfd222758c845c50c7463a19f",
+      "sha256": "e4b9b05dd1c344039bb27a0ec6e12d80c41c7e2c341a3f0109010ed52346e540",
       "executable": false
     },
     "src/plinth/role-model.ts": {
@@ -5409,7 +5409,7 @@
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
-      "sha256": "fabb275e475e31d827dbc98364db2cd5e8a20fd99b78ba957c32e5509dc084ec",
+      "sha256": "36ce0c6c72ca744f6bce3422391c7e0ca3d7e194749929ff81f707a6120386cb",
       "executable": false
     },
     "tests/journeys/meetings.mjs": {
@@ -5645,7 +5645,7 @@
       "executable": false
     },
     "tests/plinth/meeting-reminder-support.mjs": {
-      "sha256": "105b97e08d08a7c5f7b57f3cffe1e972dae0530ff1862ca4cf8b518486a7378e",
+      "sha256": "65f6ce28d7e50da8ce8f2523805081efcb475f99f6426bfd059919be4b0696fd",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {

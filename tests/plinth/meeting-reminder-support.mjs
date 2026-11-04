@@ -8,13 +8,13 @@ export async function delegateReminderJourney(s, meeting, controls) {
  const root=`/jobs/${job.id}`,read=async()=>job=(await s.api(root)).value.job
  const act=async(path,body={})=>{await read();const r=await s.api(root+path,{method:'POST',body:{expected_version:job.version,...body}});assert.equal(r.status,200,JSON.stringify(r.value));return r.value.record}
  const people={}
- for(const [name,role,kind] of [['field','admin','office'],['custom','admin','office'],['client','member','client'],['sub','member','sub']]) {
+ for(const [name,role,kind] of [['field','admin','office'],['custom','admin','office'],['bookkeeper','admin','office'],['reader','admin','office'],['client','member','client'],['sub','member','sub']]) {
   const email=['synthetic-plinth-reminder-'+name,'example.test'].join('@'),cookie=await f.invite(email,'Synthetic reminder '+name,role)
   const person=(await f.json('/auth/operators',{cookie:f.owner})).value.find(p=>p.email===email)
-  people[name]={email,cookie,person,kind,teamVersion:0}
+  people[name]={email,cookie,person,kind,teamRole:['bookkeeper','reader'].includes(name)?name:undefined,teamVersion:0}
  }
- const team=async(p,ids,extra={})=>{const r=await s.api('/team/'+p.person.id,{method:'PUT',body:{expected_version:p.teamVersion,role:p.kind==='office'?'superintendent':'crew',job_ids:ids,po_limit_cents:0,...extra}});assert.equal(r.status,200);p.teamVersion=r.value.member.version}
- await team(people.field,[job.id])
+ const team=async(p,ids,extra={})=>{const r=await s.api('/team/'+p.person.id,{method:'PUT',body:{expected_version:p.teamVersion,role:p.teamRole??(p.kind==='office'?'superintendent':'crew'),job_ids:ids,po_limit_cents:0,...extra}});assert.equal(r.status,200);p.teamVersion=r.value.member.version}
+ for(const name of ['field','bookkeeper','reader'])await team(people[name],[job.id])
  let role=(await s.api('/roles',{method:'POST',body:{copy_of:'project_manager',name:'Synthetic reminder document viewer',permissions:{documents:{view:true,create:false}}}})).value.role
  await team(people.custom,[job.id],{role:'custom',role_id:role.id})
  const customer=(await s.api('/customers',{method:'POST',body:{name:'Synthetic reminder household',kind:'household',contacts:[{id:'synthetic-plinth-reminder-contact',name:'Synthetic reminder client',email:people.client.email}],properties:[{id:'synthetic-plinth-reminder-property',label:'Site',address:'Synthetic reminder site'}]}})).value.customer
@@ -88,7 +88,7 @@ export async function delegateReminderJourney(s, meeting, controls) {
  // Recheck every current native authority at review and final send, and never reserve a refused attempt.
  for(const [name,p] of Object.entries(people)) {
   const attempt=await pending(p)
-  if(name==='field')await team(p,[])
+  if(['field','bookkeeper','reader'].includes(name))await team(p,[])
   if(name==='custom'){const changed=await s.api('/roles/'+role.id,{method:'PUT',body:{expected_version:role.version,permissions:{documents:{view:false}}}});assert.equal(changed.status,200);role=changed.value.role}
   if(name==='client')await act('/customer',{...link,client_contact_ids:[]})
   if(name==='sub')await act(`/subcontracts/${p.scope}/access`,{contact_ids:[],reason:'Synthetic current scope authority ended'})
@@ -119,6 +119,6 @@ export async function delegateReminderJourney(s, meeting, controls) {
  assert.ok(stillShared.value.shares.some(row=>row.id===independent.share.id),'The independent extract remains currently authorized')
  assert.ok(!stillShared.value.actions.some(row=>row.id===independent.action.id),'The action loses its own released-scope authority')
  await refused(independent,independentAttempt,'forbidden')
- console.log('PROBE DOC-011 point 4: HTTP meeting inbox and owner review -> four current delegate kinds reserved once; exact outgoing bodies; replay, completion, reassignment, quiet hours, suppression and current job, client, custom-role and released-scope loss refused without provider calls; action-scope loss also refused while a separate extract grant remains current')
+ console.log('PROBE DOC-011 point 4: HTTP meeting inbox and owner review -> six current delegate kinds reserved once; exact outgoing bodies; replay, completion, reassignment, quiet hours, suppression and current job, client, custom-role and released-scope loss refused without provider calls; action-scope loss also refused while a separate extract grant remains current')
  return durable
 }

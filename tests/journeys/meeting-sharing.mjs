@@ -59,7 +59,34 @@ export async function sharingJourney({ base, entrance, browser, page, clientPage
  const beforeRefusal=await read();assert.equal((await owner.request.get(base+`/api/plinth/jobs/${job.id}/meeting-shares/${fieldShare.id}/email-preview?request_id=${pending.id}`)).status(),409)
  const refused=await owner.request.post(base+`/api/plinth/jobs/${job.id}/meeting-shares/${fieldShare.id}/send-email`,{headers:{origin:base},data:{expected_version:job.version,request_id:pending.id,digest:reviewed.digest,confirm:true}});assert.equal(refused.status(),409);assert.deepEqual(await read(),beforeRefusal)
  console.log('PROBE DOC-011 point 4 browser: delegate Meetings tab -> requested own action reminder; owner reviewed the complete exact body; provider received that body once; completed action refused review and send; screens at 1440 and 390')
- await team(3,'superintendent',[]);assert.equal((await field.request.get(base+`/api/plinth/meeting-inbox/${job.id}`)).status(),404);await field.close()
+ // Each assigned office preset requests its own reminder through the same installed form.
+ let officeVersion=3
+ for(const officeRole of ['bookkeeper','reader']) {
+  await team(officeVersion++,officeRole,[job.id])
+  const officeAction=await act(`/meetings/${meeting.id}/add-action`,{title:'Confirm my '+officeRole+' clearance',owner_kind:'office',owner_email:pmEmail,confirm_title:true,due_on:'2026-11-06'})
+  const officeTitle='Reviewed '+officeRole+' reminder context'
+  const officeShare=await publish(officeTitle,'Check only this reviewed office clearance.','office',pmEmail)
+  await fieldPage.goto(base+`/app?job=${job.id}&tab=Meetings`)
+  await expect(fieldPage.getByRole('heading',{name:officeTitle,exact:true})).toBeVisible()
+  await fieldPage.getByText('Request my action reminder',{exact:true}).click()
+  await fieldPage.getByLabel('My outstanding meeting action',{exact:true}).selectOption(officeAction.id)
+  const officeForm=fieldPage.locator('details').filter({has:fieldPage.getByRole('button',{name:'Request one action reminder',exact:true})})
+  await officeForm.getByRole('checkbox').check();await capture(fieldPage,officeRole+'-reminder-request')
+  const requestResponse=fieldPage.waitForResponse(r=>new URL(r.url()).pathname===`/api/plinth/meeting-inbox/${job.id}/${officeShare.id}/email-copy`)
+  await officeForm.getByRole('button',{name:'Request one action reminder',exact:true}).click()
+  assert.equal((await requestResponse).status(),200,officeRole+' can request their own reminder')
+  await expect(fieldPage.getByText('One email copy requested; nothing sent',{exact:true})).toBeVisible();await capture(fieldPage,officeRole+'-reminder-receipt')
+  await openMeeting();const officeRecord=page.locator('details.record').filter({has:page.locator('summary').filter({hasText:officeTitle+' · Published extract'})});await officeRecord.locator(':scope > summary').click()
+  const reviewResponse=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/plinth/jobs/${job.id}/meeting-shares/${officeShare.id}/email-preview`)
+  await officeRecord.getByRole('button',{name:'Review requested email',exact:true}).click();const exactReview=await(await reviewResponse).json()
+  const officeReview=officeRecord.getByRole('region',{name:'Review meeting email',exact:true})
+  await expect(officeReview).toContainText(officeAction.title);await expect(officeReview).toContainText(pmEmail)
+  await officeReview.getByRole('checkbox').check();await officeReview.getByRole('button',{name:'Send reviewed meeting email',exact:true}).click()
+  await expect(officeRecord.getByText(mailOutcome,{exact:false})).toBeVisible()
+  if(process.env.PLINTH_PROVIDER_EDGE_URL){const response=await owner.request.get(process.env.PLINTH_PROVIDER_EDGE_URL+'/mail/latest?email='+encodeURIComponent(pmEmail));assert.equal(response.status(),200);const {message}=await response.json();assert.deepEqual(message.to,[pmEmail]);assert.equal(message.subject,exactReview.subject);assert.equal(message.text,exactReview.body)}
+  console.log('PROBE DOC-011 BLOCKING A '+officeRole+': assigned own outstanding action and reviewed extract -> installed reminder request 200; owner reviewed and sent exact body; provider accepted; screens at 1440 and 390')
+ }
+ await team(officeVersion,'reader',[]);assert.equal((await field.request.get(base+`/api/plinth/meeting-inbox/${job.id}`)).status(),404);await field.close()
  await openMeeting();record=page.locator('details.record').filter({has:page.locator('summary').filter({hasText:title+' · Published extract'})});await record.locator(':scope > summary').click();await record.getByLabel('Extract revocation reason',{exact:true}).fill('The reviewed coordination extract is superseded.');await record.getByRole('checkbox').filter({visible:true}).last().check();await record.getByRole('button',{name:'Revoke extract',exact:true}).click();await expect(page.locator('summary').filter({hasText:title+' · Revoked'})).toBeVisible()
  await clientPage.goto(base+`/app?job=${job.id}&tab=Meetings`);await expect(clientPage.getByRole('heading',{name:title,exact:true})).toHaveCount(0);assert.equal((await client.request.get(base+`/api/plinth/meeting-inbox/${job.id}/${share.id}/export.json`)).status(),404);await capture(clientPage,'shared-extract-revoked')
 }
