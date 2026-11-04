@@ -1,4 +1,5 @@
 import { proveRawMeetingGrants } from './meeting-raw-support.mjs'
+import { delegateReminderJourney } from './meeting-reminder-support.mjs'
 import { searchDocument } from '../fixtures/search-document.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -352,7 +353,7 @@ test('DOC-005 — site meeting decisions retain assigned action history and the 
   assert.equal((await finish('field',orphan.field)).status,404,'Restored authority does not undo cross-kind reassignment')
   assert.equal((await finish('contact',orphan.field)).status,200)
   await documents(true);assert.equal((await finish('custom',orphan.custom)).status,200,'Current document-view is enough for an assigned custom delegate')
-  // A delegate reminder remains outside this clause, even with a reviewed extract.
+  // A completed, reassigned action stays ineligible even with a reviewed extract.
   const share=await act(`/meetings/${meeting.id}/share`,{operation_id:'synthetic-plinth-delegate-no-reminder',confirm:true,title:'Safe field context',body:'Reviewed field action context',recipients:[{email:email('field'),kind:'office',can_comment:false}]});assert.equal(share.status,200)
   const reminder=await s.api(`/meeting-inbox/${job.id}/${share.value.record.id}/email-copy`,{method:'POST',cookie:people.field.cookie,body:{expected_version:(await read()).version,kind:'action_reminder',action_id:orphan.field.id,operation_id:'synthetic-plinth-no-delegate-reminder',confirm:true}});assert.equal(reminder.status,409)
   await f.scheduled(Date.parse('2026-11-08T12:00:00Z'))
@@ -377,7 +378,7 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
  try {
   execFileSync(process.execPath,[fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js',import.meta.url)),'d1','migrations','apply','DB','--local','--persist-to',join(persistTo,'.wrangler/state'),'--config',fileURLToPath(new URL('../../wrangler.jsonc',import.meta.url))],{env:{...process.env,WRANGLER_SEND_METRICS:'false'},stdio:'pipe'})
   s=await setup({persistTo,now:Date.parse('2026-10-26T12:00:00Z'),mailResponse:async message=>{
-   if(message.subject.startsWith('Meeting decision:')){if(deliveryGate){deliveryGate.entered.resolve();await deliveryGate.release.promise}if(uncertain)throw Error('Synthetic lost provider response')}
+   if(message.subject.startsWith('Meeting ')){if(deliveryGate){deliveryGate.entered.resolve();await deliveryGate.release.promise}if(uncertain)throw Error('Synthetic lost provider response')}
    return new Response(null,{status:202,headers:{'x-message-id':'synthetic-plinth-meeting-delivery'}})
   }})
  } catch(error){await s?.f.close();await rm(persistTo,{recursive:true,force:true});throw error}
@@ -529,7 +530,7 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   r=await requestCopy(s.client);assert.equal(r.status,200);const suppressed=r.value.record,suppressedPreview=(await previewCopy(suppressed.id)).value
   assert.equal((await fetch(f.origin+unsubscribe.pathname,{method:'POST',body:'List-Unsubscribe=One-Click',headers:{'content-type':'application/x-www-form-urlencoded'}})).status,200)
   const beforeSuppressed=f.messages.length
-  assert.equal((await sendCopy(suppressed,suppressedPreview)).status,200);assert.equal((await copyState(suppressed.id)).status,'cancelled');assert.equal(f.messages.length,beforeSuppressed,'A signed unsubscribe blocks the meeting-email provider call')
+  assert.equal((await previewCopy(suppressed.id)).value.error,'mail_suppressed');assert.equal((await sendCopy(suppressed,suppressedPreview)).value.error,'mail_suppressed');assert.equal((await copyState(suppressed.id)).status,'requested');assert.equal((await requestCopy(s.client,{cancel:true,request_id:suppressed.id})).status,200);assert.equal((await copyState(suppressed.id)).status,'cancelled');assert.equal(f.messages.length,beforeSuppressed,'A signed unsubscribe blocks the meeting-email provider call')
   // Removing an authorized household contact ends both extract access and a pending email request.
   r=await s.api('/customers',{method:'POST',body:{name:'synthetic-plinth-2425',kind:'household',contacts:[{id:'synthetic-plinth-2426',name:'synthetic-plinth-2427',email:'synthetic-plinth-shared-other@example.com'}],properties:[{id:'synthetic-plinth-2428',label:'synthetic-plinth-2429',address:'synthetic-plinth-2430'}]}});assert.equal(r.status,201);const customer=r.value.customer
   const clientLink={customer_id:customer.id,property_id:'synthetic-plinth-2428',client_contact_ids:['synthetic-plinth-2426']}
@@ -576,6 +577,8 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
   assert.equal((await s.api(path+`/meeting-shares/${reminderShare.id}/email-preview?request_id=${superseded.id}`)).status,409,'A completed action cannot receive a later reminder instruction');assert.equal(f.messages.length,beforeReminder+1)
 
 
+  const delegateSends=await delegateReminderJourney(s,meeting,{gate:value=>deliveryGate=value,uncertain:value=>uncertain=value})
+
   // Reopen the same D1 installation and replay both accepted and uncertain reservations.
   const cookie=f.owner;await f.close();sourceClosed=true
   restarted=await createFixture({persistTo,ownerCookie:cookie,now:Date.parse('2026-10-26T12:00:00Z')})
@@ -586,6 +589,11 @@ test('Reviewed meeting extracts isolate named audiences, delegated feedback, exp
    const current=(await restarted.json('/api/plinth'+path,{cookie})).value.job
    const replay=await restarted.json('/api/plinth'+path+sendPath,{method:'POST',cookie,body:{expected_version:current.version,request_id:request.id,digest:review.digest,confirm:true}})
    assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved')
+  }
+  for(const attempt of delegateSends){
+   const current=(await restarted.json('/api/plinth'+path,{cookie})).value.job
+   const stored=recovered.value.shares.find(row=>row.id===attempt.share.id).email_requests.find(row=>row.id===attempt.request.id);assert.equal(stored.status,attempt.status);assert.equal(stored.body,attempt.review.body)
+   const replay=await restarted.json('/api/plinth'+path+`/meeting-shares/${attempt.share.id}/send-email`,{method:'POST',cookie,body:{expected_version:current.version,request_id:attempt.request.id,digest:attempt.review.digest,confirm:true}});assert.equal(replay.status,409);assert.equal(replay.value.error,'mail_reserved')
   }
   assert.equal(restarted.messages.length,0,'Restart cannot replay an accepted or uncertain delivery')
  } finally {deliveryGate?.release.resolve();await restarted?.close();if(!sourceClosed)await f.close();await rm(persistTo,{recursive:true,force:true})}

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { JobProps } from './job'
 import type { MeetingShare, PublicMeetingShare } from '../plinth/meeting-sharing-model'
 import { api, Form } from './shared'
+import type { OwnMeetingAction } from '../plinth/meetings'
 
 export function MeetingEmailRequests({ job, share, mutate }: Pick<JobProps,'job'|'mutate'> & {share:MeetingShare}) {
  const [review,setReview]=useState<{request_id:string;email:string;subject:string;body:string;digest:string;version:number}>(),[error,setError]=useState('')
@@ -9,5 +10,11 @@ export function MeetingEmailRequests({ job, share, mutate }: Pick<JobProps,'job'
 }
 export function RequestMeetingCopy({ job, share, version, refresh }: {job:JobProps['job'];share:PublicMeetingShare;version:number;refresh:()=>Promise<unknown>}) {
  const pending=share.email_copy?.status==='requested'
- return <details><summary>Request an email copy</summary>{share.email_copy&&<p>{share.email_copy.label}</p>}<p>This requests one copy of this exact extract. The owner must review and send it. No ongoing email permission is granted.</p><Form submit={pending?'Cancel email request':'Request one email copy'} action={async f=>{await api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{expected_version:version,kind:'minutes',confirm:f.get('confirm')==='on',operation_id:crypto.randomUUID(),...(pending?{cancel:true,request_id:share.email_copy!.id}:{})});await refresh()}}><label><input type="checkbox" name="confirm" required/>{pending?'Cancel my request before dispatch.':'I request one email copy of this exact extract.'}</label></Form></details>
+ return <>{share.email_copy&&<p role="status">{share.email_copy.label}</p>}<details><summary>Request an email copy</summary><p>This requests one copy of this exact extract. The owner must review and send it. No ongoing email permission is granted.</p><Form submit={pending?'Cancel email request':'Request one email copy'} action={async f=>{await api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{expected_version:version,kind:'minutes',confirm:f.get('confirm')==='on',operation_id:crypto.randomUUID(),...(pending?{cancel:true,request_id:share.email_copy!.id}:{})});await refresh()}}><label><input type="checkbox" name="confirm" required/>{pending?'Cancel my request before dispatch.':'I request one email copy of this exact extract.'}</label></Form></details></>
+}
+
+export function RequestMeetingReminder({ job, share, actions, version, refresh }: {job:JobProps['job'];share:PublicMeetingShare;actions:OwnMeetingAction[];version:number;refresh:()=>Promise<unknown>}) {
+ const actionField=useId()
+ if (!actions.length || share.email_copy?.status === 'requested') return null
+ return <details><summary>Request my action reminder</summary><p>Request one reminder of your outstanding action with this reviewed extract. The owner reviews the complete email before sending.</p><Form submit="Request one action reminder" action={async f=>{await api(`/meeting-inbox/${job.id}/${share.id}/email-copy`,{expected_version:version,kind:'action_reminder',action_id:f.get('action_id'),confirm:f.get('confirm')==='on',operation_id:crypto.randomUUID()});await refresh()}}><label htmlFor={actionField}>My outstanding meeting action</label><select id={actionField} name="action_id" required><option value="">Choose your outstanding action</option>{actions.map(a=><option key={a.id} value={a.id}>{a.title} · due {a.due_on}</option>)}</select><label><input type="checkbox" name="confirm" required/>Request one owner-reviewed reminder of my current action.</label></Form></details>
 }

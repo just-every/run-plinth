@@ -19,8 +19,12 @@ export async function meetingInboxResponse(request: Request, env: Bindings, acto
  const visible = []
  for (const job of all) {
   if (parts[1] && job.id !== parts[1]) continue
-  const shares = await projectMeetingShares(env.DB, job, actor)
   const actions = await ownMeetingActions(env.DB, job, actor)
+  const shares = (await projectMeetingShares(env.DB, job, actor)).map(share => {
+   const source = job.meeting_shares?.find(row => row.id === share.id)
+   const ids = new Set(job.meetings?.find(row => row.id === source?.meeting_id)?.actions.map(row => row.id))
+   return { ...share, reminder_action_ids: actions.filter(row => !row.completed && ids.has(row.id)).map(row => row.id) }
+  })
   const raw_meetings = await projectRawMeetings(env.DB, job, actor)
   if (shares.length || actions.length || raw_meetings.length) visible.push({ job, shares, actions, raw_meetings })
  }

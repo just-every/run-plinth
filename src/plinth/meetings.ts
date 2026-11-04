@@ -33,7 +33,7 @@ export async function workLinks(job: Job, value: unknown): Promise<WorkLink[]> {
 export function meetingWorkChoices(job: Job) {
  return [ ...job.schedules.map(r => ({ kind: 'schedule', id: r.id, title: r.description })), ...job.diary.map(r => ({ kind: 'daily', id: r.id, title: r.note })), ...job.variations.map(r => ({ kind: 'change', id: r.id, title: r.description })), ...(job.selections ?? []).map(r => ({ kind: 'selection', id: r.id, title: r.revisions.at(-1)?.category ?? 'Selection' })) ]
 }
-async function delegateAuthority(db: D1Database, job: Job, row: MeetingAction): Promise<MeetingShareRecipient | null> {
+export async function meetingDelegateAuthority(db: D1Database, job: Job, row: MeetingAction): Promise<MeetingShareRecipient | null> {
  if (!row.owner_kind || row.owner_kind === 'manager') return null
  const current = await recipientAuthority(db, job, { email: row.owner_email, kind: row.owner_kind, subcontract_id: row.subcontract_id, can_comment: false })
  return current && current.operator_id === row.owner_operator_id ? current : null
@@ -43,7 +43,7 @@ export async function ownMeetingActions(db: D1Database, job: Job, actor: Actor):
  const actions: OwnMeetingAction[] = []
  for (const meeting of job.meetings ?? []) for (const row of meeting.actions) {
   if (row.owner_email !== actor.email.toLowerCase()) continue
-  const current = await delegateAuthority(db, job, row)
+  const current = await meetingDelegateAuthority(db, job, row)
   if (!current || current.operator_id !== actor.id || current.operator_version !== actor.version) continue
   const by = row.assignment_history?.at(-1)?.by ?? row.by
   actions.push({ id: row.id, title: row.title, due_on: row.due_on, assigner: { name: by.name, at: by.at }, meeting_on: meeting.held_on, completed: !!row.completion })
@@ -53,7 +53,7 @@ export async function ownMeetingActions(db: D1Database, job: Job, actor: Actor):
 export async function completeMeetingDelegate(db: D1Database, job: Job, actor: Actor, input: Input, actionId: string, permitted: Job) {
  need((await ownMeetingActions(db, job, actor)).some(row => row.id === actionId), 'Assigned meeting action not found', 404, 'not_found')
  const meeting = job.meetings!.find(m => m.actions.some(a => a.id === actionId))!, row = find(meeting.actions, actionId)
- const authority = await delegateAuthority(db, job, row)
+ const authority = await meetingDelegateAuthority(db, job, row)
  need(authority, 'Your action authority changed', 403, 'forbidden')
  need(!row.completion, 'Action already completed', 409, 'completed')
  const message_id = input.message_id === undefined ? undefined : text(input.message_id, 'Source message', 100)
