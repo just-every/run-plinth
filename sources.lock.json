@@ -5625,7 +5625,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "eec17ef9677f9bddad8a8d0c760433f0b1496b481f28e81875a2076f11060fca",
+      "sha256": "5de7dd098627b3f7deca82724998bba47bff96409124f04b001d81ceccd76345",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
@@ -5637,7 +5637,7 @@
       "executable": false
     },
     "tests/plinth/mail.test.mjs": {
-      "sha256": "82d78cfcc5a2822a9b2b604bde477808125b4f4f713d6849f441af167cac50db",
+      "sha256": "5d08a4df6d9394b2abcca48b44b7e311ba1d0059bd7a3339a96154ec8b66b120",
       "executable": false
     },
     "tests/plinth/meeting-raw-support.mjs": {
