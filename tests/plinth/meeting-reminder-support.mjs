@@ -106,6 +106,19 @@ export async function delegateReminderJourney(s, meeting, controls) {
  const unsubscribe=new URL(suppressed.review.body.match(/https?:\/\/\S+\/api\/plinth\/mail\/unsubscribe\/\S+/)[0])
  assert.equal((await fetch(f.origin+unsubscribe.pathname,{method:'POST'})).status,200)
  await refused(p,suppressed,'mail_suppressed')
- console.log('PROBE DOC-011 point 4: HTTP meeting inbox and owner review -> four current delegate kinds reserved once; exact outgoing bodies; replay, completion, reassignment, quiet hours, suppression and current job, client, custom-role and released-scope loss refused without provider calls')
+ // An extract from a second released scope cannot replace the action's independent scope authority.
+ const actionScope=await createReleasedScope(f,await read(),people.sub.email,'Synthetic action-only scope')
+ const extractScope=await createReleasedScope(f,await read(),people.sub.email,'Synthetic extract-only scope')
+ const independent={...people.sub,scope:actionScope.scope.id}
+ independent.action=await newAction(independent,'Synthetic independently authorized scope action')
+ independent.scope=extractScope.scope.id;independent.share=await publish(independent)
+ const independentAttempt=await pending(independent)
+ await act(`/subcontracts/${actionScope.scope.id}/access`,{contact_ids:[],reason:'Synthetic action scope authority ended'})
+ const stillShared=await s.api('/meeting-inbox/'+job.id,{cookie:independent.cookie})
+ assert.equal(stillShared.status,200)
+ assert.ok(stillShared.value.shares.some(row=>row.id===independent.share.id),'The independent extract remains currently authorized')
+ assert.ok(!stillShared.value.actions.some(row=>row.id===independent.action.id),'The action loses its own released-scope authority')
+ await refused(independent,independentAttempt,'forbidden')
+ console.log('PROBE DOC-011 point 4: HTTP meeting inbox and owner review -> four current delegate kinds reserved once; exact outgoing bodies; replay, completion, reassignment, quiet hours, suppression and current job, client, custom-role and released-scope loss refused without provider calls; action-scope loss also refused while a separate extract grant remains current')
  return durable
 }

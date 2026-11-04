@@ -437,6 +437,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const freshSend=()=>recoveredSearch.json(reminderRoot+'/send-email',{method:'POST',cookie:receivingCookie,body:{expected_version:freshReminder.value.version,request_id:freshReminder.value.record.id,digest:freshReview.value.digest,confirm:true}})
       assert.equal((await freshSend()).status,200);assert.equal(recoveredSearch.messages.length,beforeFreshReminder+1);assert.deepEqual(recoveredSearch.messages.at(-1).to,[archiveActionEmail]);assert.equal(recoveredSearch.messages.at(-1).text,freshReview.value.body)
       assert.equal((await freshSend()).status,409);assert.equal(recoveredSearch.messages.length,beforeFreshReminder+1)
+      const beforeRestoredActionChanges=recoveredSearch.messages.length
       const receivingTeam=await recoveredSearch.json('/api/plinth/team/'+archiveActionPerson.id,{method:'PUT',cookie:receivingCookie,body:{expected_version:1,role:'superintendent',job_ids:[],po_limit_cents:0}});assert.equal(receivingTeam.status,200)
       const completionPath=`/api/plinth/meeting-inbox/${job.id}/actions/${archiveAction.id}/complete`
       let receivingJob=(await recoveredSearch.json('/api/plinth/jobs/'+job.id,{cookie:receivingCookie})).value.job
@@ -448,7 +449,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       receivingJob=(await recoveredSearch.json('/api/plinth/jobs/'+job.id,{cookie:receivingCookie})).value.job
       assert.equal(receivingJob.meetings.find(m=>m.id===meeting.id).actions.find(a=>a.id===archiveAction.id).completion.by.id,archiveActionPerson.id)
       assert.equal((await recoveredSearch.json('/api/plinth/jobs/'+job.id+'/meetings',{cookie:receivingDelegate})).status,403)
-      assert.equal(recoveredSearch.messages.length,beforeDelegateSignIn+1,'Restored delegate completion, grant loss and grant restoration send no mail')
+      assert.equal(recoveredSearch.messages.length,beforeRestoredActionChanges,'Restored delegate completion, grant loss and grant restoration send no mail')
       const restoredMailRoot = '/api/plinth/jobs/' + job.id + '/correspondence'
       for (const [path, bytes] of [[restoredMailRoot + '/' + captured.id + '/original', originalEmail], [restoredMailRoot + '/files/' + captured.files[0].id, drawingBytes]]) {
        const response = await recoveredSearch.request(path, { cookie: receivingCookie }); assert.equal(response.status, 200)

@@ -141,7 +141,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "f0bf15955ac21eee00471891cee75f6131a777104c6da5e4240761eef6c5a9f5",
+      "sha256": "10b1ebf4b9ef1d79f898d20181c1c1759a917e277bf4b1eb14212f5d09662a1a",
       "executable": false
     },
     "DEMO.md": {
@@ -5409,7 +5409,7 @@
       "executable": false
     },
     "tests/journeys/meeting-sharing.mjs": {
-      "sha256": "c0b50f95da7c9d00ffe8df63746f3d031e0c2bacf8308e366f69e57cf2aac393",
+      "sha256": "fabb275e475e31d827dbc98364db2cd5e8a20fd99b78ba957c32e5509dc084ec",
       "executable": false
     },
     "tests/journeys/meetings.mjs": {
@@ -5645,7 +5645,7 @@
       "executable": false
     },
     "tests/plinth/meeting-reminder-support.mjs": {
-      "sha256": "53f68aab596f582bd5a6c62555e32f10011957aea18d5b3401ef9f8a4b984fd1",
+      "sha256": "105b97e08d08a7c5f7b57f3cffe1e972dae0530ff1862ca4cf8b518486a7378e",
       "executable": false
     },
     "tests/plinth/opening-support.mjs": {
@@ -5665,7 +5665,7 @@
       "executable": false
     },
     "tests/plinth/portable.test.mjs": {
-      "sha256": "84cf2e83e631e7199896412777e8347b9c0fcfba218c71c521d1da90791b39dc",
+      "sha256": "1694f6834bcf5001c55bed8bc52b678b9a205b6e2745baf40ff828ddc7f806b2",
       "executable": false
     },
     "tests/plinth/portfolio-support.mjs": {
