@@ -8,10 +8,9 @@ import { build } from 'esbuild'
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
 const root=fileURLToPath(new URL('../../',import.meta.url))
 let bundle
-async function worker(){return bundle??=build({stdin:{contents:`
 // SQLite's 'now' otherwise bypasses the fixture's JavaScript clock. Keep the
 // real D1 statements and constraints, supplying the same instant to both clocks.
-function clockedEnv(env) {
+export function fixtureClockEnv(env) {
  if (!env.PLINTH_TEST_NOW) return env;
  const db = env.DB;
  return {...env, DB: new Proxy(db, {get(target, key) {
@@ -20,7 +19,9 @@ function clockedEnv(env) {
   return typeof value === 'function' ? value.bind(target) : value;
  }})};
 }
-import {plinthAgentDoor} from './src/plinth/agent-door/index.ts'; import {rejectedResponse} from './src/base/rejected-response.ts'; import {authResponse} from './src/auth.server.ts'; import {plinthResponse} from './src/plinth/http.ts'; import {importResponse} from './src/plinth/imports.ts'; import {plinthScheduled} from './src/plinth/scheduled.ts'; import {plinthEmail} from './src/plinth/mail-inbound.ts'; async function routedEmail(request,env){const raw=new Uint8Array(await request.arrayBuffer());let rejected=null;await plinthEmail({from:request.headers.get('x-envelope-from'),to:request.headers.get('x-envelope-to'),headers:new Headers(JSON.parse(request.headers.get('x-mail-headers')??'{}')),raw:new Blob([raw]).stream(),rawSize:raw.length,setReject:reason=>{rejected=reason}},env);return Response.json({rejected})} export default {async scheduled(controller,env){if(env.PLINTH_TEST_NOW)Date.now=()=>controller.scheduledTime;await plinthScheduled(controller,clockedEnv(env))},async fetch(request,env){if(env.PLINTH_TEST_NOW)Date.now=()=>Number(request.headers.get('x-plinth-test-now')??env.PLINTH_TEST_NOW);env=clockedEnv(env);if(new URL(request.url).pathname==='/__test/email')return routedEmail(request,env);return rejectedResponse(request,await plinthAgentDoor(env).handle(request) ?? await authResponse(request,env) ?? await importResponse(request,env) ?? await plinthResponse(request,env) ?? new Response('Not found',{status:404}))}}`,resolveDir:root,sourcefile:'plinth-integration.ts'},bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',external:['node:*','cloudflare:*'],logLevel:'silent'}).then(r=>r.outputFiles[0].text)}
+async function worker(){return bundle??=build({stdin:{contents:`
+${fixtureClockEnv.toString()}
+import {plinthAgentDoor} from './src/plinth/agent-door/index.ts'; import {rejectedResponse} from './src/base/rejected-response.ts'; import {authResponse} from './src/auth.server.ts'; import {plinthResponse} from './src/plinth/http.ts'; import {importResponse} from './src/plinth/imports.ts'; import {plinthScheduled} from './src/plinth/scheduled.ts'; import {plinthEmail} from './src/plinth/mail-inbound.ts'; async function routedEmail(request,env){const raw=new Uint8Array(await request.arrayBuffer());let rejected=null;await plinthEmail({from:request.headers.get('x-envelope-from'),to:request.headers.get('x-envelope-to'),headers:new Headers(JSON.parse(request.headers.get('x-mail-headers')??'{}')),raw:new Blob([raw]).stream(),rawSize:raw.length,setReject:reason=>{rejected=reason}},env);return Response.json({rejected})} export default {async scheduled(controller,env){if(env.PLINTH_TEST_NOW)Date.now=()=>controller.scheduledTime;await plinthScheduled(controller,fixtureClockEnv(env))},async fetch(request,env){if(env.PLINTH_TEST_NOW)Date.now=()=>Number(request.headers.get('x-plinth-test-now')??env.PLINTH_TEST_NOW);env=fixtureClockEnv(env);if(new URL(request.url).pathname==='/__test/email')return routedEmail(request,env);return rejectedResponse(request,await plinthAgentDoor(env).handle(request) ?? await authResponse(request,env) ?? await importResponse(request,env) ?? await plinthResponse(request,env) ?? new Response('Not found',{status:404}))}}`,resolveDir:root,sourcefile:'plinth-integration.ts'},bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',external:['node:*','cloudflare:*'],logLevel:'silent'}).then(r=>r.outputFiles[0].text)}
 /** Real Worker, native authentication, provider-edge mail and migrated D1; no application fakes. */
 export async function createFixture({persistTo,ownerCookie,mailResponse,mailProvider='resend',mailEventKey,mailReplyDomain,stripeEdge,stripeSecret,stripeWebhookSecret,webhookReceiver,webhookOrigins,webhookDns,now=process.env.PLINTH_TEST_NOW?Number(process.env.PLINTH_TEST_NOW):undefined}={}){
  const messages=[]

@@ -1049,7 +1049,7 @@
       "executable": false
     },
     "scripts/verify/installed-worker.mjs": {
-      "sha256": "c2beb0f71e4c4aa4c8953374405203f692c85b407a20c7079c31853edf91b16b",
+      "sha256": "00cba25118de89be6f5509a24645cf845180d9785ac946193cff915ec692bea7",
       "executable": false
     },
     "scripts/verify/installed.mjs": {
@@ -5625,7 +5625,7 @@
       "executable": false
     },
     "tests/plinth/helpers.mjs": {
-      "sha256": "5de7dd098627b3f7deca82724998bba47bff96409124f04b001d81ceccd76345",
+      "sha256": "6e1a695c25fdca454f7aad1ee7519ea965c784c8a834a1cc759a8aba70170db4",
       "executable": false
     },
     "tests/plinth/imports.test.mjs": {
