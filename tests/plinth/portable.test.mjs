@@ -274,6 +274,10 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const archivedChanges=(await signedArchive.list()).changes
     const archivedForecast=(await reviewForecast(c)).record
     const archivedForecastProposal=(await c.ok('/agent-forecasts/'+archivedForecast.id+'/prepare',{packet_digest:archivedForecast.digest})).record
+    const refreshRoot='/api/plinth/jobs/'+c.job.id+'/actuals-refresh',refreshSources=(await f.json(refreshRoot,{cookie:f.owner})).value
+    const refreshInput={expected_version:refreshSources.version,operation_id:'synthetic-plinth-archive-refresh',source_digest:refreshSources.source_digest,as_of:'2026-10-23',reference:'Synthetic archive actuals review',confirm:true}
+    const refreshSaved=await f.json(refreshRoot,{method:'POST',cookie:f.owner,body:refreshInput});assert.equal(refreshSaved.status,200,JSON.stringify(refreshSaved.value))
+    const archivedActuals=refreshSaved.value.record;await c.read()
     const costJobId=c.job.id
     const {roomInput,roomFiles}=await import('../fixtures/room-board.mjs')
     job=(await f.json('/api/plinth/jobs/'+job.id,{cookie:f.owner})).value.job
@@ -347,6 +351,7 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     const originalRows=rows(original),restoredRows=rows(restored),getCost=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).cost_records
     assert.deepEqual(getCost(restoredRows),getCost(originalRows));assert.equal(getCost(restoredRows).bills[0].document.base64,costOriginal.base64);assert.equal(getCost(restoredRows).periods.length,1);assert.equal(getCost(restoredRows).forecasts.length,1);assert.equal(getCost(restoredRows).reconciliations.length,1);assert.equal(Buffer.from(getCost(restoredRows).payroll_imports[0].document.base64,'base64').toString(),payrollCsv);assert.ok(!restoredRows.some(r=>['oa_sessions','oa_credentials','oa_tokens'].includes(r.table)))
     for(const records of [originalRows,restoredRows]){const captured=JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).agent_forecasts;assert.deepEqual(captured.proposals,[archivedForecastProposal]);assert.equal(captured.requests[0].digest,archivedForecast.digest);assert.ok(!records.some(r=>r.table==='pl_agent_forecast_reviews'),'Forecast packets restore as history without execution authority')}
+    for(const records of [originalRows,restoredRows]){assert.deepEqual(getCost(records).actuals_refresh,[archivedActuals]);assert.ok(!records.some(r=>r.table==='pl_actuals_refresh_reviews'),'Restored previews have no active source review')}
     const authority=records=>JSON.parse(records.find(r=>r.table==='pl_jobs'&&r.row.id===costJobId).row.data).accounting_authority
     assert.deepEqual(authority(restoredRows),authority(originalRows));assert.equal(authority(restoredRows).accountant_id,accountantId);assert.equal(getCost(restoredRows).periods[0].native_review.by.id,accountantId);assert.deepEqual(getCost(restoredRows).periods[0].snapshot,nativePreview.snapshot)
     // The complete part stream, including binary cells, is unchanged by a restore.
@@ -388,6 +393,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const consent=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/review',{method:'POST',cookie:receivingCookie,body:{expected_version:recoveredVersion,digest:evidenceReview.value.digest,confirm:true}});assert.equal(consent.status,200)
       const fresh=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:{...recoveredObservation,expected_version:consent.value.version,packet_id:consent.value.record.id,observation_id:'synthetic-plinth-restored-observation'}});assert.equal(fresh.status,200);assert.equal(fresh.value.record.comparison.overall_restoration,'unverified');
       const closeoutRoot='/api/plinth/jobs/'+job.id+'/agent-closeout';const restoredCloseout=await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie});assert.deepEqual(restoredCloseout.value.packets,archivedCloseout);const refusedCloseout=await recoveredSearch.json(closeoutRoot+'/'+closeoutPacket.id+'/drafts',{method:'POST',cookie:receivingCookie,body:{expected_version:restoredCloseout.value.version,...closeout.draft(closeoutPacket),request_id:'synthetic-plinth-restored-draft'}});assert.equal(refusedCloseout.status,409,'Restored review consent cannot authorize new drafting');assert.equal(refusedCloseout.value.error,'closeout_authority');assert.deepEqual((await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie})).value.packets[0].drafts,[closeoutDraft]);
+      const restoredRefresh=(await recoveredSearch.json(refreshRoot,{cookie:receivingCookie})).value
+      assert.deepEqual(restoredRefresh.previews[0].sources,archivedActuals.sources);assert.equal(restoredRefresh.previews[0].review_active,false)
+      assert.equal((await recoveredSearch.json(refreshRoot+'/'+archivedActuals.id,{cookie:receivingCookie})).value.error,'actuals_review_required')
+      const replayRefresh=await recoveredSearch.json(refreshRoot,{method:'POST',cookie:receivingCookie,body:{...refreshInput,source_digest:restoredRefresh.source_digest,expected_version:restoredRefresh.version}})
+      assert.equal(replayRefresh.value.error,'actuals_review_required')
+      const reviewedRefresh=await recoveredSearch.json(refreshRoot,{method:'POST',cookie:receivingCookie,body:{...refreshInput,operation_id:'synthetic-plinth-destination-refresh',source_digest:restoredRefresh.source_digest,expected_version:restoredRefresh.version}})
+      assert.equal(reviewedRefresh.status,200,JSON.stringify(reviewedRefresh.value))
+      assert.equal((await recoveredSearch.json(refreshRoot+'/'+reviewedRefresh.value.record.id,{cookie:receivingCookie})).status,200)
       const inactiveForecast=await recoveredSearch.json('/api/plinth/jobs/'+costJobId+'/agent-forecasts/'+archivedForecast.id,{cookie:receivingCookie});assert.equal(inactiveForecast.status,403);assert.equal(inactiveForecast.value.error,'forecast_review_required');
       const recoveredCoverage=await recoveredSearch.json('/api/plinth/imports/'+importId+'/coverage',{cookie:receivingCookie});
       assert.equal(recoveredCoverage.status,200,JSON.stringify(recoveredCoverage.value));

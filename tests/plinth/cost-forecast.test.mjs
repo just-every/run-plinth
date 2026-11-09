@@ -1,3 +1,4 @@
+import {proveActualsRefresh} from './actuals-refresh-support.mjs'
 import {proveAgentForecast} from './agent-forecast-support.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -78,5 +79,29 @@ test('Recovery evidence compares confirmation, delivery, installed progress and 
   assert.equal(third.comparison.posted_actual_cents,220000);assert.equal(third.comparison.observed_margin_cents,80000);assert.equal(third.comparison.forecast_margin_cents,null);assert.equal(third.comparison.margin_state,'contradicted');assert.equal(third.comparison.native_status,'contradicted');assert.equal(third.reopened,true);assert.equal(third.comparison.overall_restoration,'unverified')
   assert.deepEqual(r.recovery.assessments.slice(0,3),[first,deliveryOnly,second]);assert.equal(r.recovery.packets.length,4)
   const after=await c.read();for(const key of ['schedules','budgets','quotes','trade_invitations'])assert.deepEqual(after[key],before[key],key+' decisions remain immutable');assert.equal(after.approvals.filter(a=>a.kind==='schedule.publish').length,1)
+ }finally{await f.close()}
+})
+
+test('Owner actuals refresh reconciles receipt, reviewed bill and corrected sources with inert retained previews',async()=>{
+ const f=await createFixture({now:Date.parse('2026-11-09T12:00:00Z')})
+ try{
+  const x=await proveActualsRefresh(f),{c}=x
+  const address=['synthetic-plinth-refresh-office','example.invalid'].join('@'),admin=await f.invite(address,'Refresh administrator','admin'),client=await f.invite(c.job.client_email),agent=await f.agent()
+  const request=await x.input({codes:undefined}),snapshot=(await c.read()).version
+  for(const credentials of [{cookie:admin},{cookie:client},{token:agent},{}]){
+   const root='/api/plinth/jobs/'+c.job.id+'/actuals-refresh'
+   for(const [method,body] of [['GET',undefined],['POST',request]])assert.ok([401,403].includes((await f.request(root,{method,body,...credentials})).status))
+  }
+  const other=await costFixture(f),id=(await x.list()).previews[0].id
+  assert.equal((await f.request('/api/plinth/jobs/'+other.job.id+'/actuals-refresh/'+id,{cookie:f.owner})).status,404)
+  assert.equal((await c.read()).version,snapshot,'Denied requests do not partially write')
+  const wire=JSON.stringify((await c.api('/jobs/'+c.job.id,undefined,client)).value)
+  assert.ok(!wire.includes('synthetic-plinth-fresh-native-review'))
+  const credentials=(await c.api('/agent-credentials')).value.credentials
+  for(const credential of credentials)await c.api('/agent-credentials/'+credential.id+'/revoke',{})
+  assert.equal((await f.request('/api/plinth/jobs/'+c.job.id+'/actuals-refresh',{token:agent})).status,401)
+  const erased=await f.request('/api/plinth/jobs/'+c.job.id,{method:'DELETE',cookie:f.owner,body:{expected_version:(await c.read()).version}})
+  assert.equal(erased.status,200);assert.equal((await c.api('/jobs/'+c.job.id+'/actuals-refresh')).status,404)
+  assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_actuals_refresh_reviews WHERE job_id=?').bind(c.job.id).first()).n,0)
  }finally{await f.close()}
 })

@@ -70,6 +70,15 @@ test('BILL-003 / BILL-001 — coded USD draws retain reviewed tax, reconcile sto
   assert.equal((await act('/retainage',{...retainage,rules:retainage.rules.map(row=>({...row,work_bps:0}))})).status,409,'BILL-003 approved contract terms cannot be rewritten after billing')
   assert.equal((await act(`/claims/${first.id}/issue`)).status,200);first=structuredClone(job.claims.find(c=>c.id===first.id))
   assert.equal((await act(`/claims/${first.id}/issue`)).status,409)
+  const refreshRoot='/jobs/'+job.id+'/actuals-refresh',refreshSource=(await api(refreshRoot)).value
+  const prospective=await api(refreshRoot,{expected_version:job.version,operation_id:crypto.randomUUID(),source_digest:refreshSource.source_digest,as_of:'2026-10-21',reference:'Synthetic stored-only prospective review',confirm:true,stored_allocations:first.sov.lines.map(l=>({line_id:l.id,stored_cents:l.stored_cents,order_ids:l.order_ids,evidence:'Retain exact previously reviewed stored allocation'}))})
+  assert.equal(prospective.status,200,JSON.stringify(prospective.value))
+  assert.equal(prospective.value.record.sov.current_cents,0,'Unchanged approved position can be inspected without preparing a new claim')
+  assert.equal(prospective.value.record.sov.completed_cents,first.sov.completed_cents)
+  assert.equal(prospective.value.record.sov.retainage.current_withheld_cents,0)
+  assert.equal(prospective.value.record.sov.retainage.current_net_cents,0)
+  job=(await api('/jobs/'+job.id)).value.job
+  assert.deepEqual(job.claims.find(c=>c.id===first.id),first,'A prospective refresh cannot issue or rewrite an application')
   const applicationPath=`/api/plinth/jobs/${job.id}/claims/${first.id}/application`
   const issued=await f.json(applicationPath+'.json',{cookie:f.owner});assert.equal(issued.status,200);assert.deepEqual(issued.value.application,first.sov);assert.equal(issued.value.issued_by.id,first.exported_by.id)
   assert.deepEqual((await f.json(applicationPath+'.json',{cookie:f.owner})).value,issued.value,'Repeated downloads preserve exact issuance and snapshot')

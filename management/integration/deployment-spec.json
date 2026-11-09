@@ -354,6 +354,12 @@
       "name": "202611020100_file_extraction.sql",
       "sha256": "67e7da5506ccfeeb6d9e9f1e071425a9a0dbf644938063ff5e21bd54e6d673f7",
       "sql": "-- Native checkpoints belong to the exact original and disappear with its custody.\nCREATE TABLE pl_file_extraction_work (\n file_id TEXT PRIMARY KEY REFERENCES pl_mail_files(id) ON DELETE CASCADE,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n version INTEGER NOT NULL DEFAULT 1,\n state TEXT NOT NULL CHECK(state IN ('queued','complete','no_text','failed')),\n method TEXT NOT NULL,\n progress INTEGER NOT NULL DEFAULT 0,\n total INTEGER,\n error TEXT,\n updated_at TEXT NOT NULL\n);\nCREATE TABLE pl_file_extraction_pages (\n file_id TEXT NOT NULL REFERENCES pl_file_extraction_work(file_id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n page INTEGER NOT NULL,\n text TEXT NOT NULL,\n text_checksum TEXT NOT NULL,\n PRIMARY KEY(file_id,page)\n);\n-- Execution authority is deliberately excluded from portable archives.\nCREATE TABLE pl_file_extraction_reviews (\n file_id TEXT PRIMARY KEY REFERENCES pl_file_extraction_work(file_id) ON DELETE CASCADE,\n checksum TEXT NOT NULL,\n owner_id TEXT NOT NULL,\n owner_version INTEGER NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202611090100_actuals_refresh.sql",
+      "sha256": "3009631359b61bb5f3e5475b49996b2c99853d95820a6378d43488104ead9bd5",
+      "sql": "-- Portable previews remain history. Current review authority never restores from an archive.\nCREATE TABLE pl_actuals_refresh_reviews(\n preview_id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n owner_id TEXT NOT NULL,\n digest TEXT NOT NULL\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

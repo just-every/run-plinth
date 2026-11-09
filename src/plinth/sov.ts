@@ -110,7 +110,7 @@ function allocateStored(lines: SovApplicationLine[], capacities: Map<string, num
  lines.forEach((line, i) => need(send(i, line.stored_cents, new Set(), new Set()) === line.stored_cents, 'Stored materials exceed the net receipts on their referenced issued POs, including references shared by other rows', 409, 'sov_stored_balance'))
  lines.forEach((line, i) => line.stored_orders.forEach(order => { order.allocated_cents = allocations[i]!.get(order.id) ?? 0 }))
 }
-function buildApplication(job: Job, input: Input, prepared_by: Stamp): SovApplication {
+function buildApplication(job: Job, input: Input, prepared_by: Stamp, prospective = false): SovApplication {
  const revision = currentRevision(job), previous = latestClaim(job)
  need(Array.isArray(input.lines) && input.lines.length === revision.lines.length, 'Include every current schedule of values row exactly once')
  const inputs = input.lines.map(object), ids = inputs.map(row => text(row.line_id, 'line_id', 200))
@@ -143,7 +143,7 @@ function buildApplication(job: Job, input: Input, prepared_by: Stamp): SovApplic
  allocateStored(lines, capacities)
  const total_cents = sum(lines.map(line => line.total_cents)), previous_cents = sum(lines.map(line => line.previous_cents)), scheduled_cents = sum(lines.map(line => line.scheduled_cents))
  need(previous_cents === (previous?.cumulative_cents ?? 0), 'Earlier approved pay app totals do not reconcile to coded history', 409, 'sov_legacy_history')
- need(total_cents > previous_cents && total_cents <= scheduled_cents, 'Application total must exceed earlier approved applications and remain within the contract', 409, 'claim_balance')
+ need((prospective ? total_cents >= previous_cents : total_cents > previous_cents) && total_cents <= scheduled_cents, 'Application total must exceed earlier approved applications and remain within the contract', 409, 'claim_balance')
  const application: SovApplication = { format: 'plinth-sov-application-v1', purpose, currency: 'USD', job_id: job.id, job_name: job.name, prepared_by: structuredClone(prepared_by), sov_revision: structuredClone(revision), ...(previous ? { previous_claim_id: previous.id } : {}), lines, scheduled_cents, previous_cents, completed_cents: sum(lines.map(line => line.completed_cents)), stored_cents: sum(lines.map(line => line.stored_cents)), current_cents: total_cents - previous_cents, total_cents, completion_percent: percent(total_cents, scheduled_cents), balance_cents: scheduled_cents - total_cents }
  const retainage = retainageSnapshot(job, application)
  return {...application,...(retainage ? {retainage} : {})}
@@ -152,6 +152,20 @@ function buildApplication(job: Job, input: Input, prepared_by: Stamp): SovApplic
 export function prepareSovApplication(job: Job, actor: Actor, input: Input): SovApplication {
  requireJobManager(actor, true)
  return buildApplication(job, input, stamp(actor))
+}
+/** Receipt refresh preserves the last human-approved completed work, even when notes suggest more. */
+export function previewReceiptApplication(job: Job, actor: Actor, allocations: unknown): SovApplication {
+ requireJobManager(actor)
+ need(Array.isArray(allocations), 'Explicitly review stored material allocations for every SOV row')
+ const previous = latestClaim(job), revision = currentRevision(job)
+ const lines = allocations.map(value => {
+  const row = object(value), line = revision.lines.find(l => l.id === row.line_id)
+  need(line, 'Choose a current SOV line', 409, 'sov_stale')
+  const approved = previous?.sov?.lines.find(l => l.id === line.id)
+  need(row.completed_cents === undefined, 'Receipt refresh cannot assert completed work', 409, 'actuals_completion')
+  return {...row, completed_cents: approved?.completed_cents ?? 0}
+ })
+ return buildApplication(job, {lines}, stamp(actor), true)
 }
 /** Recompute before human approval, pinning prior progress, sources, and net receipts. */
 export function assertSovCurrent(job: Job, application: SovApplication): void {
