@@ -60,6 +60,8 @@ export async function prepareActualsRefresh(job:Job,actor:Actor,input:Input):Pro
   try{sov=previewReceiptApplication(job,actor,input.stored_allocations)}
   catch(error){if(!(error instanceof DomainError))throw error;unavailable.push({scope:'SOV',reason:error.message})}
  }
+ if(sov&&!sov.retainage)unavailable.push({scope:'retainage',reason:'No approved contract retainage terms are recorded'})
+ if(current.sources.some(s=>s.kind==='receipt'&&!s.checksums.length))unavailable.push({scope:'receipt originals',reason:'Native receipt references have no captured original bytes or checksum; they remain staff-recorded evidence'})
  const exceptions=exceptionView(job)
  if(!exceptions.healthy)unavailable.push({scope:'reconciliation',reason:'Native discrepancies or unresolved exceptions remain; this preview cannot clear them'})
  unavailable.push({scope:'external accounting',reason:'No authorized external accounting synchronization or independent reconciliation is supplied'})

@@ -3249,7 +3249,7 @@
       "executable": false
     },
     "src/plinth/actuals-refresh.ts": {
-      "sha256": "9efb4ec4399eb4e8aef3b966b59b41fdab03002cd9d889c15f13ad2b22e53287",
+      "sha256": "21ab90bc63ac95be22e314ab9cd5ec02e493af3b8ffea16ab945d954008264e5",
       "executable": false
     },
     "src/plinth/agent-answers.ts": {
@@ -4489,7 +4489,7 @@
       "executable": false
     },
     "src/ui/actuals-refresh.tsx": {
-      "sha256": "47f8961773675280dba65d7e062adefc65b4e1a7e9c239496d7ae79b146cb70b",
+      "sha256": "7327716325379dd80f768f75ad3099e11f22a2ccbf5ac267dc71c0b0a662ed35",
       "executable": false
     },
     "src/ui/allowance-changes.tsx": {
@@ -5310,6 +5310,10 @@
     },
     "tests/fixtures/workbook-xls.mjs": {
       "sha256": "0d3f09286d1b3c6b000531d2fa2b778129403f3a4b3cd20e04fbb4c815e74597",
+      "executable": false
+    },
+    "tests/journeys/actuals-refresh.mjs": {
+      "sha256": "18f930a09d03c52a9253955fc9346090b2cfc392947ec00c0808e11a8f496763",
       "executable": false
     },
     "tests/journeys/attachment-extraction.mjs": {
