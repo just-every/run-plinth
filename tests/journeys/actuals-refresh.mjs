@@ -51,6 +51,18 @@ try{
  await expect(result.getByRole('region',{name:'Refresh code 06-100'})).toContainText('$330.00')
  await expect(result.getByRole('region',{name:'Refresh code 06-100'})).toContainText('$1,270.00')
  await expect(result.getByRole('region',{name:'Prospective billing'})).toContainText('Current net $190.00')
+ await c.read()
+ const correctedSource={...c.bill('synthetic-plinth-browser-correction'),kind:'credit',credit_of:bill.id,lines:[{...c.bill().lines[0],subtotal_cents:10000,matches:[{order_id:c.order.id,receipt_id:c.receipts[0].id,cost_code:'06-100',amount_cents:10000}]}]}
+ const correction=(await c.ok('/costs/bills',correctedSource)).record
+ await c.ok('/costs/bills/'+correction.id+'/review',{reason:'Human reviews the exact supplier correction original'})
+ await c.ok('/costs/bills/'+correction.id+'/post')
+ await open();await expect(result).toContainText('Sources changed');await save('Synthetic corrected bill refresh',refreshCodes(70000))
+ latest=(await list()).previews.at(-1)
+ assert.equal(latest.forecast.final_cents,179000);assert.equal(latest.forecast.margin_cents,121000)
+ assert.equal(latest.codes[0].delta.actual_cents,-11000);assert.equal(latest.codes[0].delta.open_commitment_cents,10000)
+ await expect(result.getByRole('region',{name:'Refresh code 06-100'})).toContainText('$220.00')
+ await expect(result.getByRole('region',{name:'Refresh code 06-100'})).toContainText('$700.00')
+ await expect(result.getByRole('region',{name:'Refresh code 06-100'})).toContainText('$1,370.00')
  await c.read();await c.ok('/diary',{note:'Synthetic unapproved note claims more completed work'})
  await open()
  const source=(await list()).source_digest
@@ -73,5 +85,5 @@ try{
   }
  }
  await context.close()
- console.log('AUTO-003 PASS: installed native receipt and bill deltas, reviewed assumptions, frozen completed work and issued billing; zero provider calls; owner screens at 1440 and 390')
+ console.log('AUTO-003 PASS: installed native receipt, posted bill and correction deltas, reviewed assumptions, frozen completed work and issued billing; zero provider calls; owner screens at 1440 and 390')
 }finally{await browser.close()}
