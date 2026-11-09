@@ -75,6 +75,12 @@ test('US-001 — USD company setup, US address and phone, exact US/metric measur
   r = await f.json(`/api/plinth/jobs/${aud.id}/pricing/preview`, { method: 'POST', cookie: f.owner, body: { expected_version: aud.version } })
   assert.equal(r.status, 409); assert.equal(r.value.error, 'currency', 'USD rates and tax never price a historical AUD job')
 
+  for(const method of ['GET','POST']){
+   const historicalRefresh=await f.json('/api/plinth/jobs/'+aud.id+'/actuals-refresh',{method,cookie:f.owner,...(method==='POST'?{body:{expected_version:aud.version,confirm:true}}:{})})
+   assert.equal(historicalRefresh.status,409,'A USD refresh never projects historical AUD amounts')
+   assert.equal(historicalRefresh.value.error,'currency')
+  }
+
   // US phone numbers on customer contacts gain E.164; other numbers stay exactly as written.
   r = await f.json('/api/plinth/customers', { method: 'POST', cookie: f.owner, body: { name: 'Rivera household', kind: 'household', contacts: [{ id: 'sam', name: 'Sam Rivera', email: 'sam@example.com', phone: '1 (802) 555-0199' }, { id: 'ana', name: 'Ana Rivera', email: 'ana@example.com', phone: '+44 20 7946 0958' }] } })
   assert.equal(r.status, 201, JSON.stringify(r.value))

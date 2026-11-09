@@ -1,6 +1,6 @@
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { authorize, requireOwner } from './auth'
-import { active, DomainError, need, object, type Input } from './model'
+import { active, DomainError, need, object, usdOnly, type Input } from './model'
 import { costLedger } from './cost-ledger'
 import { costs } from './cost-model'
 import { prepareActualsRefresh, refreshSources } from './actuals-refresh'
@@ -22,7 +22,9 @@ export async function actualsRefreshResponse(request:Request,original:Bindings):
  if(!match)return null
  const env=runtimeBindings(original),actor=await authorize(request,env);requireOwner(actor)
  need(!actor.agent_door,'A signed-in owner is required',403,'forbidden')
- const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,match[1]!),current=await refreshSources(previous)
+ const clock=await readClock(env.DB),previous=await jobOf(env.DB,actor,match[1]!)
+ usdOnly(previous)
+ const current=await refreshSources(previous)
  const rows=costs(previous).actuals_refresh??[]
  const locallyReviewed=async(id:string,digest:string)=>!!await env.DB.prepare('SELECT preview_id FROM pl_actuals_refresh_reviews WHERE preview_id=? AND owner_id=? AND digest=?').bind(id,actor.id,digest).first()
  if(request.method==='GET'){
