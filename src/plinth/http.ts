@@ -6,6 +6,7 @@ import { agentForecastResponse } from './agent-forecast'
 import { roomBoardExport } from './room-export'
 import { roomBoardAction, roomBoardFile } from './room-boards'
 import { signedChangeResponse } from './signed-change-http'
+import { collectionReviewResponse } from './collection-review-http'
 import { followupResponse } from './followup-rules'
 import { submittalAccess, submittalAction, submittalFile, submittalReviewers, requireSubmittalGate } from './submittals'
 import { planResponse } from './plan-http'
@@ -116,7 +117,7 @@ const role=(actor:Actor)=>actor.role==='member'?'client':actor.role
 async function resourcePreview(db:D1Database,job:Job,actor:Actor,preview:import('./schedule-model').SchedulePreview){preview.conflicts.push(...scopedConflicts(resourceConflicts(await resources(db),await jobs(db),{...job,schedules:preview.tasks}),actor));return preview}
 async function named(db:D1Database,list:Job[]):Promise<Job[]>{const rows=await db.prepare("SELECT lower(email) AS email,display_name FROM oa_operators WHERE role='member'").all<{email:string;display_name:string}>();const names=new Map(rows.results.map(r=>[r.email,r.display_name]));return list.map(job=>names.has(job.client_email)?{...job,client_name:names.get(job.client_email)}:job)}
 function display(job:Job,actor:Actor):any {
- job={...job,agent_forecasts:undefined,recovery_evidence:undefined,agent_closeout:undefined,agent_answers:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
+ job={...job,collection_reviews:undefined,agent_forecasts:undefined,recovery_evidence:undefined,agent_closeout:undefined,agent_answers:undefined,room_boards:actor.role==='owner'&&!actor.agent_door?job.room_boards:undefined,signed_changes:undefined,approvals:job.approvals.filter(a=>!a.kind.startsWith('signed-change.'))}
  if(actor.agent_native_role) {
   const native=display(job,{...actor,role:actor.agent_native_role,agent_door:undefined,agent_native_role:undefined})
   return {...native,meetings:undefined,meeting_shares:undefined,meeting_office_access:false,bids:undefined,bid_comparisons:undefined,bid_cost_adjustments:undefined,bid_comparison_awards:undefined,portal_submissions:undefined,warranties:native.warranties?warrantyAgentProjection(native):undefined}
@@ -173,6 +174,7 @@ export async function nativePlinth(request:Request,original:Bindings,actor:Actor
  const closeout=await closeoutResponse(request,env,actor,parts,body);if(closeout)return closeout
  const forecastPacket=await agentForecastResponse(request,env,actor,parts,body);if(forecastPacket)return forecastPacket
  const signedChanges=await signedChangeResponse(request,env,actor,parts,body);if(signedChanges)return signedChanges
+ const collectionReview=await collectionReviewResponse(request,env,actor,parts,body);if(collectionReview)return collectionReview
  const followup=await followupResponse(request,env,actor,parts,body);if(followup)return followup
  if(parts[0]!=='jobs')return json({error:'not_found',message:'Unknown Plinth route'},404)
  if(parts.length===1){if(method==='GET'){const all=await jobs(env.DB),allowed=actor.role==='member'?await Promise.all(all.map(job=>clientAccess(env.DB,job,actor.email))):all.map(job=>assignedJob(actor,job));const shown=all.filter((job,i)=>allowed[i]);return json({role:role(actor),...(actor.permissions?{role_name:actor.permissions.name}:{}),jobs:(await named(env.DB,shown)).map(job=>display(job,actor)),...(actor.role==='member'||isTeamRole(actor.role)&&actor.role!=='project_manager'||actor.permissions&&!actor.permissions.financial?{}:{currency_totals:currencyTotals(shown)})})}if(method==='POST'){requireManager(actor);const input=await body(request),clock=await readClock(env.DB),job=emptyJob(input,actor,(await company(env.DB))?.time_zone);if(input.customer_id)await linkCustomer(env.DB,job,actor,input);await insertJob(env.DB,actor,job,clock);return json({job,role:role(actor)},201)}return json({error:'method_not_allowed'},405)}

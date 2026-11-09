@@ -11,6 +11,7 @@ export interface FollowupConsent { kind:FollowupKind; person_id:string; allowed:
 export interface FollowupState { rules:FollowupRule[]; consents:FollowupConsent[] }
 export interface FollowupSource { id:string; revision:string; kind:FollowupKind; title:string; event_on:string; scheduled_on:string; amount_cents:number; outstanding:boolean }
 export interface FollowupAction {
+ amount_cents?:number; monetary_state?:string; monetary_reason?:string
  key:string; rule_id:string; rule_revision:number; source_id:string; source_revision:string; source_title:string
  step_id:string; step:string; due_on:string; recipient_id:string; recipient_name:string; escalation:boolean
  status:'eligible'|'withheld'; reason:string

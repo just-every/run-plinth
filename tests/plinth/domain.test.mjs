@@ -1077,6 +1077,35 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   const next=(await active.act('/selections',{room:'Bath',category:'Fixtures',allowance_cents:1000,cost_code:'22-100',decision_on:'2026-10-28',lead_days:1,options:[{name:'Basin',supplier:'Synthetic supplier',specifications:'Reviewed white basin',price_cents:1000}]})).record
   await active.act('/selections/'+next.id+'/present',{revision_id:next.revisions[0].id})
   assert.equal((await c.preview(active)).actions.find(a=>a.source_id===next.id&&!a.escalation).reason,'Recipient has no current access')
+  const reviewRoot='/api/plinth/jobs/'+active.job.id+'/collection-reviews'
+  const collectionSources=(await f.json(reviewRoot,{cookie:f.owner})).value
+  const reviewInput={expected_version:collectionSources.version,review_generation:collectionSources.review_generation,owner_version:collectionSources.owner_version,source_digest:collectionSources.source_digest,confirm:true}
+  const privateBefore=await active.read(),collectionCalls=f.messages.length
+  for(const cookie of [c.client,foreign,admin]){
+   assert.equal((await f.json(reviewRoot,{cookie})).status,403)
+   assert.equal((await f.json(reviewRoot,{method:'POST',cookie,body:reviewInput})).status,403)
+  }
+  assert.equal((await f.json(reviewRoot,{token:agent})).status,403)
+  assert.equal((await f.json(reviewRoot,{method:'POST',cookie:f.owner,body:{...reviewInput,expected_version:reviewInput.expected_version-1}})).status,409)
+  assert.equal((await f.json(reviewRoot,{method:'POST',cookie:f.owner,body:{...reviewInput,confirm:false}})).status,400)
+  assert.deepEqual(await active.read(),privateBefore)
+  const reviews=await Promise.all([1,2].map(()=>f.json(reviewRoot,{method:'POST',cookie:f.owner,body:reviewInput})))
+  assert.ok(reviews.some(r=>r.status===200));assert.ok(reviews.every(r=>[200,409].includes(r.status)))
+  const collection=reviews.find(r=>r.status===200).value.record
+  const dedup=await f.json(reviewRoot,{method:'POST',cookie:f.owner,body:reviewInput});assert.equal(dedup.status,200);assert.equal(dedup.value.record.id,collection.id)
+  await active.read()
+  const privateAfter=await active.read(),collectionPreview=reviewRoot+'/'+collection.id+'/preview?as_of=2026-10-30T15:00:00Z'
+  const beforePreview=await f.json(collectionPreview,{cookie:f.owner});assert.equal(beforePreview.status,200);assert.equal(beforePreview.value.case_status,'unresolved')
+  for(const cookie of [c.client,foreign,admin])for(const suffix of ['/'+collection.id,'/'+collection.id+'/preview?as_of=2026-10-30T15:00:00Z'])assert.equal((await f.json(reviewRoot+suffix,{cookie})).status,403)
+  assert.equal((await f.json('/api/plinth/jobs/'+estimate.job.id+'/collection-reviews/'+collection.id,{cookie:f.owner})).status,404)
+  for(const cookie of [c.client,admin]){const shown=(await f.json('/api/plinth/jobs/'+active.job.id,{cookie})).value.job;assert.equal(shown.collection_reviews,undefined)}
+  const generic=(await f.json('/api/plinth/jobs',{cookie:f.owner})).value.jobs.find(j=>j.id===active.job.id);assert.equal(generic.collection_reviews,undefined,'Private review content is available only through its own door')
+  const revoke=await f.json(reviewRoot+'/'+collection.id+'/revoke',{method:'POST',cookie:f.owner,body:{...reviewInput,expected_version:active.job.version,source_digest:collectionSources.source_digest,reason:'Owner withdrew prospective review use',confirm:true}});assert.equal(revoke.status,200)
+  assert.equal((await f.json(collectionPreview,{cookie:f.owner})).value.error,'collection_revoked')
+  assert.equal((await f.json(reviewRoot,{method:'POST',cookie:f.owner,body:reviewInput})).value.error,'collection_revoked','Captured identical request never resurrects revoked consent')
+  assert.deepEqual((await f.json(reviewRoot+'/'+collection.id,{cookie:f.owner})).value.record,collection,'Revocation appends separately, preserving the exact original review')
+  await active.read();assert.deepEqual(active.job.invoices,privateAfter.invoices);assert.deepEqual(active.job.remittances,privateAfter.remittances)
+  assert.equal(f.messages.length,collectionCalls,'Private review operations cause no outbound effects')
   const clientJob=(await f.json('/api/plinth/jobs/'+active.job.id,{cookie:c.client})).value.job;assert.equal(clientJob.followup,undefined,'Private configuration and other people consent never leave the owner door')
   assert.equal((await f.request('/auth/operator/status',{method:'POST',cookie:f.owner,body:{operatorId:c.clientId,status:'inactive'}})).status,200)
   assert.equal((await f.json('/api/plinth/jobs/'+active.job.id+'/followup-consent',{cookie:c.client})).status,401)
@@ -1084,9 +1113,12 @@ test('Owner follow-up previews retain revisions, respect current consent and aut
   assert.equal((await f.json('/api/plinth/jobs/'+active.job.id+'/followup-rules',{method:'POST',cookie:f.owner,body:{...config,kind:'selection',expected_version:active.job.version}})).status,403)
   assert.equal((await f.request('/api/plinth/agent-credentials/'+(await f.json('/api/plinth/agent-credentials',{cookie:f.owner})).value.credentials[0].id+'/revoke',{method:'POST',cookie:f.owner,body:{}})).status,200)
   assert.equal((await f.json(root+'/followup-rules',{token:agent})).status,401)
+  assert.equal((await f.json(reviewRoot,{token:agent})).status,401,'A revoked captured bearer cannot expose collection review content')
   const erasedId=active.job.id
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId,{method:'DELETE',cookie:f.owner,body:{expected_version:active.job.version}})).status,200)
   assert.equal((await f.json('/api/plinth/jobs/'+erasedId+'/followup-rules/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner})).status,404)
+  for(const suffix of ['', '/'+collection.id, '/'+collection.id+'/preview?as_of=2026-10-30T15:00:00Z'])assert.equal((await f.json(reviewRoot+suffix,{cookie:f.owner})).status,404)
+  assert.equal((await f.json(reviewRoot,{method:'POST',cookie:f.owner,body:reviewInput})).status,404,'Captured review cannot recreate erased sources')
  }finally{await f.close()}
 })
 

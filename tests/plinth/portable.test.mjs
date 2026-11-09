@@ -204,6 +204,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
     processor.refundStatus='pending';assert.equal((await refund('synthetic-plinth-37',500)).status,200)
     processor.loseRefundResponse=true;assert.equal((await refund('synthetic-plinth-38',250)).status,502);processor.loseRefundResponse=false
     const paymentHistory=(await f.json(`/api/plinth/jobs/${billing.id}/payments`,{cookie:f.owner})).value
+    const collectionRoot='/api/plinth/jobs/'+billing.id+'/collection-reviews',collectionSources=(await f.json(collectionRoot,{cookie:f.owner})).value
+    const collectionInput={expected_version:collectionSources.version,source_digest:collectionSources.source_digest,review_generation:collectionSources.review_generation,owner_version:collectionSources.owner_version,confirm:true}
+    const collectionSaved=await f.json(collectionRoot,{method:'POST',cookie:f.owner,body:collectionInput});assert.equal(collectionSaved.status,200,JSON.stringify(collectionSaved.value))
+    const archivedCollection=collectionSaved.value.record
+    const collectionPreview=await f.json(collectionRoot+'/'+archivedCollection.id+'/preview?as_of=2026-10-30T15:00:00Z',{cookie:f.owner});assert.equal(collectionPreview.status,200)
+    assert.equal(collectionPreview.value.invoices.find(i=>i.invoice_id===processorInvoice.id).monetary_state,'processor_unresolved','Processor and dispute evidence never becomes native recorded-funds closure')
+    assert.equal(collectionPreview.value.case_status,'unresolved');billing=(await f.json('/api/plinth/jobs/'+billing.id,{cookie:f.owner})).value.job
+
     assert.deepEqual(paymentHistory.refunds.map(r=>[r.id,r.amount_cents,r.status]).sort(),[['synthetic-plinth-36',500,'succeeded'],['synthetic-plinth-37',500,'pending'],['synthetic-plinth-38',250,'unresolved']])
     const processorEffects=processor.refunds.length;assert.equal(processorEffects,3)
 
@@ -393,6 +401,14 @@ test('CLI archive round trip carries jobs, approvals, photos and import custody;
       const consent=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/review',{method:'POST',cookie:receivingCookie,body:{expected_version:recoveredVersion,digest:evidenceReview.value.digest,confirm:true}});assert.equal(consent.status,200)
       const fresh=await recoveredSearch.json(recoveryRoot+'/'+archivedRecovery.id+'/assess',{method:'POST',cookie:receivingCookie,body:{...recoveredObservation,expected_version:consent.value.version,packet_id:consent.value.record.id,observation_id:'synthetic-plinth-restored-observation'}});assert.equal(fresh.status,200);assert.equal(fresh.value.record.comparison.overall_restoration,'unverified');
       const closeoutRoot='/api/plinth/jobs/'+job.id+'/agent-closeout';const restoredCloseout=await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie});assert.deepEqual(restoredCloseout.value.packets,archivedCloseout);const refusedCloseout=await recoveredSearch.json(closeoutRoot+'/'+closeoutPacket.id+'/drafts',{method:'POST',cookie:receivingCookie,body:{expected_version:restoredCloseout.value.version,...closeout.draft(closeoutPacket),request_id:'synthetic-plinth-restored-draft'}});assert.equal(refusedCloseout.status,409,'Restored review consent cannot authorize new drafting');assert.equal(refusedCloseout.value.error,'closeout_authority');assert.deepEqual((await recoveredSearch.json(closeoutRoot,{cookie:receivingCookie})).value.packets[0].drafts,[closeoutDraft]);
+      const collectionHistory=(await recoveredSearch.json(collectionRoot,{cookie:receivingCookie})).value
+      assert.deepEqual(collectionHistory.reviews.map(({stale,revoked,authority_current,...r})=>r),[archivedCollection],'Private native review and its exact source snapshots survive the real CLI archive')
+      assert.equal(collectionHistory.reviews[0].authority_current,false,'Restored collection review confers no authority')
+      assert.equal((await recoveredSearch.json(collectionRoot+'/'+archivedCollection.id+'/preview?as_of=2026-10-30T15:00:00Z',{cookie:receivingCookie})).value.error,'collection_authority')
+      assert.equal((await recoveredSearch.json(collectionRoot,{method:'POST',cookie:receivingCookie,body:collectionInput})).value.error,'collection_authority','Captured pre-restore consent cannot activate a new review')
+      const reviewedCollection=await recoveredSearch.json(collectionRoot,{method:'POST',cookie:receivingCookie,body:{expected_version:collectionHistory.version,source_digest:collectionHistory.source_digest,review_generation:collectionHistory.review_generation,owner_version:collectionHistory.owner_version,confirm:true}});assert.equal(reviewedCollection.status,200)
+      assert.notEqual(reviewedCollection.value.record.id,archivedCollection.id)
+      const recoveredCollectionPreview=await recoveredSearch.json(collectionRoot+'/'+reviewedCollection.value.record.id+'/preview?as_of=2026-10-30T15:00:00Z',{cookie:receivingCookie});assert.equal(recoveredCollectionPreview.status,200);assert.equal(recoveredCollectionPreview.value.case_status,'unresolved')
       const restoredRefresh=(await recoveredSearch.json(refreshRoot,{cookie:receivingCookie})).value
       assert.deepEqual(restoredRefresh.previews[0].sources,archivedActuals.sources);assert.equal(restoredRefresh.previews[0].review_active,false)
       assert.equal((await recoveredSearch.json(refreshRoot+'/'+archivedActuals.id,{cookie:receivingCookie})).value.error,'actuals_review_required')

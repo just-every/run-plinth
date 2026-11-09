@@ -8,6 +8,8 @@ import { portalEnabled } from './portal-policy'
 import { teamGrant } from './team'
 import { roleOf } from './role-store'
 import { presets } from './role-model'
+import { digest } from './cost-model'
+import { collectionInvoice } from './collection-reviews'
 import { invoiceBalance } from './invoices'
 import { suppression } from './mail-store'
 import { day } from './purchase-order-model'
@@ -64,6 +66,9 @@ export async function followupPreview(db:D1Database,job:Job,asOf:number){
   const owner=await officeAuthority(db,job,r.by.id,true)
   const optedOut=r.recipients.some(id=>state(job).consents.findLast(c=>c.person_id===id&&c.kind===rule.kind)?.allowed===false)
   for(const source of followupSources(job).filter(s=>s.kind===rule.kind)){
+   const invoice=source.kind==='collection'?job.invoices!.find(i=>i.id===source.id):undefined
+   const collection=invoice?collectionInvoice(job,invoice):undefined
+   const source_revision=collection?await digest({balance:collection,original:invoice!.issued,receipts:invoice!.receipts,allocations:invoice!.deposit_applications,corrections:invoice!.corrections,write_offs:invoice!.write_offs}):source.revision
    const anchor=r.mode==='event'?source.event_on:[source.scheduled_on,r.starts_on].sort().at(-1)!
    for(const step of r.steps){
     const due_on=nextDate(anchor,step.after_days)
@@ -72,7 +77,7 @@ export async function followupPreview(db:D1Database,job:Job,asOf:number){
      const consent=state(job).consents.findLast(c=>c.person_id===id&&c.kind===rule.kind)
      const suppressed=p?await suppression(db,p.email):null
      const reason=r.paused?'Rule paused':r.generation!==generation||!owner||owner.role!=='owner'?'Owner authority changed; review the rule again':!source.outstanding?'Source resolved or held':optedOut?'Recipient opted out; sequence stopped':local.date<r.starts_on?'Sequence not started':local.date>r.stop_on?'Stop date passed':due_on>local.date?'Step not due':source.amount_cents>r.approval_limit_cents?'Amount exceeds owner review limit':!p?'Recipient has no current access':!consent?.allowed?'Recipient consent is off':suppressed?'Mailbox suppression requires owned follow-up':quiet?'Recipient quiet hours':'Prospective action only; nothing sent'
-     actions.push({key:[rule.id,source.id,source.revision,step.id,id].join(':'),rule_id:rule.id,rule_revision:r.revision,source_id:source.id,source_revision:source.revision,source_title:source.title,step_id:step.id,step:step.label,due_on,recipient_id:id,recipient_name:p?.display_name??'Unavailable recipient',escalation:step.escalate,status:reason==='Prospective action only; nothing sent'?'eligible':'withheld',reason})
+     actions.push({key:[rule.id,source.id,source_revision,step.id,id].join(':'),rule_id:rule.id,rule_revision:r.revision,source_id:source.id,source_revision,source_title:source.title,step_id:step.id,step:step.label,due_on,recipient_id:id,recipient_name:p?.display_name??'Unavailable recipient',escalation:step.escalate,status:reason==='Prospective action only; nothing sent'?'eligible':'withheld',reason,...(collection?{amount_cents:collection.collectible_cents,monetary_state:collection.monetary_state,monetary_reason:collection.reason}:{})})
     }
    }
   }

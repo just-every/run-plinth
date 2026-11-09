@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 export const followupAddress=n=>'synthetic-plinth-'+n+String.fromCharCode(64)+'example.invalid'
 /** Native HTTP preparation shared by the installed and Worker sanity journeys. */
-export async function followupFixture(f){
- const client=await f.invite(followupAddress(1),'Synthetic follow-up client')
+export async function followupFixture(f,{clientNumber=1}={}){
+ const client=await f.invite(followupAddress(clientNumber),'Synthetic follow-up client')
  const api=(path,body,cookie=f.owner)=>f.json('/api/plinth'+path,{method:body===undefined?'GET':'POST',cookie,body})
  async function create(name){
-  const result=await api('/jobs',{name,client_email:followupAddress(1),address:'22 Synthetic Street'});assert.equal(result.status,201)
+  const result=await api('/jobs',{name,client_email:followupAddress(clientNumber),address:'22 Synthetic Street'});assert.equal(result.status,201)
   const c={job:result.value.job}
   c.read=async()=>{const result=await api('/jobs/'+c.job.id);assert.equal(result.status,200);c.job=result.value.job;return c.job}
   c.act=async(path,body={},cookie=f.owner)=>{const result=await api('/jobs/'+c.job.id+path,{expected_version:c.job.version,...body},cookie);assert.equal(result.status,200,JSON.stringify(result.value));await c.read();return result.value}
@@ -19,7 +19,7 @@ export async function followupFixture(f){
  await active.act('/quotes/'+active.job.quotes.at(-1).id+'/accept',{method:'signed',evidence:'Synthetic recorded client agreement',schedule_choice:{kind:'none',reason:'Scheduling follows permit'}})
  const choice=(await active.act('/selections',{room:'Kitchen',category:'Flooring',allowance_cents:10000,cost_code:'06-100',decision_on:'2026-10-28',lead_days:7,options:[{name:'Oak',supplier:'Synthetic supplier',specifications:'Reviewed oak boards',price_cents:10000}]})).record
  await active.act('/selections/'+choice.id+'/present',{revision_id:choice.revisions[0].id})
- const invoice=(await active.act('/invoices',{kind:'deposit',description:'Reviewed deposit',amount_cents:10000,recipient_email:followupAddress(1),due_on:'2026-10-28',terms:'Reviewed deposit terms'})).record
+ const invoice=(await active.act('/invoices',{kind:'deposit',description:'Reviewed deposit',amount_cents:10000,recipient_email:followupAddress(clientNumber),due_on:'2026-10-28',terms:'Reviewed deposit terms'})).record
  await active.act('/invoices/'+invoice.id+'/issue')
  const people=(await api('/jobs/'+active.job.id+'/followup-rules')).value
  const clientId=people.recipients.find(p=>p.display_name==='Synthetic follow-up client').id,ownerId=people.owner_id

@@ -572,3 +572,8 @@ test('Signed change application reconciles native budget and SOV once, publishes
   assert.equal((await c.act('/invoices/'+invoice.id+'/send',{confirm:true})).status,409);assert.equal(f.messages.length,beforeSend+1,'Invoice-send replay cannot send another email')
  }finally{await f.close()}
 })
+
+ test('Collection reviews reconcile native partial receipts, coverage and returns without closing cases or changing financial sources',async()=>{
+ const f=await createFixture({now:Date.parse('2026-10-27T15:00:00Z')})
+ try{await (await import('./collection-support.mjs')).collectionMoneyProof(f)}finally{await f.close()}
+})
