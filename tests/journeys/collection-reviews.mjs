@@ -17,6 +17,7 @@ try{
  const c=await collectionFixture({json,invite,owner:'owner'}),j=c.j
  const observations=async()=>{const r=await owner.request.get(process.env.PLINTH_PROVIDER_EDGE_URL+'/observations');assert.equal(r.status(),200);return r.json()}
  const beforeCalls=await observations(),originals=structuredClone(j.job.invoices.map(i=>i.issued)),otherOriginal=structuredClone(j.job.invoices.find(i=>i.id===c.ids[1]))
+ const originalHtml=await (await owner.request.get(base+'/api/plinth/jobs/'+j.job.id+'/invoices/'+c.ids[0]+'/document.html')).text()
  const screen=page.getByRole('region',{name:'Collection balance reviews',exact:true})
  await page.goto(base+'/app?job='+j.job.id+'&tab=Billing');await expect(screen.getByRole('heading',{name:'Current recorded balances',exact:true})).toBeVisible()
  const save=async(number)=>{
@@ -61,6 +62,14 @@ try{
  await expect(invoice(p4,number1)).toContainText('Collectible residual $75.00');await expect(invoice(p4,number1)).toContainText('Native returns $75.00');await expect(invoice(p4,number1)).toContainText('A native bank or check return reversed recorded coverage');await expect(invoice(p4,number1)).toContainText('Eligible preview');await expect(invoice(p4,number2)).toContainText('Collectible residual $450.00')
  await j.read();assert.deepEqual(j.job.invoices.map(i=>i.issued),originals);assert.deepEqual(j.job.invoices.find(i=>i.id===c.ids[1]),otherOriginal)
  const beforePreview=structuredClone(j.job);await preview();assert.deepEqual(await j.read(),beforePreview)
+ await screen.locator('summary').filter({hasText:/^Exact reviewed invoice evidence$/}).click()
+ const source=screen.getByRole('region',{name:'Reviewed invoice '+number1,exact:true})
+ assert.equal(r4.sources.invoices.find(i=>i.id===c.ids[0]).original_digest,r1.sources.invoices.find(i=>i.id===c.ids[0]).original_digest)
+ const [originalPage]=await Promise.all([owner.waitForEvent('page'),source.getByRole('link',{name:'Open original invoice',exact:true}).click()])
+ await expect(originalPage.getByRole('heading',{name:'Invoice '+number1,exact:true})).toBeVisible()
+ assert.equal(await (await owner.request.get(originalPage.url())).text(),originalHtml,'The review source link opens identical issued original bytes after receipts and returns')
+ await originalPage.close()
+
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:1000})
   if(width===390){const menu=page.getByRole('button',{name:'Open menu',exact:true});await menu.hover();await expect.poll(()=>menu.evaluate(e=>getComputedStyle(e,'::after').visibility)).toBe('visible');await menu.focus();assert.equal(await menu.evaluate(e=>getComputedStyle(e,'::after').visibility),'visible')}

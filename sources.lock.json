@@ -185,7 +185,7 @@
       "executable": false
     },
     "docs/COLLECTION-REVIEWS.md": {
-      "sha256": "aa0fb112625177c7fa7b7f6dc0e194dd24ec2b34b903c8b98a6a924637416770",
+      "sha256": "7249cbbdf14923bcf7221aad56587d13aa49117672a26136714512092fadd0c6",
       "executable": false
     },
     "docs/COMMANDS.md": {
@@ -4765,7 +4765,7 @@
       "executable": false
     },
     "src/ui/collection-reviews.tsx": {
-      "sha256": "8c996d02e09dcc4c49ff0939c9221352bf76f4cf42b34665792eb36deae8e761",
+      "sha256": "aa991ac73e4ebff3c95ab4ebb4d74214f6c683612119b622293198774386f185",
       "executable": false
     },
     "src/ui/company.tsx": {
@@ -5361,7 +5361,7 @@
       "executable": false
     },
     "tests/journeys/collection-reviews.mjs": {
-      "sha256": "218eedaef297869dc9c68e0c31daa077989c6ce09e6eb1d948382ca2d4c399c9",
+      "sha256": "02200bc38578d505ec2c14a44a7d8fd990a06baf97f714b81eb83f578e696735",
       "executable": false
     },
     "tests/journeys/connections.mjs": {
