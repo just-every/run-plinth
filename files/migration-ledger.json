@@ -1,0 +1,1 @@
+{"check": "Applied migration bytes and emitted deployment ledger", "baseline_migrations": 58, "candidate_migrations": 59, "added": "202611090100_actuals_refresh.sql", "sha256": "3009631359b61bb5f3e5475b49996b2c99853d95820a6378d43488104ead9bd5", "exit": 0}

@@ -1,0 +1,93 @@
+[
+  {
+    "name": "typecheck",
+    "exit": 0,
+    "command": "cloud_run pnpm run typecheck",
+    "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+    "recorded_at": "2026-11-09T12:45:22.025948+00:00"
+  },
+  {
+    "name": "build",
+    "exit": 0,
+    "command": "cloud_run npx -y @runeditrun/rer build",
+    "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+    "recorded_at": "2026-11-09T12:45:59.695502+00:00"
+  },
+  {
+    "name": "native",
+    "exit": 0,
+    "command": "cloud_run node --test --test-concurrency=1 tests/plinth/cost-forecast.test.mjs tests/plinth/sov.test.mjs",
+    "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+    "recorded_at": "2026-11-09T12:47:16.175564+00:00"
+  },
+  {
+    "name": "installed",
+    "exit": 0,
+    "command": "cloud_run timeout 1200 node scripts/verify/installed.mjs actuals-refresh",
+    "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+    "recorded_at": "2026-11-09T12:47:53.178775+00:00"
+  },
+  {
+    "name": "portable",
+    "exit": 0,
+    "command": "cloud_run node --test tests/plinth/portable.test.mjs",
+    "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+    "recorded_at": "2026-11-09T12:59:31.608375+00:00"
+  },
+  {
+    "name": "typecheck",
+    "exit": 0,
+    "command": "cloud_run pnpm run typecheck",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:01:33.233318+00:00"
+  },
+  {
+    "name": "build",
+    "exit": 0,
+    "command": "cloud_run npx -y @runeditrun/rer build",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:01:49.090212+00:00"
+  },
+  {
+    "name": "native",
+    "exit": 1,
+    "command": "cloud_run node --test --test-concurrency=1 tests/plinth/cost-forecast.test.mjs tests/plinth/sov.test.mjs tests/plinth/us-conventions.test.mjs",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:02:59.265923+00:00"
+  },
+  {
+    "name": "currency",
+    "exit": 0,
+    "command": "cloud_run node --test tests/plinth/us-conventions.test.mjs",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:03:53.959165+00:00"
+  },
+  {
+    "name": "installed",
+    "exit": 0,
+    "command": "cloud_run timeout 1200 node scripts/verify/installed.mjs actuals-refresh",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:04:16.064100+00:00"
+  },
+  {
+    "name": "first-party",
+    "exit": 0,
+    "command": "cloud_run pnpm exec rer check --profile first-party",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:04:17.385999+00:00"
+  },
+  {
+    "name": "deployment",
+    "exit": 0,
+    "command": "node scripts/build-deployment-spec.mjs --check",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:04:17.550675+00:00"
+  },
+  {
+    "name": "source-lock",
+    "exit": 0,
+    "command": "node scripts/edition-authoring/cli.mjs check",
+    "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "recorded_at": "2026-11-09T13:04:18.060904+00:00"
+  }
+]

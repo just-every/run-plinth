@@ -1,0 +1,18 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: US-001 — USD company setup, US address and phone, exact US/metric measures, IANA job calendars across daylight saving and separate historical AUD totals
+ok 1 - US-001 — USD company setup, US address and phone, exact US/metric measures, IANA job calendars across daylight saving and separate historical AUD totals
+  ---
+  duration_ms: 5839.065626
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8185.900133

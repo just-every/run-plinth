@@ -1,0 +1,6 @@
+{
+  "source_head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+  "tests": "working test added to existing US-001 integration before guard fix",
+  "command": "node --test tests/plinth/us-conventions.test.mjs",
+  "exit": 1
+}

@@ -1,0 +1,190 @@
+{
+  "files": [
+    {
+      "blob": "87a80bef6c376f4b42894125185141abfed217bd",
+      "bytes": 176991,
+      "path": "AUTO-003-result-1440.png",
+      "sha256": "8128478387a3c55aa30e700cdd79584477542a28029672342b1c537f5980f2f6"
+    },
+    {
+      "blob": "166f180c5fa699f257ec8bf1fec8e26d7ab50576",
+      "bytes": 95463,
+      "path": "AUTO-003-result-390.png",
+      "sha256": "9cd5a56d30ebdbf9983f207916c1cd12ce13ffd8d794b6b41a75577efb3ddd3e"
+    },
+    {
+      "blob": "daa3baac5c990d01354e949ca31dc7b9b27b6266",
+      "bytes": 729660,
+      "path": "AUTO-003-sources-1440.png",
+      "sha256": "0d21ec295f7cd376088df9967a4b21eb7733737d8ae58cb9d7d2342bb1cd9b2c"
+    },
+    {
+      "blob": "1d37fb77a8e354df6c99ff1072aa851cfa5bfb73",
+      "bytes": 642446,
+      "path": "AUTO-003-sources-390.png",
+      "sha256": "7dcd0c19018b2cd27e57a9194ae758270ca5cd08232cc7a8d036ffe6331d4c63"
+    },
+    {
+      "blob": "94f1a5c5986e6b220cea5e821f5bf97a9d6fe103",
+      "bytes": 2153,
+      "path": "PLAN.md",
+      "sha256": "045cb83b377fd3d0ad573080d6fae50740a656d53f11c7c4b83afa41bdd668e5"
+    },
+    {
+      "blob": "2524efe25f7d53565c926ea3fda4ad198f362b81",
+      "bytes": 2778,
+      "path": "PROBES.md",
+      "sha256": "71e4296a1fab5963494e07c61df07beb4e7147354812c9ea16778c3d38069fb1"
+    },
+    {
+      "blob": "72c6a3c5e01d1a2b7c80555e3dda74d5d7b396d6",
+      "bytes": 15344,
+      "path": "REPORT.md",
+      "sha256": "c48ca0f17d83ac88c27ca919dec0c38e56e11cf180dcaf8487f4d68e79753ae5"
+    },
+    {
+      "blob": "03f29fd4611461a461d67f47076fb152e5f96217",
+      "bytes": 6723,
+      "path": "build.txt",
+      "sha256": "2900814fb11fbe5e2098fdd9ed919ae314fdfc17e8611c2ce662cdbf78ee42a7"
+    },
+    {
+      "blob": "ecbb0903777c2d749ac6c5462907f26cfdf179fc",
+      "bytes": 244,
+      "path": "ci.json",
+      "sha256": "a613cf26879fef744e02f5ebad9dab348f7a388b91a4223f736f8feddad6e617"
+    },
+    {
+      "blob": "42cbaab08453f8b9fb971b4be5aaf9c5344c4053",
+      "bytes": 83,
+      "path": "contract-check.txt",
+      "sha256": "f035e132032ea4986e80581ca63d1f197fe05f12309872c10fd29703850e89cb"
+    },
+    {
+      "blob": "fe8786d6efcb9d553a9109ac1eaa52ad19cc32d6",
+      "bytes": 83,
+      "path": "contract-write.txt",
+      "sha256": "33c9928ba9603b8683fdf7197d7948d38aac776f7958c3384ac3deadebc5d1e0"
+    },
+    {
+      "blob": "968b4f83045440418d8ce990929854985b502cc1",
+      "bytes": 1351,
+      "path": "currency-before.txt",
+      "sha256": "4bd14b43e2f0bbe1af8ee4b651166354ac101997ec902c89253fee41a4d16943"
+    },
+    {
+      "blob": "5138be3c63a7854e7225a33e8f24a37f7212654f",
+      "bytes": 223,
+      "path": "currency-reproduction.json",
+      "sha256": "0023ccce2931fd1951ec3d26573dc97c0092761b607a2fff79628574c7860828"
+    },
+    {
+      "blob": "2965a68909d7d116c0e23579ff341656a3922685",
+      "bytes": 704,
+      "path": "currency-test.txt",
+      "sha256": "6942bd5c7f57b8e91b1a7112410a551badd936f9249d372a94b0a485fe91173e"
+    },
+    {
+      "blob": "c98f2a83a311148bfed6e82ae04db39df5b310b9",
+      "bytes": 67,
+      "path": "deployment-check.txt",
+      "sha256": "018168b042814e9ae1eedf6a6457cc80d32ab70ed26953f451df81377d615b3c"
+    },
+    {
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "path": "first-party-check.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "blob": "96b29faeeaa7075c558e8b8e3cf50675030b5206",
+      "bytes": 500,
+      "path": "installed-journey.txt",
+      "sha256": "6eae245327e8ab93d45afd1d62679f12aedd32b1933a56f2245ca66aaac113be"
+    },
+    {
+      "blob": "12b40b0ae9b89bfa4fe0d5eee0666317cf90f43a",
+      "bytes": 3078,
+      "path": "local-validation.json",
+      "sha256": "5c8d727fb60060c5ee36e7c2defdaa39fd54d64dbc80209027f0bda5b49a02ef"
+    },
+    {
+      "blob": "5efa1ec38f23bb1ce1b2a68057c9a631a1a093a8",
+      "bytes": 1610,
+      "path": "main-ci.json",
+      "sha256": "e4b800b7359f9de25bd2252124aff350071007eec869ada2f774cb99648cbb6a"
+    },
+    {
+      "blob": "26c0ecba953ce884df4f8a56cc19f59896214caf",
+      "bytes": 1363,
+      "path": "main-portable.txt",
+      "sha256": "d9b27732efb146fb788447cf2b08458cd70003ff2ccca396ee61ba25d77221cc"
+    },
+    {
+      "blob": "d25e9d97b48b3f3a717058ae328d5d20dd9c7d8c",
+      "bytes": 256,
+      "path": "migration-ledger.json",
+      "sha256": "7a6ca67866c0781ca2fe438b394639ac8112c54e3f516cd27c96633bca1258e9"
+    },
+    {
+      "blob": "fb0da24fd0db643b6f84a7834e099e1d595ff679",
+      "bytes": 4198,
+      "path": "native-currency-transport-attempt.txt",
+      "sha256": "8dbfae1e2fab1e330bb4d4a4bb142ead3446fe985e85d110b5633626aa805615"
+    },
+    {
+      "blob": "fb0da24fd0db643b6f84a7834e099e1d595ff679",
+      "bytes": 4198,
+      "path": "native-tests.txt",
+      "sha256": "8dbfae1e2fab1e330bb4d4a4bb142ead3446fe985e85d110b5633626aa805615"
+    },
+    {
+      "blob": "f0d8b19eee7da1bb8502310705262260d09b7ecf",
+      "bytes": 3347,
+      "path": "portable-attempt-1.txt",
+      "sha256": "82b820fe8f44d29fb84c65d657215134f7af55dc38d02da4963c2318480e283e"
+    },
+    {
+      "blob": "28d54ba37e2fde1d3aa9573647596b9be1eaf914",
+      "bytes": 2574,
+      "path": "portable-attempt-2.txt",
+      "sha256": "c11f2a4a4be16d61e54a7dc3796e86df9738e024f2952da63f94f5ae8ed0cea0"
+    },
+    {
+      "blob": "33d2b0e92be9937c8f67f8ecda864d3ed952daff",
+      "bytes": 1364,
+      "path": "portable-test.txt",
+      "sha256": "4b5666a25410193484638e1fe61b13d40c5e9a65e36e5acefeac564c0354c654"
+    },
+    {
+      "blob": "304acf7e459cbdc184b35014cf6a1e47119d0be3",
+      "bytes": 716,
+      "path": "product-push.txt",
+      "sha256": "69ce364c0bae5db055bbc34dc8668c3515a97fd6dd4794d48649023ca3ac1c02"
+    },
+    {
+      "blob": "ecca737d5caae639f19c7377f0e532ce82cadf41",
+      "bytes": 2418,
+      "path": "product-receipt.json",
+      "sha256": "756790506a42ec5f52b3d8e276ab19933c5d78bdb7b4f9189f44686026150c28"
+    },
+    {
+      "blob": "267a3d9a120182e2a972e7bf7b2f03e4a93bb998",
+      "bytes": 716,
+      "path": "save-push.txt",
+      "sha256": "858e5ef8325fbf7224f4c3aa3668acb6abb69c458b18040a2770d585b9172843"
+    },
+    {
+      "blob": "25a2c7066c1e0828c3024c30e0c360a3ce28879e",
+      "bytes": 91,
+      "path": "typecheck.txt",
+      "sha256": "c3d80b90111997ef9fe8b81a7f727afa1dd4012fcba9b3046befb4e62f16a272"
+    }
+  ],
+  "product_branch": "cloud/sx-plinth-c-f98",
+  "product_head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+  "ref": "refs/heads/evidence/sx-plinth-c-f98",
+  "repository": "just-every/run-plinth",
+  "schema": 1,
+  "tag": "sx-plinth-c-f98"
+}

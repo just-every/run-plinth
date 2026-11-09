@@ -1,0 +1,4 @@
+
+> @construction/plinth@0.1.0 typecheck /workspace/run-plinth
+> tsc --build --incremental
+

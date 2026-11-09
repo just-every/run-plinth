@@ -1,0 +1,78 @@
+{
+  "repository": "just-every/run-plinth",
+  "branch": "cloud/sx-plinth-c-f98",
+  "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+  "remote_head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+  "base": "43a2d1228129a76cc7d124068badb4b8b1b5db73",
+  "working_tree_clean": true,
+  "contract_counts_before": {
+    "done": 67,
+    "partial": 34,
+    "missing": 40,
+    "total": 141
+  },
+  "contract_counts_after": {
+    "done": 67,
+    "partial": 34,
+    "missing": 40,
+    "total": 141
+  },
+  "status_rows_edited": false,
+  "product_push": "success",
+  "published_commit_count": 5,
+  "ci": {
+    "conclusion": null,
+    "event": "push",
+    "head_sha": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+    "html_url": "https://github.com/just-every/run-plinth/actions/runs/42622514586",
+    "id": 42622514586,
+    "name": "Verify",
+    "status": "in_progress"
+  },
+  "commits": [
+    {
+      "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+      "subject": "Keep historical currency outside USD actuals refresh previews"
+    },
+    {
+      "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+      "subject": "Reconcile corrected bill sources through the installed owner refresh flow"
+    },
+    {
+      "head": "4fe4452e1d1a90c2142c4ece1f699d426d12f5fa",
+      "subject": "Bind native forecast custody and prevent private refresh delivery events [skip ci]"
+    },
+    {
+      "head": "61b6bfd6f743933eb6b4b76f410b4aeb4232e785",
+      "subject": "Prove installed actuals refresh and retain review inputs"
+    },
+    {
+      "head": "497cfa7d4ddc8378d922770bdddc1856aa85d9ae",
+      "subject": "Add owner-reviewed native actuals refresh previews [skip ci]"
+    }
+  ],
+  "proofs": {
+    "archive": {
+      "head": "b258d96d1c61339d9ca13144fdc7f4bd787f271f",
+      "exit": 0,
+      "duration_ms": 694869,
+      "subsequent_delta": "Read-side USD guard and currency-test assertions only; archive schema, custody and USD calculations unchanged"
+    },
+    "final_native": {
+      "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+      "cost_and_sov_pass": 6,
+      "currency_isolated_pass": 1,
+      "prior_local_transport_failure": "fetch failed; retry passed without changes"
+    },
+    "installed": {
+      "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+      "exit": 0,
+      "widths": [
+        1440,
+        390
+      ]
+    },
+    "identity_and_trailers_checked": true,
+    "default_branch_pushed": false
+  }
+}

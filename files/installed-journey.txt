@@ -1,0 +1,6 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+Warning: Please use the `legacy` build in Node.js environments.
+Installed actuals-refresh: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic
+AUTO-003 PASS: installed native receipt, posted bill and correction deltas, reviewed assumptions, frozen completed work and issued billing; zero provider calls; owner screens at 1440 and 390

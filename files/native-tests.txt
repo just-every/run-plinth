@@ -1,0 +1,75 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: COST-004 — half-complete framing, worse productivity, posted costs and a revised remaining bid produce independently reconciled immutable forecasts
+ok 1 - COST-004 — half-complete framing, worse productivity, posted costs and a revised remaining bid produce independently reconciled immutable forecasts
+  ---
+  duration_ms: 9996.051062
+  type: 'test'
+  ...
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: COST-006 — owner limits and separated approval assign budget and missing-accounting exceptions; only approved correction and source agreement permit clearance
+ok 2 - COST-006 — owner limits and separated approval assign budget and missing-accounting exceptions; only approved correction and source agreement permit clearance
+  ---
+  duration_ms: 4635.231074
+  type: 'test'
+  ...
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: Recovery evidence compares confirmation, delivery, installed progress and adverse costs without certifying restoration
+ok 3 - Recovery evidence compares confirmation, delivery, installed progress and adverse costs without certifying restoration
+  ---
+  duration_ms: 4519.308968
+  type: 'test'
+  ...
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: Owner actuals refresh reconciles receipt, reviewed bill and corrected sources with inert retained previews
+ok 4 - Owner actuals refresh reconciles receipt, reviewed bill and corrected sources with inert retained previews
+  ---
+  duration_ms: 7323.794768
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: BILL-003 / BILL-001 — coded USD draws retain reviewed tax, reconcile stored materials and approved changes, and issue immutable commercial applications
+ok 5 - BILL-003 / BILL-001 — coded USD draws retain reviewed tax, reconcile stored materials and approved changes, and issue immutable commercial applications
+  ---
+  duration_ms: 7230.778932
+  type: 'test'
+  ...
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: CARE-001 — exact client-safe handover keeps assigned punch exceptions, separate decisions and contract retainage rules
+ok 6 - CARE-001 — exact client-safe handover keeps assigned punch exceptions, separate decisions and contract retainage rules
+  ---
+  duration_ms: 5323.551365
+  type: 'test'
+  ...
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: US-001 — USD company setup, US address and phone, exact US/metric measures, IANA job calendars across daylight saving and separate historical AUD totals
+not ok 7 - US-001 — USD company setup, US address and phone, exact US/metric measures, IANA job calendars across daylight saving and separate historical AUD totals
+  ---
+  duration_ms: 24479.849044
+  type: 'test'
+  location: '/workspace/run-plinth/tests/plinth/us-conventions.test.mjs:5:1'
+  failureType: 'testCodeFailure'
+  error: 'fetch failed'
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    Object.processResponse (/workspace/run-plinth/node_modules/.pnpm/undici@7.29.1/node_modules/undici/lib/web/fetch/index.js:237:16)
+    /workspace/run-plinth/node_modules/.pnpm/undici@7.29.1/node_modules/undici/lib/web/fetch/index.js:1081:19
+    node:internal/process/task_queues:151:7
+    AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:148:8)
+    /workspace/run-plinth/node_modules/.pnpm/undici@7.29.1/node_modules/undici/index.js:157:7
+    async MessagePort.<anonymous> ([worker eval]:32:22)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 69708.594617
