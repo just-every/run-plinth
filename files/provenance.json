@@ -1,0 +1,19 @@
+{
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "base": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+  "branch": "cloud/sx-plinth-c-f99",
+  "save": "0bea7fae9423f455b901899fb640792d6a7b8d4f",
+  "pushes": [
+    "save-push.log",
+    "candidate-push.log"
+  ],
+  "pr": null,
+  "generated_views_committed": false,
+  "status_cells_changed": false,
+  "publication_scan": {
+    "status": "DELEGATED_TO_FLEET_LANDER",
+    "complete": false,
+    "historyScanned": null,
+    "findings": null
+  }
+}

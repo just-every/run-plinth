@@ -1,0 +1,14 @@
+{
+  "name": "views-write-exact",
+  "command": [
+    "node",
+    "src/plinth/contract-docs.mjs",
+    "write"
+  ],
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "dirty": false,
+  "started_at": "2026-11-09T15:12:38.697819+00:00",
+  "finished_at": "2026-11-09T15:12:38.858505+00:00",
+  "exit": 0,
+  "log": "views-write-exact.log"
+}

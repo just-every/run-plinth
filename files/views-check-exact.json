@@ -1,0 +1,14 @@
+{
+  "name": "views-check-exact",
+  "command": [
+    "node",
+    "src/plinth/contract-docs.mjs",
+    "check"
+  ],
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "dirty": true,
+  "started_at": "2026-11-09T15:12:38.933511+00:00",
+  "finished_at": "2026-11-09T15:12:39.137540+00:00",
+  "exit": 0,
+  "log": "views-check-exact.log"
+}

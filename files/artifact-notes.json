@@ -1,0 +1,5 @@
+{
+  "workflow_logs": "Workflow environment blocks and any native confirmation URLs or credential-shaped values are omitted. Failure commands, assertions, stack traces and conclusions are retained.",
+  "private_material": "No credential file, environment dump, browser state, raw archive or held-out gate material is selected.",
+  "source_snapshots": "Probe script variants accompany their actual unsuccessful receipts; no overall-success result is invented."
+}

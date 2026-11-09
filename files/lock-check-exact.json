@@ -1,0 +1,14 @@
+{
+  "name": "lock-check-exact",
+  "command": [
+    "node",
+    "scripts/edition-authoring/cli.mjs",
+    "check"
+  ],
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "dirty": false,
+  "started_at": "2026-11-09T15:12:39.244257+00:00",
+  "finished_at": "2026-11-09T15:12:39.796369+00:00",
+  "exit": 0,
+  "log": "lock-check-exact.log"
+}

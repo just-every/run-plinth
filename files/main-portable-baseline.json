@@ -1,0 +1,14 @@
+{
+  "name": "main-portable-baseline",
+  "command": [
+    "node",
+    "--test",
+    "tests/plinth/portable.test.mjs"
+  ],
+  "head": "54fe2a1b63fa9465f9d84c98378f0e1fea1b7c8f",
+  "dirty": true,
+  "started_at": "2026-11-09T14:57:28.810160+00:00",
+  "finished_at": "2026-11-09T15:02:25.644890+00:00",
+  "exit": 1,
+  "log": "main-portable-baseline.log"
+}

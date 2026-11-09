@@ -1,0 +1,15 @@
+{
+  "before": {
+    "done": 67,
+    "partial": 34,
+    "missing": 40,
+    "total": 141
+  },
+  "after": {
+    "done": 67,
+    "partial": 34,
+    "missing": 40,
+    "total": 141
+  },
+  "status_table_changed": false
+}

@@ -1,0 +1,10 @@
+{"conclusion":"success","failed_steps":[],"id":129202651152,"name":"verify","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202651591,"name":"Installed meetings","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202651723,"name":"Installed bid-follow-up","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202651773,"name":"Installed report-packets","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202651846,"name":"Installed satisfaction","status":"completed"}
+{"conclusion":"failure","failed_steps":["Exercise office keyboard, read and write recovery"],"id":129202651945,"name":"Installed cost-billing","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202651956,"name":"Installed portfolio","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202652042,"name":"Installed invoice-corrections","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202652099,"name":"Installed plans","status":"completed"}
+{"conclusion":"success","failed_steps":[],"id":129202652201,"name":"Installed settlements","status":"completed"}

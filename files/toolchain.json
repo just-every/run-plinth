@@ -1,0 +1,8 @@
+{
+  "node": "v22.20.0",
+  "pnpm": "10.12.4",
+  "rer": "0.2.85",
+  "playwright": "1.63.0",
+  "chromium": "/usr/bin/chromium",
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2"
+}

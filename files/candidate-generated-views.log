@@ -1,0 +1,17 @@
+verify	Run node src/plinth/contract-docs.mjs check	﻿2026-11-09T15:04:28.0583880Z ##[group]Run node src/plinth/contract-docs.mjs check
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.0584656Z [36;1mnode src/plinth/contract-docs.mjs check[0m
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.0608757Z shell: /usr/bin/bash -e {0}
+[workflow environment block omitted from public evidence]
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.0610699Z ##[endgroup]
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1150087Z file:///home/runner/work/run-plinth/run-plinth/src/plinth/contract-docs.mjs:23
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1151323Z  else if(!fs.existsSync(path)||fs.readFileSync(path,'utf8')!==content)throw Error(path+' is stale; run the Lander-Regenerate write command')
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1152069Z                                                                             ^
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1152334Z 
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1153187Z Error: ACCEPTANCE.md is stale; run the Lander-Regenerate write command
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1153894Z     at file:///home/runner/work/run-plinth/run-plinth/src/plinth/contract-docs.mjs:23:77
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1154503Z     at ModuleJob.run (node:internal/modules/esm/module_job:345:25)
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1155000Z     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1155560Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1155872Z 
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1155966Z Node.js v22.20.0
+verify	Run node src/plinth/contract-docs.mjs check	2026-11-09T15:04:28.1185447Z ##[error]Process completed with exit code 1.

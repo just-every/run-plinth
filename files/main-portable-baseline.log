@@ -1,0 +1,64 @@
+TAP version 13
+# [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+# Warning: Please use the `legacy` build in Node.js environments.
+# Warning: Please use the `legacy` build in Node.js environments.
+# Subtest: CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive
+not ok 1 - CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive
+  ---
+  duration_ms: 282407.580501
+  type: 'test'
+  location: '/home/agent/rer-consolidation/work/sx-plinth-c-f99/main-baseline/tests/plinth/portable.test.mjs:25:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Checking pinned pnpm
+    10.12.4
+    Local export
+    [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+    
+    
+    Checking migration history for local installation data
+    ▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+    
+    
+    Exporting local installation data
+    Exporting about 11.1 MB of local data. This takes under a minute.
+    ▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+    
+    
+    Building the archive: 1 part so far (648 B of about 11.1 MB).
+    Building the archive: 4 parts so far (21.2 KB of about 11.1 MB), about 28 min left.
+    Building the archive: 8 parts so far (24.4 KB of about 11.1 MB), about 48 min left.
+    Building the archive: 12 parts so far (37.6 KB of about 11.1 MB), about 46 min left.
+    Building the archive: 18 parts so far (492 KB of about 11.1 MB), about 4 min left.
+    Building the archive: 27 parts so far (508 KB of about 11.1 MB), about 5 min left.
+    Building the archive: 32 parts so far (726 KB of about 11.1 MB), about 5 min left.
+    Building the archive: 36 parts so far (809 KB of about 11.1 MB), about 5 min left.
+    Building the archive: 37 parts so far (811 KB of about 11.1 MB), about 10 min left.
+    
+    {"version":1,"verb":"export","event":"error","code":"transfer_failed","message":"The portability module refused or failed the archive operation (native_error: TypeError). Run the same command again; it starts over.","exitCode":1}
+    {"version":1,"verb":"export","event":"result","ok":false,"exitCode":1}
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    succeeds (file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/main-baseline/tests/plinth/portable.test.mjs:37:34)
+    TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/main-baseline/tests/plinth/portable.test.mjs:307:5)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 296767.656497

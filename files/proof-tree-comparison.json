@@ -1,0 +1,13 @@
+{
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "previous_save": "0bea7fae9423f455b901899fb640792d6a7b8d4f",
+  "changed_paths": [
+    "docs/COLLECTION-REVIEWS.md",
+    "sources.lock.json",
+    "src/ui/collection-reviews.tsx",
+    "tests/journeys/collection-reviews.mjs"
+  ],
+  "backend_and_native_tests_unchanged": true,
+  "working_tree_clean": true,
+  "installed_proof": "The installed-final run used the final committed UI, journey and docs bytes; those files were not edited between that run and this commit."
+}

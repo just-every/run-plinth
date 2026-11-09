@@ -1,0 +1,70 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+Warning: Please use the `legacy` build in Node.js environments.
+Warning: Please use the `legacy` build in Node.js environments.
+✖ CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive (291240.897883ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 294226.205592
+
+✖ failing tests:
+
+test at tests/plinth/portable.test.mjs:25:1
+✖ CLI archive round trip carries jobs, approvals, photos and import custody; later erasure fences an old archive (291240.897883ms)
+  AssertionError [ERR_ASSERTION]: Checking pinned pnpm
+  10.12.4
+  Local export
+  [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+  
+  
+  Checking migration history for local installation data
+  ▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+  
+  
+  Exporting local installation data
+  Exporting about 11.2 MB of local data. This takes under a minute.
+  ▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+  
+  
+  Building the archive: 1 part so far (648 B of about 11.2 MB).
+  Building the archive: 2 parts so far (8.9 KB of about 11.2 MB), about 7 h 7 min left.
+  Building the archive: 5 parts so far (21.7 KB of about 11.2 MB), about 3 h 21 min left.
+  Building the archive: 10 parts so far (27.1 KB of about 11.2 MB), about 3 h 1 min left.
+  Building the archive: 14 parts so far (438 KB of about 11.2 MB), about 12 min left.
+  Building the archive: 20 parts so far (500 KB of about 11.2 MB), about 12 min left.
+  Building the archive: 26 parts so far (507 KB of about 11.2 MB), about 13 min left.
+  Building the archive: 31 parts so far (725 KB of about 11.2 MB), about 9 min left.
+  Building the archive: 37 parts so far (812 KB of about 11.2 MB), about 9 min left.
+  Building the archive: 43 parts so far (841 KB of about 11.2 MB), about 9 min left.
+  Building the archive: 46 parts so far (1.8 MB of about 11.2 MB), about 4 min left.
+  Building the archive: 48 parts so far (1.8 MB of about 11.2 MB), about 5 min left.
+  Building the archive: 51 parts so far (2.1 MB of about 11.2 MB), about 4 min left.
+  Building the archive: 54 parts so far (6.3 MB of about 11.2 MB), about 1 min left.
+  Building the archive: 55 parts so far (6.3 MB of about 11.2 MB), about 1 min left.
+  Building the archive: 58 parts so far (6.3 MB of about 11.2 MB), about 1 min left.
+  Building the archive: 59 parts so far (6.3 MB of about 11.2 MB), about 1 min left.
+  Building the archive: 60 parts so far (6.3 MB of about 11.2 MB), about 2 min left.
+  
+  {"version":1,"verb":"export","event":"node-selection","versionSelected":"22.20.0","previousVersion":"24.19.0","message":"Using project Node 22.20.0 (current Node 24.19.0)."}
+  
+  
+  143 !== 0
+  
+      at succeeds (file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/run-plinth/tests/plinth/portable.test.mjs:37:34)
+      at TestContext.<anonymous> (file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/run-plinth/tests/plinth/portable.test.mjs:315:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 143,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

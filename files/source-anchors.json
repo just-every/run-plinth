@@ -1,0 +1,37 @@
+[
+  {
+    "path": "tests/plinth/invoices.test.mjs",
+    "line": 576,
+    "anchor": "test('Collection reviews"
+  },
+  {
+    "path": "tests/plinth/domain.test.mjs",
+    "line": 1028,
+    "anchor": "test('Owner follow-up"
+  },
+  {
+    "path": "tests/plinth/portable.test.mjs",
+    "line": 25,
+    "anchor": "test('CLI archive"
+  },
+  {
+    "path": "tests/plinth/collection-support.mjs",
+    "line": 24,
+    "anchor": "export async function collectionMoneyProof"
+  },
+  {
+    "path": "tests/journeys/collection-reviews.mjs",
+    "line": 38,
+    "anchor": "const r1=await save(1)"
+  },
+  {
+    "path": "src/plinth/collection-review-http.ts",
+    "line": 11,
+    "anchor": "export async function collectionReviewResponse"
+  },
+  {
+    "path": "src/plinth/collection-reviews.ts",
+    "line": 18,
+    "anchor": "export function collectionInvoice"
+  }
+]

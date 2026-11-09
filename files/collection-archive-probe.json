@@ -1,0 +1,18 @@
+{
+  "name": "collection-archive-probe",
+  "command": [
+    "perl",
+    "-e",
+    "alarm 1200; exec @ARGV",
+    "--",
+    "node",
+    "/home/agent/rer-consolidation/work/sx-plinth-c-f99/packet/collection-archive-probe.mjs",
+    "/home/agent/rer-consolidation/work/sx-plinth-c-f99/run-plinth"
+  ],
+  "head": "d37a2e3e05bfb2be91fceda1c8bf38da19b726a2",
+  "dirty": false,
+  "started_at": "2026-11-09T15:16:08.207258+00:00",
+  "finished_at": "2026-11-09T15:18:20.316164+00:00",
+  "exit": 1,
+  "log": "collection-archive-probe.log"
+}

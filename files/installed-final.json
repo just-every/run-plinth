@@ -1,0 +1,18 @@
+{
+  "name": "installed-final",
+  "command": [
+    "perl",
+    "-e",
+    "alarm 1200; exec @ARGV",
+    "--",
+    "node",
+    "scripts/verify/installed.mjs",
+    "followup-rules"
+  ],
+  "head": "0bea7fae9423f455b901899fb640792d6a7b8d4f",
+  "dirty": true,
+  "started_at": "2026-11-09T14:56:08.102662+00:00",
+  "finished_at": "2026-11-09T14:57:34.239614+00:00",
+  "exit": 0,
+  "log": "installed-final.log"
+}

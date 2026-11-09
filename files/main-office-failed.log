@@ -1,0 +1,81 @@
+Installed cost-billing	Exercise office keyboard, read and write recovery	﻿2026-11-09T13:56:22.1072870Z ##[group]Run perl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs office
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:22.1073528Z [36;1mperl -e 'alarm 1200; exec @ARGV' -- node scripts/verify/installed.mjs office[0m
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:22.1084808Z shell: /usr/bin/bash -e {0}
+[workflow environment block omitted from public evidence]
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:22.1085788Z ##[endgroup]
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:23.4022354Z Warning: Please use the `legacy` build in Node.js environments.
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:25.3678870Z Installed office: emitted Worker, migrated D1, native email sign-in; provider boundary is synthetic
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:27.4304301Z {"office":"jobs read failure and keyboard retry","elapsed_ms":1690,"delayed_ms":700}
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:34.8825371Z OPS-001 Jobs PASS: failed reads and saves, retained draft, keyboard retry and drawer recovery, accessibility tree and reload of every acknowledged field
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:36.2865247Z OPS-001 Quote search PASS: keyboard typing and editing retain focus, matching job opens with heading focus
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:39.6353056Z {"office":"failed and successful PDF upload under browser network throttling","failed_ms":1472,"saved_ms":1309,"bytes":912,"latency_ms":80}
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5633172Z node:internal/modules/run_main:123
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5633869Z     triggerUncaughtException(
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5634263Z     ^
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5634425Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5634789Z ExpectError: expect(locator).toBeFocused() failed
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5635118Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5635633Z Locator:  getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true })
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5636290Z Expected: focused
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5636668Z Received: inactive
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5636897Z Timeout:  5000ms
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5636997Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5637623Z Call log:
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5638221Z   - Expect "toBeFocused" getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true }) with timeout 5000ms
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5639175Z   - waiting for getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true })
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5640119Z     14 × locator resolved to <input value="" required="" type="text" name="line-0-sell" inputmode="decimal"/>
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5640529Z        - unexpected value "inactive"
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5640705Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5641140Z     at captureRawStack (/home/runner/work/run-plinth/run-plinth/node_modules/.pnpm/playwright-core@1.63.0/node_modules/playwright-core/lib/coreBundle.js:8588:17)
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5641922Z     at callMatcherAsStep (/home/runner/work/run-plinth/run-plinth/node_modules/.pnpm/playwright@1.63.0/node_modules/playwright/lib/matchers/expect.js:13310:57)
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5642684Z     at Object.toBeFocused (/home/runner/work/run-plinth/run-plinth/node_modules/.pnpm/playwright@1.63.0/node_modules/playwright/lib/matchers/expect.js:13302:23)
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5643329Z     at /home/runner/work/run-plinth/run-plinth/tests/journeys/estimates.mjs:62:47 {
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5643673Z   matcherResult: {
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5644042Z     message: 'expect(locator).toBeFocused() failed\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5644317Z       '\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5644947Z       "Locator:  getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true })\n" +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5645384Z       'Expected: focused\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5645663Z       'Received: inactive\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5645926Z       'Timeout:  5000ms\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5646155Z       '\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5646379Z       'Call log:\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5646921Z       `  - Expect "toBeFocused" getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true }) with timeout 5000ms\n` +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5647885Z       "  - waiting for getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true })\n" +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5649609Z       '    14 × locator resolved to <input value="" required="" type="text" name="line-0-sell" inputmode="decimal"/>\n' +
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5650328Z       '       - unexpected value "inactive"\n',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5650696Z     pass: false,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5651101Z     actual: 'inactive',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5651399Z     name: 'toBeFocused',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5651774Z     expected: 'focused',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5652089Z     log: [
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5652700Z       `  - Expect "toBeFocused" getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true }) with timeout 5000ms`,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5653567Z       "  - waiting for getByRole('region', { name: 'Estimate line 1', exact: true }).getByLabel('Unit selling price 1', { exact: true })",
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5654201Z       '    14 × locator resolved to <input value="" required="" type="text" name="line-0-sell" inputmode="decimal"/>',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5655215Z       '       - unexpected value "inactive"'
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5655571Z     ],
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5655791Z     timeout: 5000,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5656139Z     ariaSnapshot: '- textbox "Unit selling price 1": invalid amount'
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5656431Z   }
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5656652Z }
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5656796Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5656884Z Node.js v22.20.0
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5831909Z node:internal/modules/run_main:123
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5832301Z     triggerUncaughtException(
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5832665Z     ^
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5832814Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5833099Z AssertionError [ERR_ASSERTION]: Installed estimates journey passed at 1440 and 390
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5833498Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5833656Z 1 !== 0
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5833795Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5834062Z     at file:///home/runner/work/run-plinth/run-plinth/scripts/verify/installed.mjs:79:10
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5834555Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5834969Z   generatedMessage: false,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5835234Z   code: 'ERR_ASSERTION',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5835532Z   actual: 1,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5835767Z   expected: 0,
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5836025Z   operator: 'strictEqual',
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5836345Z   diff: 'simple'
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5836665Z }
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5836792Z 
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5836915Z Node.js v22.20.0
+Installed cost-billing	Exercise office keyboard, read and write recovery	2026-11-09T13:56:46.5994590Z ##[error]Process completed with exit code 1.

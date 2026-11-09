@@ -1,0 +1,16 @@
+{
+  "name": "native-final",
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern=BILL-006|Collection reviews|Owner follow-up",
+    "tests/plinth/invoices.test.mjs",
+    "tests/plinth/domain.test.mjs"
+  ],
+  "head": "0bea7fae9423f455b901899fb640792d6a7b8d4f",
+  "dirty": true,
+  "started_at": "2026-11-09T14:58:21.697759+00:00",
+  "finished_at": "2026-11-09T14:59:38.658479+00:00",
+  "exit": 0,
+  "log": "native-final.log"
+}

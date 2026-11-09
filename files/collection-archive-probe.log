@@ -1,0 +1,42 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+Warning: Please use the `legacy` build in Node.js environments.
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Checking pinned pnpm
+10.12.4
+Local export
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+Checking migration history for local installation data
+▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+
+
+Exporting local installation data
+Exporting about 6.6 MB of local data. This takes under a minute.
+▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+
+
+
+{"version":1,"verb":"export","event":"error","code":"transfer_failed","message":"The portability module refused or failed the archive operation (native_error: TypeError). Run the same command again; it starts over.","exitCode":1}
+{"version":1,"verb":"export","event":"result","ok":false,"exitCode":1}
+
+
+1 !== 0
+
+    at command (file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/packet/collection-archive-probe.mjs:19:9)
+    at file:///home/agent/rer-consolidation/work/sx-plinth-c-f99/packet/collection-archive-probe.mjs:42:46
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.20.0

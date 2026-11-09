@@ -1,0 +1,110 @@
+Heavy job admitted: Plinth build:workflow [cb2882ed8d3d]
+Checking pinned pnpm
+10.12.4
+Building your application
+▲ [WARNING] Proxy environment variables detected. We'll use your proxy for fetch requests.
+
+
+(node:6447) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 370 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/client/.assetsignore                                    0.02 kB
+dist/client/assets/worker-C2rADpdX.js                       45.52 kB
+dist/client/assets/worker.min-32WLk7pY.js                  111.30 kB
+dist/client/assets/tiff-worker-B3TiXEnG.js                 150.66 kB
+dist/client/assets/office_oxide_bg-CdeUCBbL.wasm         1,047.43 kB │ gzip: 486.38 kB
+dist/client/assets/pdf.worker.min-CjEcRF4W.mjs           1,264.34 kB
+dist/client/assets/eng.traineddata-CYZ2qwst.gz           2,952.87 kB
+dist/client/assets/tesseract-core-lstm.wasm-DhgzXyTR.js  3,896.48 kB
+dist/client/assets/app-B7F61I8U.css                         40.09 kB │ gzip:   8.25 kB
+dist/client/assets/rolldown-runtime-C0FnF6B9.js              1.29 kB │ gzip:   0.71 kB
+dist/client/assets/attachment-legacy-Bqsfq73x.js             2.29 kB │ gzip:   1.11 kB
+dist/client/assets/raster-FcUvsFD0.js                        2.99 kB │ gzip:   1.51 kB
+dist/client/assets/attachment-opendocument-Ce8LsgmA.js      14.85 kB │ gzip:   5.62 kB
+dist/client/assets/src-SuYvKHvm.js                          17.24 kB │ gzip:   7.31 kB
+dist/client/assets/attachment-office-DXJEnpge.js            24.98 kB │ gzip:   8.46 kB
+dist/client/assets/xml-DXa6krz3.js                         102.33 kB │ gzip:  31.22 kB
+dist/client/assets/attachment-formats-D3RsIAxE.js          251.73 kB │ gzip:  79.25 kB
+dist/client/assets/index-D_Uon0US.js                       313.59 kB │ gzip: 101.65 kB
+dist/client/assets/pdf-CeRqnNRP.js                         430.86 kB │ gzip: 129.35 kB
+dist/client/assets/app-CR0pZV84.js                         600.73 kB │ gzip: 148.53 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.80s
+[PLUGIN_TIMINGS] Plugin hooks ran for 4.6s of this 5.8s build (79%).
+The slowest hooks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - vite:css transform (44%, 2.5s, 5 calls)
+Additional hook time came from the hooks below and from hooks under 1s.
+3 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - tanstack-start-core:import-protection resolveId (1064 calls)
+  - vite:asset load (4 calls)
+  - vite:worker-import-meta-url transform (2 calls)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+vite v8.2.2 building ssr environment for production...
+transforming...
+✓ 1135 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/server/wrangler.json                                             1.63 kB │ gzip:     0.81 kB
+dist/server/.vite/manifest.json                                       9.36 kB │ gzip:     1.53 kB
+dist/server/assets/worker-C2rADpdX.js                                45.52 kB
+dist/server/assets/worker.min-32WLk7pY.js                           111.30 kB
+dist/server/assets/tiff-worker-B3TiXEnG.js                          150.66 kB
+dist/server/assets/office_oxide_bg-CdeUCBbL.wasm                  1,047.43 kB │ gzip:   486.38 kB
+dist/server/assets/pdf.worker.min-CjEcRF4W.mjs                    1,264.34 kB
+dist/server/assets/eng.traineddata-CYZ2qwst.gz                    2,952.87 kB
+dist/server/assets/tesseract-core-lstm.wasm-DhgzXyTR.js           3,896.48 kB
+dist/server/assets/app-B7F61I8U.css                                  40.09 kB │ gzip:     8.25 kB
+dist/server/assets/types-DVbHOdFT.js                                  0.28 kB │ gzip:     0.20 kB
+dist/server/assets/empty-plugin-adapters-D_0twvAa.js                  0.28 kB │ gzip:     0.18 kB
+dist/server/assets/start-D8qDT34V.js                                  0.28 kB │ gzip:     0.21 kB
+dist/server/assets/builtin_esm-external-require-util-wXRSsOu6.js      0.34 kB │ gzip:     0.23 kB
+dist/server/assets/font-head-C_OIjXyw.js                              0.44 kB │ gzip:     0.29 kB
+dist/server/assets/_tanstack-start-manifest_v-CLtj2lYm.js             0.65 kB │ gzip:     0.37 kB
+dist/server/assets/rolldown-runtime-CEgmsyvS.js                       2.30 kB │ gzip:     1.03 kB
+dist/server/assets/attachment-legacy-Bod9FdZx.js                      3.24 kB │ gzip:     1.32 kB
+dist/server/assets/raster-BTz9lTLE.js                                 4.74 kB │ gzip:     1.90 kB
+dist/server/assets/holds-B732chNJ.js                                  6.14 kB │ gzip:     2.37 kB
+dist/server/assets/xml-BBsX1pg6.js                                   10.49 kB │ gzip:     3.73 kB
+dist/server/assets/import-erasure-vJZzC3sB.js                        12.56 kB │ gzip:     4.72 kB
+dist/server/assets/us-conventions-DuYwiVAH.js                        13.67 kB │ gzip:     5.30 kB
+dist/server/assets/jsx-runtime-CckQS-3O.js                           17.14 kB │ gzip:     4.48 kB
+dist/server/assets/schedule-resource-model-DvpJDlm8.js               19.56 kB │ gzip:     6.42 kB
+dist/server/assets/attachment-opendocument-CHWXDdT8.js               21.34 kB │ gzip:     6.77 kB
+dist/server/assets/react-dom-BlRy1-kq.js                             24.76 kB │ gzip:     7.98 kB
+dist/server/assets/attachment-office-Dkug9sks.js                     37.21 kB │ gzip:    10.25 kB
+dist/server/assets/router-aQwvNJlU.js                                41.71 kB │ gzip:    11.11 kB
+dist/server/assets/Match-DZoTMlSc.js                                145.02 kB │ gzip:    36.42 kB
+dist/server/assets/lib-CbsmzVqQ.js                                  238.48 kB │ gzip:    61.81 kB
+dist/server/assets/attachment-formats-0M90_mPJ.js                   270.10 kB │ gzip:    62.97 kB
+dist/server/assets/lib-Bs5rzy2-.js                                  287.66 kB │ gzip:    63.50 kB
+dist/server/assets/src-BmkuK40J.js                                  404.53 kB │ gzip:    95.34 kB
+dist/server/assets/import-context-EpLqyig-.js                       486.99 kB │ gzip:   120.39 kB
+dist/server/assets/auth-DYhZElpZ.js                                 505.96 kB │ gzip:   125.81 kB
+dist/server/assets/app-6bqUPbCd.js                                1,078.51 kB │ gzip:   200.59 kB
+dist/server/index.js                                              5,037.81 kB │ gzip: 1,187.98 kB
+
+[INEFFECTIVE_DYNAMIC_IMPORT] src/plinth/schedule-resources.ts is dynamically imported by src/plinth/signed-change-http.ts but also statically imported by src/plinth/http.ts, src/plinth/trade-confirmations.ts, src/plinth/warranty-service.ts, dynamic import will not move module into another chunk.
+
+[PLUGIN_TIMINGS] Plugin hooks ran for 4.4s of this 5.8s build (76%).
+The slowest hooks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - vite-plugin-cloudflare:additional-modules resolveId (32%, 1.9s, 2 calls)
+Additional hook time came from the hooks below and from hooks under 1s.
+3 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - tanstack-start-core:import-protection resolveId (4087 calls)
+  - vite:asset load (4 calls)
+  - tanstack-start-core::server-fn:ssr transform (15 calls)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+✓ built in 5.86s
+Your application is built
+build: complete (exit 0)
