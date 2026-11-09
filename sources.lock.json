@@ -3245,11 +3245,11 @@
       "executable": false
     },
     "src/plinth/actuals-refresh-http.ts": {
-      "sha256": "9ebc6d269a6f37a09486bd9e798c8cecd69cda63af0db500f486891901ff6ad5",
+      "sha256": "5a13da7aca43a7296e739cc998c0059b10d417cad8c2fccd19c683017a5fdbcb",
       "executable": false
     },
     "src/plinth/actuals-refresh.ts": {
-      "sha256": "21ab90bc63ac95be22e314ab9cd5ec02e493af3b8ffea16ab945d954008264e5",
+      "sha256": "98c091053ac1dc5a6e5e993bcc2badb47453bca974a76863b75ed8ce7ab7a8da",
       "executable": false
     },
     "src/plinth/agent-answers.ts": {
@@ -5557,7 +5557,7 @@
       "executable": false
     },
     "tests/plinth/actuals-refresh-support.mjs": {
-      "sha256": "69899b1908d3ce4c0996cbde164c6dca3ffa4a8ace70dde452a3b0f88542998c",
+      "sha256": "6cf98e01fc5fd92dfaf7e49e887a51955203287974087b79a4c250ed7951475a",
       "executable": false
     },
     "tests/plinth/agent-answers-support.mjs": {

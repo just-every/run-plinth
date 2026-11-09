@@ -1,7 +1,7 @@
 import { active, DomainError, need, stamp, sum, text, usdOnly, type Actor, type Input, type Job } from './model'
 import { costs, digest, type CostForecast } from './cost-model'
 import { actualEntries, costLedger } from './cost-ledger'
-import { calculateCostForecast } from './cost-forecast'
+import { calculateCostForecast, forecastSourceDigest } from './cost-forecast'
 import { exceptionView } from './cost-exceptions'
 import { canonical, previewReceiptApplication } from './sov'
 import { localDate } from './remittances'
@@ -37,7 +37,7 @@ export async function refreshSources(job:Job){
  for(const source of state.sources)await add(source.kind,source.id,source,source.dated_on,source.approved_by?'human approved':'unapproved',source.document?[source.document.checksum]:[])
  for(const claim of job.claims.filter(c=>c.status!=='draft'))await add('approved application',claim.id,claim,claim.approved_by?.at.slice(0,10)??null,claim.status)
  // Every calculator input is bound; preview history and unapproved daily notes are deliberately absent.
- await add('ledger',job.id+':ledger',{ledger:costLedger(job).rows.map(({uncommitted_forecast_cents,...r})=>r),entries:actualEntries(job),opening:state.opening,subcontracts:job.subcontracts,bid_cost_adjustments:job.bid_cost_adjustments,variations:job.variations},null,'recorded native sources')
+ await add('ledger',job.id+':ledger',{forecast_source_digest:await forecastSourceDigest(job),ledger:costLedger(job).rows.map(({uncommitted_forecast_cents,...r})=>r),entries:actualEntries(job),opening:state.opening,subcontracts:job.subcontracts,bid_cost_adjustments:job.bid_cost_adjustments,variations:job.variations},null,'recorded native sources')
  await add('billing terms',job.id+':billing',{sov:job.sov,quotes:job.quotes.filter(q=>q.status==='accepted'),retainage:job.retainage},null,'human approvals only')
  const {source_version:_,...exceptions}=exceptionView(job)
  await add('exceptions',job.id+':exceptions',{policy:state.policy,reconciliations:state.reconciliations,exceptions},null,'unresolved states retained')

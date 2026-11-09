@@ -14,9 +14,18 @@ export async function actualsFixture(f){
  await c.ok('/retainage',{contract_reference:'Synthetic signed retainage terms',rules:[{line_id:'quote:framing',work_bps:1000,stored_bps:500},{line_id:'quote:labor',work_bps:1000,stored_bps:0}],milestones:[{id:'final',name:'Final completion',final:true,completion_requirements:['Signed completion'],waiver_requirements:['Final waiver']}]})
  const claim=(await c.ok('/claims',{description:'Synthetic approved completed work',lines:[{line_id:'quote:framing',completed_cents:20000,stored_cents:0,evidence:'Human approved framing',order_ids:[]},{line_id:'quote:labor',completed_cents:10000,stored_cents:0,evidence:'Human approved labor',order_ids:[]}]})).record
  await c.ok('/claims/'+claim.id+'/approve');await c.ok('/claims/'+claim.id+'/issue')
+ const task=(await c.ok('/schedules',{trade:'Synthetic accepted framing '+c.job.id,description:'Existing human-recorded completed work',start:'2026-11-08T08:00:00Z',end:'2026-11-08T09:00:00Z'})).record
+ await c.ok('/schedule-actuals',{task_id:task.id,actual_start:'2026-11-08T08:00:00Z',actual_finish:'2026-11-08T09:00:00Z',installed:{quantity:'5',unit:'pack',cost_code:'06-100'},evidence:'Existing human-recorded completion; no time approval'})
+
  const list=async()=>{const r=await c.api('/jobs/'+c.job.id+'/actuals-refresh');assert.equal(r.status,200,JSON.stringify(r.value));return r.value}
  const input=async(extra={})=>({expected_version:(await list()).version,source_digest:(await list()).source_digest,confirm:true,as_of:'2026-11-09',reference:'synthetic-plinth-fresh-native-review',operation_id:crypto.randomUUID(),codes:refreshCodes(),stored_allocations:storedAllocations(c),...extra})
- const preview=async extra=>{await c.read();return c.ok('/actuals-refresh',await input(extra))}
+ const preview=async extra=>{
+  await c.read()
+  const queued=f.db?(await f.db.prepare('SELECT count(*) AS n FROM pl_connector_events').first()).n:null
+  const result=await c.ok('/actuals-refresh',await input(extra))
+  if(f.db)assert.equal((await f.db.prepare('SELECT count(*) AS n FROM pl_connector_events').first()).n,queued,'A private refresh cannot enqueue provider delivery')
+  return result
+ }
  return {c,claim,list,input,preview}
 }
 export async function proveActualsRefresh(f){
@@ -32,6 +41,9 @@ export async function proveActualsRefresh(f){
  let r=await c.api('/jobs/'+c.job.id+'/actuals-refresh/'+first.id);assert.equal(r.status,200)
  const version=c.job.version,replayed=await c.act('/actuals-refresh',prepared);assert.equal(replayed.status,200);assert.equal(replayed.value.record.id,first.id);assert.equal(replayed.value.version,version)
  const mismatch=await c.act('/actuals-refresh',{...prepared,reference:'Different reviewed terms'});assert.equal(mismatch.status,409)
+ const acceptedTask=(await c.read()).schedules[0]
+ await c.ok('/schedule-actuals',{task_id:acceptedTask.id,actual_start:'2026-11-08T08:00:00Z',actual_finish:'2026-11-08T09:30:00Z',installed:{quantity:'5',unit:'pack',cost_code:'06-100'},reason:'Human corrects the existing completion source',evidence:'Retained correction evidence'})
+ assert.equal((await c.api('/jobs/'+c.job.id+'/actuals-refresh/'+first.id)).status,409,'The shared forecast source revision invalidates its owner review')
  await c.ok('/orders/'+c.order.id+'/receive',{lines:[{line_id:'lumber',quantity:'2'}],reference:'synthetic-plinth-second-source-receipt',received_on:'2026-11-08'})
  assert.equal((await c.act('/actuals-refresh',prepared)).status,409)
  assert.equal((await c.api('/jobs/'+c.job.id+'/actuals-refresh/'+first.id)).status,409)
@@ -58,10 +70,11 @@ export async function proveActualsRefresh(f){
  assert.equal(unsafe.record.sov,null);assert.ok(unsafe.record.unavailable.some(u=>u.scope==='SOV'))
  const completion=await x.preview({codes:refreshCodes(70000),stored_allocations:storedAllocations(c).map(r=>({...r,completed_cents:99999}))})
  assert.equal(completion.record.sov,null,'Receipt preview cannot smuggle new completed work')
- const current=await c.read()
+ const acceptedCompletion=structuredClone((await c.read()).schedule_actuals)
  // Ordinary unapproved daily record is unrelated evidence, never completed work or a time approval.
  await c.ok('/diary',{note:'Synthetic unapproved note says framing complete'})
  const afterLog=(await x.preview({codes:refreshCodes(70000)})).record
+ assert.deepEqual((await c.read()).schedule_actuals,acceptedCompletion,'An unapproved daily note cannot rewrite accepted completion')
  assert.equal(afterLog.sov.completed_cents,30000);assert.deepEqual((await c.read()).claims,before.claims)
  for(const key of ['budgets','schedules','retainage','quotes'])assert.deepEqual((await c.read())[key],before[key])
  assert.deepEqual((await c.api('/jobs/'+c.job.id+'/costs/forecasts')).value.forecasts,[])

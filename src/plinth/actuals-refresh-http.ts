@@ -4,7 +4,8 @@ import { active, DomainError, need, object, type Input } from './model'
 import { costLedger } from './cost-ledger'
 import { costs } from './cost-model'
 import { prepareActualsRefresh, refreshSources } from './actuals-refresh'
-import { jobOf, readClock, saveJob } from './store'
+import { jobOf, readClock, transaction } from './store'
+import { jobRef } from './audit'
 const headers={'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-robots-tag':'noindex, nofollow'}
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers})
 async function body(request:Request):Promise<Input>{
@@ -42,6 +43,12 @@ export async function actualsRefreshResponse(request:Request,original:Bindings):
  else need(input.expected_version===previous.version,'Job changed; reload before review',409,'stale_version')
  const job=structuredClone(previous),record=await prepareActualsRefresh(job,actor,input)
  if(replay)return json({record,version:previous.version})
- await saveJob(env.DB,actor,previous,job,[env.DB.prepare('INSERT INTO pl_actuals_refresh_reviews(preview_id,job_id,owner_id,digest) VALUES(?,?,?,?)').bind(record.id,job.id,actor.id,record.digest)],clock)
+ // A private diagnostic has no connector event: saving it cannot schedule an outbound send.
+ job.version=previous.version+1
+ const data=JSON.stringify(job);need(data.length<=8_000_000,'Job history is too large')
+ await transaction(env.DB,actor,previous,[
+  env.DB.prepare('UPDATE pl_jobs SET version=?,data=? WHERE id=? AND version=?').bind(job.version,data,job.id,previous.version),
+  env.DB.prepare('INSERT INTO pl_actuals_refresh_reviews(preview_id,job_id,owner_id,digest) VALUES(?,?,?,?)').bind(record.id,job.id,actor.id,record.digest)
+ ],clock,{job_id:job.id,version_before:previous.version,version_after:job.version,before_ref:await jobRef(JSON.stringify(previous)),after_ref:await jobRef(data)})
  return json({record,version:job.version})
 }
