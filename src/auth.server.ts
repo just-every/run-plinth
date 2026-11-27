@@ -6,7 +6,7 @@ import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from './modules/o
 import { firstRunResponse } from './base/setup'
 import { fontDocumentResponse } from './base/font-response'
 import { createOperatorAuth, createAuthHandler, createSignInHandler, type AuthConfig } from './modules/operator-auth/index.mjs'
-import { mailOff, operatorMail } from './mail.server.mjs'
+import { operatorMail } from './mail.server.mjs'
 import branding from './branding.json'
 
 // The edition's declared theme (public/rer-theme.css), as Base frames link it.
@@ -58,6 +58,8 @@ export interface Bindings {
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env
+// MAIL_PROVIDER=none: no sign-in email is offered; the owner signs in with `rer signin`.
+const mailOff = (env: Bindings) => env.MAIL_PROVIDER === 'none' && env.RER_DEMO !== '1'
 export const authConfig = (env: Bindings): AuthConfig => ({ allowList: env.AUTH_ALLOW_LIST?.split(',').map(email=>email.trim().toLowerCase()).filter(Boolean), dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, INSTALLATION_KEY: env.INSTALLATION_KEY, INSTALLATION_KEY_PREVIOUS: env.INSTALLATION_KEY_PREVIOUS, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: env.MAIL_FROM, branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
 export const business: BusinessManifest = { settings: 1, values: ['display_name'], team: { roles: { admin: 'admin', member: 'member' } } }
 function nativeAuth(env: Bindings) {
