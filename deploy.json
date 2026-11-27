@@ -13,7 +13,10 @@
   "originVar": "AUTH_ORIGIN",
   "vars": {
     "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "none"
+    "MAIL_PROVIDER": "none",
+    "MAIL_FROM": "",
+    "MAIL_RELAY_URL": "",
+    "MAIL_ACCOUNT_ID": ""
   },
   "secrets": [
     {
@@ -36,6 +39,28 @@
     {
       "binding": "SETUP_TOKEN",
       "environment": "SETUP_TOKEN"
+    },
+    {
+      "binding": "MAIL_PROVIDER",
+      "environment": "MAIL_PROVIDER",
+      "optional": true,
+      "verifyStandIn": "resend"
+    },
+    {
+      "binding": "MAIL_FROM",
+      "environment": "MAIL_FROM",
+      "optional": true,
+      "verifyStandIn": "auth@example.test"
+    },
+    {
+      "binding": "MAIL_RELAY_URL",
+      "environment": "MAIL_RELAY_URL",
+      "optional": true
+    },
+    {
+      "binding": "MAIL_ACCOUNT_ID",
+      "environment": "MAIL_ACCOUNT_ID",
+      "optional": true
     },
     {
       "binding": "MAIL_API_KEY",

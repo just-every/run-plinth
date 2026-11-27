@@ -161,7 +161,7 @@
       "executable": false
     },
     "deploy.json": {
-      "sha256": "0b1d37e5306962687fe76658e7d102616e6b29e78287d78d59152e3a468fd4e1",
+      "sha256": "fb7430183e423a99fa8bc077ee341e79f3c3ca530f1a3ec23c43d77705e3f0ff",
       "executable": false
     },
     "docs/ACTUALS-REFRESH.md": {
@@ -309,7 +309,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "5f42efb7640e1ba641f069a7e6f1488436bc4f39ed1c0f1c77a2e687683a82c1",
+      "sha256": "d3c6246d4a21bf947be41df4a63582c0dfd3bff40ffaa812aca229f9c84ebf6c",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -5821,7 +5821,7 @@
       "executable": false
     },
     "wrangler.jsonc": {
-      "sha256": "9f9521deea7ebd893607eace47c29228a77071a81bfa4903f70616249dae4b6b",
+      "sha256": "c4d0a11e8261b06b1ad3ebaca8699c872f2537bf8ba2a348e2bdee740ad5baa2",
       "executable": false
     }
   }
