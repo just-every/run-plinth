@@ -360,6 +360,12 @@
       "name": "202611090100_actuals_refresh.sql",
       "sha256": "3009631359b61bb5f3e5475b49996b2c99853d95820a6378d43488104ead9bd5",
       "sql": "-- Portable previews remain history. Current review authority never restores from an archive.\nCREATE TABLE pl_actuals_refresh_reviews(\n preview_id TEXT PRIMARY KEY,\n job_id TEXT NOT NULL REFERENCES pl_jobs(id) ON DELETE CASCADE,\n owner_id TEXT NOT NULL,\n digest TEXT NOT NULL\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "202611270100_owner_signin.sql",
+      "sha256": "98da904e768e35b43fb1be83d9dcc9c9b5d86ab3a795234ed5223c4fddc567d9",
+      "sql": "-- One-time owner sign-in links minted by `rer signin` with the deployment's own\n-- Cloudflare credentials, written straight into this table through the D1 API.\n-- Apply as a NEW numbered migration under the seed's next unused number; never\n-- rewrite an applied migration. Additive only. token_hash is the SHA-256 of the\n-- link token (owner-signin-grant.mjs); the token itself is never stored.\nCREATE TABLE IF NOT EXISTS oa_owner_signins (\n id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE,\n operator_id TEXT NOT NULL REFERENCES oa_operators(id), operator_version INTEGER NOT NULL,\n created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed_at INTEGER\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

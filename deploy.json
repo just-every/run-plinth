@@ -13,7 +13,7 @@
   "originVar": "AUTH_ORIGIN",
   "vars": {
     "AUTH_LOCAL": "false",
-    "MAIL_PROVIDER": "resend"
+    "MAIL_PROVIDER": "none"
   },
   "secrets": [
     {
@@ -39,7 +39,9 @@
     },
     {
       "binding": "MAIL_API_KEY",
-      "environment": "MAIL_API_KEY"
+      "environment": "MAIL_API_KEY",
+      "optional": true,
+      "verifyStandIn": "test-only-provider-key"
     },
     {
       "binding": "MAIL_EVENT_KEY",

@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "previousVersion": null,
-  "publicReleaseNotes": "Prepare Plinth for hosted installation on rer 0.2.80 with a digest-bound setup manifest, a deployment specification, Managed mail and retained source provenance. Native release publication remains a separate round.",
+  "publicReleaseNotes": "Plinth 0.1.0, its first published release, on rer 0.2.143: hosted installation with a digest-bound setup manifest, a deployment specification and retained source provenance. Mail is off by default (MAIL_PROVIDER=none): no sender or mail key is needed, sends are refused with mail_off, and the owner signs in with rer signin. Managed mail and the hosted providers remain available.",
   "migrations": [
     "migrations/core/0001_owner.sql",
     "migrations/core/0002_outbox.sql",
@@ -37,12 +37,33 @@
     "migrations/core/202610230100_audit.sql",
     "migrations/core/202610230200_roles.sql",
     "migrations/core/202610240100_base79.sql",
+    "migrations/core/202610250900_native_connectors.sql",
+    "migrations/core/202610260700_connector_standing.sql",
+    "migrations/core/202610270100_job_mail.sql",
+    "migrations/core/202610270200_decision_sources.sql",
+    "migrations/core/202610270200_stripe_payments.sql",
+    "migrations/core/202610270300_payment_reconciliation.sql",
+    "migrations/core/202610270400_connector_recovery.sql",
+    "migrations/core/202610271100_refund_posting.sql",
+    "migrations/core/202610271200_file_transcriptions.sql",
+    "migrations/core/202610272000_portfolio_snapshots.sql",
+    "migrations/core/202610280100_agent_door.sql",
+    "migrations/core/202610280100_plan_file_chunks.sql",
+    "migrations/core/202610280101_business_settings.sql",
+    "migrations/core/202610280102_business_people.sql",
+    "migrations/core/202610290100_background_work.sql",
+    "migrations/core/202610291200_agent_learning.sql",
+    "migrations/core/202610291200_recovery_evidence.sql",
+    "migrations/core/202610292200_recovery_evidence_erasure.sql",
     "migrations/core/202610292201_workbook_catalog.sql",
     "migrations/core/202610292202_closeout_cache.sql",
     "migrations/core/202610292203_agent_runs.sql",
     "migrations/core/202610292204_agent_forecast_reviews.sql",
-    "migrations/core/202610292205_agent_forecast_custody.sql"
+    "migrations/core/202610292205_agent_forecast_custody.sql",
+    "migrations/core/202611020100_file_extraction.sql",
+    "migrations/core/202611090100_actuals_refresh.sql",
+    "migrations/core/202611270100_owner_signin.sql"
   ],
   "breaking": false,
-  "agentUpdateInstructions": "Install the exact source and locked dependencies, review the declared mail provider setup, and preserve applied migration bytes. No native release or tag is produced by this preparation."
+  "agentUpdateInstructions": "Install the exact source and locked dependencies, review the declared mail provider setup (none by default), and apply migrations in order; applied migration bytes are immutable."
 }
