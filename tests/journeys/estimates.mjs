@@ -56,6 +56,8 @@ try {
  await page.getByLabel('Exclusions (one per line)', { exact: true }).fill('Unforeseen concealed defects')
  await capture('measured-editor')
  await page.setViewportSize({ width: 1440, height: 1100 })
+ // Two pages share this browser; a resize can leave this one without window focus, so focus checks read "inactive".
+ await page.bringToFront()
  const measured = page.getByRole('form', { name: 'Prepare measured estimate revision', exact: true })
  await input('Unit selling price', 1).fill('invalid amount')
  await measured.getByRole('button', { name: 'Prepare measured estimate revision', exact: true }).click()
